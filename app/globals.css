@@ -1,26 +1,120 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  /* Core palette — light mode defaults */
+  --color-ink: #1A1A2E;
+  --color-ink-secondary: #6B6B80;
+  --color-ink-muted: #8E8EA0;
+  --color-ink-faint: #B0B0C0;
+
+  --color-page: #F8F9FB;
+  --color-surface: #FFFFFF;
+  --color-section: #F3F4F6;
+  --color-hover: #F0F1F5;
+
+  /* Borders */
+  --color-border-subtle: rgba(0, 0, 0, 0.04);
+  --color-border-default: rgba(0, 0, 0, 0.08);
+
+  /* On-ink: text that sits on bg-ink backgrounds */
+  --color-on-ink: #FFFFFF;
+
+  /* Accent — Contra purple/violet */
+  --color-accent: #A78BFA;
+  --color-accent-text: #FFFFFF;
+
+  /* Signal colors — vibrant palette */
+  --color-signal-blue: #F3E8FF;
+  --color-signal-blue-text: #A78BFA;
+  --color-signal-green: #ECFDF5;
+  --color-signal-green-text: #10B981;
+  --color-signal-red: #FEF2F2;
+  --color-signal-red-text: #EF4444;
+  --color-signal-slate: #F1F5F9;
+  --color-signal-slate-text: #64748B;
+
+  --color-linkedin: #0A66C2;
+
+  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
+
+  /* shadcn radius tokens */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+}
+
+/* Dark mode overrides */
+[data-theme="dark"] {
+  --color-ink: #E2E8F0;
+  --color-ink-secondary: #94A3B8;
+  --color-ink-muted: #64748B;
+  --color-ink-faint: #475569;
+
+  --color-page: #0F172A;
+  --color-surface: #1E293B;
+  --color-section: #1E293B;
+  --color-hover: #334155;
+
+  --color-border-subtle: rgba(255, 255, 255, 0.06);
+  --color-border-default: rgba(255, 255, 255, 0.1);
+
+  --color-on-ink: #0F172A;
+
+  --color-accent: #D8B4FE;
+  --color-accent-text: #0F172A;
+
+  --color-signal-blue: rgba(167, 139, 250, 0.15);
+  --color-signal-blue-text: #D8B4FE;
+  --color-signal-green: rgba(16, 185, 129, 0.15);
+  --color-signal-green-text: #34D399;
+  --color-signal-red: rgba(239, 68, 68, 0.15);
+  --color-signal-red-text: #F87171;
+  --color-signal-slate: rgba(100, 116, 139, 0.15);
+  --color-signal-slate-text: #94A3B8;
+
+  --color-linkedin: #D8B4FE;
+}
+
+/* Root variables for shadcn compatibility */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --radius: 0.625rem;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-size: 13px;
+  color: var(--color-ink);
+  background: var(--color-page);
+  font-family: var(--font-sans);
 }

@@ -1,0 +1,128 @@
+import type { AppSettingsSnapshot } from "@/lib/types/settings";
+
+function daysAgo(days: number) {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+}
+
+export const mockSettings: AppSettingsSnapshot = {
+  profile: {
+    fullName: "Yaseen Ahmed",
+    title: "Founder",
+    email: "yaseen@leadey.io",
+    phone: "+1 (415) 555-0191",
+    timezone: "America/Los_Angeles",
+    locale: "en-US",
+    twoFactorEnabled: true,
+    sessionTimeoutMinutes: 60,
+  },
+  organization: {
+    organizationName: "Leadey Labs",
+    website: "https://leadey.ai",
+    billingEmail: "finance@leadey.ai",
+    primaryDomain: "leadey.ai",
+    timezone: "America/Los_Angeles",
+    defaultCurrency: "USD",
+    ssoRequired: false,
+    ipAllowlistEnabled: false,
+  },
+  teamMembers: [
+    {
+      id: "tm_001",
+      name: "Yaseen Ahmed",
+      email: "yaseen@leadey.io",
+      role: "admin",
+      status: "active",
+      lastActive: daysAgo(0),
+    },
+    {
+      id: "tm_002",
+      name: "Amira Johnson",
+      email: "amira@leadey.io",
+      role: "manager",
+      status: "active",
+      lastActive: daysAgo(1),
+    },
+    {
+      id: "tm_003",
+      name: "Lucas Park",
+      email: "lucas@leadey.io",
+      role: "rep",
+      status: "active",
+      lastActive: daysAgo(0),
+    },
+    {
+      id: "tm_004",
+      name: "Nora Chen",
+      email: "nora@leadey.io",
+      role: "viewer",
+      status: "invited",
+      lastActive: null,
+    },
+  ],
+  billing: {
+    planName: "Growth",
+    monthlyPriceUsd: 499,
+    billingCycle: "monthly",
+    creditsIncludedMonthly: 25000,
+    creditsUsedThisMonth: 18240,
+    autoTopUpEnabled: true,
+    autoTopUpThreshold: 3000,
+    autoTopUpAmount: 5000,
+    paymentMethodLabel: "Visa •••• 4242",
+    nextInvoiceDate: new Date("2026-03-01T00:00:00Z"),
+  },
+  invoices: [
+    { id: "inv_2391", periodLabel: "Jan 2026", totalUsd: 499, status: "paid", issuedAt: new Date("2026-01-01T00:00:00Z") },
+    { id: "inv_2312", periodLabel: "Dec 2025", totalUsd: 499, status: "paid", issuedAt: new Date("2025-12-01T00:00:00Z") },
+    { id: "inv_2240", periodLabel: "Nov 2025", totalUsd: 499, status: "paid", issuedAt: new Date("2025-11-01T00:00:00Z") },
+  ],
+  notifications: {
+    criticalAlertsEmail: true,
+    weeklyDigestEmail: true,
+    highIntentSignalSlack: true,
+    scraperFailureSlack: true,
+    billingAlertsEmail: true,
+  },
+  integrations: [
+    {
+      id: "int_hubspot",
+      name: "HubSpot",
+      category: "crm",
+      connected: true,
+      connectedAccount: "growth@leadey.ai",
+      lastSyncAt: daysAgo(0),
+    },
+    {
+      id: "int_salesforce",
+      name: "Salesforce",
+      category: "crm",
+      connected: false,
+      connectedAccount: null,
+      lastSyncAt: null,
+    },
+    {
+      id: "int_bettercontact",
+      name: "BetterContact",
+      category: "enrichment",
+      connected: true,
+      connectedAccount: "api-key configured",
+      lastSyncAt: daysAgo(0),
+    },
+    {
+      id: "int_smartlead",
+      name: "Smartlead",
+      category: "sending",
+      connected: true,
+      connectedAccount: "leadey-prod-workspace",
+      lastSyncAt: daysAgo(0),
+    },
+    {
+      id: "int_slack",
+      name: "Slack",
+      category: "communication",
+      connected: true,
+      connectedAccount: "#revops-alerts",
+      lastSyncAt: daysAgo(2),
+    },
+  ],
+};
