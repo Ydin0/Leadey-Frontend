@@ -1,48 +1,37 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import { Search } from "lucide-react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { Search, MoreHorizontal, Phone, Mail } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
-import type { FunnelLead, FunnelLeadStatus } from "@/lib/types/funnel";
+import { advanceLead } from "@/lib/api/funnels";
+import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
+import { focusDataMap } from "@/lib/mock-data/funnel-focus";
+import { statusDot, statusLabel, TERMINAL_STATUSES } from "@/lib/utils/lead-status";
+import type { FunnelLead } from "@/lib/types/funnel";
+import type { LeadStatus } from "@/lib/types/funnel-focus";
 
 interface FunnelLeadTableProps {
   leads: FunnelLead[];
+  funnelId: string;
+  onLeadAdvanced?: () => void;
+  onLeadClick?: (leadIndex: number) => void;
 }
 
 const PAGE_SIZE = 10;
 
-type FilterKey = "all" | "sent" | "opened" | "replied" | "bounced" | "completed";
+type FilterKey = "all" | "active" | "no_answer" | "interested" | "dnc" | "completed";
 
 const filters: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "sent", label: "Active" },
-  { key: "opened", label: "Opened" },
-  { key: "replied", label: "Replied" },
-  { key: "bounced", label: "Bounced" },
+  { key: "active", label: "Active" },
+  { key: "no_answer", label: "No Answer" },
+  { key: "interested", label: "Interested" },
+  { key: "dnc", label: "DNC" },
   { key: "completed", label: "Completed" },
 ];
 
-const statusDot: Record<FunnelLeadStatus, string> = {
-  pending: "bg-ink-faint",
-  sent: "bg-signal-blue-text",
-  opened: "bg-signal-blue-text",
-  clicked: "bg-signal-blue-text",
-  replied: "bg-signal-green-text",
-  bounced: "bg-signal-red-text",
-  completed: "bg-signal-green-text",
-};
-
-const statusLabel: Record<FunnelLeadStatus, string> = {
-  pending: "Pending",
-  sent: "Sent",
-  opened: "Opened",
-  clicked: "Clicked",
-  replied: "Replied",
-  bounced: "Bounced",
-  completed: "Completed",
-};
 
 function ProgressDots({ current, total }: { current: number; total: number }) {
   return (
@@ -61,7 +50,81 @@ function ProgressDots({ current, total }: { current: number; total: number }) {
   );
 }
 
-export function FunnelLeadTable({ leads }: FunnelLeadTableProps) {
+
+const actionOptions: { outcome: string; label: string }[] = [
+  { outcome: "contacted", label: "Mark Contacted" },
+  { outcome: "no_answer", label: "Mark No Answer" },
+  { outcome: "interested", label: "Mark Interested" },
+  { outcome: "bounced", label: "Mark Bounced" },
+];
+
+function LeadActionMenu({
+  lead,
+  funnelId,
+  onAdvanced,
+}: {
+  lead: FunnelLead;
+  funnelId: string;
+  onAdvanced?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  const handleAdvance = useCallback(async (outcome: string) => {
+    setLoading(true);
+    try {
+      await advanceLead(funnelId, lead.id, outcome);
+      onAdvanced?.();
+    } catch {
+      // silently fail — user can retry
+    } finally {
+      setLoading(false);
+      setOpen(false);
+    }
+  }, [funnelId, lead.id, onAdvanced]);
+
+  if (TERMINAL_STATUSES.has(lead.status)) {
+    return <span className="text-[10px] text-ink-faint">&mdash;</span>;
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        disabled={loading}
+        className="p-1 rounded-md hover:bg-section transition-colors text-ink-muted hover:text-ink disabled:opacity-50"
+      >
+        <MoreHorizontal size={14} strokeWidth={1.5} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+          {actionOptions.map((opt) => (
+            <button
+              key={opt.outcome}
+              onClick={(e) => { e.stopPropagation(); void handleAdvance(opt.outcome); }}
+              disabled={loading}
+              className="w-full text-left px-3 py-1.5 text-[11px] text-ink-secondary hover:bg-hover hover:text-ink transition-colors disabled:opacity-50"
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }: FunnelLeadTableProps) {
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -70,10 +133,16 @@ export function FunnelLeadTable({ leads }: FunnelLeadTableProps) {
   const filtered = useMemo(() => {
     let result = leads;
     if (activeFilter !== "all") {
-      if (activeFilter === "sent") {
-        result = result.filter((l) => ["sent", "opened", "clicked", "pending"].includes(l.status));
-      } else {
-        result = result.filter((l) => l.status === activeFilter);
+      if (activeFilter === "active") {
+        result = result.filter((l) => ["new", "contacted", "callback"].includes(l.status));
+      } else if (activeFilter === "no_answer") {
+        result = result.filter((l) => l.status === "no_answer");
+      } else if (activeFilter === "interested") {
+        result = result.filter((l) => ["interested", "qualified"].includes(l.status));
+      } else if (activeFilter === "dnc") {
+        result = result.filter((l) => ["dnc", "not_interested", "competitor"].includes(l.status));
+      } else if (activeFilter === "completed") {
+        result = result.filter((l) => l.status === "completed");
       }
     }
     if (search) {
@@ -86,14 +155,19 @@ export function FunnelLeadTable({ leads }: FunnelLeadTableProps) {
       );
     }
 
-    const statusPriority: Record<FunnelLeadStatus, number> = {
-      pending: 0,
-      sent: 1,
-      opened: 2,
-      clicked: 3,
-      replied: 4,
-      bounced: 5,
-      completed: 6,
+    const statusPriority: Record<LeadStatus, number> = {
+      new: 0,
+      contacted: 1,
+      no_answer: 2,
+      callback: 3,
+      interested: 4,
+      not_interested: 5,
+      other_contact: 6,
+      competitor: 7,
+      dnc: 8,
+      qualified: 9,
+      bounced: 10,
+      completed: 11,
     };
 
     return [...result].sort((a, b) => {
@@ -120,6 +194,12 @@ export function FunnelLeadTable({ leads }: FunnelLeadTableProps) {
     const allSelected = filtered.every((l) => selectedIds.has(l.id));
     if (allSelected) setSelectedIds(new Set());
     else setSelectedIds(new Set(filtered.map((l) => l.id)));
+  }
+
+  function handleRowClick(lead: FunnelLead) {
+    if (!onLeadClick) return;
+    const absoluteIndex = leads.findIndex((l) => l.id === lead.id);
+    if (absoluteIndex !== -1) onLeadClick(absoluteIndex);
   }
 
   const allSelected = filtered.length > 0 && filtered.every((l) => selectedIds.has(l.id));
@@ -164,68 +244,106 @@ export function FunnelLeadTable({ leads }: FunnelLeadTableProps) {
               <TableHead className="w-8 px-3">
                 <input type="checkbox" className="rounded" checked={allSelected} onChange={toggleSelectAll} />
               </TableHead>
-              <TableHead className="text-left">Lead</TableHead>
-              <TableHead className="text-left">Email</TableHead>
+              <TableHead className="text-left">Name</TableHead>
+              <TableHead className="text-left">Contacts</TableHead>
               <TableHead className="text-center">Step</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-left">Next Action</TableHead>
               <TableHead className="text-left">Due</TableHead>
               <TableHead className="text-left">Source</TableHead>
+              <TableHead className="w-12 text-center">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginated.map((lead) => (
-              <TableRow key={lead.id}>
-                <TableCell className="w-8 px-3">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.has(lead.id)}
-                    onChange={() => toggleSelect(lead.id)}
-                    className="rounded"
-                  />
-                </TableCell>
-                <TableCell>
-                  <div>
-                    <div className="text-[12px] font-medium text-ink">{lead.name}</div>
-                    <div className="text-[10px] text-ink-muted">{lead.title} at {lead.company}</div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <span className="text-[11px] text-ink-secondary">{lead.email}</span>
-                </TableCell>
-                <TableCell className="text-center">
-                  <ProgressDots current={lead.currentStep} total={lead.totalSteps} />
-                </TableCell>
-                <TableCell className="text-center">
-                  <div className="flex items-center justify-center gap-1.5">
-                    <div className={cn("w-1.5 h-1.5 rounded-full", statusDot[lead.status])} />
-                    <span className="text-[11px] text-ink-secondary">{statusLabel[lead.status]}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <span className="text-[10px] font-medium rounded-full px-2 py-0.5 bg-section text-ink-secondary">
-                    {lead.nextAction}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  {(() => {
-                    const isOverdue =
-                      lead.nextDate.getTime() < Date.now() &&
-                      ["pending", "sent", "opened", "clicked"].includes(lead.status);
+            {paginated.map((lead) => {
+              const focusData = focusDataMap[lead.id];
+              const contactCount = focusData?.contacts.length ?? 0;
+              const primaryContact = focusData?.contacts.find((c) => c.isPrimary);
 
-                    return (
-                      <span className={cn("text-[11px]", isOverdue ? "text-signal-red-text" : "text-ink-muted")}>
-                        {lead.nextDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                        {isOverdue ? " · overdue" : ""}
-                      </span>
-                    );
-                  })()}
-                </TableCell>
-                <TableCell>
-                  <span className="text-[10px] text-ink-muted">{lead.source}</span>
-                </TableCell>
-              </TableRow>
-            ))}
+              return (
+                <TableRow
+                  key={lead.id}
+                  className={cn(onLeadClick && "cursor-pointer hover:bg-hover")}
+                  onClick={() => handleRowClick(lead)}
+                >
+                  <TableCell className="w-8 px-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(lead.id)}
+                      onChange={() => toggleSelect(lead.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="rounded"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2.5">
+                      <CompanyAvatar name={lead.company} size="md" domain={lead.companyDomain || lead.email?.split("@")[1]} />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "text-[12px] font-medium",
+                            onLeadClick ? "text-signal-blue-text" : "text-ink"
+                          )}>
+                            {lead.company}
+                          </span>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {lead.phone && (
+                              <Phone size={12} strokeWidth={1.5} className="text-ink-faint hover:text-ink" />
+                            )}
+                            <Mail size={12} strokeWidth={1.5} className="text-ink-faint hover:text-ink" />
+                          </div>
+                        </div>
+                        <div className="text-[10px] text-ink-muted">{lead.name} &middot; {lead.title}</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-[11px] text-ink-secondary">
+                      {primaryContact?.name ?? lead.name}
+                      {contactCount > 1 && (
+                        <span className="ml-1 text-[9px] font-medium rounded-full px-1.5 py-0.5 bg-section text-ink-muted">
+                          +{contactCount - 1}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <ProgressDots current={lead.currentStep} total={lead.totalSteps} />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <div className={cn("w-1.5 h-1.5 rounded-full", statusDot[lead.status])} />
+                      <span className="text-[11px] text-ink-secondary">{statusLabel[lead.status]}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-[10px] font-medium rounded-full px-2 py-0.5 bg-section text-ink-secondary">
+                      {lead.nextAction}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const isOverdue =
+                        lead.nextDate.getTime() < Date.now() &&
+                        ["new", "contacted", "callback", "no_answer"].includes(lead.status);
+
+                      return (
+                        <span className={cn("text-[11px]", isOverdue ? "text-signal-red-text" : "text-ink-muted")}>
+                          {lead.nextDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                          {isOverdue ? " \u00b7 overdue" : ""}
+                        </span>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-[10px] text-ink-muted">{lead.source}</span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <LeadActionMenu lead={lead} funnelId={funnelId} onAdvanced={onLeadAdvanced} />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
         {filtered.length === 0 && (

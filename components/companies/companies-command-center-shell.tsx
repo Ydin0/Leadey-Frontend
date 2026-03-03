@@ -145,7 +145,7 @@ function MetricCard({
   icon: typeof Building2;
 }) {
   return (
-    <div className="rounded-[12px] border border-border-subtle bg-surface p-3">
+    <div className="rounded-[14px] border border-border-subtle bg-surface p-3">
       <div className="flex items-center justify-between">
         <p className="text-[10px] uppercase tracking-wider text-ink-faint">{label}</p>
         <Icon size={14} strokeWidth={1.8} className="text-ink-muted" />

@@ -1,22 +1,20 @@
+import type { LeadStatus } from "./funnel-focus";
+
+export type { LeadStatus };
+
 export type FunnelStatus = "active" | "paused" | "draft";
 
-export type FunnelChannel = "email" | "linkedin" | "call";
+export type FunnelChannel = "email" | "linkedin" | "call" | "whatsapp";
 
 export interface FunnelStep {
   id: string;
   channel: FunnelChannel;
   label: string;
   dayOffset: number;
+  subject?: string;
+  emailBody?: string;
+  action?: string;
 }
-
-export type FunnelLeadStatus =
-  | "pending"
-  | "sent"
-  | "opened"
-  | "clicked"
-  | "replied"
-  | "bounced"
-  | "completed";
 
 export interface FunnelSource {
   type: "csv" | "signals" | "webhook" | "companies";
@@ -41,11 +39,16 @@ export interface FunnelLead {
   email: string;
   currentStep: number;
   totalSteps: number;
-  status: FunnelLeadStatus;
+  status: LeadStatus;
   nextAction: string;
   nextDate: Date;
   source: string;
   score: number;
+  phone?: string | null;
+  companyDomain?: string;
+  notes?: Record<string, string>;
+  linkedinUrl?: string;
+  unipileProviderId?: string | null;
 }
 
 export interface FunnelAnalyticsStep {
@@ -58,14 +61,31 @@ export interface FunnelAnalyticsStep {
   replyRate: number;
 }
 
+export interface LinkedInActionProgress {
+  completed: number;
+  limit: number;
+  totalPending: number;
+}
+
 export interface CockpitLinkedInItem {
+  id: string;
+  leadId: string;
+  name: string;
+  title: string;
+  company: string;
+  type: "view" | "connect" | "message";
+  action?: string;
+  message: string;
+  profileUrl: string;
+}
+
+export interface CockpitWhatsAppItem {
   id: string;
   name: string;
   title: string;
   company: string;
-  type: "connect" | "message";
+  phone: string;
   message: string;
-  profileUrl: string;
 }
 
 export interface CockpitCallItem {
@@ -92,8 +112,16 @@ export interface CockpitEmailSummary {
 
 export interface FunnelCockpit {
   linkedin: CockpitLinkedInItem[];
+  linkedinProgress: Record<string, LinkedInActionProgress>;
   calls: CockpitCallItem[];
+  whatsapp: CockpitWhatsAppItem[];
   email: CockpitEmailSummary;
+}
+
+export interface FunnelMember {
+  teamMemberId: string;
+  role: "owner" | "contributor" | "viewer";
+  addedAt: Date;
 }
 
 export interface Funnel {
@@ -107,5 +135,6 @@ export interface Funnel {
   leads: FunnelLead[];
   cockpit: FunnelCockpit;
   analyticsSteps: FunnelAnalyticsStep[];
+  members: FunnelMember[];
   createdAt: Date;
 }

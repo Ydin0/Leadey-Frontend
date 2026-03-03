@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   GitFork,
+  Radio,
   Target,
   Building2,
   Download,
@@ -12,6 +13,7 @@ import {
   Mail,
   Sparkles,
   Coins,
+  Briefcase,
 } from "lucide-react";
 import type {
   NavItem,
@@ -27,7 +29,9 @@ import type {
 // ── Navigation ──────────────────────────────────────────────
 export const navItems: NavItem[] = [
   { id: "cockpit", label: "Cockpit", icon: LayoutDashboard, href: "/dashboard", badge: 14 },
-  { id: "funnels", label: "Funnels", icon: GitFork, href: "/dashboard/funnels" },
+  { id: "funnels", label: "Funnels", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
+  { id: "opportunities", label: "Opportunities", icon: Briefcase, href: "/dashboard/opportunities" },
+  { id: "channels", label: "Channels", icon: Radio, href: "/dashboard/channels" },
   { id: "icps", label: "ICPs", icon: Target, href: "/dashboard/icps" },
   { id: "companies", label: "Companies", icon: Building2, href: "/dashboard/companies" },
   { id: "exports", label: "Exports", icon: Download, href: "/dashboard/exports" },

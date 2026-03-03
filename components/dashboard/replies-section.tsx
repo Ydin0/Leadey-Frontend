@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Linkedin, ChevronDown, ChevronUp, Clock, ExternalLink } from "lucide-react";
+import { Mail, Linkedin, MessageSquare, ChevronDown, ChevronUp, Clock, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
 import { mockReplies } from "@/lib/mock-data";
@@ -26,6 +26,8 @@ function ReplyCard({ reply, onAction }: { reply: Reply; onAction: (id: string, a
               <span className="text-[13px] font-medium text-ink truncate">{reply.contact.name}</span>
               {reply.channel === "email" ? (
                 <Mail size={13} strokeWidth={1.5} className="text-ink-muted shrink-0" />
+              ) : reply.channel === "whatsapp" ? (
+                <MessageSquare size={13} strokeWidth={1.5} className="text-signal-green-text shrink-0" />
               ) : (
                 <Linkedin size={13} strokeWidth={1.5} className="text-linkedin shrink-0" />
               )}

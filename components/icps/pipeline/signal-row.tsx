@@ -35,7 +35,7 @@ export function SignalRow({ signal, selected, onSelect }: SignalRowProps) {
                 : "border-border-default hover:border-signal-blue-text/50"
             )}
           >
-            {selected && <Check size={10} strokeWidth={2.5} className="text-white" />}
+            {selected && <Check size={10} strokeWidth={2.5} className="text-on-ink" />}
           </button>
         )}
       </div>

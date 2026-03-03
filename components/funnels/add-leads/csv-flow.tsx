@@ -16,6 +16,7 @@ const FIELD_OPTIONS = [
   "Title",
   "Phone",
   "LinkedIn URL",
+  "Notes",
   "--- Skip ---",
 ] as const;
 
@@ -290,12 +291,14 @@ export function CSVFlow({
                       <span
                         className={cn(
                           "text-[10px] font-medium rounded-full px-2 py-0.5",
-                          mapping.autoMapped
-                            ? "bg-signal-green text-signal-green-text"
-                            : "bg-signal-blue text-signal-blue-text"
+                          mapping.mappedField === "Notes"
+                            ? "bg-signal-slate text-signal-slate-text"
+                            : mapping.autoMapped
+                              ? "bg-signal-green text-signal-green-text"
+                              : "bg-signal-blue text-signal-blue-text"
                         )}
                       >
-                        {mapping.autoMapped ? "Auto" : "Manual"}
+                        {mapping.mappedField === "Notes" ? "Context" : mapping.autoMapped ? "Auto" : "Manual"}
                       </span>
                     )}
                   </td>

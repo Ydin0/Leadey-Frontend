@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, X, Mail, Linkedin, Phone } from "lucide-react";
+import { Plus, X, Mail, Linkedin, Phone, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FunnelStep, FunnelChannel } from "@/lib/types/funnel";
 
@@ -8,6 +8,13 @@ const channels: { value: FunnelChannel; icon: typeof Mail; label: string }[] = [
   { value: "email", icon: Mail, label: "Email" },
   { value: "linkedin", icon: Linkedin, label: "LinkedIn" },
   { value: "call", icon: Phone, label: "Call" },
+  { value: "whatsapp", icon: MessageSquare, label: "WhatsApp" },
+];
+
+const linkedinActions: { value: string; label: string }[] = [
+  { value: "view_profile", label: "View Profile" },
+  { value: "send_connection", label: "Send Connection" },
+  { value: "send_message", label: "Send Message" },
 ];
 
 interface FunnelStepsStepProps {
@@ -60,7 +67,7 @@ export function FunnelStepsStep({ steps, onChange }: FunnelStepsStepProps) {
               {channels.map((ch) => (
                 <button
                   key={ch.value}
-                  onClick={() => updateStep(index, { channel: ch.value })}
+                  onClick={() => updateStep(index, { channel: ch.value, action: undefined })}
                   className={cn(
                     "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-medium transition-colors",
                     step.channel === ch.value
@@ -73,6 +80,26 @@ export function FunnelStepsStep({ steps, onChange }: FunnelStepsStepProps) {
                 </button>
               ))}
             </div>
+
+            {/* LinkedIn Action Picker */}
+            {step.channel === "linkedin" && (
+              <div className="flex items-center gap-1 mb-3">
+                {linkedinActions.map((la) => (
+                  <button
+                    key={la.value}
+                    onClick={() => updateStep(index, { action: la.value })}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-[10px] font-medium transition-colors",
+                      (step.action || "send_connection") === la.value
+                        ? "bg-signal-blue text-signal-blue-text"
+                        : "bg-section text-ink-muted hover:text-ink-secondary"
+                    )}
+                  >
+                    {la.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
             <div className="grid grid-cols-[1fr_auto] gap-3">
               {/* Label */}
@@ -98,6 +125,66 @@ export function FunnelStepsStep({ steps, onChange }: FunnelStepsStepProps) {
                 />
               </div>
             </div>
+
+            {/* Email subject + body (only for email channel) */}
+            {step.channel === "email" && (
+              <div className="mt-3 space-y-2">
+                <div>
+                  <label className="text-[10px] text-ink-muted block mb-1">Subject Line</label>
+                  <input
+                    type="text"
+                    value={step.subject || ""}
+                    onChange={(e) => updateStep(index, { subject: e.target.value })}
+                    placeholder="e.g. Quick question about {{company_name}}"
+                    className="w-full px-3 py-1.5 rounded-[8px] bg-section border border-border-subtle text-[11px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-ink-muted block mb-1">Email Body</label>
+                  <textarea
+                    rows={5}
+                    value={step.emailBody || ""}
+                    onChange={(e) => updateStep(index, { emailBody: e.target.value })}
+                    placeholder="Write your email content here..."
+                    className="w-full px-3 py-1.5 rounded-[8px] bg-section border border-border-subtle text-[11px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default resize-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* LinkedIn message (for send_connection / send_message) */}
+            {step.channel === "linkedin" && (step.action || "send_connection") !== "view_profile" && (
+              <div className="mt-3">
+                <label className="text-[10px] text-ink-muted block mb-1">
+                  {(step.action || "send_connection") === "send_connection" ? "Connection Note" : "Message"}
+                </label>
+                <textarea
+                  rows={3}
+                  value={step.emailBody || ""}
+                  onChange={(e) => updateStep(index, { emailBody: e.target.value })}
+                  placeholder={
+                    (step.action || "send_connection") === "send_connection"
+                      ? "Hi {{first_name}}, would love to connect..."
+                      : "Write your LinkedIn message here..."
+                  }
+                  className="w-full px-3 py-1.5 rounded-[8px] bg-section border border-border-subtle text-[11px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default resize-none"
+                />
+              </div>
+            )}
+
+            {/* WhatsApp message */}
+            {step.channel === "whatsapp" && (
+              <div className="mt-3">
+                <label className="text-[10px] text-ink-muted block mb-1">Message Template</label>
+                <textarea
+                  rows={3}
+                  value={step.emailBody || ""}
+                  onChange={(e) => updateStep(index, { emailBody: e.target.value })}
+                  placeholder="Hi {{first_name}}, reaching out about..."
+                  className="w-full px-3 py-1.5 rounded-[8px] bg-section border border-border-subtle text-[11px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default resize-none"
+                />
+              </div>
+            )}
           </div>
         ))}
       </div>

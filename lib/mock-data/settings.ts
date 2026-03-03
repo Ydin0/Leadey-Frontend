@@ -33,6 +33,11 @@ export const mockSettings: AppSettingsSnapshot = {
       role: "admin",
       status: "active",
       lastActive: daysAgo(0),
+      linkedinConnected: true,
+      linkedinAccountName: "Yaseen Aslam",
+      linkedinDailyLimit: 80,
+      linkedinDailyUsed: 34,
+      linkedinLastSync: daysAgo(0),
     },
     {
       id: "tm_002",
@@ -41,6 +46,11 @@ export const mockSettings: AppSettingsSnapshot = {
       role: "manager",
       status: "active",
       lastActive: daysAgo(1),
+      linkedinConnected: true,
+      linkedinAccountName: "Amira Mehdi",
+      linkedinDailyLimit: 60,
+      linkedinDailyUsed: 52,
+      linkedinLastSync: daysAgo(0),
     },
     {
       id: "tm_003",
@@ -49,6 +59,7 @@ export const mockSettings: AppSettingsSnapshot = {
       role: "rep",
       status: "active",
       lastActive: daysAgo(0),
+      linkedinConnected: false,
     },
     {
       id: "tm_004",
@@ -57,6 +68,7 @@ export const mockSettings: AppSettingsSnapshot = {
       role: "viewer",
       status: "invited",
       lastActive: null,
+      linkedinConnected: false,
     },
   ],
   billing: {
@@ -115,6 +127,14 @@ export const mockSettings: AppSettingsSnapshot = {
       connected: true,
       connectedAccount: "leadey-prod-workspace",
       lastSyncAt: daysAgo(0),
+    },
+    {
+      id: "int_unipile",
+      name: "Unipile (LinkedIn)",
+      category: "sending",
+      connected: false,
+      connectedAccount: null,
+      lastSyncAt: null,
     },
     {
       id: "int_slack",

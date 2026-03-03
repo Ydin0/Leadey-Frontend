@@ -19,6 +19,12 @@ export function formatRelativeTime(date: Date): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+export function formatCallDuration(seconds: number): string {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
 export function formatPhoneNumber(phone: string): string {
   const cleaned = phone.replace(/\D/g, "");
   if (cleaned.length === 10) {

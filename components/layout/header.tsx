@@ -1,10 +1,12 @@
 "use client";
 
 import { Search } from "lucide-react";
+import { UserButton } from "@clerk/nextjs";
 import { quickStats } from "@/lib/mock-data";
 import { QuickStatChip } from "@/components/dashboard/quick-stat-chip";
 import { NotificationDropdown } from "@/components/dashboard/notification-dropdown";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { DialerDropdown } from "@/components/calling/dialer/dialer-dropdown";
 
 export function Header() {
   return (
@@ -29,8 +31,14 @@ export function Header() {
       {/* Theme Toggle */}
       <ThemeToggle />
 
+      {/* Phone Dialer */}
+      <DialerDropdown />
+
       {/* Notifications */}
       <NotificationDropdown />
+
+      {/* User Menu */}
+      <UserButton afterSignOutUrl="/sign-in" />
     </header>
   );
 }

@@ -23,7 +23,7 @@ export function FunnelWizardShell() {
   const [description, setDescription] = useState("");
   const [funnelSteps, setFunnelSteps] = useState<FunnelStep[]>([
     { id: "default_1", channel: "email", label: "Intro Email", dayOffset: 0 },
-    { id: "default_2", channel: "linkedin", label: "LinkedIn Connect", dayOffset: 2 },
+    { id: "default_2", channel: "linkedin", label: "LinkedIn Connect", dayOffset: 2, action: "send_connection" },
     { id: "default_3", channel: "email", label: "Follow-up Email", dayOffset: 5 },
   ]);
   const [selectedSources, setSelectedSources] = useState<("csv" | "signals" | "webhook" | "companies")[]>([]);
@@ -53,6 +53,9 @@ export function FunnelWizardShell() {
           channel: step.channel,
           label: step.label,
           dayOffset: step.dayOffset,
+          subject: step.subject,
+          emailBody: step.emailBody,
+          action: step.action,
         })),
         sourceTypes: selectedSources,
       });

@@ -8,7 +8,7 @@ export interface Reply {
     avatarUrl?: string;
   };
   company: string;
-  channel: "email" | "linkedin";
+  channel: "email" | "linkedin" | "whatsapp";
   message: string;
   timestamp: Date;
   status: "unhandled" | "interested" | "not_interested" | "snoozed";
@@ -95,10 +95,18 @@ export interface Notification {
   type: "reply" | "signal" | "system" | "sequence" | "alert";
 }
 
+export interface NavSubItem {
+  id: string;
+  label: string;
+  href: string;
+  status?: "active" | "paused" | "draft";
+}
+
 export interface NavItem {
   id: string;
   label: string;
   icon: LucideIcon;
   href: string;
   badge?: number;
+  dynamicChildren?: boolean;
 }

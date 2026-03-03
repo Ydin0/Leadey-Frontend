@@ -212,15 +212,15 @@ export function ScraperActiveRow({
       {expanded && (
         <div className="px-4 py-4 border-t border-border-subtle bg-section/30 space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-            <div className="rounded-[12px] border border-border-subtle bg-surface px-3 py-2">
+            <div className="rounded-[14px] border border-border-subtle bg-surface px-3 py-2">
               <p className="text-[10px] text-ink-faint uppercase tracking-wider">Estimated Daily Credits</p>
               <p className="text-[14px] text-ink font-semibold mt-1">{estimate.creditsPerDay}</p>
             </div>
-            <div className="rounded-[12px] border border-border-subtle bg-surface px-3 py-2">
+            <div className="rounded-[14px] border border-border-subtle bg-surface px-3 py-2">
               <p className="text-[10px] text-ink-faint uppercase tracking-wider">Estimated Daily Signals</p>
               <p className="text-[14px] text-ink font-semibold mt-1">{estimate.signalsPerDay}</p>
             </div>
-            <div className="rounded-[12px] border border-border-subtle bg-surface px-3 py-2">
+            <div className="rounded-[14px] border border-border-subtle bg-surface px-3 py-2">
               <p className="text-[10px] text-ink-faint uppercase tracking-wider">Credits Per Run</p>
               <p className="text-[14px] text-ink font-semibold mt-1">{estimate.creditsPerRun}</p>
             </div>
@@ -288,7 +288,7 @@ export function ScraperActiveRow({
                       <div
                         key={source}
                         className={cn(
-                          "rounded-[12px] border px-3 py-2 transition-colors",
+                          "rounded-[14px] border px-3 py-2 transition-colors",
                           selected
                             ? "bg-signal-blue/10 border-signal-blue-text/40"
                             : "bg-surface border-border-subtle"
@@ -306,7 +306,7 @@ export function ScraperActiveRow({
                             )}
                           >
                             {selected && (
-                              <Check size={11} strokeWidth={2.5} className="text-white" />
+                              <Check size={11} strokeWidth={2.5} className="text-on-ink" />
                             )}
                           </button>
                           <SourceSitePill source={source} selected={selected} />

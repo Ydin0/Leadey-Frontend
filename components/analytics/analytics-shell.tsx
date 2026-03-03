@@ -10,6 +10,7 @@ import {
   GitFork,
   Goal,
   Mail,
+  MessageSquare,
   Phone,
   Radio,
   Sparkles,
@@ -85,6 +86,7 @@ function sectionCard(title: string, description?: string) {
 function channelIcon(channel: ChannelAnalytics["channel"]) {
   if (channel === "email") return Mail;
   if (channel === "linkedin") return Radio;
+  if (channel === "whatsapp") return MessageSquare;
   return Phone;
 }
 
@@ -105,7 +107,7 @@ function KpiCard({ label, value, changePct }: KpiCardProps) {
   const up = changePct >= 0;
   const TrendIcon = up ? TrendingUp : TrendingDown;
   return (
-    <div className="rounded-[12px] border border-border-subtle bg-surface px-3 py-3">
+    <div className="rounded-[14px] border border-border-subtle bg-surface px-3 py-3">
       <p className="text-[10px] uppercase tracking-wider text-ink-faint">{label}</p>
       <div className="flex items-center justify-between mt-1">
         <p className="text-[16px] font-semibold text-ink">{value}</p>
@@ -210,7 +212,7 @@ function ChannelPerformanceGrid({
           return (
             <div
               key={channel.channel}
-              className="rounded-[12px] border border-border-subtle bg-section/40 px-3 py-3"
+              className="rounded-[14px] border border-border-subtle bg-section/40 px-3 py-3"
             >
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-7 h-7 rounded-full bg-section flex items-center justify-center">
@@ -292,7 +294,7 @@ function SourceEfficiencyTable({
           return (
             <div
               key={source.source}
-              className="rounded-[12px] border border-border-subtle bg-section/40 px-3 py-3"
+              className="rounded-[14px] border border-border-subtle bg-section/40 px-3 py-3"
             >
               <div className="flex items-center gap-2 mb-2">
                 <span className="w-7 h-7 rounded-full bg-section flex items-center justify-center">
@@ -542,25 +544,25 @@ export function AnalyticsShell() {
         <section className="rounded-[14px] border border-border-subtle bg-surface p-4">
           {sectionCard("Rep Snapshot", "Your performance contribution for selected period.")}
           <div className="mt-3 grid grid-cols-1 md:grid-cols-4 gap-3">
-            <div className="rounded-[12px] border border-border-subtle bg-section/40 px-3 py-3">
+            <div className="rounded-[14px] border border-border-subtle bg-section/40 px-3 py-3">
               <p className="text-[10px] text-ink-faint uppercase tracking-wider">Meetings</p>
               <p className="text-[14px] font-semibold text-ink mt-1">
                 {val(period, teamRows[0]?.meetingsBooked ?? { "7d": 0, "30d": 0, "90d": 0 })}
               </p>
             </div>
-            <div className="rounded-[12px] border border-border-subtle bg-section/40 px-3 py-3">
+            <div className="rounded-[14px] border border-border-subtle bg-section/40 px-3 py-3">
               <p className="text-[10px] text-ink-faint uppercase tracking-wider">Reply Rate</p>
               <p className="text-[14px] font-semibold text-ink mt-1">
                 {val(period, teamRows[0]?.replyRatePct ?? { "7d": 0, "30d": 0, "90d": 0 }).toFixed(1)}%
               </p>
             </div>
-            <div className="rounded-[12px] border border-border-subtle bg-section/40 px-3 py-3">
+            <div className="rounded-[14px] border border-border-subtle bg-section/40 px-3 py-3">
               <p className="text-[10px] text-ink-faint uppercase tracking-wider">Response SLA</p>
               <p className="text-[14px] font-semibold text-ink mt-1">
                 {formatNumber(val(period, teamRows[0]?.avgResponseMinutes ?? { "7d": 0, "30d": 0, "90d": 0 }))} min
               </p>
             </div>
-            <div className="rounded-[12px] border border-border-subtle bg-section/40 px-3 py-3">
+            <div className="rounded-[14px] border border-border-subtle bg-section/40 px-3 py-3">
               <p className="text-[10px] text-ink-faint uppercase tracking-wider">Pipeline</p>
               <p className="text-[14px] font-semibold text-ink mt-1">
                 {formatCurrency(val(period, teamRows[0]?.pipelineGeneratedUsd ?? { "7d": 0, "30d": 0, "90d": 0 }))}

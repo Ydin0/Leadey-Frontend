@@ -64,7 +64,7 @@ export function EnrichmentSelector({ departments, onEnrich }: EnrichmentSelector
                       "w-4 h-4 rounded border flex items-center justify-center transition-colors",
                       isSelected ? "bg-signal-blue-text border-signal-blue-text" : "border-border-default"
                     )}>
-                      {isSelected && <span className="text-[10px] text-white font-bold">&#10003;</span>}
+                      {isSelected && <span className="text-[10px] text-on-ink font-bold">&#10003;</span>}
                     </div>
                     <span className="text-[11px] text-ink">{dept.department} {level.label}</span>
                   </button>

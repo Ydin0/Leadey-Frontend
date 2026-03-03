@@ -49,7 +49,7 @@ export function ScraperActiveList({
             {Array.from(categoryTotals.entries()).map(([category, totals]) => (
               <div
                 key={category}
-                className="rounded-[12px] border border-border-subtle bg-surface px-3 py-2"
+                className="rounded-[14px] border border-border-subtle bg-surface px-3 py-2"
               >
                 <p className="text-[10px] text-ink-faint capitalize">{category}</p>
                 <p className="text-[12px] font-medium text-ink mt-1">

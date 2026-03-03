@@ -29,6 +29,11 @@ export interface TeamMemberSettings {
   role: TeamRole;
   status: "active" | "invited" | "suspended";
   lastActive: Date | null;
+  linkedinConnected: boolean;
+  linkedinAccountName?: string;
+  linkedinDailyLimit?: number;
+  linkedinDailyUsed?: number;
+  linkedinLastSync?: Date;
 }
 
 export interface BillingSettings {

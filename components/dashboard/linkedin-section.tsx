@@ -53,7 +53,7 @@ function LinkedInCard({
             onBlur={() => setEditing(false)}
             autoFocus
             rows={3}
-            className="w-full text-[12px] text-ink-secondary leading-relaxed bg-section rounded-lg p-2 outline-none resize-none border border-border-subtle focus:border-ink-faint"
+            className="w-full text-[12px] text-ink-secondary leading-relaxed bg-section rounded-lg p-2 outline-none resize-none border border-border-subtle focus:border-border-default"
           />
         ) : (
           <p
@@ -72,7 +72,7 @@ function LinkedInCard({
           href={item.profileUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-linkedin text-white text-[11px] font-medium hover:bg-linkedin/90 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-linkedin text-on-ink text-[11px] font-medium hover:bg-linkedin/90 transition-colors"
         >
           <ExternalLink size={12} strokeWidth={1.5} />
           Open on LinkedIn

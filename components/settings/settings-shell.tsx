@@ -5,6 +5,8 @@ import {
   Bell,
   Building2,
   CreditCard,
+  Linkedin,
+  Phone,
   PlugZap,
   Save,
   Shield,
@@ -15,6 +17,10 @@ import {
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { mockSettings } from "@/lib/mock-data/settings";
+import { SmartleadIntegration } from "./smartlead-integration";
+import { UnipileIntegration } from "./unipile-integration";
+import { PhoneLinesTab } from "@/components/calling/settings/phone-lines-tab";
+import { LinkedInTeamTab } from "./linkedin-team-tab";
 import type {
   AppSettingsSnapshot,
   IntegrationSettings,
@@ -26,6 +32,8 @@ type SettingsTab =
   | "profile"
   | "organization"
   | "team"
+  | "phone-lines"
+  | "linkedin"
   | "billing"
   | "notifications"
   | "integrations";
@@ -34,6 +42,8 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "profile", label: "Profile", icon: UserCircle2 },
   { id: "organization", label: "Organization", icon: Building2 },
   { id: "team", label: "Team", icon: Users },
+  { id: "phone-lines", label: "Phone Lines", icon: Phone },
+  { id: "linkedin", label: "LinkedIn", icon: Linkedin },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "integrations", label: "Integrations", icon: PlugZap },
@@ -235,6 +245,7 @@ export function SettingsShell() {
           role: inviteRole,
           status: "invited",
           lastActive: null,
+          linkedinConnected: false,
         },
       ],
     }));
@@ -664,6 +675,12 @@ export function SettingsShell() {
             </>
           )}
 
+          {activeTab === "phone-lines" && <PhoneLinesTab />}
+
+          {activeTab === "linkedin" && (
+            <LinkedInTeamTab members={draft.teamMembers} />
+          )}
+
           {activeTab === "billing" && (
             <>
               <SettingCard
@@ -869,35 +886,41 @@ export function SettingsShell() {
               description="Manage provider connections and sync health."
             >
               <div className="space-y-2">
-                {draft.integrations.map((integration) => (
-                  <div
-                    key={integration.id}
-                    className="flex items-center justify-between rounded-[10px] border border-border-subtle bg-section/40 px-3 py-2"
-                  >
-                    <div>
-                      <p className="text-[12px] text-ink font-medium">{integration.name}</p>
-                      <p className="text-[11px] text-ink-muted">
-                        {integration.connectedAccount || "No account connected"}
-                        {integration.lastSyncAt ? ` · synced ${formatRelativeTime(integration.lastSyncAt)}` : ""}
-                      </p>
+                {draft.integrations.map((integration) =>
+                  integration.id === "int_smartlead" ? (
+                    <SmartleadIntegration key={integration.id} />
+                  ) : integration.id === "int_unipile" ? (
+                    <UnipileIntegration key={integration.id} />
+                  ) : (
+                    <div
+                      key={integration.id}
+                      className="flex items-center justify-between rounded-[10px] border border-border-subtle bg-section/40 px-3 py-2"
+                    >
+                      <div>
+                        <p className="text-[12px] text-ink font-medium">{integration.name}</p>
+                        <p className="text-[11px] text-ink-muted">
+                          {integration.connectedAccount || "No account connected"}
+                          {integration.lastSyncAt ? ` · synced ${formatRelativeTime(integration.lastSyncAt)}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <IntegrationBadge integration={integration} />
+                        <button
+                          type="button"
+                          onClick={() => toggleIntegration(integration.id)}
+                          className={cn(
+                            "px-3 py-1 rounded-[16px] text-[11px] font-medium transition-colors",
+                            integration.connected
+                              ? "bg-section text-ink-secondary hover:bg-hover"
+                              : "bg-ink text-on-ink hover:bg-ink/90"
+                          )}
+                        >
+                          {integration.connected ? "Disconnect" : "Connect"}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <IntegrationBadge integration={integration} />
-                      <button
-                        type="button"
-                        onClick={() => toggleIntegration(integration.id)}
-                        className={cn(
-                          "px-3 py-1 rounded-[16px] text-[11px] font-medium transition-colors",
-                          integration.connected
-                            ? "bg-section text-ink-secondary hover:bg-hover"
-                            : "bg-ink text-on-ink hover:bg-ink/90"
-                        )}
-                      >
-                        {integration.connected ? "Disconnect" : "Connect"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  ),
+                )}
               </div>
             </SettingCard>
           )}

@@ -32,7 +32,7 @@ export interface TeamMemberPerformance {
 }
 
 export interface ChannelAnalytics {
-  channel: "email" | "linkedin" | "call";
+  channel: "email" | "linkedin" | "call" | "whatsapp";
   sentOrExecuted: PeriodValue;
   replies: PeriodValue;
   replyRatePct: PeriodValue;

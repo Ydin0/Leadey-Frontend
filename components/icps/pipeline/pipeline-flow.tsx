@@ -1,4 +1,5 @@
 import { Radio, Users, GitFork, Mail, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { PipelineStats } from "@/lib/types/pipeline";
 
 const flowSteps = [
@@ -18,7 +19,7 @@ export function PipelineFlow({ stats }: { stats: PipelineStats }) {
           return (
             <div key={step.key} className="flex items-center gap-3">
               <div className="flex flex-col items-center gap-1.5 min-w-[100px]">
-                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${isActive ? "bg-signal-blue animate-pulse" : "bg-section"}`}>
+                <div className={cn("w-9 h-9 rounded-lg flex items-center justify-center", isActive ? "bg-signal-blue animate-pulse" : "bg-section")}>
                   <Icon size={16} strokeWidth={1.5} className={isActive ? "text-signal-blue-text" : "text-ink-muted"} />
                 </div>
                 <span className="text-[11px] font-medium text-ink text-center">{step.label}</span>
