@@ -8,6 +8,7 @@ import {
   useCallback,
   useEffect,
 } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { Device, Call } from "@twilio/voice-sdk";
 import type {
   ActiveCall,
@@ -29,10 +30,15 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "http://localhost:3001";
 
-async function fetchToken(): Promise<string> {
+async function fetchTwilioToken(clerkToken: string | null): Promise<string> {
+  const headers: Record<string, string> = {};
+  if (clerkToken) {
+    headers["Authorization"] = `Bearer ${clerkToken}`;
+  }
+
   const res = await fetch(`${API_BASE}/api/twilio/token`, {
     method: "POST",
-    credentials: "include",
+    headers,
   });
   if (!res.ok) throw new Error("Failed to fetch Twilio token");
   const data = await res.json();
@@ -40,6 +46,7 @@ async function fetchToken(): Promise<string> {
 }
 
 export function CallProvider({ children }: { children: React.ReactNode }) {
+  const { getToken } = useAuth();
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [phoneLines] = useState<PhoneLine[]>(mockPhoneLines);
   const [callHistory, setCallHistory] = useState<CallRecord[]>(mockCallRecords);
@@ -59,7 +66,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
     async function initDevice() {
       try {
-        const token = await fetchToken();
+        const clerkToken = await getToken();
+        const token = await fetchTwilioToken(clerkToken);
         if (cancelled) return;
 
         const device = new Device(token, {
@@ -85,7 +93,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         // Token refresh — re-register before expiry (45 min)
         device.on("tokenWillExpire", async () => {
           try {
-            const newToken = await fetchToken();
+            const clerkTk = await getToken();
+            const newToken = await fetchTwilioToken(clerkTk);
             device.updateToken(newToken);
           } catch (err) {
             console.error("[Twilio] Token refresh failed", err);

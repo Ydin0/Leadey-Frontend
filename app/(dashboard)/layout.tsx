@@ -1,6 +1,7 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { CallProvider } from "@/components/calling/call-context";
+import { AuthTokenSync } from "@/components/providers/auth-token-sync";
 
 export default function DashboardLayout({
   children,
@@ -9,6 +10,7 @@ export default function DashboardLayout({
 }) {
   return (
     <CallProvider>
+      <AuthTokenSync />
       <div className="min-h-screen bg-page">
         <Sidebar />
         <Header />
