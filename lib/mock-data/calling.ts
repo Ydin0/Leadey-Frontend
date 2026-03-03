@@ -23,11 +23,11 @@ function minsAgo(mins: number) {
 export const mockPhoneLines: PhoneLine[] = [
   {
     id: "pl_001",
-    number: "+1 (415) 555-0120",
-    friendlyName: "Sales Main",
-    country: "United States",
-    countryCode: "US",
-    type: "local",
+    number: "+44 7578 157443",
+    friendlyName: "Main Line",
+    country: "United Kingdom",
+    countryCode: "GB",
+    type: "mobile",
     status: "active",
     assignedTo: "tm_001",
     assignedToName: "Yaseen Ahmed",
