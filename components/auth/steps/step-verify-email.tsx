@@ -21,6 +21,7 @@ export function StepVerifyEmail({ onNext }: StepVerifyEmailProps) {
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const verifyingRef = useRef(false);
 
   useEffect(() => {
     inputRefs.current[0]?.focus();
@@ -34,12 +35,20 @@ export function StepVerifyEmail({ onNext }: StepVerifyEmailProps) {
 
   const handleVerify = useCallback(
     async (fullCode: string) => {
-      if (!isLoaded) return;
+      if (!isLoaded || verifyingRef.current) return;
+      verifyingRef.current = true;
 
       setError("");
       setLoading(true);
 
       try {
+        // If sign-up is already complete (e.g. double-call), just activate and advance
+        if (signUp.status === "complete") {
+          await setActive({ session: signUp.createdSessionId });
+          onNext();
+          return;
+        }
+
         const result = await signUp.attemptEmailAddressVerification({
           code: fullCode,
         });
@@ -50,12 +59,20 @@ export function StepVerifyEmail({ onNext }: StepVerifyEmailProps) {
         }
       } catch (err) {
         if (isClerkAPIResponseError(err)) {
-          setError(err.errors[0]?.longMessage || "Invalid code.");
+          const msg = err.errors[0]?.longMessage || "";
+          // If already verified, just advance
+          if (msg.toLowerCase().includes("already been verified")) {
+            await setActive({ session: signUp.createdSessionId });
+            onNext();
+            return;
+          }
+          setError(msg || "Invalid code.");
         } else {
           setError("Verification failed. Please try again.");
         }
       } finally {
         setLoading(false);
+        verifyingRef.current = false;
       }
     },
     [isLoaded, signUp, setActive, onNext]
