@@ -17,7 +17,6 @@ export function StepCredentials({ onNext }: StepCredentialsProps) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -33,7 +32,6 @@ export function StepCredentials({ onNext }: StepCredentialsProps) {
         firstName,
         lastName,
         emailAddress: email,
-        password,
       });
 
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
@@ -78,16 +76,6 @@ export function StepCredentials({ onNext }: StepCredentialsProps) {
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="email"
-        />
-        <AuthInput
-          label="Password"
-          type="password"
-          placeholder="Min. 8 characters"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          minLength={8}
-          autoComplete="new-password"
         />
 
         {error && (
