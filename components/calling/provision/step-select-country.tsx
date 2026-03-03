@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { mockCountryOptions } from "@/lib/mock-data/calling";
+import { countryOptions } from "@/lib/constants/calling";
 import type { CountryOption } from "@/lib/types/calling";
 
 interface StepSelectCountryProps {
@@ -13,7 +13,7 @@ interface StepSelectCountryProps {
 export function StepSelectCountry({ selected, onSelect }: StepSelectCountryProps) {
   const [search, setSearch] = useState("");
 
-  const filtered = mockCountryOptions.filter(
+  const filtered = countryOptions.filter(
     (c) => c.name.toLowerCase().includes(search.toLowerCase()) || c.code.toLowerCase().includes(search.toLowerCase())
   );
 

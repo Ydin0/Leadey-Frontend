@@ -16,7 +16,7 @@ import type {
   PhoneLine,
   CallRecord,
 } from "@/lib/types/calling";
-import { mockPhoneLines, mockCallRecords } from "@/lib/mock-data/calling";
+import { getPhoneLines, getCallRecords, saveCallRecord } from "@/lib/api/phone-lines";
 
 const CallContext = createContext<CallContextValue | null>(null);
 
@@ -48,17 +48,51 @@ async function fetchTwilioToken(clerkToken: string | null): Promise<string> {
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const { getToken } = useAuth();
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
-  const [phoneLines] = useState<PhoneLine[]>(mockPhoneLines);
-  const [callHistory, setCallHistory] = useState<CallRecord[]>(mockCallRecords);
-  const [selectedLineId, setSelectedLineId] = useState<string | null>(
-    mockPhoneLines.find((l) => l.status === "active")?.id ?? null
-  );
+  const [phoneLines, setPhoneLines] = useState<PhoneLine[]>([]);
+  const [phoneLinesLoading, setPhonesLoading] = useState(true);
+  const [callHistory, setCallHistory] = useState<CallRecord[]>([]);
+  const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [deviceReady, setDeviceReady] = useState(false);
 
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const callStartRef = useRef<number>(0);
+
+  // ── Fetch phone lines + call records on mount ──
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const [lines, records] = await Promise.all([
+          getPhoneLines(),
+          getCallRecords({ limit: 50 }),
+        ]);
+        if (cancelled) return;
+        setPhoneLines(lines);
+        setCallHistory(records);
+        const firstActive = lines.find((l) => l.status === "active");
+        if (firstActive) setSelectedLineId(firstActive.id);
+      } catch (err) {
+        console.error("[CallProvider] Failed to load phone data:", err);
+      } finally {
+        if (!cancelled) setPhonesLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  const refreshPhoneLines = useCallback(async () => {
+    try {
+      const lines = await getPhoneLines();
+      setPhoneLines(lines);
+    } catch (err) {
+      console.error("[CallProvider] Failed to refresh lines:", err);
+    }
+  }, []);
 
   // ── Initialise Twilio Device ──────────────────
   useEffect(() => {
@@ -181,7 +215,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           prev ? { ...prev, state: "ended" } : prev
         );
 
-        // Add to call history
+        // Add to call history locally
         const record: CallRecord = {
           id: `cr_${Date.now()}`,
           direction,
@@ -192,9 +226,20 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           lineId,
           duration,
           disposition: "completed",
-          timestamp: new Date(),
+          timestamp: new Date().toISOString(),
         };
         setCallHistory((prev) => [record, ...prev]);
+
+        // Persist to backend
+        saveCallRecord({
+          lineId: lineId !== "unknown" ? lineId : undefined,
+          twilioCallSid: call.parameters?.CallSid || undefined,
+          direction,
+          fromNumber: from,
+          toNumber: to,
+          duration,
+          disposition: "completed",
+        }).catch((err) => console.error("[CallProvider] Failed to save call record:", err));
 
         setTimeout(() => {
           setActiveCall(null);
@@ -324,6 +369,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         toggleHold,
         toggleDtmfPad,
         sendDtmf,
+        phoneLinesLoading,
+        refreshPhoneLines,
       }}
     >
       {children}

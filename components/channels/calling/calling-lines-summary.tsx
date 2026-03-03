@@ -1,6 +1,11 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { mockPhoneLines } from "@/lib/mock-data/calling";
+import { Loader2 } from "lucide-react";
+import { getPhoneLines } from "@/lib/api/phone-lines";
 import { PhoneLineStatusBadge } from "@/components/calling/shared/phone-line-status-badge";
+import type { PhoneLine } from "@/lib/types/calling";
 
 const countryFlags: Record<string, string> = {
   US: "\u{1F1FA}\u{1F1F8}",
@@ -18,7 +23,25 @@ const typeBadgeStyles: Record<string, string> = {
 };
 
 export function CallingLinesSummary() {
-  const lines = mockPhoneLines.slice(0, 5);
+  const [allLines, setAllLines] = useState<PhoneLine[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getPhoneLines()
+      .then(setAllLines)
+      .catch((err) => console.error("Failed to fetch lines:", err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-6">
+        <Loader2 size={16} className="animate-spin text-ink-muted" />
+      </div>
+    );
+  }
+
+  const lines = allLines.slice(0, 5);
 
   return (
     <div>
@@ -50,15 +73,19 @@ export function CallingLinesSummary() {
         ))}
       </div>
 
-      {mockPhoneLines.length > 5 && (
+      {allLines.length > 5 && (
         <div className="mt-2 pt-2 border-t border-border-subtle">
           <Link
             href="/dashboard/settings"
             className="text-[11px] text-signal-blue-text font-medium hover:underline"
           >
-            View all {mockPhoneLines.length} lines in Settings
+            View all {allLines.length} lines in Settings
           </Link>
         </div>
+      )}
+
+      {allLines.length === 0 && (
+        <p className="text-[12px] text-ink-muted text-center py-4">No phone lines provisioned yet.</p>
       )}
     </div>
   );

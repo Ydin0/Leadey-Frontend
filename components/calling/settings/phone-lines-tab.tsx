@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { Plus, ArrowLeft } from "lucide-react";
-import { mockPhoneLines } from "@/lib/mock-data/calling";
+import { useState, useEffect, useCallback } from "react";
+import { Plus, ArrowLeft, Loader2 } from "lucide-react";
+import { getPhoneLines } from "@/lib/api/phone-lines";
 import { PhoneLineFilters, type PhoneLineFilterState } from "./phone-line-filters";
 import { PhoneLinesTable } from "./phone-lines-table";
 import { PhoneLineDetail } from "./phone-line-detail";
@@ -15,11 +15,28 @@ type PhoneLinesView = "list" | "provision" | "detail";
 export function PhoneLinesTab() {
   const [view, setView] = useState<PhoneLinesView>("list");
   const [selectedLine, setSelectedLine] = useState<PhoneLine | null>(null);
+  const [lines, setLines] = useState<PhoneLine[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<PhoneLineFilterState>({
     status: "all",
     country: "all",
     assignment: "all",
   });
+
+  const fetchLines = useCallback(async () => {
+    try {
+      const data = await getPhoneLines();
+      setLines(data);
+    } catch (err) {
+      console.error("Failed to fetch phone lines:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLines();
+  }, [fetchLines]);
 
   function handleSelectLine(line: PhoneLine) {
     setSelectedLine(line);
@@ -29,6 +46,7 @@ export function PhoneLinesTab() {
   function handleBackToList() {
     setView("list");
     setSelectedLine(null);
+    fetchLines();
   }
 
   if (view === "provision") {
@@ -75,12 +93,18 @@ export function PhoneLinesTab() {
       <PhoneLineFilters filters={filters} onChange={setFilters} />
 
       {/* Table */}
-      <PhoneLinesTable
-        lines={mockPhoneLines}
-        filters={filters}
-        onSelectLine={handleSelectLine}
-        onProvision={() => setView("provision")}
-      />
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={20} className="animate-spin text-ink-muted" />
+        </div>
+      ) : (
+        <PhoneLinesTable
+          lines={lines}
+          filters={filters}
+          onSelectLine={handleSelectLine}
+          onProvision={() => setView("provision")}
+        />
+      )}
 
       {/* Bundle Management */}
       <BundleManagement />

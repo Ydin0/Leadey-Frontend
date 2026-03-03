@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
-import { apiRequest } from "@/lib/api/client";
+import { provisionPhoneLine, updatePhoneLine } from "@/lib/api/phone-lines";
 import { StepIndicator } from "@/components/shared/step-indicator";
 import { StepSelectCountry } from "./step-select-country";
 import { StepSelectType } from "./step-select-type";
@@ -29,6 +29,7 @@ export function ProvisionWizardShell({ onComplete }: ProvisionWizardShellProps) 
   const [currentStep, setCurrentStep] = useState(0);
   const [provisioning, setProvisioning] = useState(false);
   const [provisionError, setProvisionError] = useState("");
+  const [provisionedLineId, setProvisionedLineId] = useState<string | null>(null);
   const [data, setData] = useState<ProvisionWizardData>({
     country: null,
     type: null,
@@ -75,20 +76,23 @@ export function ProvisionWizardShell({ onComplete }: ProvisionWizardShellProps) 
   }, []);
 
   async function handleConfirmAndProvision() {
-    if (!data.selectedNumber) return;
+    if (!data.selectedNumber || !data.country) return;
 
     setProvisioning(true);
     setProvisionError("");
 
     try {
-      await apiRequest("/twilio/numbers/provision", {
-        method: "POST",
-        body: JSON.stringify({
-          phoneNumber: data.selectedNumber.number,
-          friendlyName: data.friendlyName || data.selectedNumber.number,
-        }),
+      const line = await provisionPhoneLine({
+        phoneNumber: data.selectedNumber.number,
+        friendlyName: data.friendlyName || data.selectedNumber.number,
+        country: data.country.name,
+        countryCode: data.country.code,
+        type: data.type || "local",
+        monthlyCost: data.selectedNumber.monthlyCost,
+        bundleId: data.bundleId,
       });
 
+      setProvisionedLineId(line.id);
       // Provisioned successfully — move to assign step
       setCurrentStep(5);
     } catch (err) {
@@ -98,7 +102,18 @@ export function ProvisionWizardShell({ onComplete }: ProvisionWizardShellProps) 
     }
   }
 
-  function handleComplete() {
+  async function handleComplete() {
+    // If a line was provisioned and assignment was made, update the line
+    if (provisionedLineId && data.assignedTo) {
+      try {
+        await updatePhoneLine(provisionedLineId, {
+          assignedTo: data.assignedTo,
+          assignedToName: data.friendlyName || null,
+        });
+      } catch (err) {
+        console.error("Failed to assign line:", err);
+      }
+    }
     onComplete();
   }
 

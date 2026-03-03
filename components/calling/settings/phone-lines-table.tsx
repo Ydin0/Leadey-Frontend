@@ -14,7 +14,7 @@ import {
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PhoneLineStatusBadge } from "@/components/calling/shared/phone-line-status-badge";
-import { mockCountryOptions } from "@/lib/mock-data/calling";
+import { countryOptions } from "@/lib/constants/calling";
 import type { PhoneLine } from "@/lib/types/calling";
 import type { PhoneLineFilterState } from "./phone-line-filters";
 
@@ -124,7 +124,7 @@ export function PhoneLinesTable({ lines, filters, onSelectLine, onProvision }: P
         </TableHeader>
         <TableBody>
           {paginated.map((line) => {
-            const countryOption = mockCountryOptions.find((c) => c.code === line.countryCode);
+            const countryOption = countryOptions.find((c) => c.code === line.countryCode);
             return (
               <TableRow
                 key={line.id}

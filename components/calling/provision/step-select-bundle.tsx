@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mockBundles } from "@/lib/mock-data/calling";
+import { getBundles, createBundle } from "@/lib/api/phone-lines";
 import { BundleStatusBadge } from "@/components/calling/settings/bundle-status-badge";
 import { BundleCreateForm } from "@/components/calling/settings/bundle-create-form";
 import type { CountryOption, RegulatoryBundle } from "@/lib/types/calling";
@@ -16,7 +17,8 @@ interface StepSelectBundleProps {
 
 export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }: StepSelectBundleProps) {
   const [showCreate, setShowCreate] = useState(false);
-  const [bundles, setBundles] = useState<RegulatoryBundle[]>(mockBundles);
+  const [bundles, setBundles] = useState<RegulatoryBundle[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Auto-skip if country doesn't require a bundle
   useEffect(() => {
@@ -25,23 +27,39 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
     }
   }, [country, onSkip]);
 
+  // Fetch bundles from API
+  useEffect(() => {
+    getBundles()
+      .then(setBundles)
+      .catch((err) => console.error("Failed to fetch bundles:", err))
+      .finally(() => setLoading(false));
+  }, []);
+
   const countryBundles = bundles.filter((b) => b.countryCode === country?.code);
 
-  function handleCreate(data: { businessName: string; businessAddress: string; country: string; identityDocumentName: string }) {
-    const newBundle: RegulatoryBundle = {
-      id: `bun_${Date.now()}`,
-      name: `${data.country} Business Bundle`,
-      country: data.country,
-      countryCode: country?.code ?? "",
-      status: "draft",
-      businessName: data.businessName,
-      businessAddress: data.businessAddress,
-      identityDocumentName: data.identityDocumentName,
-      createdAt: new Date(),
-    };
-    setBundles((prev) => [newBundle, ...prev]);
-    onSelect(newBundle.id);
-    setShowCreate(false);
+  async function handleCreate(data: { businessName: string; businessAddress: string; country: string; identityDocumentName: string }) {
+    try {
+      const newBundle = await createBundle({
+        country: data.country,
+        countryCode: country?.code ?? "",
+        businessName: data.businessName,
+        businessAddress: data.businessAddress,
+        identityDocumentName: data.identityDocumentName,
+      });
+      setBundles((prev) => [newBundle, ...prev]);
+      onSelect(newBundle.id);
+      setShowCreate(false);
+    } catch (err) {
+      console.error("Failed to create bundle:", err);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={20} className="animate-spin text-ink-muted" />
+      </div>
+    );
   }
 
   return (

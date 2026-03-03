@@ -7,15 +7,15 @@ import type {
 } from "@/lib/types/calling";
 
 function daysAgo(days: number) {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
 function hoursAgo(hours: number) {
-  return new Date(Date.now() - hours * 60 * 60 * 1000);
+  return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
 }
 
 function minsAgo(mins: number) {
-  return new Date(Date.now() - mins * 60 * 1000);
+  return new Date(Date.now() - mins * 60 * 1000).toISOString();
 }
 
 // ── Phone Lines ──────────────────────────────

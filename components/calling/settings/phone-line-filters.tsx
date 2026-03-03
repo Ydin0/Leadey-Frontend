@@ -1,7 +1,7 @@
 "use client";
 
 import type { PhoneLineStatus } from "@/lib/types/calling";
-import { mockCountryOptions } from "@/lib/mock-data/calling";
+import { countryOptions } from "@/lib/constants/calling";
 
 export interface PhoneLineFilterState {
   status: PhoneLineStatus | "all";
@@ -35,7 +35,7 @@ export function PhoneLineFilters({ filters, onChange }: PhoneLineFiltersProps) {
         className="px-3 py-1.5 rounded-[10px] bg-section text-[12px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30"
       >
         <option value="all">All Countries</option>
-        {mockCountryOptions.map((c) => (
+        {countryOptions.map((c) => (
           <option key={c.code} value={c.code}>
             {c.flag} {c.name}
           </option>

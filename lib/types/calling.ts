@@ -33,7 +33,7 @@ export interface PhoneLine {
   monthlyCost: number;
   config: PhoneLineConfig;
   stats: PhoneLineStats;
-  createdAt: Date;
+  createdAt: string;
 }
 
 // ── Regulatory Bundle ────────────────────────
@@ -49,7 +49,8 @@ export interface RegulatoryBundle {
   businessName: string;
   businessAddress: string;
   identityDocumentName: string;
-  createdAt: Date;
+  twilioBundleSid?: string | null;
+  createdAt: string;
 }
 
 // ── Call Records ─────────────────────────────
@@ -67,7 +68,7 @@ export interface CallRecord {
   lineId: string;
   duration: number; // seconds
   disposition: CallDisposition;
-  timestamp: Date;
+  timestamp: string;
 }
 
 // ── Active Call (ephemeral UI state) ─────────
@@ -137,4 +138,6 @@ export interface CallContextValue {
   toggleHold: () => void;
   toggleDtmfPad: () => void;
   sendDtmf: (digit: string) => void;
+  phoneLinesLoading: boolean;
+  refreshPhoneLines: () => Promise<void>;
 }
