@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Search, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiRequest } from "@/lib/api/client";
 import type { AvailableNumber, CountryOption, PhoneLineType } from "@/lib/types/calling";
 
 interface StepSearchNumbersProps {
@@ -34,29 +35,25 @@ export function StepSearchNumbers({ country, type, selected, onSelect }: StepSea
         params.set("areaCode", areaCode.trim());
       }
 
-      const res = await fetch(`/api/twilio/numbers/search?${params}`);
-      const data = await res.json();
+      const data = await apiRequest<Record<string, unknown>[]>(
+        `/twilio/numbers/search?${params}`
+      );
 
-      if (!res.ok) {
-        setError(data.error || "Search failed");
-        setResults([]);
-      } else {
-        setResults(
-          data.map((n: Record<string, unknown>, i: number) => ({
-            id: `an_${i}`,
-            number: n.number,
-            locality: n.locality || "",
-            region: n.region || "",
-            country: country.name,
-            countryCode: country.code,
-            type,
-            monthlyCost: type === "toll-free" ? 2.15 : 1.15,
-            capabilities: n.capabilities || ["voice"],
-          }))
-        );
-      }
-    } catch {
-      setError("Network error. Please try again.");
+      setResults(
+        data.map((n, i) => ({
+          id: `an_${i}`,
+          number: n.number as string,
+          locality: (n.locality as string) || "",
+          region: (n.region as string) || "",
+          country: country.name,
+          countryCode: country.code,
+          type,
+          monthlyCost: type === "toll-free" ? 2.15 : 1.15,
+          capabilities: (n.capabilities as ("voice" | "sms" | "mms")[]) || ["voice"],
+        }))
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Search failed.");
       setResults([]);
     } finally {
       setSearched(true);

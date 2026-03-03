@@ -25,11 +25,18 @@ export function useCallContext() {
   return ctx;
 }
 
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
+  "http://localhost:3001";
+
 async function fetchToken(): Promise<string> {
-  const res = await fetch("/api/twilio/token", { method: "POST" });
+  const res = await fetch(`${API_BASE}/api/twilio/token`, {
+    method: "POST",
+    credentials: "include",
+  });
   if (!res.ok) throw new Error("Failed to fetch Twilio token");
   const data = await res.json();
-  return data.token;
+  return data.data.token;
 }
 
 export function CallProvider({ children }: { children: React.ReactNode }) {

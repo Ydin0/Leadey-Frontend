@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
+import { apiRequest } from "@/lib/api/client";
 import { StepIndicator } from "@/components/shared/step-indicator";
 import { StepSelectCountry } from "./step-select-country";
 import { StepSelectType } from "./step-select-type";
@@ -80,26 +81,18 @@ export function ProvisionWizardShell({ onComplete }: ProvisionWizardShellProps) 
     setProvisionError("");
 
     try {
-      const res = await fetch("/api/twilio/numbers/provision", {
+      await apiRequest("/twilio/numbers/provision", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           phoneNumber: data.selectedNumber.number,
           friendlyName: data.friendlyName || data.selectedNumber.number,
         }),
       });
 
-      const result = await res.json();
-
-      if (!res.ok) {
-        setProvisionError(result.error || "Provisioning failed.");
-        return;
-      }
-
       // Provisioned successfully — move to assign step
       setCurrentStep(5);
-    } catch {
-      setProvisionError("Network error. Please try again.");
+    } catch (err) {
+      setProvisionError(err instanceof Error ? err.message : "Provisioning failed.");
     } finally {
       setProvisioning(false);
     }
