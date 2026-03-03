@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useClerk } from "@clerk/nextjs";
+import { useAuth, useClerk } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { AuthInput } from "../auth-input";
 import { Loader2 } from "lucide-react";
@@ -11,12 +11,23 @@ interface StepCreateOrgProps {
 }
 
 export function StepCreateOrg({ onNext }: StepCreateOrgProps) {
+  const { isSignedIn, isLoaded: authLoaded } = useAuth();
   const clerk = useClerk();
 
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Wait for Clerk session to propagate after OTP verification
+  if (!authLoaded || !isSignedIn) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-8">
+        <Loader2 size={20} className="animate-spin text-ink-muted" />
+        <p className="text-[13px] text-ink-muted">Setting up your account...</p>
+      </div>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
