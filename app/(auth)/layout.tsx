@@ -8,6 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <span className="text-[20px] font-semibold text-ink">Leadey</span>
       </div>
       {children}
+      <div id="clerk-captcha" />
     </div>
   );
 }
