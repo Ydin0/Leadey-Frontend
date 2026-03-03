@@ -1,14 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useClerk } from "@clerk/nextjs";
+import { useOrganization } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useRouter } from "next/navigation";
 import { AuthInput } from "../auth-input";
 import { Loader2, X } from "lucide-react";
 
 export function StepInviteTeam() {
-  const clerk = useClerk();
+  const { organization, isLoaded } = useOrganization();
   const router = useRouter();
 
   const [emailInput, setEmailInput] = useState("");
@@ -37,13 +37,13 @@ export function StepInviteTeam() {
   }
 
   async function handleInvite() {
-    if (!clerk.organization || emails.length === 0) return;
+    if (!isLoaded || !organization || emails.length === 0) return;
 
     setError("");
     setLoading(true);
 
     try {
-      await clerk.organization.inviteMembers({
+      await organization.inviteMembers({
         emailAddresses: emails,
         role: "org:member",
       });

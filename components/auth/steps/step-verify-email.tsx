@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useSignUp, useClerk } from "@clerk/nextjs";
+import { useSignUp } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,8 +14,7 @@ const CODE_LENGTH = 6;
 const RESEND_COOLDOWN = 30;
 
 export function StepVerifyEmail({ onNext }: StepVerifyEmailProps) {
-  const { signUp, isLoaded } = useSignUp();
-  const clerk = useClerk();
+  const { signUp, setActive, isLoaded } = useSignUp();
 
   const [code, setCode] = useState<string[]>(Array(CODE_LENGTH).fill(""));
   const [error, setError] = useState("");
@@ -36,43 +35,30 @@ export function StepVerifyEmail({ onNext }: StepVerifyEmailProps) {
 
   const handleVerify = useCallback(
     async (fullCode: string) => {
-      if (!isLoaded || verifyingRef.current) return;
+      if (!isLoaded || !setActive || verifyingRef.current) return;
       verifyingRef.current = true;
 
       setError("");
       setLoading(true);
 
       try {
-        // If already complete, just activate and advance
-        if (signUp.status === "complete") {
-          if (signUp.createdSessionId) {
-            await clerk.setActive({ session: signUp.createdSessionId });
-          }
-          onNext();
-          return;
-        }
-
         const result = await signUp.attemptEmailAddressVerification({
           code: fullCode,
         });
 
         if (result.status === "complete" && result.createdSessionId) {
-          // Sign-up done — activate the session, then advance
-          await clerk.setActive({ session: result.createdSessionId });
+          await setActive({ session: result.createdSessionId });
           onNext();
         } else {
-          // Status is not "complete" (e.g. missing_requirements).
-          // No session yet — show a message instead of silently advancing.
-          setError("Verification succeeded but sign-up is incomplete. Please try again or contact support.");
+          setError("Could not complete sign-up. Please try again.");
           verifyingRef.current = false;
         }
       } catch (err) {
         if (isClerkAPIResponseError(err)) {
           const msg = err.errors[0]?.longMessage || "";
           if (msg.toLowerCase().includes("already been verified")) {
-            // Email already verified — if there's a session, activate and go
-            if (signUp.createdSessionId) {
-              await clerk.setActive({ session: signUp.createdSessionId });
+            if (signUp.createdSessionId && setActive) {
+              await setActive({ session: signUp.createdSessionId });
             }
             onNext();
             return;
@@ -86,7 +72,7 @@ export function StepVerifyEmail({ onNext }: StepVerifyEmailProps) {
         setLoading(false);
       }
     },
-    [isLoaded, signUp, clerk, onNext]
+    [isLoaded, signUp, setActive, onNext]
   );
 
   function handleChange(index: number, value: string) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAuth, useClerk } from "@clerk/nextjs";
+import { useOrganizationList } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { AuthInput } from "../auth-input";
 import { Loader2 } from "lucide-react";
@@ -11,33 +11,25 @@ interface StepCreateOrgProps {
 }
 
 export function StepCreateOrg({ onNext }: StepCreateOrgProps) {
-  const { isSignedIn, isLoaded: authLoaded } = useAuth();
-  const clerk = useClerk();
+  const { createOrganization, setActive, isLoaded } = useOrganizationList();
 
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Wait for Clerk session to propagate after OTP verification
-  if (!authLoaded || !isSignedIn) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-8">
-        <Loader2 size={20} className="animate-spin text-ink-muted" />
-        <p className="text-[13px] text-ink-muted">Setting up your account...</p>
-      </div>
-    );
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!isLoaded || !createOrganization) return;
 
     setError("");
     setLoading(true);
 
     try {
-      const org = await clerk.createOrganization({ name: companyName });
-      await clerk.setActive({ organization: org.id });
+      const org = await createOrganization({ name: companyName });
+      if (setActive) {
+        await setActive({ organization: org.id });
+      }
       onNext();
     } catch (err) {
       if (isClerkAPIResponseError(err)) {
@@ -72,10 +64,10 @@ export function StepCreateOrg({ onNext }: StepCreateOrgProps) {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={loading || !isLoaded}
         className="w-full py-2.5 rounded-[20px] bg-ink text-on-ink text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
       >
-        {loading && <Loader2 size={14} className="animate-spin" />}
+        {(loading || !isLoaded) && <Loader2 size={14} className="animate-spin" />}
         Continue
       </button>
     </form>
