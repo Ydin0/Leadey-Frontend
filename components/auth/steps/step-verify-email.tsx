@@ -33,6 +33,16 @@ export function StepVerifyEmail({ onNext }: StepVerifyEmailProps) {
     return () => clearTimeout(timer);
   }, [cooldown]);
 
+  const activateAndAdvance = useCallback(
+    async (sessionId: string | null | undefined) => {
+      if (sessionId && setActive) {
+        await setActive({ session: sessionId });
+      }
+      onNext();
+    },
+    [setActive, onNext]
+  );
+
   const handleVerify = useCallback(
     async (fullCode: string) => {
       if (!isLoaded || verifyingRef.current) return;
@@ -42,10 +52,9 @@ export function StepVerifyEmail({ onNext }: StepVerifyEmailProps) {
       setLoading(true);
 
       try {
-        // If sign-up is already complete (e.g. double-call), just activate and advance
+        // If already complete, just advance
         if (signUp.status === "complete") {
-          await setActive({ session: signUp.createdSessionId });
-          onNext();
+          await activateAndAdvance(signUp.createdSessionId);
           return;
         }
 
@@ -54,28 +63,29 @@ export function StepVerifyEmail({ onNext }: StepVerifyEmailProps) {
         });
 
         if (result.status === "complete") {
-          await setActive({ session: result.createdSessionId });
-          onNext();
+          await activateAndAdvance(result.createdSessionId);
+        } else {
+          // Handle non-complete statuses (e.g. missing_requirements)
+          // The email is verified — activate session and move on
+          await activateAndAdvance(result.createdSessionId);
         }
       } catch (err) {
         if (isClerkAPIResponseError(err)) {
           const msg = err.errors[0]?.longMessage || "";
-          // If already verified, just advance
           if (msg.toLowerCase().includes("already been verified")) {
-            await setActive({ session: signUp.createdSessionId });
-            onNext();
+            await activateAndAdvance(signUp.createdSessionId);
             return;
           }
           setError(msg || "Invalid code.");
         } else {
           setError("Verification failed. Please try again.");
         }
+        verifyingRef.current = false;
       } finally {
         setLoading(false);
-        verifyingRef.current = false;
       }
     },
-    [isLoaded, signUp, setActive, onNext]
+    [isLoaded, signUp, activateAndAdvance]
   );
 
   function handleChange(index: number, value: string) {
