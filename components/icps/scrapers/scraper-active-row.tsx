@@ -6,7 +6,6 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
-  Coins,
   Loader2,
   Play,
   RotateCcw,
@@ -22,9 +21,7 @@ import type {
   ScraperCategory,
   ScraperDefinition,
   ScraperFrequency,
-  ScraperSourceId,
 } from "@/lib/types/scraper";
-import { SourceSitePill } from "./source-site-pill";
 
 const statusConfig = {
   running: {
@@ -61,12 +58,16 @@ interface ScraperActiveRowProps {
   assignment: ScraperAssignment;
   definition?: ScraperDefinition;
   onSaveConfig: (assignment: ScraperAssignment) => void;
+  onRunNow?: (id: string) => void;
+  isRunning?: boolean;
 }
 
 export function ScraperActiveRow({
   assignment,
   definition,
   onSaveConfig,
+  onRunNow,
+  isRunning,
 }: ScraperActiveRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -74,8 +75,7 @@ export function ScraperActiveRow({
 
   const statusCfg = statusConfig[assignment.status];
   const StatusIcon = statusCfg.icon;
-  const category = definition?.category ?? "social";
-  const availableSources = definition?.sourceIds ?? assignment.sourceIds;
+  const category = definition?.category ?? "jobs";
   const availableFrequencies = definition?.frequencyOptions ?? fallbackFrequencies;
 
   const activeConfig = editing ? draft : assignment;
@@ -83,16 +83,10 @@ export function ScraperActiveRow({
     () => estimateScraperDailyUsage(activeConfig, category),
     [activeConfig, category]
   );
-  const sourceEstimateById = useMemo(
-    () => new Map(estimate.sourceBreakdown.map((item) => [item.source, item])),
-    [estimate.sourceBreakdown]
-  );
 
   const canSave =
-    draft.sourceIds.length > 0 &&
-    draft.sourceIds.every((source) => (draft.sourceSignalLimits[source] ?? 0) > 0) &&
+    draft.keywords.length > 0 &&
     draft.countries.length > 0 &&
-    draft.languages.length > 0 &&
     draft.maxSignalsPerRun > 0;
 
   function beginEdit() {
@@ -114,30 +108,6 @@ export function ScraperActiveRow({
 
   function setFrequency(frequency: ScraperFrequency) {
     setDraft((prev) => ({ ...prev, frequency }));
-  }
-
-  function setSourceLimit(source: ScraperSourceId, value: number) {
-    setDraft((prev) => ({
-      ...prev,
-      sourceSignalLimits: {
-        ...prev.sourceSignalLimits,
-        [source]: Math.max(0, value),
-      },
-    }));
-  }
-
-  function toggleSource(source: ScraperSourceId) {
-    setDraft((prev) => {
-      const isSelected = prev.sourceIds.includes(source);
-      const nextSourceIds = isSelected
-        ? prev.sourceIds.filter((id) => id !== source)
-        : [...prev.sourceIds, source];
-      const nextLimits = { ...prev.sourceSignalLimits };
-      if (!isSelected && (nextLimits[source] ?? 0) === 0) {
-        nextLimits[source] = 20;
-      }
-      return { ...prev, sourceIds: nextSourceIds, sourceSignalLimits: nextLimits };
-    });
   }
 
   function toggleLanguage(language: string) {
@@ -182,9 +152,10 @@ export function ScraperActiveRow({
             </span>
           </div>
           <div className="flex items-center gap-1 mt-1">
-            {assignment.sourceIds.slice(0, 5).map((source) => (
-              <SourceSitePill key={source} source={source} compact />
-            ))}
+            <span className="text-[10px] text-ink-muted">
+              {assignment.keywords.slice(0, 3).join(", ")}
+              {assignment.keywords.length > 3 ? ` +${assignment.keywords.length - 3}` : ""}
+            </span>
           </div>
         </div>
 
@@ -260,102 +231,29 @@ export function ScraperActiveRow({
                   </button>
                 </>
               )}
-              <button className="flex items-center gap-1 px-3 py-1 rounded-[16px] bg-ink text-on-ink text-[10px] font-medium hover:bg-ink/90 transition-colors">
-                <Play size={10} strokeWidth={2} />
-                Run Now
+              <button
+                type="button"
+                onClick={() => onRunNow?.(assignment.id)}
+                disabled={isRunning}
+                className="flex items-center gap-1 px-3 py-1 rounded-[16px] bg-ink text-on-ink text-[10px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-50"
+              >
+                {isRunning ? (
+                  <>
+                    <Loader2 size={10} strokeWidth={2} className="animate-spin" />
+                    Running...
+                  </>
+                ) : (
+                  <>
+                    <Play size={10} strokeWidth={2} />
+                    Run Now
+                  </>
+                )}
               </button>
             </div>
           </div>
 
           {editing ? (
             <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium">
-                    Data Sources
-                  </label>
-                  <span className="text-[10px] text-ink-faint">
-                    {draft.sourceIds.length} selected
-                  </span>
-                </div>
-                <div className="space-y-2">
-                  {availableSources.map((source) => {
-                    const selected = draft.sourceIds.includes(source);
-                    const perRunLimit = draft.sourceSignalLimits[source] ?? 0;
-                    const sourceEstimate = sourceEstimateById.get(source);
-
-                    return (
-                      <div
-                        key={source}
-                        className={cn(
-                          "rounded-[14px] border px-3 py-2 transition-colors",
-                          selected
-                            ? "bg-signal-blue/10 border-signal-blue-text/40"
-                            : "bg-surface border-border-subtle"
-                        )}
-                      >
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={() => toggleSource(source)}
-                            className={cn(
-                              "w-5 h-5 rounded-full border flex items-center justify-center transition-colors shrink-0",
-                              selected
-                                ? "bg-signal-blue-text border-signal-blue-text"
-                                : "border-border-default bg-surface"
-                            )}
-                          >
-                            {selected && (
-                              <Check size={11} strokeWidth={2.5} className="text-on-ink" />
-                            )}
-                          </button>
-                          <SourceSitePill source={source} selected={selected} />
-                          <div className="ml-auto flex items-center gap-2">
-                            <span className="text-[10px] text-ink-faint">Signals / run</span>
-                            <input
-                              type="number"
-                              min={0}
-                              step={5}
-                              disabled={!selected}
-                              value={perRunLimit}
-                              onChange={(e) =>
-                                setSourceLimit(source, Number(e.target.value) || 0)
-                              }
-                              className={cn(
-                                "w-20 px-2 py-1 rounded-[8px] text-[11px] outline-none border",
-                                selected
-                                  ? "bg-surface text-ink border-border-default focus:border-signal-blue-text/40"
-                                  : "bg-section text-ink-faint border-border-subtle"
-                              )}
-                            />
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between mt-2 pl-8">
-                          <span
-                            className={cn(
-                              "text-[10px]",
-                              selected ? "text-ink-muted" : "text-ink-faint"
-                            )}
-                          >
-                            {selected ? "Platform active" : "Platform disabled"}
-                          </span>
-                          <span
-                            className={cn(
-                              "text-[10px] font-medium",
-                              selected ? "text-ink-secondary" : "text-ink-faint"
-                            )}
-                          >
-                            {selected
-                              ? `~${sourceEstimate?.creditsPerDay ?? 0} credits/day`
-                              : "0 credits/day"}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                 <div className="lg:col-span-2 space-y-3">
                   <div>
@@ -554,17 +452,17 @@ export function ScraperActiveRow({
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 text-[11px]">
               <div>
-                <label className="block text-[10px] text-ink-faint mb-1">Sources & Limits</label>
-                <div className="space-y-1.5">
-                  {assignment.sourceIds.map((source) => (
-                    <div key={source} className="flex items-center justify-between">
-                      <SourceSitePill source={source} compact />
-                      <span className="text-ink-secondary">
-                        {assignment.sourceSignalLimits[source] ?? 0} / run
-                      </span>
-                    </div>
+                <label className="block text-[10px] text-ink-faint mb-1">Job Titles</label>
+                <div className="flex flex-wrap gap-1">
+                  {assignment.keywords.map((kw) => (
+                    <span key={kw} className="text-[10px] bg-section text-ink-secondary px-2 py-0.5 rounded-full border border-border-subtle">
+                      {kw}
+                    </span>
                   ))}
                 </div>
+                <p className="text-ink-muted mt-1.5">
+                  Countries: {assignment.countries.join(", ") || "All"}
+                </p>
               </div>
               <div>
                 <label className="block text-[10px] text-ink-faint mb-1">Run Controls</label>
@@ -577,12 +475,11 @@ export function ScraperActiveRow({
                 </p>
               </div>
               <div>
-                <label className="block text-[10px] text-ink-faint mb-1">Cost Forecast</label>
-                <p className="text-ink-secondary flex items-center gap-1">
-                  <Coins size={12} strokeWidth={1.8} />
-                  ~{estimate.creditsPerDay} credits/day
+                <label className="block text-[10px] text-ink-faint mb-1">Stats</label>
+                <p className="text-ink-secondary">
+                  {assignment.signalsFound} signals found
                 </p>
-                <p className="text-ink-muted mt-1">~{estimate.signalsPerDay} signals/day</p>
+                <p className="text-ink-muted mt-1">{assignment.companiesFound} companies</p>
               </div>
             </div>
           )}

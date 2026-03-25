@@ -14,6 +14,7 @@ import {
   Sparkles,
   Coins,
   Briefcase,
+  Search,
 } from "lucide-react";
 import type {
   NavItem,
@@ -28,14 +29,15 @@ import type {
 
 // ── Navigation ──────────────────────────────────────────────
 export const navItems: NavItem[] = [
-  { id: "cockpit", label: "Cockpit", icon: LayoutDashboard, href: "/dashboard", badge: 14 },
+  { id: "cockpit", label: "Cockpit", icon: LayoutDashboard, href: "/dashboard" },
   { id: "funnels", label: "Funnels", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
-  { id: "opportunities", label: "Opportunities", icon: Briefcase, href: "/dashboard/opportunities" },
-  { id: "channels", label: "Channels", icon: Radio, href: "/dashboard/channels" },
-  { id: "icps", label: "ICPs", icon: Target, href: "/dashboard/icps" },
-  { id: "companies", label: "Companies", icon: Building2, href: "/dashboard/companies" },
-  { id: "exports", label: "Exports", icon: Download, href: "/dashboard/exports" },
-  { id: "analytics", label: "Analytics", icon: BarChart3, href: "/dashboard/analytics" },
+  { id: "scrapers", label: "Scrapers", icon: Search, href: "/dashboard/scrapers" },
+  { id: "opportunities", label: "Opportunities", icon: Briefcase, href: "/dashboard/opportunities", comingSoon: true },
+  { id: "channels", label: "Channels", icon: Radio, href: "/dashboard/channels", comingSoon: true },
+  { id: "icps", label: "ICPs", icon: Target, href: "/dashboard/icps", comingSoon: true },
+  { id: "companies", label: "Companies", icon: Building2, href: "/dashboard/companies", comingSoon: true },
+  { id: "exports", label: "Exports", icon: Download, href: "/dashboard/exports", comingSoon: true },
+  { id: "analytics", label: "Analytics", icon: BarChart3, href: "/dashboard/analytics", comingSoon: true },
   { id: "settings", label: "Settings", icon: Settings, href: "/dashboard/settings" },
 ];
 

@@ -17,6 +17,7 @@ import type {
   CallRecord,
 } from "@/lib/types/calling";
 import { getPhoneLines, getCallRecords, saveCallRecord } from "@/lib/api/phone-lines";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
 
 const CallContext = createContext<CallContextValue | null>(null);
 
@@ -47,6 +48,7 @@ async function fetchTwilioToken(clerkToken: string | null): Promise<string> {
 
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const { getToken } = useAuth();
+  const isAuthReady = useAuthReady();
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [phoneLines, setPhoneLines] = useState<PhoneLine[]>([]);
   const [phoneLinesLoading, setPhonesLoading] = useState(true);
@@ -59,8 +61,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const callStartRef = useRef<number>(0);
 
-  // ── Fetch phone lines + call records on mount ──
+  // ── Fetch phone lines + call records once auth is ready ──
   useEffect(() => {
+    if (!isAuthReady) return;
     let cancelled = false;
 
     async function load() {
@@ -83,7 +86,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [isAuthReady]);
 
   const refreshPhoneLines = useCallback(async () => {
     try {
@@ -96,6 +99,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   // ── Initialise Twilio Device ──────────────────
   useEffect(() => {
+    if (!isAuthReady) return;
     let cancelled = false;
 
     async function initDevice() {
@@ -153,7 +157,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       setDeviceReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isAuthReady]);
 
   // ── Duration timer ────────────────────────────
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { Mail, Eye, MessageSquare, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mockEmailSummary } from "@/lib/mock-data";
+import type { EmailSummary } from "@/lib/types";
 
 const typeColors = {
   bounce: "bg-signal-red text-signal-red-text",
@@ -14,9 +14,11 @@ const typeLabels = {
   unsubscribe: "Unsubscribe",
 };
 
-export function EmailSection() {
-  const data = mockEmailSummary;
+interface EmailSectionProps {
+  email: EmailSummary;
+}
 
+export function EmailSection({ email: data }: EmailSectionProps) {
   return (
     <section>
       <div className="flex items-center gap-3 mb-4">

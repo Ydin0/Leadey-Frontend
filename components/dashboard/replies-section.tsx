@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Mail, Linkedin, MessageSquare, ChevronDown, ChevronUp, Clock, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
-import { mockReplies } from "@/lib/mock-data";
 import type { Reply } from "@/lib/types";
 
 function ReplyCard({ reply, onAction }: { reply: Reply; onAction: (id: string, action: string) => void }) {
@@ -103,17 +102,13 @@ function ReplyCard({ reply, onAction }: { reply: Reply; onAction: (id: string, a
   );
 }
 
-export function RepliesSection() {
-  const [replies, setReplies] = useState(mockReplies);
-  const unhandled = replies.filter((r) => r.status === "unhandled");
+interface RepliesSectionProps {
+  replies: Reply[];
+  onAction: (id: string, action: string) => void;
+}
 
-  function handleAction(id: string, action: string) {
-    setReplies((prev) =>
-      prev.map((r) =>
-        r.id === id ? { ...r, status: action as Reply["status"] } : r
-      )
-    );
-  }
+export function RepliesSection({ replies, onAction }: RepliesSectionProps) {
+  const unhandled = replies.filter((r) => r.status === "unhandled");
 
   return (
     <section>
@@ -127,7 +122,7 @@ export function RepliesSection() {
       </div>
       <div className="flex flex-col gap-3">
         {unhandled.map((reply) => (
-          <ReplyCard key={reply.id} reply={reply} onAction={handleAction} />
+          <ReplyCard key={reply.id} reply={reply} onAction={onAction} />
         ))}
         {unhandled.length === 0 && (
           <div className="bg-surface rounded-[14px] border border-border-subtle p-8 text-center">

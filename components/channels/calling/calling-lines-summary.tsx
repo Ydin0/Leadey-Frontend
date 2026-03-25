@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { getPhoneLines } from "@/lib/api/phone-lines";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { PhoneLineStatusBadge } from "@/components/calling/shared/phone-line-status-badge";
 import type { PhoneLine } from "@/lib/types/calling";
 
@@ -25,13 +26,15 @@ const typeBadgeStyles: Record<string, string> = {
 export function CallingLinesSummary() {
   const [allLines, setAllLines] = useState<PhoneLine[]>([]);
   const [loading, setLoading] = useState(true);
+  const isAuthReady = useAuthReady();
 
   useEffect(() => {
+    if (!isAuthReady) return;
     getPhoneLines()
       .then(setAllLines)
       .catch((err) => console.error("Failed to fetch lines:", err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [isAuthReady]);
 
   if (loading) {
     return (

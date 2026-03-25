@@ -3,17 +3,19 @@
 import { useState } from "react";
 import { UserPlus, MessageCircle, ExternalLink, Check, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mockLinkedInQueue } from "@/lib/mock-data";
+import { advanceLead } from "@/lib/api/funnels";
 import type { LinkedInQueueItem } from "@/lib/types";
+
+type QueueItem = LinkedInQueueItem & { funnelId?: string; leadId?: string };
 
 function LinkedInCard({
   item,
   onMarkSent,
   onSkip,
 }: {
-  item: LinkedInQueueItem;
-  onMarkSent: (id: string) => void;
-  onSkip: (id: string) => void;
+  item: QueueItem;
+  onMarkSent: (item: QueueItem) => void;
+  onSkip: (item: QueueItem) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [message, setMessage] = useState(item.message);
@@ -78,14 +80,14 @@ function LinkedInCard({
           Open on LinkedIn
         </a>
         <button
-          onClick={() => onMarkSent(item.id)}
+          onClick={() => onMarkSent(item)}
           className="flex items-center gap-1 px-3 py-1.5 rounded-[20px] bg-signal-green text-signal-green-text text-[11px] font-medium hover:bg-signal-green/80 transition-colors"
         >
           <Check size={12} strokeWidth={1.5} />
           Mark Sent
         </button>
         <button
-          onClick={() => onSkip(item.id)}
+          onClick={() => onSkip(item)}
           className="flex items-center gap-1 px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors"
         >
           <SkipForward size={12} strokeWidth={1.5} />
@@ -96,22 +98,40 @@ function LinkedInCard({
   );
 }
 
-export function LinkedInSection() {
-  const [queue, setQueue] = useState(mockLinkedInQueue);
-  const pending = queue.filter((item) => item.status === "pending");
+interface LinkedInSectionProps {
+  queue: QueueItem[];
+  linkedinProgress: Record<string, { completed: number; limit: number; totalPending: number }>;
+  onRefresh: () => void;
+}
+
+export function LinkedInSection({ queue, linkedinProgress, onRefresh }: LinkedInSectionProps) {
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const pending = queue.filter((item) => item.status === "pending" && !dismissed.has(item.id));
   const connectionRequests = pending.filter((item) => item.type === "connection_request");
   const messages = pending.filter((item) => item.type === "message");
 
-  function handleMarkSent(id: string) {
-    setQueue((prev) => prev.map((item) => (item.id === id ? { ...item, status: "sent" as const } : item)));
+  async function handleMarkSent(item: QueueItem) {
+    if (item.funnelId && item.leadId) {
+      try {
+        await advanceLead(item.funnelId, item.leadId, "sent");
+      } catch {
+        // Continue — optimistically dismiss
+      }
+    }
+    setDismissed((prev) => new Set(prev).add(item.id));
+    onRefresh();
   }
 
-  function handleSkip(id: string) {
-    setQueue((prev) => prev.map((item) => (item.id === id ? { ...item, status: "skipped" as const } : item)));
-  }
-
-  function handleMarkAllSent() {
-    setQueue((prev) => prev.map((item) => (item.status === "pending" ? { ...item, status: "sent" as const } : item)));
+  async function handleSkip(item: QueueItem) {
+    if (item.funnelId && item.leadId) {
+      try {
+        await advanceLead(item.funnelId, item.leadId, "skipped");
+      } catch {
+        // Continue
+      }
+    }
+    setDismissed((prev) => new Set(prev).add(item.id));
+    onRefresh();
   }
 
   return (
@@ -123,15 +143,6 @@ export function LinkedInSection() {
             {pending.length} pending
           </span>
         </div>
-        {pending.length > 0 && (
-          <button
-            onClick={handleMarkAllSent}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors"
-          >
-            <Check size={12} strokeWidth={1.5} />
-            Mark All Sent
-          </button>
-        )}
       </div>
 
       {pending.length === 0 ? (

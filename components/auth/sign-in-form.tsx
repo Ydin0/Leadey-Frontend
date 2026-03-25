@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useSignIn } from "@clerk/nextjs";
+import { useSignIn, useClerk } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -15,6 +15,7 @@ const RESEND_COOLDOWN = 30;
 
 export function SignInForm() {
   const { signIn, setActive, isLoaded } = useSignIn();
+  const clerk = useClerk();
   const router = useRouter();
 
   const [step, setStep] = useState<"email" | "code">("email");
@@ -90,6 +91,16 @@ export function SignInForm() {
 
         if (result.status === "complete") {
           await setActive({ session: result.createdSessionId });
+
+          // Set the active organization so backend auth works
+          const memberships = await clerk.user?.getOrganizationMemberships();
+          if (memberships && memberships.data.length > 0) {
+            await setActive({
+              session: result.createdSessionId,
+              organization: memberships.data[0].organization.id,
+            });
+          }
+
           router.push("/dashboard");
         }
       } catch (err) {

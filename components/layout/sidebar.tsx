@@ -106,6 +106,11 @@ export function Sidebar() {
                   {item.badge && !expanded && (
                     <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-signal-red-text" />
                   )}
+                  {item.comingSoon && expanded && (
+                    <span className="ml-auto text-[9px] text-ink-faint shrink-0">
+                      Soon
+                    </span>
+                  )}
                 </Link>
 
                 {/* Chevron toggle for groups with children */}

@@ -8,6 +8,33 @@ export function setAuthToken(token: string | null) {
   _authToken = token;
 }
 
+/** Returns the raw JSON payload (not unwrapped) — for endpoints that return { data, meta } */
+export async function apiRequestRaw<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> || {}),
+  };
+
+  if (_authToken) {
+    headers["Authorization"] = `Bearer ${_authToken}`;
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api${path}`, {
+    ...init,
+    headers,
+    cache: "no-store",
+  });
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = payload?.error?.message || `Request failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  return payload as T;
+}
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

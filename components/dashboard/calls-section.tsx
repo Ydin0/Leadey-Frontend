@@ -4,8 +4,10 @@ import { useState } from "react";
 import { Phone, ChevronDown, ChevronUp, Copy, Check, SkipForward } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatPhoneNumber } from "@/lib/utils";
-import { mockCallQueue } from "@/lib/mock-data";
+import { advanceLead } from "@/lib/api/funnels";
 import type { CallQueueItem } from "@/lib/types";
+
+type QueueItem = CallQueueItem & { funnelId?: string; leadId?: string };
 
 const outcomeOptions = [
   { value: "interested", label: "Interested", color: "bg-signal-green text-signal-green-text" },
@@ -20,9 +22,9 @@ function CallCard({
   onLog,
   onSkip,
 }: {
-  item: CallQueueItem;
-  onLog: (id: string, outcome: CallQueueItem["outcome"]) => void;
-  onSkip: (id: string) => void;
+  item: QueueItem;
+  onLog: (item: QueueItem, outcome: CallQueueItem["outcome"]) => void;
+  onSkip: (item: QueueItem) => void;
 }) {
   const [scriptOpen, setScriptOpen] = useState(false);
   const [showOutcomes, setShowOutcomes] = useState(false);
@@ -90,28 +92,32 @@ function CallCard({
               ))}
             </ul>
           </div>
-          <div>
-            <h4 className="text-[10px] font-medium text-ink-muted uppercase tracking-wider mb-1">Objection Handlers</h4>
-            <div className="space-y-2">
-              {item.script.objectionHandlers.map((handler, i) => (
-                <div key={i}>
-                  <p className="text-[11px] font-medium text-ink-secondary">&quot;{handler.objection}&quot;</p>
-                  <p className="text-[12px] text-ink-muted leading-relaxed mt-0.5">{handler.response}</p>
-                </div>
-              ))}
+          {item.script.objectionHandlers && item.script.objectionHandlers.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-medium text-ink-muted uppercase tracking-wider mb-1">Objection Handlers</h4>
+              <div className="space-y-2">
+                {item.script.objectionHandlers.map((handler, i) => (
+                  <div key={i}>
+                    <p className="text-[11px] font-medium text-ink-secondary">&quot;{handler.objection}&quot;</p>
+                    <p className="text-[12px] text-ink-muted leading-relaxed mt-0.5">{handler.response}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-          <div>
-            <h4 className="text-[10px] font-medium text-ink-muted uppercase tracking-wider mb-1">Qualifying Questions</h4>
-            <ul className="space-y-1">
-              {item.script.qualifyingQuestions.map((q, i) => (
-                <li key={i} className="text-[12px] text-ink-secondary leading-relaxed flex gap-2">
-                  <span className="text-ink-faint shrink-0">{i + 1}.</span>
-                  {q}
-                </li>
-              ))}
-            </ul>
-          </div>
+          )}
+          {item.script.qualifyingQuestions && item.script.qualifyingQuestions.length > 0 && (
+            <div>
+              <h4 className="text-[10px] font-medium text-ink-muted uppercase tracking-wider mb-1">Qualifying Questions</h4>
+              <ul className="space-y-1">
+                {item.script.qualifyingQuestions.map((q, i) => (
+                  <li key={i} className="text-[12px] text-ink-secondary leading-relaxed flex gap-2">
+                    <span className="text-ink-faint shrink-0">{i + 1}.</span>
+                    {q}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
@@ -132,7 +138,7 @@ function CallCard({
                 <button
                   key={option.value}
                   onClick={() => {
-                    onLog(item.id, option.value);
+                    onLog(item, option.value);
                     setShowOutcomes(false);
                   }}
                   className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover transition-colors flex items-center gap-2"
@@ -145,7 +151,7 @@ function CallCard({
           )}
         </div>
         <button
-          onClick={() => onSkip(item.id)}
+          onClick={() => onSkip(item)}
           className="flex items-center gap-1 px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors"
         >
           <SkipForward size={12} strokeWidth={1.5} />
@@ -156,18 +162,37 @@ function CallCard({
   );
 }
 
-export function CallsSection() {
-  const [calls, setCalls] = useState(mockCallQueue);
-  const pending = calls.filter((c) => c.status === "pending");
+interface CallsSectionProps {
+  calls: QueueItem[];
+  onRefresh: () => void;
+}
 
-  function handleLog(id: string, outcome: CallQueueItem["outcome"]) {
-    setCalls((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, status: "completed" as const, outcome } : c))
-    );
+export function CallsSection({ calls, onRefresh }: CallsSectionProps) {
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
+  const pending = calls.filter((c) => c.status === "pending" && !dismissed.has(c.id));
+
+  async function handleLog(item: QueueItem, outcome: CallQueueItem["outcome"]) {
+    if (item.funnelId && item.leadId) {
+      try {
+        await advanceLead(item.funnelId, item.leadId, outcome || "sent");
+      } catch {
+        // Continue
+      }
+    }
+    setDismissed((prev) => new Set(prev).add(item.id));
+    onRefresh();
   }
 
-  function handleSkip(id: string) {
-    setCalls((prev) => prev.map((c) => (c.id === id ? { ...c, status: "skipped" as const } : c)));
+  async function handleSkip(item: QueueItem) {
+    if (item.funnelId && item.leadId) {
+      try {
+        await advanceLead(item.funnelId, item.leadId, "skipped");
+      } catch {
+        // Continue
+      }
+    }
+    setDismissed((prev) => new Set(prev).add(item.id));
+    onRefresh();
   }
 
   return (

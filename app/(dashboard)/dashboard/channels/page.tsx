@@ -1,5 +1,12 @@
-import { ChannelHub } from "@/components/channels/channel-hub";
+import { Radio } from "lucide-react";
+import { ComingSoon } from "@/components/shared/coming-soon";
 
 export default function ChannelsPage() {
-  return <ChannelHub />;
+  return (
+    <ComingSoon
+      icon={Radio}
+      title="Channels"
+      description="Manage your outreach channels and integrations. Channel configuration is available in Settings."
+    />
+  );
 }

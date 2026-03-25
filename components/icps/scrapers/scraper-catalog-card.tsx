@@ -2,13 +2,12 @@ import {
   Briefcase, DollarSign, Cpu, Search, MessageCircle, Newspaper, UserCheck, TrendingUp,
 } from "lucide-react";
 import type { ScraperDefinition } from "@/lib/types/scraper";
-import { SourceSitePill } from "./source-site-pill";
 
-const iconMap: Record<string, typeof Briefcase> = {
+export const iconMap: Record<string, typeof Briefcase> = {
   Briefcase, DollarSign, Cpu, Search, MessageCircle, Newspaper, UserCheck, TrendingUp,
 };
 
-const tierColors = {
+export const tierColors = {
   basic: "bg-signal-green text-signal-green-text",
   pro: "bg-signal-blue text-signal-blue-text",
   enterprise: "bg-signal-slate text-signal-slate-text",
@@ -39,15 +38,8 @@ export function ScraperCatalogCard({
       </div>
       <h4 className="text-[12px] font-medium text-ink mb-1">{scraper.name}</h4>
       <p className="text-[10px] text-ink-muted leading-relaxed mb-3">{scraper.description}</p>
-      <div className="flex flex-wrap gap-1 mb-3">
-        {scraper.sourceIds.map((source) => (
-          <SourceSitePill key={source} source={source} compact />
-        ))}
-      </div>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] text-ink-faint">~{scraper.creditCostPerRun} credits/run</span>
-          <span className="text-[10px] text-ink-faint">&middot;</span>
           <span className="text-[10px] text-ink-faint">{scraper.frequencyOptions.join(", ")}</span>
         </div>
         <button

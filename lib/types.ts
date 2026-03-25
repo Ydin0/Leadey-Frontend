@@ -109,4 +109,5 @@ export interface NavItem {
   href: string;
   badge?: number;
   dynamicChildren?: boolean;
+  comingSoon?: boolean;
 }

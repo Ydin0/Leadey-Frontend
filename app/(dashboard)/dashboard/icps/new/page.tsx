@@ -1,5 +1,5 @@
-import { WizardShell } from "@/components/icps/wizard/wizard-shell";
+import { redirect } from "next/navigation";
 
 export default function NewICPPage() {
-  return <WizardShell />;
+  redirect("/dashboard/icps");
 }

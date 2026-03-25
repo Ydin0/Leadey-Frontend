@@ -4,12 +4,15 @@ import { useEffect, useState } from "react";
 import type { NavSubItem } from "@/lib/types";
 import { listFunnels } from "@/lib/api/funnels";
 import type { FunnelStatus } from "@/lib/types/funnel";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
 
 export function useSidebarFunnels() {
   const [items, setItems] = useState<NavSubItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const isAuthReady = useAuthReady();
 
   useEffect(() => {
+    if (!isAuthReady) return;
     let cancelled = false;
 
     async function load() {
@@ -33,7 +36,7 @@ export function useSidebarFunnels() {
 
     void load();
     return () => { cancelled = true; };
-  }, []);
+  }, [isAuthReady]);
 
   return { items, loading };
 }

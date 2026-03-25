@@ -2,8 +2,6 @@
 
 import { Search } from "lucide-react";
 import { UserButton } from "@clerk/nextjs";
-import { quickStats } from "@/lib/mock-data";
-import { QuickStatChip } from "@/components/dashboard/quick-stat-chip";
 import { NotificationDropdown } from "@/components/dashboard/notification-dropdown";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { DialerDropdown } from "@/components/calling/dialer/dialer-dropdown";
@@ -11,12 +9,8 @@ import { DialerDropdown } from "@/components/calling/dialer/dialer-dropdown";
 export function Header() {
   return (
     <header className="fixed top-0 left-[56px] right-0 z-30 h-14 bg-surface border-b border-border-subtle flex items-center px-6 gap-4">
-      {/* Quick Stats */}
-      <div className="flex-1 flex items-center gap-2 overflow-x-auto no-scrollbar">
-        {quickStats.map((stat) => (
-          <QuickStatChip key={stat.id} stat={stat} />
-        ))}
-      </div>
+      {/* Spacer */}
+      <div className="flex-1" />
 
       {/* Search */}
       <div className="flex items-center gap-2 bg-section rounded-[10px] px-3 py-1.5 w-52 shrink-0">

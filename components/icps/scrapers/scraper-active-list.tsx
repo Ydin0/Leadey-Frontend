@@ -6,12 +6,16 @@ interface ScraperActiveListProps {
   assignments: ScraperAssignment[];
   catalog: ScraperDefinition[];
   onUpdateAssignment: (assignment: ScraperAssignment) => void;
+  onRunNow?: (id: string) => void;
+  runningIds?: Set<string>;
 }
 
 export function ScraperActiveList({
   assignments,
   catalog,
   onUpdateAssignment,
+  onRunNow,
+  runningIds,
 }: ScraperActiveListProps) {
   const enabled = assignments.filter((a) => a.enabled);
   const disabled = assignments.filter((a) => !a.enabled);
@@ -71,6 +75,8 @@ export function ScraperActiveList({
             assignment={a}
             definition={catalogById.get(a.scraperId)}
             onSaveConfig={onUpdateAssignment}
+            onRunNow={onRunNow}
+            isRunning={runningIds?.has(a.id)}
           />
         ))}
       </div>
@@ -84,6 +90,8 @@ export function ScraperActiveList({
                 assignment={a}
                 definition={catalogById.get(a.scraperId)}
                 onSaveConfig={onUpdateAssignment}
+                onRunNow={onRunNow}
+                isRunning={runningIds?.has(a.id)}
               />
             ))}
           </div>
