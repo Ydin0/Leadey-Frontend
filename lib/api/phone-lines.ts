@@ -147,6 +147,22 @@ export async function createBundle(data: {
   });
 }
 
+/** Auto-allocates a random available number for the given country+type.
+ *  The backend picks the number, attaches the org's approved bundle (if
+ *  required), and provisions in one call — no UI search/select. */
+export async function autoAllocatePhoneLine(payload: {
+  countryCode: string;
+  country?: string;
+  type?: "local" | "mobile" | "national" | "toll-free";
+  assignedTo?: string;
+  assignedToName?: string;
+}): Promise<PhoneLine> {
+  return apiRequest<PhoneLine>("/phone-lines/auto-allocate", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function updateBundle(
   bundleId: string,
   data: Partial<{

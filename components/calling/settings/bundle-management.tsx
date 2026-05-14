@@ -1,20 +1,65 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Loader2, RefreshCw, Send } from "lucide-react";
-import { formatRelativeTime } from "@/lib/utils";
+import { useState, useEffect, useRef } from "react";
+import {
+  Plus,
+  Loader2,
+  RefreshCw,
+  Send,
+  Upload,
+  Trash2,
+  FileText,
+  CheckCircle,
+  AlertCircle,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
+import { formatRelativeTime, cn } from "@/lib/utils";
 import { countryOptions } from "@/lib/constants/calling";
-import { getBundles, createBundle, submitBundle, refreshBundleStatus } from "@/lib/api/phone-lines";
+import {
+  getBundles,
+  createBundle,
+  submitBundle,
+  refreshBundleStatus,
+  getBundleDocuments,
+  uploadBundleDocument,
+  deleteBundleDocument,
+} from "@/lib/api/phone-lines";
 import { BundleStatusBadge } from "./bundle-status-badge";
 import { BundleCreateForm } from "./bundle-create-form";
-import type { RegulatoryBundle } from "@/lib/types/calling";
+import type { RegulatoryBundle, BundleDocument } from "@/lib/types/calling";
+
+const REQUIRED_DOCS: Record<string, { type: string; label: string }[]> = {
+  GB: [
+    { type: "business_registration", label: "Business Registration (Companies House)" },
+    { type: "utility_bill", label: "Proof of Address (utility bill or bank statement)" },
+  ],
+  DE: [
+    { type: "business_registration", label: "Business Registration (Handelsregister)" },
+    { type: "government_id", label: "Government-Issued ID" },
+    { type: "utility_bill", label: "Proof of Address" },
+  ],
+  FR: [
+    { type: "business_registration", label: "Business Registration (KBIS)" },
+    { type: "government_id", label: "Government-Issued ID" },
+    { type: "utility_bill", label: "Proof of Address" },
+  ],
+  AU: [
+    { type: "business_registration", label: "Business Registration (ABN)" },
+    { type: "government_id", label: "Government-Issued ID" },
+  ],
+  DEFAULT: [
+    { type: "business_registration", label: "Business Registration" },
+    { type: "government_id", label: "Government-Issued ID" },
+    { type: "utility_bill", label: "Proof of Address" },
+  ],
+};
 
 export function BundleManagement() {
   const [bundles, setBundles] = useState<RegulatoryBundle[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
-  const [submittingId, setSubmittingId] = useState<string | null>(null);
-  const [refreshingId, setRefreshingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     getBundles()
@@ -23,48 +68,20 @@ export function BundleManagement() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleCreate(data: { businessName: string; businessAddress: string; country: string; identityDocumentName: string }) {
-    const countryOption = countryOptions.find((c) => c.name === data.country);
+  async function reload() {
+    const fresh = await getBundles().catch(() => null);
+    if (fresh) setBundles(fresh);
+  }
+
+  async function handleCreate(data: Parameters<typeof createBundle>[0]) {
     try {
-      const newBundle = await createBundle({
-        country: data.country,
-        countryCode: countryOption?.code ?? "",
-        businessName: data.businessName,
-        businessAddress: data.businessAddress,
-        identityDocumentName: data.identityDocumentName,
-      });
+      const newBundle = await createBundle(data);
       setBundles((prev) => [newBundle, ...prev]);
       setShowCreate(false);
-    } catch (err) {
+      setExpandedId(newBundle.id);
+    } catch (err: any) {
       console.error("Failed to create bundle:", err);
-    }
-  }
-
-  async function handleSubmit(bundleId: string) {
-    setSubmittingId(bundleId);
-    try {
-      const result = await submitBundle(bundleId);
-      setBundles((prev) =>
-        prev.map((b) => (b.id === bundleId ? { ...b, status: result.status as RegulatoryBundle["status"], twilioBundleSid: result.twilioBundleSid } : b))
-      );
-    } catch (err) {
-      console.error("Failed to submit bundle:", err);
-    } finally {
-      setSubmittingId(null);
-    }
-  }
-
-  async function handleRefresh(bundleId: string) {
-    setRefreshingId(bundleId);
-    try {
-      const result = await refreshBundleStatus(bundleId);
-      setBundles((prev) =>
-        prev.map((b) => (b.id === bundleId ? { ...b, status: result.status as RegulatoryBundle["status"] } : b))
-      );
-    } catch (err) {
-      console.error("Failed to refresh bundle status:", err);
-    } finally {
-      setRefreshingId(null);
+      alert(err?.message || "Failed to create bundle.");
     }
   }
 
@@ -74,7 +91,8 @@ export function BundleManagement() {
         <div>
           <h3 className="text-[13px] font-semibold text-ink">Regulatory Bundles</h3>
           <p className="text-[11px] text-ink-muted mt-0.5">
-            Manage compliance bundles required for international numbers.
+            Compliance bundles required for international numbers. Save as a
+            draft, upload documents, then submit for Twilio review.
           </p>
         </div>
         {!showCreate && (
@@ -91,7 +109,12 @@ export function BundleManagement() {
 
       {showCreate && (
         <div className="mb-4">
-          <BundleCreateForm onCancel={() => setShowCreate(false)} onCreate={handleCreate} />
+          <BundleCreateForm
+            onCancel={() => setShowCreate(false)}
+            onCreate={async (d) => {
+              await handleCreate(d);
+            }}
+          />
         </div>
       )}
 
@@ -99,61 +122,301 @@ export function BundleManagement() {
         <div className="flex items-center justify-center py-6">
           <Loader2 size={18} className="animate-spin text-ink-muted" />
         </div>
+      ) : bundles.length === 0 ? (
+        <p className="text-[12px] text-ink-muted text-center py-4">
+          No bundles yet. Click <strong>New Bundle</strong> to start.
+        </p>
       ) : (
         <div className="space-y-2">
           {bundles.map((bundle) => (
-            <div
+            <BundleRow
               key={bundle.id}
-              className="flex items-center justify-between rounded-[10px] border border-border-subtle bg-section/40 px-3 py-2"
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-[14px]">
-                  {countryOptions.find((c) => c.code === bundle.countryCode)?.flag ?? ""}
-                </span>
-                <div>
-                  <p className="text-[12px] text-ink font-medium">{bundle.name}</p>
-                  <p className="text-[11px] text-ink-muted">
-                    {bundle.businessName} &middot; {formatRelativeTime(bundle.createdAt)}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {bundle.status === "draft" && (
-                  <button
-                    type="button"
-                    onClick={() => handleSubmit(bundle.id)}
-                    disabled={submittingId === bundle.id}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-[16px] bg-signal-blue text-signal-blue-text text-[10px] font-medium hover:bg-signal-blue/80 transition-colors disabled:opacity-50"
-                  >
-                    {submittingId === bundle.id ? (
-                      <Loader2 size={11} className="animate-spin" />
-                    ) : (
-                      <Send size={11} strokeWidth={2} />
-                    )}
-                    Submit
-                  </button>
-                )}
-                {bundle.status === "pending-review" && (
-                  <button
-                    type="button"
-                    onClick={() => handleRefresh(bundle.id)}
-                    disabled={refreshingId === bundle.id}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-[16px] bg-section text-ink-secondary text-[10px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
-                  >
-                    <RefreshCw size={11} strokeWidth={2} className={refreshingId === bundle.id ? "animate-spin" : ""} />
-                    Refresh
-                  </button>
-                )}
-                <BundleStatusBadge status={bundle.status} />
-              </div>
-            </div>
+              bundle={bundle}
+              expanded={expandedId === bundle.id}
+              onToggle={() =>
+                setExpandedId(expandedId === bundle.id ? null : bundle.id)
+              }
+              onReload={reload}
+            />
           ))}
-
-          {bundles.length === 0 && (
-            <p className="text-[12px] text-ink-muted text-center py-4">No bundles created yet.</p>
-          )}
         </div>
       )}
     </section>
+  );
+}
+
+function BundleRow({
+  bundle,
+  expanded,
+  onToggle,
+  onReload,
+}: {
+  bundle: RegulatoryBundle;
+  expanded: boolean;
+  onToggle: () => void;
+  onReload: () => Promise<void>;
+}) {
+  const country = countryOptions.find((c) => c.code === bundle.countryCode);
+  const isDraft = bundle.status === "draft";
+
+  return (
+    <div className="rounded-[10px] border border-border-subtle bg-section/40 overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-hover/40 transition-colors text-left"
+      >
+        <div className="flex items-center gap-3">
+          {expanded ? (
+            <ChevronDown size={14} className="text-ink-muted" />
+          ) : (
+            <ChevronRight size={14} className="text-ink-muted" />
+          )}
+          <span className="text-[14px]">{country?.flag ?? ""}</span>
+          <div>
+            <p className="text-[12px] text-ink font-medium">{bundle.name}</p>
+            <p className="text-[11px] text-ink-muted">
+              {bundle.businessName} · {formatRelativeTime(bundle.createdAt)}
+              {isDraft && " · draft"}
+            </p>
+          </div>
+        </div>
+        <BundleStatusBadge status={bundle.status} />
+      </button>
+
+      {expanded && (
+        <div className="border-t border-border-subtle px-3 py-3">
+          <BundleDocumentsSection bundle={bundle} onReload={onReload} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BundleDocumentsSection({
+  bundle,
+  onReload,
+}: {
+  bundle: RegulatoryBundle;
+  onReload: () => Promise<void>;
+}) {
+  const [documents, setDocuments] = useState<BundleDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadDocType, setUploadDocType] = useState<string | null>(null);
+
+  const requiredDocs =
+    REQUIRED_DOCS[bundle.countryCode] || REQUIRED_DOCS.DEFAULT;
+
+  useEffect(() => {
+    setLoading(true);
+    getBundleDocuments(bundle.id)
+      .then(setDocuments)
+      .catch((err) => console.error("Failed to fetch docs:", err))
+      .finally(() => setLoading(false));
+  }, [bundle.id]);
+
+  async function handleUploadClick(docType: string) {
+    setUploadDocType(docType);
+    setError(null);
+    fileInputRef.current?.click();
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !uploadDocType) return;
+    setUploading(uploadDocType);
+    try {
+      const uploaded = await uploadBundleDocument(bundle.id, file, uploadDocType);
+      setDocuments((prev) => [uploaded, ...prev]);
+    } catch (err: any) {
+      setError(err?.message || "Upload failed");
+    } finally {
+      setUploading(null);
+      setUploadDocType(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleDeleteDoc(docId: string) {
+    try {
+      await deleteBundleDocument(bundle.id, docId);
+      setDocuments((prev) => prev.filter((d) => d.id !== docId));
+    } catch (err: any) {
+      setError(err?.message || "Failed to delete document");
+    }
+  }
+
+  async function handleSubmit() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await submitBundle(bundle.id);
+      await onReload();
+    } catch (err: any) {
+      setError(err?.message || "Failed to submit bundle");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await refreshBundleStatus(bundle.id);
+      await onReload();
+    } catch (err: any) {
+      setError(err?.message || "Failed to refresh");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  const uploadedTypes = new Set(documents.map((d) => d.documentType));
+  const allRequiredUploaded = requiredDocs.every((d) =>
+    uploadedTypes.has(d.type),
+  );
+
+  return (
+    <div className="space-y-3">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".pdf,.png,.jpg,.jpeg"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
+      <p className="text-[11px] text-ink-muted">
+        Upload the required documents below, then submit the bundle for Twilio
+        review. Drafts are saved automatically.
+      </p>
+
+      {loading ? (
+        <div className="text-[11px] text-ink-muted">Loading documents…</div>
+      ) : (
+        <div className="space-y-2">
+          {requiredDocs.map((doc) => {
+            const uploaded = documents.find((d) => d.documentType === doc.type);
+            const isUploading = uploading === doc.type;
+            return (
+              <div
+                key={doc.type}
+                className="flex items-center justify-between rounded-[8px] border border-border-subtle bg-surface px-3 py-2"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  {uploaded ? (
+                    <CheckCircle
+                      size={14}
+                      className="text-signal-green-text shrink-0"
+                    />
+                  ) : (
+                    <FileText size={14} className="text-ink-muted shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-[12px] text-ink font-medium truncate">
+                      {doc.label}
+                    </p>
+                    {uploaded && (
+                      <p className="text-[11px] text-ink-muted truncate">
+                        {uploaded.fileName}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {uploaded ? (
+                    bundle.status === "draft" && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDoc(uploaded.id)}
+                        className="p-1.5 rounded-md text-ink-faint hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
+                        title="Remove"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )
+                  ) : bundle.status === "draft" ? (
+                    <button
+                      type="button"
+                      onClick={() => handleUploadClick(doc.type)}
+                      disabled={isUploading}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-[16px] bg-section text-ink-secondary text-[10px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
+                    >
+                      {isUploading ? (
+                        <Loader2 size={11} className="animate-spin" />
+                      ) : (
+                        <Upload size={11} strokeWidth={2} />
+                      )}
+                      Upload
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {error && (
+        <div className="flex items-start gap-2 rounded-[8px] bg-signal-red/10 border border-signal-red-text/20 px-3 py-2">
+          <AlertCircle
+            size={13}
+            className="text-signal-red-text shrink-0 mt-0.5"
+          />
+          <p className="text-[11px] text-signal-red-text">{error}</p>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        {bundle.status === "draft" && (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={!allRequiredUploaded || submitting}
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] text-[11px] font-medium transition-colors",
+              allRequiredUploaded && !submitting
+                ? "bg-signal-green text-signal-green-text hover:bg-signal-green/80"
+                : "bg-section text-ink-faint cursor-not-allowed",
+            )}
+          >
+            {submitting ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <Send size={11} />
+            )}
+            {allRequiredUploaded
+              ? "Submit for review"
+              : `Upload all ${requiredDocs.length} documents to submit`}
+          </button>
+        )}
+
+        {bundle.status === "pending-review" && (
+          <button
+            type="button"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-1 px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
+          >
+            <RefreshCw
+              size={11}
+              className={refreshing ? "animate-spin" : ""}
+            />
+            Check status
+          </button>
+        )}
+
+        {bundle.twilioBundleSid && (
+          <span className="text-[11px] text-ink-muted font-mono">
+            {bundle.twilioBundleSid.slice(0, 14)}…
+          </span>
+        )}
+      </div>
+    </div>
   );
 }
