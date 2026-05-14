@@ -26,7 +26,7 @@ const BUSINESS_TYPES = [
   { value: "nonprofit", label: "Non-Profit" },
 ];
 
-// Twilio business classifications
+// Twilio business classifications (business_identity attribute)
 const BUSINESS_CLASSIFICATIONS = [
   { value: "INDEPENDENT_SOFTWARE_VENDOR", label: "Independent Software Vendor" },
   { value: "RESELLER", label: "Reseller" },
@@ -34,43 +34,20 @@ const BUSINESS_CLASSIFICATIONS = [
   { value: "CONSULTING_AGENCY", label: "Consulting / Agency" },
 ];
 
-// Per-country registration authority defaults
-const REGISTRATION_AUTHORITY_BY_COUNTRY: Record<string, { value: string; label: string }[]> = {
-  GB: [
-    { value: "UK:CRN", label: "UK:CRN (Companies House Reg #)" },
-  ],
-  US: [
-    { value: "US:EIN", label: "US:EIN (Employer Identification #)" },
-    { value: "US:DUNS", label: "US:DUNS" },
-  ],
-  AU: [
-    { value: "AU:ABN", label: "AU:ABN (Australian Business #)" },
-    { value: "AU:ACN", label: "AU:ACN (Australian Company #)" },
-  ],
-  CA: [
-    { value: "CA:CBN", label: "CA:CBN (Business #)" },
-  ],
-  DE: [
-    { value: "DE:HRB", label: "DE:HRB (Handelsregister)" },
-  ],
-  FR: [
-    { value: "FR:SIREN", label: "FR:SIREN" },
-  ],
-  IE: [
-    { value: "IE:CRO", label: "IE:CRO (Companies Reg Office)" },
-  ],
-  IN: [
-    { value: "IN:CIN", label: "IN:CIN (Corporate Identity #)" },
-  ],
-  SG: [
-    { value: "SG:UEN", label: "SG:UEN (Unique Entity #)" },
-  ],
-  AE: [
-    { value: "AE:TRN", label: "AE:TRN (Tax Reg #)" },
-  ],
-  DEFAULT: [
-    { value: "OTHER", label: "Other / Country-specific" },
-  ],
+// Per-country label for the registration-number field, so customers know
+// which number to type in. The actual authority code (UK:CRN etc.) is
+// derived server-side from the country — we don't ask the user.
+const REGISTRATION_NUMBER_HINT_BY_COUNTRY: Record<string, string> = {
+  GB: "Companies House registration number",
+  US: "EIN (Employer Identification Number)",
+  AU: "ABN (Australian Business Number)",
+  CA: "Business Number",
+  DE: "Handelsregister (HRB) number",
+  FR: "SIREN number",
+  IE: "CRO (Companies Registration Office) number",
+  IN: "CIN (Corporate Identity Number)",
+  SG: "UEN (Unique Entity Number)",
+  AE: "Trade Licence / TRN",
 };
 
 const REQUIRED_DOCS: Record<string, { type: string; label: string }[]> = {
@@ -107,7 +84,6 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
   // Create form state — business info
   const [businessName, setBusinessName] = useState("");
   const [businessType, setBusinessType] = useState("limited_company");
-  const [businessRegAuthority, setBusinessRegAuthority] = useState("");
   const [businessRegNumber, setBusinessRegNumber] = useState("");
   const [businessWebsite, setBusinessWebsite] = useState("");
   const [businessClassification, setBusinessClassification] = useState("INDEPENDENT_SOFTWARE_VENDOR");
@@ -158,7 +134,7 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
         countryCode: country?.code || "",
         businessName,
         businessType,
-        businessRegistrationAuthority: businessRegAuthority,
+        // business_registration_authority is auto-derived server-side from country
         businessRegistrationNumber: businessRegNumber,
         businessWebsite,
         businessClassification,
@@ -391,9 +367,9 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
 
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Business Name *</label>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Legal Business Name *</label>
                 <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)}
-                  placeholder="OCTOGLE TECHNOLOGIES LTD"
+                  placeholder="Acme Ltd"
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
               <div>
@@ -412,25 +388,18 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
                   ))}
                 </NativeSelect>
               </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Registration Authority *</label>
-                <NativeSelect value={businessRegAuthority} onChange={(e) => setBusinessRegAuthority(e.target.value)}>
-                  <option value="">Select…</option>
-                  {(REGISTRATION_AUTHORITY_BY_COUNTRY[country?.code || ""] || REGISTRATION_AUTHORITY_BY_COUNTRY.DEFAULT).map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </NativeSelect>
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Registration Number *</label>
+              <div className="col-span-2">
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">
+                  {REGISTRATION_NUMBER_HINT_BY_COUNTRY[country?.code || ""] || "Business Registration Number"} *
+                </label>
                 <input type="text" value={businessRegNumber} onChange={(e) => setBusinessRegNumber(e.target.value)}
-                  placeholder="14516092"
+                  placeholder={country?.code === "GB" ? "e.g. 12345678" : country?.code === "US" ? "e.g. 12-3456789" : "Registration number"}
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
               <div className="col-span-2">
                 <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Business Website</label>
                 <input type="url" value={businessWebsite} onChange={(e) => setBusinessWebsite(e.target.value)}
-                  placeholder="https://www.octogle.com"
+                  placeholder="https://www.example.com"
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
             </div>
@@ -444,32 +413,32 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
             <div>
               <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Street Line 1 *</label>
               <input type="text" value={addressStreet1} onChange={(e) => setAddressStreet1(e.target.value)}
-                placeholder="319B Walton Road"
+                placeholder="123 Main Street"
                 className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
             </div>
             <div>
               <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Street Line 2</label>
               <input type="text" value={addressStreet2} onChange={(e) => setAddressStreet2(e.target.value)}
-                placeholder="Optional"
+                placeholder="Apt, suite, unit (optional)"
                 className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">City *</label>
                 <input type="text" value={addressCity} onChange={(e) => setAddressCity(e.target.value)}
-                  placeholder="Molesey"
+                  placeholder="City"
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">State / Region</label>
                 <input type="text" value={addressSubdivision} onChange={(e) => setAddressSubdivision(e.target.value)}
-                  placeholder="England"
+                  placeholder="State or county"
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Postal Code *</label>
                 <input type="text" value={addressPostalCode} onChange={(e) => setAddressPostalCode(e.target.value)}
-                  placeholder="KT8 2QG"
+                  placeholder="Postal code"
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
             </div>
@@ -487,25 +456,25 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">First Name *</label>
                 <input type="text" value={repFirstName} onChange={(e) => setRepFirstName(e.target.value)}
-                  placeholder="Yaseen"
+                  placeholder="First name"
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Last Name *</label>
                 <input type="text" value={repLastName} onChange={(e) => setRepLastName(e.target.value)}
-                  placeholder="Chaudhry"
+                  placeholder="Last name"
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Work Email *</label>
                 <input type="email" value={repEmail} onChange={(e) => setRepEmail(e.target.value)}
-                  placeholder="yaseen@octogle.com"
+                  placeholder="name@company.com"
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
               <div>
                 <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Phone *</label>
                 <input type="tel" value={repPhone} onChange={(e) => setRepPhone(e.target.value)}
-                  placeholder="+447502241019"
+                  placeholder="+44 20 1234 5678"
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
             </div>
