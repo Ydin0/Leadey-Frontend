@@ -33,17 +33,24 @@ interface CompanyAvatarProps {
   className?: string;
 }
 
+function logoUrl(domain: string): string {
+  // Use Google's favicon service as primary (reliable, fast, free)
+  return `https://www.google.com/s2/favicons?domain=${domain}&sz=128`;
+}
+
 export function CompanyAvatar({ name, size = "md", domain, className }: CompanyAvatarProps) {
   const [imgFailed, setImgFailed] = useState(false);
 
   const colorIndex = name.charCodeAt(0) % avatarColors.length;
   const initial = name.charAt(0).toUpperCase();
 
-  // Try Clearbit logo if we have a domain
-  if (domain && !imgFailed) {
+  // Use explicit domain or derive from company name
+  const effectiveDomain = domain || `${name.toLowerCase().replace(/[^a-z0-9]/g, "")}.com`;
+
+  if (!imgFailed) {
     return (
       <img
-        src={`https://logo.clearbit.com/${domain}`}
+        src={logoUrl(effectiveDomain)}
         alt={name}
         onError={() => setImgFailed(true)}
         className={cn(

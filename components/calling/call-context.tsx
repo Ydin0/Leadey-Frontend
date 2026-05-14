@@ -68,13 +68,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
     async function load() {
       try {
-        const [lines, records] = await Promise.all([
+        const [lines, recordsResult] = await Promise.all([
           getPhoneLines(),
           getCallRecords({ limit: 50 }),
         ]);
         if (cancelled) return;
         setPhoneLines(lines);
-        setCallHistory(records);
+        setCallHistory(recordsResult.data);
         const firstActive = lines.find((l) => l.status === "active");
         if (firstActive) setSelectedLineId(firstActive.id);
       } catch (err) {

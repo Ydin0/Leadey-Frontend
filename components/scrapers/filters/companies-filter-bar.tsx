@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X, ChevronDown } from "lucide-react";
+import { Plus, X, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FilterPopover } from "./filter-popover";
 import type { CompaniesFilterState } from "./filter-types";
@@ -20,6 +20,8 @@ interface CompaniesFilterBarProps {
   updateFilter: <K extends keyof CompaniesFilterState>(key: K, value: CompaniesFilterState[K]) => void;
   clearAll: () => void;
   isEmpty: boolean;
+  search?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 type AdditionalFilterKey = "industry" | "country" | "minJobCount";
@@ -34,7 +36,7 @@ function toggleInArray(arr: string[], value: string): string[] {
   return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
 }
 
-export function CompaniesFilterBar({ filters, setFilters, updateFilter, clearAll, isEmpty }: CompaniesFilterBarProps) {
+export function CompaniesFilterBar({ filters, setFilters, updateFilter, clearAll, isEmpty, search = "", onSearchChange }: CompaniesFilterBarProps) {
   const [activeAdditional, setActiveAdditional] = useState<AdditionalFilterKey[]>([]);
   const [addDropdownOpen, setAddDropdownOpen] = useState(false);
 
@@ -225,6 +227,20 @@ export function CompaniesFilterBar({ filters, setFilters, updateFilter, clearAll
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Search */}
+        {onSearchChange && (
+          <div className="relative ml-auto">
+            <Search size={13} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Search companies..."
+              className="pl-8 pr-3 py-1.5 rounded-full bg-section border border-border-subtle text-[11px] text-ink placeholder:text-ink-faint w-48 focus:outline-none focus:border-border-default"
+            />
           </div>
         )}
       </div>

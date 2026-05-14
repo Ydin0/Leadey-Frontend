@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { ExternalLink, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { useRowLimit } from "@/lib/hooks/use-row-limit";
 import { LeadFilters } from "./lead-filters";
 import { mockFunnelPickerOptions as mockFunnels } from "@/lib/mock-data/funnels";
 import type { EnrichedLead, LeadStatus } from "@/lib/types/lead";
@@ -84,9 +85,12 @@ export function LeadTable({ leads }: LeadTableProps) {
     return result;
   }, [leads, activeDepartments, activeSeniorities, activeStatuses]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const resetPage = useCallback(() => setCurrentPage(1), []);
+  const { limited, startingRow, rowLimit, unfilteredTotal, handleRowLimitChange } = useRowLimit(filtered, resetPage);
+
+  const totalPages = Math.max(1, Math.ceil(limited.length / PAGE_SIZE));
   const paginatedPage = Math.min(currentPage, totalPages);
-  const paginated = filtered.slice((paginatedPage - 1) * PAGE_SIZE, paginatedPage * PAGE_SIZE);
+  const paginated = limited.slice((paginatedPage - 1) * PAGE_SIZE, paginatedPage * PAGE_SIZE);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -253,8 +257,12 @@ export function LeadTable({ leads }: LeadTableProps) {
             currentPage={paginatedPage}
             totalPages={totalPages}
             pageSize={PAGE_SIZE}
-            totalItems={filtered.length}
+            totalItems={limited.length}
             onPageChange={setCurrentPage}
+            startingRow={startingRow}
+            rowLimit={rowLimit}
+            unfilteredTotal={unfilteredTotal}
+            onRowLimitChange={handleRowLimitChange}
           />
         )}
       </div>

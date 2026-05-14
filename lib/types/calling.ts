@@ -48,8 +48,21 @@ export interface RegulatoryBundle {
   status: BundleStatus;
   businessName: string;
   businessAddress: string;
+  businessRegistrationNumber: string;
+  businessType: string;
+  contactEmail: string;
+  contactPhone: string;
   identityDocumentName: string;
   twilioBundleSid?: string | null;
+  createdAt: string;
+}
+
+export interface BundleDocument {
+  id: string;
+  documentType: string;
+  fileName: string;
+  status: string;
+  twilioDocumentSid?: string | null;
   createdAt: string;
 }
 
@@ -68,6 +81,13 @@ export interface CallRecord {
   lineId: string;
   duration: number; // seconds
   disposition: CallDisposition;
+  recordingUrl?: string | null;
+  recordingSid?: string | null;
+  recordingDuration?: number;
+  transcript?: string | null;
+  summary?: string | null;
+  userId?: string | null;
+  userName?: string | null;
   timestamp: string;
 }
 

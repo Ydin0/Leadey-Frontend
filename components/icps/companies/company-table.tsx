@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useCallback, Fragment } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { useRowLimit } from "@/lib/hooks/use-row-limit";
 import { CompanyFilters } from "./company-filters";
 import { CompanyRowExpanded } from "./company-row-expanded";
 import { EnrichmentStatusDot } from "@/components/icps/enrichment/enrichment-status-dot";
@@ -38,7 +39,7 @@ function CompanyLogo({ domain, name }: { domain: string; name: string }) {
 
   return (
     <img
-      src={`https://logo.clearbit.com/${domain}`}
+      src={`https://www.google.com/s2/favicons?sz=128&domain=${domain}`}
       alt={name}
       width={24}
       height={24}
@@ -81,9 +82,12 @@ export function CompanyTable({ companies, leads, orgCharts }: CompanyTableProps)
     return result;
   }, [companies, activeSignals, enrichmentFilter, sortField, sortAsc]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const resetPage = useCallback(() => setCurrentPage(1), []);
+  const { limited, startingRow, rowLimit, unfilteredTotal, handleRowLimitChange } = useRowLimit(filtered, resetPage);
+
+  const totalPages = Math.max(1, Math.ceil(limited.length / PAGE_SIZE));
   const paginatedPage = Math.min(currentPage, totalPages);
-  const paginated = filtered.slice((paginatedPage - 1) * PAGE_SIZE, paginatedPage * PAGE_SIZE);
+  const paginated = limited.slice((paginatedPage - 1) * PAGE_SIZE, paginatedPage * PAGE_SIZE);
 
   function handleSort(field: SortField) {
     if (sortField === field) setSortAsc(!sortAsc);
@@ -250,8 +254,12 @@ export function CompanyTable({ companies, leads, orgCharts }: CompanyTableProps)
           currentPage={paginatedPage}
           totalPages={totalPages}
           pageSize={PAGE_SIZE}
-          totalItems={filtered.length}
+          totalItems={limited.length}
           onPageChange={setCurrentPage}
+          startingRow={startingRow}
+          rowLimit={rowLimit}
+          unfilteredTotal={unfilteredTotal}
+          onRowLimitChange={handleRowLimitChange}
         />
       </div>
     </div>

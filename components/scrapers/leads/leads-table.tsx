@@ -22,6 +22,10 @@ interface LeadsTableProps {
   crossPageSelection?: ReturnType<typeof useCrossPageSelection>;
   onEnrichSingle: (contactId: string) => void;
   onRetryEnrichment?: (contactId: string) => void;
+  startingRow?: number;
+  rowLimit?: number | null;
+  unfilteredTotal?: number;
+  onRowLimitChange?: (startingRow: number, rowLimit: number | null) => void;
 }
 
 export function LeadsTable({
@@ -36,6 +40,10 @@ export function LeadsTable({
   crossPageSelection,
   onEnrichSingle,
   onRetryEnrichment,
+  startingRow = 0,
+  rowLimit = null,
+  unfilteredTotal,
+  onRowLimitChange,
 }: LeadsTableProps) {
   const pageIds = contacts.map((c) => c.id);
   const allSelected = crossPageSelection
@@ -76,7 +84,7 @@ export function LeadsTable({
   return (
     <div>
       <div className="border border-border-subtle rounded-[14px] overflow-hidden">
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow className="border-b border-border-subtle">
               <TableHead className="w-10">
@@ -88,13 +96,13 @@ export function LeadsTable({
                   className="rounded accent-accent"
                 />
               </TableHead>
-              <TableHead className="min-w-[200px]">Name</TableHead>
-              <TableHead className="min-w-[140px]">Title</TableHead>
-              <TableHead className="min-w-[120px]">Company</TableHead>
-              <TableHead className="min-w-[100px]">Location</TableHead>
-              <TableHead className="min-w-[160px]">Email</TableHead>
-              <TableHead className="min-w-[120px]">Phone</TableHead>
-              <TableHead className="min-w-[80px]">Status</TableHead>
+              <TableHead className="w-[22%]">Name</TableHead>
+              <TableHead className="w-[16%]">Title</TableHead>
+              <TableHead className="w-[14%]">Company</TableHead>
+              <TableHead className="w-[14%]">Location</TableHead>
+              <TableHead className="w-[16%]">Email</TableHead>
+              <TableHead className="w-[10%]">Phone</TableHead>
+              <TableHead className="w-[8%]">Status</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -139,13 +147,13 @@ export function LeadsTable({
                     </div>
                   </div>
                 </TableCell>
-                <TableCell>
-                  <span className="text-[11px] text-ink-secondary truncate">
+                <TableCell className="overflow-hidden">
+                  <span className="text-[11px] text-ink-secondary block truncate">
                     {contact.currentTitle || "-"}
                   </span>
                 </TableCell>
-                <TableCell>
-                  <span className="text-[11px] text-ink-secondary truncate">
+                <TableCell className="overflow-hidden">
+                  <span className="text-[11px] text-ink-secondary block truncate">
                     {contact.currentCompany || contact.companyName || "-"}
                   </span>
                 </TableCell>
@@ -199,7 +207,7 @@ export function LeadsTable({
                 <TableCell>
                   {contact.linkedinUrl && (
                     <a
-                      href={contact.linkedinUrl}
+                      href={contact.linkedinUrl.startsWith("http") ? contact.linkedinUrl : `https://www.linkedin.com/in/${contact.linkedinUrl}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-ink-muted hover:text-ink transition-colors"
@@ -222,6 +230,10 @@ export function LeadsTable({
             pageSize={pageSize}
             totalItems={totalItems}
             onPageChange={onPageChange}
+            startingRow={startingRow}
+            rowLimit={rowLimit}
+            unfilteredTotal={unfilteredTotal}
+            onRowLimitChange={onRowLimitChange}
           />
         </div>
       )}

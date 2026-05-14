@@ -295,20 +295,20 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
       <div className="space-y-4">
         {/* Search Name */}
 
-        {/* Job Titles */}
+        {/* Job Titles (pattern match — "contains any of") */}
         <TagInput
           label="Job Titles"
-          tags={filters.job_title_or || []}
-          onChange={(tags) => handleFilterChange({ job_title_or: tags })}
+          tags={filters.job_title_pattern_or || filters.job_title_or || []}
+          onChange={(tags) => handleFilterChange({ job_title_pattern_or: tags, job_title_or: undefined })}
           placeholder="e.g. SDR, Account Executive, Sales Engineer..."
           suggestions={["SDR", "BDR", "Account Executive", "Account Manager", "Sales Engineer", "Sales Manager", "VP Sales", "Customer Success", "Revenue Operations"]}
         />
 
-        {/* Excluded Titles */}
+        {/* Excluded Titles (pattern match) */}
         <TagInput
           label="Excluded Titles"
-          tags={filters.job_title_not || []}
-          onChange={(tags) => handleFilterChange({ job_title_not: tags })}
+          tags={filters.job_title_pattern_not || filters.job_title_not || []}
+          onChange={(tags) => handleFilterChange({ job_title_pattern_not: tags, job_title_not: undefined })}
           placeholder="e.g. intern, contract..."
           suggestions={["intern", "internship", "contract", "part-time", "temporary", "freelance", "volunteer"]}
         />

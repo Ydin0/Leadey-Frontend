@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { ArrowLeft, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { statusDot } from "@/lib/utils/lead-status";
 import { CompanyAvatar } from "./company-avatar";
 import type { FunnelLead } from "@/lib/types/funnel";
 
@@ -13,6 +12,13 @@ interface LeadListSidebarProps {
   onSelectIndex: (index: number) => void;
   onClose: () => void;
   funnelName: string;
+}
+
+interface CompanyGroup {
+  company: string;
+  domain?: string;
+  firstIndex: number;
+  count: number;
 }
 
 export function LeadListSidebar({
@@ -26,6 +32,10 @@ export function LeadListSidebar({
   const activeRef = useRef<HTMLButtonElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
+  const currentCompany = currentIndex >= 0 && currentIndex < leads.length
+    ? leads[currentIndex].company
+    : null;
+
   // Auto-scroll to active item
   useEffect(() => {
     if (activeRef.current && listRef.current) {
@@ -33,23 +43,43 @@ export function LeadListSidebar({
       const el = activeRef.current;
       const containerRect = container.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
-
       if (elRect.top < containerRect.top || elRect.bottom > containerRect.bottom) {
         el.scrollIntoView({ block: "center", behavior: "smooth" });
       }
     }
   }, [currentIndex]);
 
-  const filteredWithIndex = useMemo(() => {
-    if (!search) return leads.map((lead, i) => ({ lead, originalIndex: i }));
-    const q = search.toLowerCase();
-    return leads
-      .map((lead, i) => ({ lead, originalIndex: i }))
-      .filter(
-        ({ lead }) =>
-          lead.company.toLowerCase().includes(q) ||
-          lead.name.toLowerCase().includes(q)
-      );
+  // Group leads by company — just show companies, not individual contacts
+  const companyGroups = useMemo(() => {
+    const groups: CompanyGroup[] = [];
+    const seen = new Map<string, number>();
+
+    for (let i = 0; i < leads.length; i++) {
+      const lead = leads[i];
+      const key = lead.company || "Unknown";
+
+      // Apply search
+      if (search) {
+        const q = search.toLowerCase();
+        const matchesCompany = key.toLowerCase().includes(q);
+        const matchesName = lead.name.toLowerCase().includes(q);
+        if (!matchesCompany && !matchesName) continue;
+      }
+
+      if (seen.has(key)) {
+        groups[seen.get(key)!].count++;
+      } else {
+        seen.set(key, groups.length);
+        groups.push({
+          company: key,
+          domain: lead.companyDomain || lead.email?.split("@")[1],
+          firstIndex: i,
+          count: 1,
+        });
+      }
+    }
+
+    return groups;
   }, [leads, search]);
 
   return (
@@ -64,7 +94,7 @@ export function LeadListSidebar({
           Back to list
         </button>
         <div className="text-[10px] text-ink-faint">
-          {funnelName} &middot; {leads.length} leads
+          {funnelName} &middot; {companyGroups.length} companies
         </div>
       </div>
 
@@ -82,35 +112,33 @@ export function LeadListSidebar({
         </div>
       </div>
 
-      {/* Lead list */}
+      {/* Company list — flat, no dropdowns */}
       <div ref={listRef} className="flex-1 overflow-y-auto">
-        {filteredWithIndex.map(({ lead, originalIndex }) => {
-          const isActive = originalIndex === currentIndex;
+        {companyGroups.map((group) => {
+          const isActive = currentCompany === group.company;
           return (
             <button
-              key={lead.id}
+              key={group.company}
               ref={isActive ? activeRef : null}
-              onClick={() => onSelectIndex(originalIndex)}
+              type="button"
+              onClick={() => onSelectIndex(group.firstIndex)}
               className={cn(
-                "w-full text-left px-3 py-2 flex items-center gap-2 transition-colors border-l-2",
+                "w-full text-left px-3 py-2.5 flex items-center gap-2.5 transition-colors border-l-2",
                 isActive
                   ? "bg-hover border-signal-blue-text"
-                  : "border-transparent hover:bg-hover"
+                  : "border-transparent hover:bg-hover/50"
               )}
             >
-              <CompanyAvatar name={lead.company} size="sm" domain={lead.companyDomain || lead.email?.split("@")[1]} />
+              <CompanyAvatar name={group.company} size="sm" domain={group.domain} />
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className={cn(
-                    "text-[11px] truncate",
-                    isActive ? "font-medium text-ink" : "text-ink-secondary"
-                  )}>
-                    {lead.company}
-                  </span>
-                  <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", statusDot[lead.status])} />
-                </div>
-                <div className="text-[10px] text-ink-muted truncate">{lead.name}</div>
+                <span className={cn(
+                  "text-[11px] truncate block",
+                  isActive ? "font-medium text-ink" : "text-ink-secondary"
+                )}>
+                  {group.company}
+                </span>
               </div>
+              <span className="text-[9px] text-ink-faint shrink-0">{group.count}</span>
             </button>
           );
         })}

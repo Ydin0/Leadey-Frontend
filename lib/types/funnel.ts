@@ -31,6 +31,15 @@ export interface FunnelMetrics {
   completed: number;
 }
 
+export interface FunnelLeadEvent {
+  id: string;
+  type: string;
+  outcome: string | null;
+  stepIndex: number;
+  meta: Record<string, unknown> | null;
+  timestamp: Date;
+}
+
 export interface FunnelLead {
   id: string;
   name: string;
@@ -46,9 +55,13 @@ export interface FunnelLead {
   score: number;
   phone?: string | null;
   companyDomain?: string;
+  companyIndustry?: string;
+  companyEmployeeCount?: number;
+  companyLocation?: string;
   notes?: Record<string, string>;
   linkedinUrl?: string;
   unipileProviderId?: string | null;
+  events?: FunnelLeadEvent[];
 }
 
 export interface FunnelAnalyticsStep {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { ExternalLink, MapPin, Wifi } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import {
@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { SortableHeader } from "@/components/ui/sortable-header";
 import { CompanyCell } from "./company-cell";
 import { HiringTeamPopover } from "./hiring-team-popover";
 import type { SearchResultRow } from "@/lib/types/scraper";
@@ -28,6 +29,10 @@ interface ResultsTableProps {
   selectedIds: Set<string>;
   onSelectionChange: (ids: Set<string>) => void;
   crossPageSelection?: ReturnType<typeof useCrossPageSelection>;
+  startingRow?: number;
+  rowLimit?: number | null;
+  unfilteredTotal?: number;
+  onRowLimitChange?: (startingRow: number, rowLimit: number | null) => void;
 }
 
 const scoreColor = (score: number) =>
@@ -63,8 +68,31 @@ export function ResultsTable({
   selectedIds,
   onSelectionChange,
   crossPageSelection,
+  startingRow = 0,
+  rowLimit = null,
+  unfilteredTotal,
+  onRowLimitChange,
 }: ResultsTableProps) {
-  const pageIds = useMemo(() => rows.map((r) => r.id), [rows]);
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState(false);
+
+  function handleSort(field: string) {
+    if (sortField === field) setSortAsc(!sortAsc);
+    else { setSortField(field); setSortAsc(false); }
+  }
+
+  const sortedRows = useMemo(() => {
+    if (!sortField) return rows;
+    return [...rows].sort((a, b) => {
+      const av = (a as any)[sortField];
+      const bv = (b as any)[sortField];
+      if (typeof av === "string" && typeof bv === "string") return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      if (typeof av === "number" && typeof bv === "number") return sortAsc ? av - bv : bv - av;
+      return 0;
+    });
+  }, [rows, sortField, sortAsc]);
+
+  const pageIds = useMemo(() => sortedRows.map((r) => r.id), [sortedRows]);
   const allSelected = crossPageSelection
     ? crossPageSelection.isAllMatching || crossPageSelection.isPageFullySelected(pageIds)
     : rows.length > 0 && rows.every((r) => selectedIds.has(r.id));
@@ -115,26 +143,36 @@ export function ResultsTable({
                   className="rounded border-border-subtle"
                 />
               </TableHead>
-              <TableHead className="min-w-[200px]">Company</TableHead>
-              <TableHead className="min-w-[180px]">Job Title</TableHead>
+              <TableHead className="min-w-[200px]">
+                <SortableHeader label="Company" field="company" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="min-w-[180px]">
+                <SortableHeader label="Job Title" field="jobTitle" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
               <TableHead className="min-w-[80px]">Hiring Team</TableHead>
-              <TableHead>Location</TableHead>
+              <TableHead>
+                <SortableHeader label="Location" field="location" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
               <TableHead>Salary</TableHead>
-              <TableHead className="w-20">Posted</TableHead>
-              <TableHead className="w-16">Score</TableHead>
+              <TableHead className="w-20">
+                <SortableHeader label="Posted" field="postedAt" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-16">
+                <SortableHeader label="Score" field="score" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
               <TableHead className="w-20">Status</TableHead>
               <TableHead className="w-8" />
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.length === 0 ? (
+            {sortedRows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={10} className="text-center py-12 text-[12px] text-ink-muted">
                   No results yet. Run this search to discover job postings.
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row) => (
+              sortedRows.map((row) => (
                 <TableRow
                   key={row.id}
                   className={cn(isSelected(row.id) && "bg-signal-blue/5")}
@@ -240,6 +278,10 @@ export function ResultsTable({
             totalItems={totalCount}
             onPageChange={onPageChange}
             onPageSizeChange={onPageSizeChange}
+            startingRow={startingRow}
+            rowLimit={rowLimit}
+            unfilteredTotal={unfilteredTotal}
+            onRowLimitChange={onRowLimitChange}
           />
         </div>
       )}

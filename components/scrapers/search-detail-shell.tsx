@@ -12,6 +12,7 @@ import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { ResultsTable } from "./results-table";
 import { CompanyCell } from "./company-cell";
 import { EmptyState } from "@/components/shared/empty-state";
+import { RowLimitPopover } from "@/components/shared/row-limit-popover";
 import { LeadsTab } from "./leads/leads-tab";
 import { DiscoveryConfigModal } from "./leads/discovery-config-modal";
 import { startDiscovery, getContactCompanyCounts } from "@/lib/api/contacts";
@@ -26,6 +27,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { SortableHeader } from "@/components/ui/sortable-header";
 import { generateCSV, downloadCSV } from "@/lib/export-csv";
 import {
   getScraperAssignments, getSearchResults, triggerScraperRun,
@@ -70,6 +72,29 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
   // Run modal state
   const [showRunModal, setShowRunModal] = useState(false);
   const [runLimit, setRunLimit] = useState(100);
+
+  // Row limit for results table
+  const [resultsStartingRow, setResultsStartingRow] = useState(0);
+  const [resultsRowLimit, setResultsRowLimit] = useState<number | null>(null);
+
+  function handleResultsRowLimitChange(newStart: number, newLimit: number | null) {
+    setResultsStartingRow(newStart);
+    setResultsRowLimit(newLimit);
+    setPage(1);
+  }
+
+  // Row limit for companies tab
+  const [companiesStartingRow, setCompaniesStartingRow] = useState(0);
+  const [companiesRowLimit, setCompaniesRowLimit] = useState<number | null>(null);
+
+  function handleCompaniesRowLimitChange(newStart: number, newLimit: number | null) {
+    setCompaniesStartingRow(newStart);
+    setCompaniesRowLimit(newLimit);
+  }
+
+  // Search state per tab
+  const [jobsSearch, setJobsSearch] = useState("");
+  const [companiesSearch, setCompaniesSearch] = useState("");
 
   const fetchData = useCallback(async (p: number) => {
     try {
@@ -158,13 +183,17 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
       const { updateSavedSearch } = await import("@/lib/api/scrapers");
       await updateSavedSearch(searchId, { maxSignalsPerRun: runLimit });
       await triggerScraperRun(searchId);
+    } catch (err) {
+      console.error("Run failed:", err);
+    }
+    // Always refresh data after run (even if partially failed — signals may have been created)
+    try {
       setPage(1);
       setActiveRunId("");
       await fetchData(1);
       await fetchAllResults();
       await fetchCompanyLeadCounts();
-    } catch (err) {
-      console.error("Run failed:", err);
+    } catch {
     } finally {
       setRunning(false);
     }
@@ -231,7 +260,26 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
   }, [results, resolvedRunId, jobsFilter.isEmpty, jobsFilter.filteredRows]);
 
   const meta = results?.meta || { page: 1, pageSize: 25, totalCount: 0, totalPages: 0 };
-  const rows = displayedRows;
+
+  // Apply search + row limit to jobs rows
+  const rows = useMemo(() => {
+    let result = displayedRows;
+    // Apply text search
+    if (jobsSearch) {
+      const q = jobsSearch.toLowerCase();
+      result = result.filter((r) =>
+        r.jobTitle.toLowerCase().includes(q) ||
+        r.company.toLowerCase().includes(q) ||
+        (r.location || "").toLowerCase().includes(q)
+      );
+    }
+    // Apply row limit
+    const start = Math.min(resultsStartingRow, result.length);
+    if (resultsRowLimit !== null) {
+      return result.slice(start, start + resultsRowLimit);
+    }
+    return result.slice(start);
+  }, [displayedRows, resultsStartingRow, resultsRowLimit, jobsSearch]);
 
   const jobsCount = !jobsFilter.isEmpty ? rows.length : (resolvedRunId ? rows.length : meta.totalCount);
   const companiesCount = !companiesFilter.isEmpty ? companiesFilter.filteredCompanies.length : uniqueCompanies.length;
@@ -580,13 +628,15 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
             updateFilter={jobsFilter.updateFilter}
             clearAll={jobsFilter.clearAll}
             isEmpty={jobsFilter.isEmpty}
+            search={jobsSearch}
+            onSearchChange={setJobsSearch}
           />
           <ResultsTable
             rows={rows}
             page={!jobsFilter.isEmpty || resolvedRunId ? 1 : meta.page}
             pageSize={!jobsFilter.isEmpty || resolvedRunId ? rows.length || 1 : pageSize}
-            totalCount={!jobsFilter.isEmpty || resolvedRunId ? rows.length : meta.totalCount}
-            totalPages={!jobsFilter.isEmpty || resolvedRunId ? 1 : meta.totalPages}
+            totalCount={!jobsFilter.isEmpty || resolvedRunId ? rows.length : (resultsRowLimit !== null ? Math.min(resultsRowLimit, Math.max(0, meta.totalCount - resultsStartingRow)) : meta.totalCount)}
+            totalPages={!jobsFilter.isEmpty || resolvedRunId ? 1 : (resultsRowLimit !== null ? Math.max(1, Math.ceil(Math.min(resultsRowLimit, Math.max(0, meta.totalCount - resultsStartingRow)) / pageSize)) : meta.totalPages)}
             onPageChange={handlePageChange}
             onPageSizeChange={!jobsFilter.isEmpty && !resolvedRunId ? handlePageSizeChange : undefined}
             selectedIds={jobsSelection.selectedIds}
@@ -603,6 +653,10 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
               }
             }}
             crossPageSelection={jobsSelection}
+            startingRow={resultsStartingRow}
+            rowLimit={resultsRowLimit}
+            unfilteredTotal={meta.totalCount}
+            onRowLimitChange={handleResultsRowLimitChange}
           />
         </>
       )}
@@ -615,12 +669,26 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
             updateFilter={companiesFilter.updateFilter}
             clearAll={companiesFilter.clearAll}
             isEmpty={companiesFilter.isEmpty}
+            search={companiesSearch}
+            onSearchChange={setCompaniesSearch}
           />
           <CompaniesTab
-            companies={companiesFilter.filteredCompanies}
+            companies={companiesSearch
+              ? companiesFilter.filteredCompanies.filter((c) => {
+                  const q = companiesSearch.toLowerCase();
+                  return c.name.toLowerCase().includes(q) ||
+                    (c.domain || "").toLowerCase().includes(q) ||
+                    (c.industry || "").toLowerCase().includes(q) ||
+                    (c.city || "").toLowerCase().includes(q) ||
+                    (c.country || "").toLowerCase().includes(q);
+                })
+              : companiesFilter.filteredCompanies}
             selection={companiesSelection}
             pageSize={pageSize}
             onPageSizeChange={handlePageSizeChange}
+            startingRow={companiesStartingRow}
+            rowLimit={companiesRowLimit}
+            onRowLimitChange={handleCompaniesRowLimitChange}
           />
         </>
       )}
@@ -778,17 +846,53 @@ function CompaniesTab({
   selection,
   pageSize: parentPageSize,
   onPageSizeChange,
+  startingRow = 0,
+  rowLimit = null,
+  onRowLimitChange,
 }: {
   companies: UniqueCompany[];
   selection: ReturnType<typeof useCrossPageSelection>;
   pageSize: number;
   onPageSizeChange: (size: number) => void;
+  startingRow?: number;
+  rowLimit?: number | null;
+  onRowLimitChange?: (startingRow: number, rowLimit: number | null) => void;
 }) {
   const [companyPage, setCompanyPage] = useState(1);
+  const [sortField, setSortField] = useState<string | null>(null);
+  const [sortAsc, setSortAsc] = useState(false);
 
-  const totalPages = Math.max(1, Math.ceil(companies.length / parentPageSize));
+  function handleSort(field: string) {
+    if (sortField === field) setSortAsc(!sortAsc);
+    else { setSortField(field); setSortAsc(false); }
+    setCompanyPage(1);
+  }
+
+  // Apply row limit + sort
+  const limitedCompanies = useMemo(() => {
+    let result = companies;
+
+    // Sort
+    if (sortField) {
+      result = [...result].sort((a, b) => {
+        const av = (a as any)[sortField];
+        const bv = (b as any)[sortField];
+        if (typeof av === "string" && typeof bv === "string") return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+        if (typeof av === "number" && typeof bv === "number") return sortAsc ? av - bv : bv - av;
+        return 0;
+      });
+    }
+
+    const start = Math.min(startingRow, result.length);
+    if (rowLimit !== null) {
+      return result.slice(start, start + rowLimit);
+    }
+    return result.slice(start);
+  }, [companies, startingRow, rowLimit, sortField, sortAsc]);
+
+  const totalPages = Math.max(1, Math.ceil(limitedCompanies.length / parentPageSize));
   const safeCompanyPage = Math.min(companyPage, totalPages);
-  const paginatedCompanies = companies.slice(
+  const paginatedCompanies = limitedCompanies.slice(
     (safeCompanyPage - 1) * parentPageSize,
     safeCompanyPage * parentPageSize,
   );
@@ -827,8 +931,17 @@ function CompaniesTab({
       {/* Header bar */}
       <div className="flex items-center gap-3 mb-4">
         <span className="text-[12px] font-medium text-ink">
-          {companies.length} companies
+          {limitedCompanies.length} companies
         </span>
+        {onRowLimitChange && (
+          <RowLimitPopover
+            startingRow={startingRow}
+            rowLimit={rowLimit ?? null}
+            totalItems={companies.length}
+            onApply={onRowLimitChange}
+            position="below"
+          />
+        )}
         <div className="ml-auto">
           <button
             onClick={handleExportCompanies}
@@ -852,12 +965,24 @@ function CompaniesTab({
                   className="rounded border-border-subtle"
                 />
               </TableHead>
-              <TableHead className="min-w-[200px]">Company</TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Employees</TableHead>
-              <TableHead>Funding</TableHead>
-              <TableHead className="w-20">Jobs</TableHead>
-              <TableHead className="w-20">Leads</TableHead>
+              <TableHead className="min-w-[200px]">
+                <SortableHeader label="Company" field="name" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
+              <TableHead>
+                <SortableHeader label="Location" field="city" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
+              <TableHead>
+                <SortableHeader label="Employees" field="employeeCount" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
+              <TableHead>
+                <SortableHeader label="Funding" field="fundingStage" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-20">
+                <SortableHeader label="Jobs" field="jobCount" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
+              <TableHead className="w-20">
+                <SortableHeader label="Leads" field="leadCount" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
+              </TableHead>
               <TableHead className="w-8" />
             </TableRow>
           </TableHeader>
@@ -928,7 +1053,7 @@ function CompaniesTab({
             currentPage={safeCompanyPage}
             totalPages={totalPages}
             pageSize={parentPageSize}
-            totalItems={companies.length}
+            totalItems={limitedCompanies.length}
             onPageChange={(p) => setCompanyPage(p)}
             onPageSizeChange={onPageSizeChange}
           />

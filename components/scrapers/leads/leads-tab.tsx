@@ -3,16 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Users, Search, Sparkles, FolderInput, EyeOff, Loader2,
-  ChevronDown, X as XIcon, Ban, Download, ListFilter,
+  ChevronDown, X as XIcon, Ban, Download, RotateCcw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { EmptyState } from "@/components/shared/empty-state";
 import { generateCSV, downloadCSV } from "@/lib/export-csv";
 import { DiscoveryConfigModal } from "./discovery-config-modal";
+import { RowLimitPopover } from "@/components/shared/row-limit-popover";
 import { LeadsTable } from "./leads-table";
 import { LeadsFilterBar, type LeadsFilters } from "./leads-filter-bar";
-import { DiscoveryRunsList } from "./discovery-runs-list";
 import { useCrossPageSelection } from "@/lib/hooks/use-cross-page-selection";
 import type { ScraperContactRow, DiscoveryRunRow, DiscoveryConfig } from "@/lib/types/contact";
 import {
@@ -21,11 +21,13 @@ import {
   pollDiscoveryRun,
   cancelDiscoveryRun,
   getContacts,
+  getContactCompanyCounts,
   enrichContacts,
   pollEnrichmentAll,
   bulkUpdateContactStatus,
   sendContactsToFunnel,
   resetEnrichment,
+  resetStuckEnrichments,
 } from "@/lib/api/contacts";
 import { listFunnels } from "@/lib/api/funnels";
 import type { Funnel } from "@/lib/types/funnel";
@@ -65,8 +67,16 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
 
   // Row limit
   const [rowLimit, setRowLimit] = useState<number | null>(null);
-  const [showLimitMenu, setShowLimitMenu] = useState(false);
-  const limitRef = useRef<HTMLDivElement>(null);
+  const [startingRow, setStartingRow] = useState(0);
+
+  function handleLeadsRowLimitChange(newStart: number, newLimit: number | null) {
+    setStartingRow(newStart);
+    setRowLimit(newLimit);
+    setPage(1);
+    // Re-fetch for the new starting position
+    const actualPage = Math.floor(newStart / pageSize) + 1;
+    fetchContacts(actualPage);
+  }
 
   // Export
   const [exporting, setExporting] = useState(false);
@@ -81,7 +91,15 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
   const [filters, setFilters] = useState<LeadsFilters>({
     enrichmentStatus: null,
     contactStatus: null,
+    companies: [],
+    title: "",
+    location: "",
+    hasEmail: null,
+    hasPhone: null,
   });
+
+  // Company options for searchable dropdown
+  const [companyOptions, setCompanyOptions] = useState<{ name: string; count: number }[]>([]);
 
   // Status message (toast)
   const [statusMessage, setStatusMessage] = useState<StatusMessage | null>(null);
@@ -107,13 +125,19 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
         pageSize,
         status: activeFilters.contactStatus || undefined,
         enrichmentStatus: activeFilters.enrichmentStatus || undefined,
+        company: activeFilters.companies.length > 0 ? activeFilters.companies.join(",") : undefined,
+        title: activeFilters.title || undefined,
+        location: activeFilters.location || undefined,
+        hasEmail: activeFilters.hasEmail || undefined,
+        hasPhone: activeFilters.hasPhone || undefined,
       });
       setContacts(result.data);
       setTotalCount(result.meta.totalCount);
       setTotalPages(result.meta.totalPages);
 
       // Also get unfiltered count for tab
-      if (activeFilters.contactStatus || activeFilters.enrichmentStatus) {
+      const hasActiveFilters = activeFilters.contactStatus || activeFilters.enrichmentStatus || activeFilters.companies.length > 0 || activeFilters.title || activeFilters.location || activeFilters.hasEmail || activeFilters.hasPhone;
+      if (hasActiveFilters) {
         const unfilteredResult = await getContacts({ assignmentId, page: 1, pageSize: 1 });
         onCountChange?.(unfilteredResult.meta.totalCount);
       } else {
@@ -138,6 +162,16 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
           setActiveRun(runningRun);
         }
         await fetchContacts(1);
+        // Load company options for filter dropdown
+        try {
+          const counts = await getContactCompanyCounts(assignmentId);
+          setCompanyOptions(
+            counts
+              .filter((c) => c.companyName)
+              .map((c) => ({ name: c.companyName!, count: c.count }))
+              .sort((a, b) => b.count - a.count)
+          );
+        } catch {}
       } finally {
         setLoading(false);
       }
@@ -203,9 +237,6 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
     function handleClick(e: MouseEvent) {
       if (funnelRef.current && !funnelRef.current.contains(e.target as Node)) {
         setShowFunnelPicker(false);
-      }
-      if (limitRef.current && !limitRef.current.contains(e.target as Node)) {
-        setShowLimitMenu(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
@@ -431,6 +462,21 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
     }
   }
 
+  async function handleResetStuck() {
+    try {
+      const result = await resetStuckEnrichments(assignmentId);
+      if (result.reset > 0) {
+        showStatus("success", `Reset ${result.reset} stuck contacts — you can now re-enrich them`);
+        await fetchContacts(page);
+      } else {
+        showStatus("success", "No stuck contacts found");
+      }
+    } catch (err) {
+      showStatus("error", "Failed to reset stuck contacts");
+      console.error("Failed to reset stuck:", err);
+    }
+  }
+
   function handleFiltersChange(newFilters: LeadsFilters) {
     setFilters(newFilters);
     setPage(1);
@@ -440,7 +486,9 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
 
   function handlePageChange(p: number) {
     setPage(p);
-    fetchContacts(p);
+    // Map user's page to actual API page accounting for startingRow offset
+    const pageOffset = Math.floor(startingRow / pageSize);
+    fetchContacts(p + pageOffset);
   }
 
   if (loading) {
@@ -486,10 +534,10 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
   }
 
   // Empty state (no contacts and no active filters)
-  if (totalCount === 0 && !filters.enrichmentStatus && !filters.contactStatus) {
+  const noFiltersActive = !filters.enrichmentStatus && !filters.contactStatus && filters.companies.length === 0 && !filters.title && !filters.location && !filters.hasEmail && !filters.hasPhone;
+  if (totalCount === 0 && noFiltersActive) {
     return (
       <>
-        <DiscoveryRunsList runs={discoveryRuns} />
         <EmptyState
           icon={Users}
           title="No contacts yet"
@@ -509,6 +557,7 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
   }
 
   // Populated state
+  const hasPendingContacts = contacts.some((c) => c.enrichmentStatus === "pending");
   const hasUnenriched = contacts.some((c) => selection.selectedIds.has(c.id) && c.enrichmentStatus === "none");
 
   return (
@@ -533,55 +582,35 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
         </div>
       )}
 
-      {/* Discovery runs history */}
-      <DiscoveryRunsList runs={discoveryRuns} />
+      {/* Filters row (matches Companies tab layout) */}
+      <LeadsFilterBar
+        filters={filters}
+        onChange={handleFiltersChange}
+        companyOptions={companyOptions}
+      />
 
-      {/* Header bar */}
+      {/* Count + rows + actions row */}
       <div className="flex items-center gap-3 mb-4">
         <span className="text-[12px] font-medium text-ink">
           {totalCount} contacts
         </span>
-
-        {/* Row limit dropdown */}
-        {totalCount > 25 && (
-          <div className="relative" ref={limitRef}>
-            <button
-              onClick={() => setShowLimitMenu(!showLimitMenu)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-[20px] text-[11px] font-medium text-ink-secondary border border-border-subtle hover:bg-hover transition-colors"
-            >
-              <ListFilter size={11} />
-              Working with {rowLimit ?? "All"}
-              <ChevronDown size={10} />
-            </button>
-            {showLimitMenu && (
-              <div className="absolute top-full left-0 mt-1 w-36 bg-surface rounded-[10px] border border-border-default shadow-lg py-1 z-20">
-                {[25, 50, 100, 200].filter((n) => n < totalCount).map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => { setRowLimit(n); setShowLimitMenu(false); }}
-                    className={cn(
-                      "w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover transition-colors",
-                      rowLimit === n ? "font-semibold text-ink" : "text-ink-secondary",
-                    )}
-                  >
-                    {n}
-                  </button>
-                ))}
-                <button
-                  onClick={() => { setRowLimit(null); setShowLimitMenu(false); }}
-                  className={cn(
-                    "w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover transition-colors",
-                    rowLimit === null ? "font-semibold text-ink" : "text-ink-secondary",
-                  )}
-                >
-                  All
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
+        <RowLimitPopover
+          startingRow={startingRow}
+          rowLimit={rowLimit}
+          totalItems={totalCount}
+          onApply={handleLeadsRowLimitChange}
+          position="below"
+        />
         <div className="flex items-center gap-1.5 ml-auto">
+          {hasPendingContacts && (
+            <button
+              onClick={handleResetStuck}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] text-[11px] font-medium bg-signal-red/10 text-signal-red-text hover:bg-signal-red/20 transition-colors"
+            >
+              <RotateCcw size={11} />
+              Reset Stuck
+            </button>
+          )}
           <button
             onClick={handleExport}
             disabled={totalCount === 0 || exporting}
@@ -611,9 +640,6 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
           </button>
         </div>
       </div>
-
-      {/* Filters */}
-      <LeadsFilterBar filters={filters} onChange={handleFiltersChange} />
 
       {/* Fixed bottom bulk action bar — doesn't shift table layout */}
       {selection.selectedCount > 0 && (
@@ -701,10 +727,32 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
       )}
 
       <LeadsTable
-        contacts={contacts}
+        contacts={(() => {
+          // Slice contacts based on startingRow offset within the current page
+          const offsetInPage = startingRow % pageSize;
+          let sliced = page === 1 && offsetInPage > 0 ? contacts.slice(offsetInPage) : contacts;
+          // Cap to rowLimit if on the last effective page
+          if (rowLimit !== null) {
+            const effectiveTotal = Math.min(rowLimit, Math.max(0, totalCount - startingRow));
+            const itemsBeforeThisPage = (page - 1) * pageSize;
+            const remainingInWindow = effectiveTotal - itemsBeforeThisPage;
+            if (remainingInWindow < sliced.length) {
+              sliced = sliced.slice(0, Math.max(0, remainingInWindow));
+            }
+          }
+          return sliced;
+        })()}
         page={page}
-        totalPages={totalPages}
-        totalItems={totalCount}
+        totalPages={(() => {
+          const effectiveTotal = rowLimit !== null
+            ? Math.min(rowLimit, Math.max(0, totalCount - startingRow))
+            : Math.max(0, totalCount - startingRow);
+          return Math.max(1, Math.ceil(effectiveTotal / pageSize));
+        })()}
+        totalItems={(() => {
+          if (rowLimit !== null) return Math.min(rowLimit, Math.max(0, totalCount - startingRow));
+          return Math.max(0, totalCount - startingRow);
+        })()}
         pageSize={pageSize}
         onPageChange={handlePageChange}
         selectedIds={selection.selectedIds}
@@ -712,6 +760,10 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
         crossPageSelection={selection}
         onEnrichSingle={handleEnrichSingle}
         onRetryEnrichment={handleRetryEnrichment}
+        startingRow={startingRow}
+        rowLimit={rowLimit}
+        unfilteredTotal={totalCount}
+        onRowLimitChange={handleLeadsRowLimitChange}
       />
 
       <DiscoveryConfigModal

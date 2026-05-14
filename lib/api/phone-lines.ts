@@ -1,5 +1,5 @@
-import { apiRequest } from "./client";
-import type { PhoneLine, CallRecord, RegulatoryBundle } from "@/lib/types/calling";
+import { apiRequest, apiRequestRaw, getAuthToken } from "./client";
+import type { PhoneLine, CallRecord, RegulatoryBundle, BundleDocument } from "@/lib/types/calling";
 
 // ── Phone Lines ───────────────────────────────────
 
@@ -57,16 +57,26 @@ export async function releasePhoneLine(id: string): Promise<{ id: string; status
 export async function getCallRecords(params?: {
   lineId?: string;
   direction?: string;
+  userId?: string;
+  disposition?: string;
+  hasRecording?: string;
+  search?: string;
+  page?: number;
   limit?: number;
   offset?: number;
-}): Promise<CallRecord[]> {
+}): Promise<{ data: CallRecord[]; meta: { page: number; pageSize: number; totalCount: number; totalPages: number } }> {
   const searchParams = new URLSearchParams();
   if (params?.lineId) searchParams.set("lineId", params.lineId);
   if (params?.direction) searchParams.set("direction", params.direction);
+  if (params?.userId) searchParams.set("userId", params.userId);
+  if (params?.disposition) searchParams.set("disposition", params.disposition);
+  if (params?.hasRecording) searchParams.set("hasRecording", params.hasRecording);
+  if (params?.search) searchParams.set("search", params.search);
+  if (params?.page) searchParams.set("page", String(params.page));
   if (params?.limit) searchParams.set("limit", String(params.limit));
   if (params?.offset) searchParams.set("offset", String(params.offset));
   const qs = searchParams.toString();
-  return apiRequest<CallRecord[]>(`/phone-lines/call-records${qs ? `?${qs}` : ""}`);
+  return apiRequestRaw<{ data: CallRecord[]; meta: { page: number; pageSize: number; totalCount: number; totalPages: number } }>(`/phone-lines/call-records${qs ? `?${qs}` : ""}`);
 }
 
 export async function saveCallRecord(data: {
@@ -79,11 +89,22 @@ export async function saveCallRecord(data: {
   companyName?: string | null;
   duration: number;
   disposition: string;
+  userId?: string;
+  userName?: string;
 }): Promise<CallRecord> {
   return apiRequest<CallRecord>("/phone-lines/call-records", {
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+export async function summarizeCall(
+  callRecordId: string,
+): Promise<{ transcript: string | null; summary: string | null }> {
+  return apiRequest<{ transcript: string | null; summary: string | null }>(
+    `/phone-lines/call-records/${callRecordId}/summarize`,
+    { method: "POST" },
+  );
 }
 
 // ── Regulatory Bundles ────────────────────────────
@@ -98,12 +119,51 @@ export async function createBundle(data: {
   countryCode: string;
   businessName: string;
   businessAddress?: string;
+  businessRegistrationNumber?: string;
+  businessType?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   identityDocumentName?: string;
 }): Promise<RegulatoryBundle> {
   return apiRequest<RegulatoryBundle>("/phone-lines/bundles", {
     method: "POST",
     body: JSON.stringify(data),
   });
+}
+
+export async function getBundleDocuments(bundleId: string): Promise<BundleDocument[]> {
+  return apiRequest<BundleDocument[]>(`/phone-lines/bundles/${bundleId}/documents`);
+}
+
+export async function uploadBundleDocument(
+  bundleId: string,
+  file: File,
+  documentType: string,
+): Promise<BundleDocument> {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("documentType", documentType);
+
+  const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:3001";
+  const headers: Record<string, string> = {};
+  const token = getAuthToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE}/api/phone-lines/bundles/${bundleId}/documents`, {
+    method: "POST",
+    headers,
+    body: formData,
+  });
+
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload?.error?.message || `Upload failed (${response.status})`);
+  }
+  return payload.data;
+}
+
+export async function deleteBundleDocument(bundleId: string, docId: string): Promise<void> {
+  await apiRequest(`/phone-lines/bundles/${bundleId}/documents/${docId}`, { method: "DELETE" });
 }
 
 export async function submitBundle(id: string): Promise<{ id: string; status: string; twilioBundleSid: string | null }> {

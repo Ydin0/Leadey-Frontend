@@ -58,6 +58,11 @@ export async function getContacts(opts: {
   pageSize?: number;
   status?: string;
   enrichmentStatus?: string;
+  company?: string;
+  title?: string;
+  location?: string;
+  hasEmail?: string;
+  hasPhone?: string;
 }): Promise<{ data: ScraperContactRow[]; meta: { page: number; pageSize: number; totalCount: number; totalPages: number } }> {
   const params = new URLSearchParams();
   params.set("assignmentId", opts.assignmentId);
@@ -65,6 +70,11 @@ export async function getContacts(opts: {
   if (opts.pageSize) params.set("pageSize", String(opts.pageSize));
   if (opts.status) params.set("status", opts.status);
   if (opts.enrichmentStatus) params.set("enrichmentStatus", opts.enrichmentStatus);
+  if (opts.company) params.set("company", opts.company);
+  if (opts.title) params.set("title", opts.title);
+  if (opts.location) params.set("location", opts.location);
+  if (opts.hasEmail) params.set("hasEmail", opts.hasEmail);
+  if (opts.hasPhone) params.set("hasPhone", opts.hasPhone);
   return apiRequestRaw(`/contacts?${params}`);
 }
 
@@ -138,5 +148,14 @@ export async function resetEnrichment(
   return apiRequest(`/contacts/reset-enrichment`, {
     method: "POST",
     body: JSON.stringify({ contactIds }),
+  });
+}
+
+export async function resetStuckEnrichments(
+  assignmentId: string,
+): Promise<{ reset: number }> {
+  return apiRequest(`/contacts/reset-stuck`, {
+    method: "POST",
+    body: JSON.stringify({ assignmentId }),
   });
 }

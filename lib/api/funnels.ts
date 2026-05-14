@@ -2,6 +2,7 @@ import type {
   Funnel,
   FunnelChannel,
   FunnelLead,
+  FunnelLeadEvent,
   FunnelMember,
   LeadStatus,
   FunnelStatus,
@@ -70,6 +71,18 @@ function asLeadStatus(value: unknown): LeadStatus {
 
 function hydrateLead(raw: ApiFunnelLead): FunnelLead {
   const notes = (raw as any).notes;
+  const rawEvents = (raw as any).events;
+  const events: FunnelLeadEvent[] = Array.isArray(rawEvents)
+    ? rawEvents.map((e: any) => ({
+        id: asString(e.id),
+        type: asString(e.type),
+        outcome: e.outcome ? asString(e.outcome) : null,
+        stepIndex: asNumber(e.stepIndex),
+        meta: e.meta && typeof e.meta === "object" ? e.meta : null,
+        timestamp: parseDate(e.timestamp),
+      }))
+    : [];
+
   return {
     id: asString(raw.id),
     name: asString(raw.name),
@@ -85,8 +98,13 @@ function hydrateLead(raw: ApiFunnelLead): FunnelLead {
     score: asNumber(raw.score),
     phone: (raw as any).phone || null,
     companyDomain: (raw as any).companyDomain || undefined,
+    companyIndustry: (raw as any).companyIndustry || undefined,
+    companyEmployeeCount: (raw as any).companyEmployeeCount ? asNumber((raw as any).companyEmployeeCount) : undefined,
+    companyLocation: (raw as any).companyLocation || undefined,
     notes: notes && typeof notes === "object" && !Array.isArray(notes) ? notes : undefined,
+    linkedinUrl: (raw as any).linkedinUrl || undefined,
     unipileProviderId: (raw as any).unipileProviderId || null,
+    events,
   };
 }
 
@@ -257,6 +275,60 @@ export async function deleteFunnel(funnelId: string): Promise<void> {
     `/funnels/${encodeURIComponent(funnelId)}`,
     { method: "DELETE" }
   );
+}
+
+export async function backfillCompanyData(): Promise<{ total: number; updated: number }> {
+  return apiRequest<{ total: number; updated: number }>("/funnels/backfill-company-data", {
+    method: "POST",
+  });
+}
+
+// ─── Funnel Members ─────────────────────────────────────────────────
+
+export interface FunnelMemberData {
+  id: string;
+  userId: string;
+  role: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  imageUrl?: string | null;
+  createdAt: string;
+}
+
+export async function getFunnelMembers(funnelId: string): Promise<FunnelMemberData[]> {
+  return apiRequest<FunnelMemberData[]>(`/funnels/${encodeURIComponent(funnelId)}/members`);
+}
+
+export async function addFunnelMember(
+  funnelId: string,
+  userId: string,
+  role: string,
+): Promise<FunnelMemberData> {
+  return apiRequest<FunnelMemberData>(`/funnels/${encodeURIComponent(funnelId)}/members`, {
+    method: "POST",
+    body: JSON.stringify({ userId, role }),
+  });
+}
+
+export async function updateFunnelMemberRole(
+  funnelId: string,
+  userId: string,
+  role: string,
+): Promise<{ id: string; userId: string; role: string }> {
+  return apiRequest(`/funnels/${encodeURIComponent(funnelId)}/members/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function removeFunnelMember(
+  funnelId: string,
+  userId: string,
+): Promise<void> {
+  await apiRequest(`/funnels/${encodeURIComponent(funnelId)}/members/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function updateFunnelStatus(

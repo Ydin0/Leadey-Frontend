@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Phone } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import {
@@ -12,6 +12,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { useRowLimit } from "@/lib/hooks/use-row-limit";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PhoneLineStatusBadge } from "@/components/calling/shared/phone-line-status-badge";
 import { countryOptions } from "@/lib/constants/calling";
@@ -41,8 +42,11 @@ export function PhoneLinesTable({ lines, filters, onSelectLine, onProvision }: P
     });
   }, [lines, filters]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const resetPage = useCallback(() => setCurrentPage(1), []);
+  const { limited, startingRow, rowLimit, unfilteredTotal, handleRowLimitChange } = useRowLimit(filtered, resetPage);
+
+  const totalPages = Math.max(1, Math.ceil(limited.length / PAGE_SIZE));
+  const paginated = limited.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -190,8 +194,12 @@ export function PhoneLinesTable({ lines, filters, onSelectLine, onProvision }: P
         currentPage={currentPage}
         totalPages={totalPages}
         pageSize={PAGE_SIZE}
-        totalItems={filtered.length}
+        totalItems={limited.length}
         onPageChange={setCurrentPage}
+        startingRow={startingRow}
+        rowLimit={rowLimit}
+        unfilteredTotal={unfilteredTotal}
+        onRowLimitChange={handleRowLimitChange}
       />
     </div>
   );

@@ -30,7 +30,8 @@ export function SearchBuilderShell({ mode, initialData }: SearchBuilderShellProp
   const [saving, setSaving] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
 
-  const canSave = (filters.job_title_or?.length ?? 0) > 0 && (filters.job_country_code_or?.length ?? 0) > 0 && searchName.trim().length > 0;
+  const hasJobTitles = (filters.job_title_pattern_or?.length ?? 0) > 0 || (filters.job_title_or?.length ?? 0) > 0;
+  const canSave = hasJobTitles && (filters.job_country_code_or?.length ?? 0) > 0 && searchName.trim().length > 0;
 
   const handleSave = useCallback(async () => {
     if (!canSave || saving) return;
@@ -45,6 +46,7 @@ export function SearchBuilderShell({ mode, initialData }: SearchBuilderShellProp
           maxSignalsPerRun,
         });
         router.push(`/dashboard/scrapers/${initialData.id}`);
+        router.refresh();
       } else {
         const result = await createSavedSearch({
           searchName,
@@ -54,6 +56,7 @@ export function SearchBuilderShell({ mode, initialData }: SearchBuilderShellProp
           maxSignalsPerRun,
         });
         router.push(`/dashboard/scrapers/${result.id}`);
+        router.refresh();
       }
     } catch (err) {
       console.error("Save failed:", err);
@@ -165,7 +168,7 @@ export function SearchBuilderShell({ mode, initialData }: SearchBuilderShellProp
         {searchName.trim().length === 0 && (
           <p className="text-[11px] text-signal-red-text">Search name is required.</p>
         )}
-        {(filters.job_title_or?.length ?? 0) === 0 && (
+        {!hasJobTitles && (
           <p className="text-[11px] text-signal-red-text">At least one job title is required.</p>
         )}
         {(filters.job_country_code_or?.length ?? 0) === 0 && (

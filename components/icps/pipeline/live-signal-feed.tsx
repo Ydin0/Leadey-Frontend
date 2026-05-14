@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { GitFork, Users } from "lucide-react";
 import { SignalRow } from "./signal-row";
+import { RowLimitPopover } from "@/components/shared/row-limit-popover";
 import type { LiveSignal } from "@/lib/types/pipeline";
 
 interface LiveSignalFeedProps {
@@ -11,6 +12,21 @@ interface LiveSignalFeedProps {
 
 export function LiveSignalFeed({ signals }: LiveSignalFeedProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [startingRow, setStartingRow] = useState(0);
+  const [rowLimit, setRowLimit] = useState<number | null>(null);
+
+  function handleRowLimitChange(newStart: number, newLimit: number | null) {
+    setStartingRow(newStart);
+    setRowLimit(newLimit);
+  }
+
+  const visibleSignals = (() => {
+    const start = Math.min(startingRow, signals.length);
+    if (rowLimit !== null) {
+      return signals.slice(start, start + rowLimit);
+    }
+    return signals.slice(start);
+  })();
 
   function toggleSelect(id: string) {
     setSelected((prev) => {
@@ -42,9 +58,18 @@ export function LiveSignalFeed({ signals }: LiveSignalFeedProps) {
             {signals.length}
           </span>
         </div>
-        <button onClick={selectAllEnriched} className="text-[10px] text-signal-blue-text hover:text-signal-blue-text/80 transition-colors">
-          Select All Enriched
-        </button>
+        <div className="flex items-center gap-2">
+          <RowLimitPopover
+            startingRow={startingRow}
+            rowLimit={rowLimit}
+            totalItems={signals.length}
+            onApply={handleRowLimitChange}
+            position="below"
+          />
+          <button onClick={selectAllEnriched} className="text-[10px] text-signal-blue-text hover:text-signal-blue-text/80 transition-colors">
+            Select All Enriched
+          </button>
+        </div>
       </div>
 
       {/* Bulk Actions */}
@@ -64,7 +89,7 @@ export function LiveSignalFeed({ signals }: LiveSignalFeedProps) {
 
       {/* Signal Rows */}
       <div className="divide-y divide-border-subtle">
-        {signals.map((signal) => (
+        {visibleSignals.map((signal) => (
           <SignalRow
             key={signal.id}
             signal={signal}

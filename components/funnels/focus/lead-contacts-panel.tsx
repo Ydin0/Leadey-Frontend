@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Mail, MessageSquare, Phone } from "lucide-react";
+import { ChevronDown, ChevronRight, Mail, Linkedin, Phone } from "lucide-react";
 import type { FunnelLeadContact } from "@/lib/types/funnel-focus";
 
 interface LeadContactsPanelProps {
@@ -51,28 +51,46 @@ export function LeadContactsPanel({ contacts }: LeadContactsPanelProps) {
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0 ml-2">
-                  {contact.email && (
-                    <button className="p-1 rounded-md hover:bg-section transition-colors">
+                  {/* Email */}
+                  {contact.email ? (
+                    <a href={`mailto:${contact.email}`} title={contact.email} className="p-1 rounded-md hover:bg-section transition-colors">
                       <Mail size={14} strokeWidth={1.5} className="text-ink-faint hover:text-ink" />
-                    </button>
+                    </a>
+                  ) : (
+                    <span title="No email" className="p-1 rounded-md relative cursor-not-allowed">
+                      <Mail size={14} strokeWidth={1.5} className="text-ink-faint/30" />
+                      <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[18px] h-px bg-signal-red-text/40 rotate-[-45deg]" />
+                    </span>
                   )}
-                  {contact.linkedinUrl && (
+
+                  {/* LinkedIn */}
+                  {contact.linkedinUrl ? (
                     <a
-                      href={contact.linkedinUrl}
+                      href={contact.linkedinUrl.startsWith("http") ? contact.linkedinUrl : `https://www.linkedin.com/in/${contact.linkedinUrl}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1 rounded-md hover:bg-section transition-colors"
+                      title="Open LinkedIn"
+                      className="p-1 rounded-md hover:bg-[#0A66C2]/10 transition-colors"
                     >
-                      <MessageSquare size={14} strokeWidth={1.5} className="text-ink-faint hover:text-ink" />
+                      <Linkedin size={14} strokeWidth={1.5} className="text-[#0A66C2]" />
                     </a>
+                  ) : (
+                    <span title="No LinkedIn" className="p-1 rounded-md relative cursor-not-allowed">
+                      <Linkedin size={14} strokeWidth={1.5} className="text-ink-faint/30" />
+                      <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[18px] h-px bg-signal-red-text/40 rotate-[-45deg]" />
+                    </span>
                   )}
-                  {contact.phone && (
-                    <a
-                      href={`tel:${contact.phone}`}
-                      className="p-1 rounded-md hover:bg-section transition-colors"
-                    >
+
+                  {/* Phone */}
+                  {contact.phone ? (
+                    <a href={`tel:${contact.phone}`} title={contact.phone} className="p-1 rounded-md hover:bg-section transition-colors">
                       <Phone size={14} strokeWidth={1.5} className="text-ink-faint hover:text-ink" />
                     </a>
+                  ) : (
+                    <span title="No phone number" className="p-1 rounded-md relative cursor-not-allowed">
+                      <Phone size={14} strokeWidth={1.5} className="text-ink-faint/30" />
+                      <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[18px] h-px bg-signal-red-text/40 rotate-[-45deg]" />
+                    </span>
                   )}
                 </div>
               </div>

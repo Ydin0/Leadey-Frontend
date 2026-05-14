@@ -16,9 +16,10 @@ interface SearchCardProps {
 
 function getFilterSummaryPills(filters: TheirStackFilters): string[] {
   const pills: string[] = [];
-  if (filters.job_title_or?.length) {
-    pills.push(...filters.job_title_or.slice(0, 3));
-    if (filters.job_title_or.length > 3) pills.push(`+${filters.job_title_or.length - 3}`);
+  const titles = filters.job_title_pattern_or ?? filters.job_title_or;
+  if (titles?.length) {
+    pills.push(...titles.slice(0, 3));
+    if (titles.length > 3) pills.push(`+${titles.length - 3}`);
   }
   if (filters.job_country_code_or?.length) {
     pills.push(...filters.job_country_code_or.slice(0, 3));

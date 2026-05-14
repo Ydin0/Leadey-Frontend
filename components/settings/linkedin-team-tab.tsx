@@ -1,76 +1,45 @@
-import { cn, formatRelativeTime } from "@/lib/utils";
+"use client";
+
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { getTeamMembers } from "@/lib/api/team";
 import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
+  Table, TableHeader, TableBody, TableRow, TableHead, TableCell,
 } from "@/components/ui/table";
-import type { TeamMemberSettings } from "@/lib/types/settings";
+import type { TeamMember } from "@/lib/types/team";
 
-interface LinkedInTeamTabProps {
-  members: TeamMemberSettings[];
+function memberName(m: TeamMember): string {
+  if (m.firstName || m.lastName) return `${m.firstName || ""} ${m.lastName || ""}`.trim();
+  return m.email;
 }
 
-function UsageBar({ used, limit }: { used: number; limit: number }) {
-  const pct = Math.min(100, Math.round((used / limit) * 100));
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-[11px] text-ink-secondary tabular-nums">
-        {used}/{limit}
-      </span>
-      <div className="w-20 h-1.5 rounded bg-section">
-        <div
-          className={cn(
-            "h-1.5 rounded",
-            pct >= 90 ? "bg-signal-red-text" : "bg-signal-blue-text"
-          )}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
+export function LinkedInTeamTab() {
+  const isAuthReady = useAuthReady();
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
 
-function ConnectionStatus({
-  connected,
-  memberStatus,
-}: {
-  connected: boolean;
-  memberStatus: TeamMemberSettings["status"];
-}) {
-  if (memberStatus === "invited") {
+  useEffect(() => {
+    if (!isAuthReady) return;
+    getTeamMembers()
+      .then((data) => setMembers(data.members))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [isAuthReady]);
+
+  if (loading) {
     return (
-      <div className="flex items-center gap-1.5">
-        <div className="w-1.5 h-1.5 rounded-full bg-ink-faint" />
-        <span className="text-[11px] text-ink-muted">Invited</span>
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={20} className="animate-spin text-ink-muted" />
       </div>
     );
   }
-  if (connected) {
-    return (
-      <div className="flex items-center gap-1.5">
-        <div className="w-1.5 h-1.5 rounded-full bg-signal-green-text" />
-        <span className="text-[11px] text-ink-secondary">Connected</span>
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="w-1.5 h-1.5 rounded-full bg-border-default" />
-      <span className="text-[11px] text-ink-muted">Not Connected</span>
-    </div>
-  );
-}
 
-export function LinkedInTeamTab({ members }: LinkedInTeamTabProps) {
   return (
     <section className="bg-surface rounded-[14px] border border-border-subtle p-4">
       <div className="mb-4">
-        <h3 className="text-[13px] font-semibold text-ink">
-          LinkedIn Connections
-        </h3>
+        <h3 className="text-[13px] font-semibold text-ink">LinkedIn Connections</h3>
         <p className="text-[11px] text-ink-muted mt-0.5">
           Manage your team's LinkedIn integration and daily send limits.
         </p>
@@ -82,7 +51,6 @@ export function LinkedInTeamTab({ members }: LinkedInTeamTabProps) {
             <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
               <TableHead className="text-left">Member</TableHead>
               <TableHead className="text-left">LinkedIn Account</TableHead>
-              <TableHead className="text-left">Daily Usage</TableHead>
               <TableHead className="text-left">Status</TableHead>
             </TableRow>
           </TableHeader>
@@ -91,55 +59,34 @@ export function LinkedInTeamTab({ members }: LinkedInTeamTabProps) {
               <TableRow key={member.id}>
                 <TableCell>
                   <div>
-                    <p className="text-[12px] font-medium text-ink">
-                      {member.name}
-                    </p>
+                    <p className="text-[12px] font-medium text-ink">{memberName(member)}</p>
                     <p className="text-[10px] text-ink-muted">{member.email}</p>
                   </div>
                 </TableCell>
                 <TableCell>
-                  {member.linkedinConnected && member.linkedinAccountName ? (
-                    <div>
-                      <p className="text-[11px] text-ink-secondary">
-                        {member.linkedinAccountName}
-                      </p>
-                      {member.linkedinLastSync && (
-                        <p className="text-[10px] text-ink-faint">
-                          Synced {formatRelativeTime(member.linkedinLastSync)}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-[11px] text-ink-faint">&mdash;</span>
-                  )}
+                  <span className="text-[11px] text-ink-faint">&mdash;</span>
                 </TableCell>
                 <TableCell>
-                  {member.linkedinConnected &&
-                  member.linkedinDailyLimit != null &&
-                  member.linkedinDailyUsed != null ? (
-                    <UsageBar
-                      used={member.linkedinDailyUsed}
-                      limit={member.linkedinDailyLimit}
-                    />
-                  ) : (
-                    <span className="text-[11px] text-ink-faint">&mdash;</span>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <ConnectionStatus
-                    connected={member.linkedinConnected}
-                    memberStatus={member.status}
-                  />
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-border-default" />
+                    <span className="text-[11px] text-ink-muted">Not Connected</span>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
+            {members.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3} className="text-center py-8">
+                  <p className="text-[12px] text-ink-muted">No team members yet. Add members in the Team tab.</p>
+                </TableCell>
+              </TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
 
       <p className="text-[10px] text-ink-faint mt-3">
-        Daily limits can be adjusted per team member. LinkedIn connections are
-        managed via Unipile integration.
+        LinkedIn connections will be available once team members connect their accounts via the Unipile integration.
       </p>
     </section>
   );

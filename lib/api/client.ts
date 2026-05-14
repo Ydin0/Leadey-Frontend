@@ -8,6 +8,11 @@ export function setAuthToken(token: string | null) {
   _authToken = token;
 }
 
+/** Get the current auth token for non-JSON requests (e.g., file uploads) */
+export function getAuthToken(): string | null {
+  return _authToken;
+}
+
 /** Returns the raw JSON payload (not unwrapped) — for endpoints that return { data, meta } */
 export async function apiRequestRaw<T>(path: string, init?: RequestInit): Promise<T> {
   const headers: Record<string, string> = {

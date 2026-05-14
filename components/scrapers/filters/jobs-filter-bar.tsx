@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X, ChevronDown } from "lucide-react";
+import { Plus, X, ChevronDown, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FilterPopover } from "./filter-popover";
 import { TagInput } from "@/components/shared/tag-input";
@@ -26,6 +26,8 @@ interface JobsFilterBarProps {
   updateFilter: <K extends keyof JobsFilterState>(key: K, value: JobsFilterState[K]) => void;
   clearAll: () => void;
   isEmpty: boolean;
+  search?: string;
+  onSearchChange?: (value: string) => void;
 }
 
 type AdditionalFilterKey =
@@ -50,7 +52,7 @@ function toggleInArray(arr: string[], value: string): string[] {
   return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
 }
 
-export function JobsFilterBar({ filters, setFilters, updateFilter, clearAll, isEmpty }: JobsFilterBarProps) {
+export function JobsFilterBar({ filters, setFilters, updateFilter, clearAll, isEmpty, search = "", onSearchChange }: JobsFilterBarProps) {
   const [activeAdditional, setActiveAdditional] = useState<AdditionalFilterKey[]>([]);
   const [addDropdownOpen, setAddDropdownOpen] = useState(false);
 
@@ -254,6 +256,20 @@ export function JobsFilterBar({ filters, setFilters, updateFilter, clearAll, isE
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Search */}
+        {onSearchChange && (
+          <div className="relative ml-auto">
+            <Search size={13} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder="Search jobs..."
+              className="pl-8 pr-3 py-1.5 rounded-full bg-section border border-border-subtle text-[11px] text-ink placeholder:text-ink-faint w-48 focus:outline-none focus:border-border-default"
+            />
           </div>
         )}
       </div>

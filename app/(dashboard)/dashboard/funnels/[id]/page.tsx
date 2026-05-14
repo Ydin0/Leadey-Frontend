@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Settings, UserPlus, Play, Pause, Trash2 } from "lucide-react";
 
+import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { FunnelStatusBadge } from "@/components/funnels/funnel-status-badge";
 import { FunnelStepPipeline } from "@/components/funnels/dashboard/funnel-step-pipeline";
 import { FunnelStatsBar } from "@/components/funnels/dashboard/funnel-stats-bar";
@@ -18,7 +19,7 @@ import { AddLeadsModal } from "@/components/funnels/add-leads/add-leads-modal";
 import { LeadFocusView } from "@/components/funnels/focus/lead-focus-view";
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
 import { focusDataMap } from "@/lib/mock-data/funnel-focus";
-import { getFunnelById, updateFunnelStatus, deleteFunnel } from "@/lib/api/funnels";
+import { getFunnelById, updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
 import type { Funnel, FunnelStatus } from "@/lib/types/funnel";
 
 export default function FunnelDetailPage() {
@@ -35,6 +36,7 @@ export default function FunnelDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [focusLeadIndex, setFocusLeadIndex] = useState<number | null>(null);
+  const isAuthReady = useAuthReady();
 
   const loadFunnel = useCallback(async () => {
     if (!funnelId) return;
@@ -42,7 +44,19 @@ export default function FunnelDetailPage() {
     setLoading(true);
     setError(null);
     try {
-      const data = await getFunnelById(funnelId);
+      let data = await getFunnelById(funnelId);
+
+      // Auto-backfill company data if any leads are missing it
+      const hasMissingData = data.leads.some((l) => l.company && !l.companyDomain && !l.companyIndustry);
+      if (hasMissingData) {
+        try {
+          const result = await backfillCompanyData();
+          if (result.updated > 0) {
+            data = await getFunnelById(funnelId);
+          }
+        } catch {}
+      }
+
       setFunnel(data);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load funnel";
@@ -80,8 +94,9 @@ export default function FunnelDetailPage() {
   }, [funnelId, loadFunnel]);
 
   useEffect(() => {
+    if (!isAuthReady) return;
     void loadFunnel();
-  }, [loadFunnel]);
+  }, [isAuthReady, loadFunnel]);
 
   if (loading) {
     return (
@@ -174,44 +189,38 @@ export default function FunnelDetailPage() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <FunnelMembersPanel funnelId={funnel.id} />
+            <div className="w-px h-5 bg-border-subtle" />
             <button
               onClick={() => setShowAddLeads(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
             >
-              <UserPlus size={13} strokeWidth={2} />
+              <UserPlus size={12} strokeWidth={2} />
               Add Leads
-            </button>
-            <button className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle">
-              <Settings size={13} strokeWidth={1.5} />
-              Edit Funnel
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-section text-signal-red-text text-[11px] font-medium hover:bg-signal-red/10 transition-colors border border-border-subtle"
+              className="p-1.5 rounded-md text-ink-muted hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
+              title="Delete funnel"
             >
-              <Trash2 size={13} strokeWidth={1.5} />
-              Delete
+              <Trash2 size={14} strokeWidth={1.5} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Step Pipeline */}
-      <div className="mb-4">
-        <FunnelStepPipeline steps={funnel.steps} />
-      </div>
-
-      {/* Members Panel */}
-      {funnel.members.length > 0 && (
-        <div className="mb-4">
-          <FunnelMembersPanel members={funnel.members} />
+      {/* Compact info bar: pipeline + stats on one line */}
+      <div className="flex items-center gap-4 mb-4 overflow-x-auto no-scrollbar">
+        <FunnelStepPipeline steps={funnel.steps} compact />
+        <div className="w-px h-5 bg-border-subtle shrink-0" />
+        <div className="flex items-center gap-3 text-[11px] shrink-0">
+          <span><strong className="text-ink">{funnel.metrics.total}</strong> <span className="text-ink-muted">total</span></span>
+          <span><strong className="text-ink">{funnel.metrics.active}</strong> <span className="text-ink-muted">active</span></span>
+          <span><strong className="text-ink">{funnel.metrics.replied}</strong> <span className="text-ink-muted">replied</span></span>
+          <span><strong className="text-ink">{funnel.metrics.replyRate}%</strong> <span className="text-ink-muted">reply</span></span>
+          <span><strong className="text-ink">{funnel.metrics.bounced}</strong> <span className="text-ink-muted">bounced</span></span>
         </div>
-      )}
-
-      {/* Stats Bar */}
-      <div className="mb-4">
-        <FunnelStatsBar metrics={funnel.metrics} />
       </div>
 
       {/* Tab Nav */}

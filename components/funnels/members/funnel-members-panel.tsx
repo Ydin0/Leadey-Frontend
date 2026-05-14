@@ -1,111 +1,158 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MemberAvatar } from "@/components/shared/member-avatar";
-import { useTeamMembers } from "@/hooks/use-team-members";
-import type { FunnelMember } from "@/lib/types/funnel";
+import {
+  getFunnelMembers, addFunnelMember, updateFunnelMemberRole, removeFunnelMember,
+  type FunnelMemberData,
+} from "@/lib/api/funnels";
+import { getTeamMembers } from "@/lib/api/team";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
+import type { TeamMember } from "@/lib/types/team";
 
 interface FunnelMembersPanelProps {
-  members: FunnelMember[];
-  onAddMember?: (teamMemberId: string) => void;
+  funnelId: string;
 }
 
-const ROLE_LABELS: Record<FunnelMember["role"], string> = {
-  owner: "Owner",
-  contributor: "Contributor",
-  viewer: "Viewer",
-};
+const FUNNEL_ROLES = [
+  { value: "owner", label: "Owner", color: "bg-signal-blue text-signal-blue-text" },
+  { value: "contributor", label: "Contributor", color: "bg-signal-green text-signal-green-text" },
+  { value: "viewer", label: "Viewer", color: "bg-signal-slate text-signal-slate-text" },
+];
 
-const ROLE_COLORS: Record<FunnelMember["role"], string> = {
-  owner: "bg-signal-blue text-signal-blue-text",
-  contributor: "bg-signal-green text-signal-green-text",
-  viewer: "bg-signal-slate text-signal-slate-text",
-};
+function memberName(m: FunnelMemberData | TeamMember): string {
+  const first = "firstName" in m ? m.firstName : null;
+  const last = "lastName" in m ? m.lastName : null;
+  if (first || last) return `${first || ""} ${last || ""}`.trim();
+  return m.email;
+}
 
-export function FunnelMembersPanel({ members, onAddMember }: FunnelMembersPanelProps) {
-  const { members: allTeamMembers, resolveMember } = useTeamMembers();
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  const assignedIds = new Set(members.map((m) => m.teamMemberId));
-  const availableMembers = allTeamMembers.filter(
-    (tm) => !assignedIds.has(tm.id) && tm.status === "active"
-  );
+export function FunnelMembersPanel({ funnelId }: FunnelMembersPanelProps) {
+  const isAuthReady = useAuthReady();
+  const [members, setMembers] = useState<FunnelMemberData[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
+  const [addRole, setAddRole] = useState("contributor");
+  const [adding, setAdding] = useState(false);
+  const addRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setShowDropdown(false);
-      }
+    if (!isAuthReady) return;
+    Promise.all([
+      getFunnelMembers(funnelId),
+      getTeamMembers(),
+    ]).then(([fMembers, team]) => {
+      setMembers(fMembers);
+      setTeamMembers(team.members);
+    }).catch(() => {})
+      .finally(() => setLoading(false));
+  }, [isAuthReady, funnelId]);
+
+  useEffect(() => {
+    if (!showAdd) return;
+    function handleClick(e: MouseEvent) {
+      if (addRef.current && !addRef.current.contains(e.target as Node)) setShowAdd(false);
     }
-    if (showDropdown) {
-      document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showAdd]);
+
+  const availableMembers = teamMembers.filter(
+    (tm) => !members.some((m) => m.userId === tm.id)
+  );
+
+  async function handleAdd(userId: string) {
+    setAdding(true);
+    try {
+      const newMember = await addFunnelMember(funnelId, userId, addRole);
+      setMembers((prev) => [...prev, newMember]);
+      setShowAdd(false);
+    } catch (err) {
+      console.error("Failed to add member:", err);
+    } finally {
+      setAdding(false);
     }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showDropdown]);
+  }
+
+  if (loading) return null;
 
   return (
-    <div className="flex items-center gap-3 bg-surface rounded-[14px] border border-border-subtle px-4 py-2.5">
-      <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium shrink-0">
-        Members
-      </span>
-
-      <div className="flex items-center gap-1.5">
-        {members.map((m) => {
-          const tm = resolveMember(m.teamMemberId);
-          if (!tm) return null;
-          return (
-            <div key={m.teamMemberId} className="group relative flex items-center">
-              <MemberAvatar id={tm.id} name={tm.name} />
-              {/* Hover tooltip */}
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:flex flex-col items-center z-10">
-                <div className="bg-ink text-on-ink rounded-lg px-2.5 py-1.5 whitespace-nowrap shadow-lg">
-                  <p className="text-[11px] font-medium">{tm.name}</p>
-                  <span className={cn("inline-block text-[9px] font-medium rounded-full px-1.5 py-0.5 mt-0.5", ROLE_COLORS[m.role])}>
-                    {ROLE_LABELS[m.role]}
-                  </span>
-                </div>
-              </div>
+    <div className="flex items-center gap-2">
+      {/* Member avatars */}
+      <div className="flex items-center -space-x-1.5">
+        {members.slice(0, 5).map((m) => (
+          <div key={m.userId} className="relative group">
+            <div className="w-7 h-7 rounded-full bg-signal-blue/10 flex items-center justify-center border-2 border-surface text-[10px] font-semibold text-signal-blue-text">
+              {(m.firstName?.[0] || m.email[0]).toUpperCase()}
             </div>
-          );
-        })}
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-ink text-on-ink text-[9px] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20">
+              {memberName(m)} &middot; {m.role}
+            </div>
+          </div>
+        ))}
+        {members.length > 5 && (
+          <div className="w-7 h-7 rounded-full bg-section flex items-center justify-center border-2 border-surface text-[9px] font-medium text-ink-muted">
+            +{members.length - 5}
+          </div>
+        )}
       </div>
 
-      {/* Add Member */}
-      {availableMembers.length > 0 && (
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-[20px] bg-section text-ink-secondary text-[10px] font-medium hover:bg-hover transition-colors border border-border-subtle"
-          >
-            <Plus size={11} strokeWidth={2} />
-            Add
-          </button>
+      {/* Add button */}
+      <div className="relative" ref={addRef}>
+        <button
+          onClick={() => setShowAdd(!showAdd)}
+          className="w-7 h-7 rounded-full bg-section border border-dashed border-border-default flex items-center justify-center text-ink-muted hover:bg-hover hover:text-ink transition-colors"
+        >
+          <Plus size={12} />
+        </button>
 
-          {showDropdown && (
-            <div className="absolute top-full left-0 mt-1 bg-surface rounded-[10px] border border-border-subtle shadow-lg z-20 min-w-[180px] py-1">
+        {showAdd && (
+          <div className="absolute top-full right-0 mt-2 w-72 bg-surface rounded-[12px] border border-border-subtle shadow-lg z-30 p-3">
+            <p className="text-[12px] font-medium text-ink mb-2">Add to funnel</p>
+            <div className="flex items-center gap-1 mb-3">
+              {FUNNEL_ROLES.filter((r) => r.value !== "owner").map((r) => (
+                <button
+                  key={r.value}
+                  onClick={() => setAddRole(r.value)}
+                  className={cn(
+                    "px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors",
+                    addRole === r.value ? r.color : "bg-section text-ink-muted"
+                  )}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <div className="max-h-48 overflow-y-auto space-y-1">
+              {availableMembers.length === 0 && (
+                <p className="text-[11px] text-ink-faint py-2 text-center">All team members are already in this funnel</p>
+              )}
               {availableMembers.map((tm) => (
                 <button
                   key={tm.id}
-                  onClick={() => {
-                    onAddMember?.(tm.id);
-                    setShowDropdown(false);
-                  }}
-                  className="flex items-center gap-2 w-full px-3 py-2 text-left hover:bg-hover/60 transition-colors"
+                  onClick={() => handleAdd(tm.id)}
+                  disabled={adding}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-[8px] hover:bg-hover transition-colors text-left disabled:opacity-50"
                 >
-                  <MemberAvatar id={tm.id} name={tm.name} />
+                  <div className="w-6 h-6 rounded-full bg-signal-blue/10 flex items-center justify-center text-[9px] font-semibold text-signal-blue-text shrink-0">
+                    {(tm.firstName?.[0] || tm.email[0]).toUpperCase()}
+                  </div>
                   <div className="min-w-0">
-                    <p className="text-[12px] text-ink font-medium truncate">{tm.name}</p>
-                    <p className="text-[10px] text-ink-muted truncate">{tm.email}</p>
+                    <p className="text-[11px] font-medium text-ink truncate">{memberName(tm)}</p>
+                    <p className="text-[9px] text-ink-faint truncate">{tm.email}</p>
                   </div>
                 </button>
               ))}
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
+
+      <span className="text-[10px] text-ink-faint">
+        {members.length} member{members.length !== 1 ? "s" : ""}
+      </span>
     </div>
   );
 }

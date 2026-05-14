@@ -41,7 +41,13 @@ export function LeadFocusView({
     return map;
   }, [leads, focusData]);
 
-  const currentFocusData = currentLead ? completeFocusData[currentLead.id] : null;
+  // Use focus data from the FIRST lead in this company so About/CustomFields stay consistent
+  const companyFirstLead = useMemo(() => {
+    if (!currentLead) return null;
+    return leads.find((l) => l.company === currentLead.company) || currentLead;
+  }, [leads, currentLead]);
+
+  const currentFocusData = companyFirstLead ? completeFocusData[companyFirstLead.id] : null;
   const currentStatus = currentLead
     ? (statusOverrides[currentLead.id] ?? currentLead.status)
     : "new";
@@ -51,13 +57,49 @@ export function LeadFocusView({
     ? (currentLead.companyDomain || currentLead.email?.split("@")[1] || "")
     : "";
 
+  // Build real contacts from all leads in the same company
+  const companyContacts = useMemo(() => {
+    if (!currentLead) return [];
+    return leads
+      .filter((l) => l.company === currentLead.company)
+      .map((l, i) => ({
+        id: l.id,
+        name: l.name,
+        title: l.title,
+        email: l.email || null,
+        phone: l.phone || null,
+        linkedinUrl: l.linkedinUrl || null,
+        isPrimary: l.id === currentLead.id,
+      }));
+  }, [leads, currentLead]);
+
+  // Navigate between companies, not individual leads
+  const companyIndices = useMemo(() => {
+    const seen = new Set<string>();
+    const indices: number[] = [];
+    for (let i = 0; i < leads.length; i++) {
+      if (!seen.has(leads[i].company)) {
+        seen.add(leads[i].company);
+        indices.push(i);
+      }
+    }
+    return indices;
+  }, [leads]);
+
+  const currentCompanyPos = useMemo(() => {
+    if (!currentLead) return 0;
+    return companyIndices.findIndex((i) => leads[i].company === currentLead.company);
+  }, [companyIndices, currentLead, leads]);
+
   const handlePrevious = useCallback(() => {
-    setCurrentIndex((i) => Math.max(0, i - 1));
-  }, []);
+    const prevPos = Math.max(0, currentCompanyPos - 1);
+    setCurrentIndex(companyIndices[prevPos]);
+  }, [currentCompanyPos, companyIndices]);
 
   const handleNext = useCallback(() => {
-    setCurrentIndex((i) => Math.min(leads.length - 1, i + 1));
-  }, [leads.length]);
+    const nextPos = Math.min(companyIndices.length - 1, currentCompanyPos + 1);
+    setCurrentIndex(companyIndices[nextPos]);
+  }, [currentCompanyPos, companyIndices]);
 
   const handleStatusChange = useCallback((status: LeadStatus) => {
     if (!currentLead) return;
@@ -112,7 +154,7 @@ export function LeadFocusView({
           {currentFocusData && (
             <>
               <LeadAboutPanel company={currentFocusData.company} />
-              <LeadContactsPanel contacts={currentFocusData.contacts} />
+              <LeadContactsPanel contacts={companyContacts} />
               <LeadCustomFieldsPanel fields={currentFocusData.customFields} />
             </>
           )}
@@ -128,8 +170,8 @@ export function LeadFocusView({
 
       {/* Navigation */}
       <LeadFocusNavigation
-        currentIndex={currentIndex}
-        totalLeads={leads.length}
+        currentIndex={currentCompanyPos}
+        totalLeads={companyIndices.length}
         onPrevious={handlePrevious}
         onNext={handleNext}
       />

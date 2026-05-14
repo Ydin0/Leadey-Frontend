@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { RowLimitPopover } from "@/components/shared/row-limit-popover";
 
 interface DataTablePaginationProps {
   currentPage: number;
@@ -12,6 +13,10 @@ interface DataTablePaginationProps {
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   pageSizeOptions?: number[];
+  startingRow?: number;
+  rowLimit?: number | null;
+  unfilteredTotal?: number;
+  onRowLimitChange?: (startingRow: number, rowLimit: number | null) => void;
 }
 
 export function DataTablePagination({
@@ -22,6 +27,10 @@ export function DataTablePagination({
   onPageChange,
   onPageSizeChange,
   pageSizeOptions = [25, 50, 100],
+  startingRow = 0,
+  rowLimit = null,
+  unfilteredTotal,
+  onRowLimitChange,
 }: DataTablePaginationProps) {
   const [showSizeMenu, setShowSizeMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -60,6 +69,14 @@ export function DataTablePagination({
   return (
     <div className="flex items-center justify-between px-4 py-3">
       <div className="flex items-center gap-3">
+        {onRowLimitChange && (
+          <RowLimitPopover
+            startingRow={startingRow}
+            rowLimit={rowLimit ?? null}
+            totalItems={unfilteredTotal ?? totalItems}
+            onApply={onRowLimitChange}
+          />
+        )}
         {onPageSizeChange && (
           <div className="relative" ref={menuRef}>
             <button

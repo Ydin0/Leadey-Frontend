@@ -130,6 +130,10 @@ export const mockBundles: RegulatoryBundle[] = [
     businessName: "Leadey Labs Inc.",
     businessAddress: "548 Market St, San Francisco, CA 94104",
     identityDocumentName: "EIN Certificate",
+    businessRegistrationNumber: "12-3456789",
+    businessType: "corporation",
+    contactEmail: "compliance@leadey.com",
+    contactPhone: "+1 415 555 0100",
     createdAt: daysAgo(150),
   },
   {
@@ -141,6 +145,10 @@ export const mockBundles: RegulatoryBundle[] = [
     businessName: "Leadey Labs Ltd.",
     businessAddress: "71-75 Shelton Street, London, WC2H 9JQ",
     identityDocumentName: "Company Registration",
+    businessRegistrationNumber: "12345678",
+    businessType: "limited_company",
+    contactEmail: "compliance@leadey.com",
+    contactPhone: "+44 20 7946 0958",
     createdAt: daysAgo(80),
   },
   {
@@ -152,6 +160,10 @@ export const mockBundles: RegulatoryBundle[] = [
     businessName: "Leadey Labs GmbH",
     businessAddress: "Friedrichstr. 123, 10117 Berlin",
     identityDocumentName: "Handelsregister",
+    businessRegistrationNumber: "HRB 12345",
+    businessType: "limited_company",
+    contactEmail: "compliance@leadey.com",
+    contactPhone: "+49 30 1234 5678",
     createdAt: daysAgo(5),
   },
 ];
