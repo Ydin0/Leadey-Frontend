@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useSignIn, useClerk } from "@clerk/nextjs";
+import { useSignIn, useClerk, useUser } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -16,6 +16,7 @@ const RESEND_COOLDOWN = 30;
 export function SignInForm() {
   const { signIn, setActive, isLoaded } = useSignIn();
   const clerk = useClerk();
+  const { user, isLoaded: isUserLoaded } = useUser();
   const router = useRouter();
 
   const [step, setStep] = useState<"email" | "code">("email");
@@ -24,7 +25,29 @@ export function SignInForm() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [signingOut, setSigningOut] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // If a session already exists (e.g. signed in on a sibling subdomain, or
+  // a stale cookie from a previous Clerk instance), redirect straight to
+  // the dashboard rather than showing the sign-in form.
+  useEffect(() => {
+    if (isUserLoaded && user) {
+      router.replace("/dashboard");
+    }
+  }, [isUserLoaded, user, router]);
+
+  async function handleSignOutAndRetry() {
+    setSigningOut(true);
+    try {
+      await clerk.signOut();
+      setError("");
+    } catch {
+      // ignore — page may refresh anyway
+    } finally {
+      setSigningOut(false);
+    }
+  }
 
   useEffect(() => {
     if (step === "code") {
@@ -67,6 +90,19 @@ export function SignInForm() {
       setStep("code");
     } catch (err) {
       if (isClerkAPIResponseError(err)) {
+        const code = err.errors[0]?.code;
+        // Stale session on this device — clear it and let them try again
+        if (code === "session_exists" || code === "client_state_invalid") {
+          try {
+            await clerk.signOut();
+            setError("Cleared a stale session. Click Continue with email again.");
+          } catch {
+            setError(
+              "You're already signed in elsewhere. Open an incognito window or sign out and try again.",
+            );
+          }
+          return;
+        }
         setError(err.errors[0]?.longMessage || "Could not send code.");
       } else {
         setError("Something went wrong. Please try again.");
