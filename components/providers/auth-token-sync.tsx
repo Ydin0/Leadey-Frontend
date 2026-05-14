@@ -37,7 +37,10 @@ export function AuthTokenSync({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     async function sync() {
-      const token = await getToken();
+      // Re-fetch the token whenever orgId changes — Clerk bakes the active
+      // org into the JWT claim, so the cached pre-org token would 403 our
+      // org-scoped backend endpoints (/billing, /team, etc.).
+      const token = await getToken({ skipCache: true });
       if (mounted) {
         setAuthToken(token);
         setIsReady(true);
@@ -52,9 +55,8 @@ export function AuthTokenSync({ children }: { children: React.ReactNode }) {
     return () => {
       mounted = false;
       clearInterval(interval);
-      setAuthToken(null);
     };
-  }, [getToken]);
+  }, [getToken, orgId]);
 
   return (
     <AuthReadyContext.Provider value={isReady}>

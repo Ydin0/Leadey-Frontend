@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { X, Sparkles } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getBillingInfo, createCheckoutSession } from "@/lib/api/billing";
@@ -9,16 +10,27 @@ import type { BillingInfo } from "@/lib/types/billing";
 
 export function TrialBanner() {
   const isAuthReady = useAuthReady();
+  const { orgId } = useAuth();
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!isAuthReady) return;
+    // Wait for both a Bearer token AND an active org. Without orgId the
+    // backend /billing endpoint 403s.
+    if (!isAuthReady || !orgId) return;
+    let cancelled = false;
     getBillingInfo()
-      .then(setBilling)
-      .catch(() => {}); // silently fail — banner just won't show
-  }, [isAuthReady]);
+      .then((b) => {
+        if (!cancelled) setBilling(b);
+      })
+      .catch((err) => {
+        console.warn("[trial-banner] /billing failed:", err?.message || err);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthReady, orgId]);
 
   if (!billing) return null;
   if (dismissed) return null;
