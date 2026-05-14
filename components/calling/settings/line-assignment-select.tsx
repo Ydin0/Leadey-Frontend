@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { mockSettings } from "@/lib/mock-data/settings";
+import { NativeSelect } from "@/components/ui/native-select";
 
 interface LineAssignmentSelectProps {
   currentAssignedTo: string | null;
@@ -61,10 +62,9 @@ export function LineAssignmentSelect({
       <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium">
         Assigned To
       </label>
-      <select
+      <NativeSelect
         value={currentAssignedTo ?? ""}
         onChange={(e) => handleChange(e.target.value)}
-        className="w-full px-3 py-2 rounded-[10px] bg-section text-[12px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30"
       >
         <option value="">Unassigned (Org-wide)</option>
         {activeMembers.map((m) => (
@@ -72,7 +72,7 @@ export function LineAssignmentSelect({
             {m.name}
           </option>
         ))}
-      </select>
+      </NativeSelect>
 
       {showConfirm && (
         <div className="rounded-[10px] border border-border-subtle bg-signal-blue/20 px-3 py-2">

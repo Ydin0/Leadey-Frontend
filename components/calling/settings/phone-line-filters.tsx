@@ -2,6 +2,7 @@
 
 import type { PhoneLineStatus } from "@/lib/types/calling";
 import { countryOptions } from "@/lib/constants/calling";
+import { NativeSelect } from "@/components/ui/native-select";
 
 export interface PhoneLineFilterState {
   status: PhoneLineStatus | "all";
@@ -17,22 +18,22 @@ interface PhoneLineFiltersProps {
 export function PhoneLineFilters({ filters, onChange }: PhoneLineFiltersProps) {
   return (
     <div className="flex items-center gap-2">
-      <select
+      <NativeSelect
         value={filters.status}
         onChange={(e) => onChange({ ...filters, status: e.target.value as PhoneLineFilterState["status"] })}
-        className="px-3 py-1.5 rounded-[10px] bg-section text-[12px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30"
+        className="w-auto min-w-[140px] py-1.5"
       >
         <option value="all">All Statuses</option>
         <option value="active">Active</option>
         <option value="suspended">Suspended</option>
         <option value="pending">Pending</option>
         <option value="released">Released</option>
-      </select>
+      </NativeSelect>
 
-      <select
+      <NativeSelect
         value={filters.country}
         onChange={(e) => onChange({ ...filters, country: e.target.value })}
-        className="px-3 py-1.5 rounded-[10px] bg-section text-[12px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30"
+        className="w-auto min-w-[160px] py-1.5"
       >
         <option value="all">All Countries</option>
         {countryOptions.map((c) => (
@@ -40,17 +41,17 @@ export function PhoneLineFilters({ filters, onChange }: PhoneLineFiltersProps) {
             {c.flag} {c.name}
           </option>
         ))}
-      </select>
+      </NativeSelect>
 
-      <select
+      <NativeSelect
         value={filters.assignment}
         onChange={(e) => onChange({ ...filters, assignment: e.target.value as PhoneLineFilterState["assignment"] })}
-        className="px-3 py-1.5 rounded-[10px] bg-section text-[12px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30"
+        className="w-auto min-w-[160px] py-1.5"
       >
         <option value="all">All Assignments</option>
         <option value="assigned">Assigned</option>
         <option value="unassigned">Unassigned</option>
-      </select>
+      </NativeSelect>
     </div>
   );
 }
