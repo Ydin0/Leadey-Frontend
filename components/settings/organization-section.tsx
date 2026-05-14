@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useOrganization } from "@clerk/nextjs";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { apiRequest } from "@/lib/api/client";
+import { NativeSelect } from "@/components/ui/native-select";
 
 const COUNTRIES = [
   { code: "GB", name: "United Kingdom" },
@@ -105,11 +106,10 @@ export function OrganizationSection() {
           </div>
           <div>
             <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Country</label>
-            <select value={settings.country} onChange={(e) => setSettings({ ...settings, country: e.target.value })}
-              className="w-full px-3 py-2 rounded-[10px] bg-section text-[12px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30">
+            <NativeSelect value={settings.country} onChange={(e) => setSettings({ ...settings, country: e.target.value })}>
               <option value="">Select country...</option>
               {COUNTRIES.map((c) => <option key={c.code} value={c.code}>{c.name}</option>)}
-            </select>
+            </NativeSelect>
           </div>
           <div>
             <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Website</label>

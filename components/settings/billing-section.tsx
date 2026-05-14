@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getBillingInfo, createCheckoutSession, getInvoices } from "@/lib/api/billing";
 import { apiRequest } from "@/lib/api/client";
+import { NativeSelect } from "@/components/ui/native-select";
 import { downloadInvoiceAsPdf } from "@/lib/utils/generate-invoice-pdf";
 import type { BillingInfo, StripeInvoice } from "@/lib/types/billing";
 
@@ -331,10 +332,9 @@ export function BillingSection() {
                 <div className="space-y-3 mb-5">
                   <div>
                     <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5 block">Reason</label>
-                    <select
+                    <NativeSelect
                       value={cancelReason}
                       onChange={(e) => setCancelReason(e.target.value)}
-                      className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink focus:outline-none focus:border-border-default"
                     >
                       <option value="">Select a reason...</option>
                       <option value="too_expensive">Too expensive</option>
@@ -343,7 +343,7 @@ export function BillingSection() {
                       <option value="not_using">Not using it enough</option>
                       <option value="temporary">Temporary pause</option>
                       <option value="other">Other</option>
-                    </select>
+                    </NativeSelect>
                   </div>
                   <div>
                     <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5 block">Additional Feedback</label>

@@ -44,7 +44,7 @@ export function TrialBanner() {
   if (isExpired) {
     return (
       <div className="bg-signal-red text-signal-red-text px-4 py-2.5 flex items-center justify-center gap-3 text-[12px] font-medium">
-        <span>Your free trial has expired. Upgrade now to continue using Leadey.</span>
+        <span>Your 60-day free trial has expired. Upgrade now to keep using Leadey.</span>
         <button
           onClick={handleUpgrade}
           disabled={loading}
@@ -65,9 +65,8 @@ export function TrialBanner() {
     )}>
       <Sparkles size={12} />
       <span>
-        {daysLeft === 1
-          ? "Your free trial ends tomorrow"
-          : `You have ${daysLeft} days left on your free trial`}
+        You&apos;re on the <strong className="font-semibold">Free</strong> plan —{" "}
+        {daysLeft === 1 ? "1 day" : `${daysLeft} days`} left of your 60-day trial.
       </span>
       <button
         onClick={handleUpgrade}
@@ -84,6 +83,7 @@ export function TrialBanner() {
       <button
         onClick={() => setDismissed(true)}
         className="p-0.5 rounded hover:bg-ink/10 transition-colors ml-2"
+        aria-label="Dismiss"
       >
         <X size={12} />
       </button>

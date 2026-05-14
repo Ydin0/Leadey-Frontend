@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
+import { NativeSelect } from "@/components/ui/native-select";
 
 const TIMEZONES = [
   "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Amsterdam", "Europe/Madrid",
@@ -91,10 +92,9 @@ export function ProfileSection() {
           </div>
           <div>
             <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Timezone</label>
-            <select value={timezone} onChange={(e) => setTimezone(e.target.value)}
-              className="w-full px-3 py-2 rounded-[10px] bg-section text-[12px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30">
+            <NativeSelect value={timezone} onChange={(e) => setTimezone(e.target.value)}>
               {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>)}
-            </select>
+            </NativeSelect>
           </div>
         </div>
 

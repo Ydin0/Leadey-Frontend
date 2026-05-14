@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Users, Mail, Loader2, X, ChevronDown, UserPlus, Clock, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { NativeSelect } from "@/components/ui/native-select";
 import {
   getTeamMembers,
   inviteTeamMember,
@@ -173,16 +174,16 @@ export function TeamSection() {
             disabled={seatsFull}
             className="flex-1 px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default disabled:opacity-50"
           />
-          <select
+          <NativeSelect
             value={inviteRole}
             onChange={(e) => setInviteRole(e.target.value)}
             disabled={seatsFull}
-            className="px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink focus:outline-none focus:border-border-default disabled:opacity-50"
+            className="w-auto min-w-[120px]"
           >
             {ROLES.map((r) => (
               <option key={r.value} value={r.value}>{r.label}</option>
             ))}
-          </select>
+          </NativeSelect>
           <button
             onClick={handleInvite}
             disabled={!inviteEmail.trim() || inviting || seatsFull}
