@@ -117,16 +117,59 @@ export async function createBundle(data: {
   name?: string;
   country: string;
   countryCode: string;
+  // Business
   businessName: string;
-  businessAddress?: string;
-  businessRegistrationNumber?: string;
   businessType?: string;
+  businessRegistrationAuthority?: string;
+  businessRegistrationNumber?: string;
+  businessWebsite?: string;
+  businessClassification?: string;
+  // Address
+  addressStreet1?: string;
+  addressStreet2?: string;
+  addressCity?: string;
+  addressSubdivision?: string;
+  addressPostalCode?: string;
+  // Authorized representative
+  representativeFirstName?: string;
+  representativeLastName?: string;
+  representativeEmail?: string;
+  representativePhone?: string;
+  // Legacy
+  businessAddress?: string;
   contactEmail?: string;
   contactPhone?: string;
   identityDocumentName?: string;
 }): Promise<RegulatoryBundle> {
   return apiRequest<RegulatoryBundle>("/phone-lines/bundles", {
     method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateBundle(
+  bundleId: string,
+  data: Partial<{
+    name: string;
+    businessName: string;
+    businessType: string;
+    businessRegistrationAuthority: string;
+    businessRegistrationNumber: string;
+    businessWebsite: string;
+    businessClassification: string;
+    addressStreet1: string;
+    addressStreet2: string;
+    addressCity: string;
+    addressSubdivision: string;
+    addressPostalCode: string;
+    representativeFirstName: string;
+    representativeLastName: string;
+    representativeEmail: string;
+    representativePhone: string;
+  }>,
+): Promise<RegulatoryBundle> {
+  return apiRequest<RegulatoryBundle>(`/phone-lines/bundles/${bundleId}`, {
+    method: "PATCH",
     body: JSON.stringify(data),
   });
 }

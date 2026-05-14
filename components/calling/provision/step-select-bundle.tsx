@@ -8,6 +8,7 @@ import {
   uploadBundleDocument, deleteBundleDocument, submitBundle,
 } from "@/lib/api/phone-lines";
 import { BundleStatusBadge } from "@/components/calling/settings/bundle-status-badge";
+import { NativeSelect } from "@/components/ui/native-select";
 import type { CountryOption, RegulatoryBundle, BundleDocument } from "@/lib/types/calling";
 
 interface StepSelectBundleProps {
@@ -24,6 +25,53 @@ const BUSINESS_TYPES = [
   { value: "corporation", label: "Corporation" },
   { value: "nonprofit", label: "Non-Profit" },
 ];
+
+// Twilio business classifications
+const BUSINESS_CLASSIFICATIONS = [
+  { value: "INDEPENDENT_SOFTWARE_VENDOR", label: "Independent Software Vendor" },
+  { value: "RESELLER", label: "Reseller" },
+  { value: "ENTERPRISE", label: "Enterprise" },
+  { value: "CONSULTING_AGENCY", label: "Consulting / Agency" },
+];
+
+// Per-country registration authority defaults
+const REGISTRATION_AUTHORITY_BY_COUNTRY: Record<string, { value: string; label: string }[]> = {
+  GB: [
+    { value: "UK:CRN", label: "UK:CRN (Companies House Reg #)" },
+  ],
+  US: [
+    { value: "US:EIN", label: "US:EIN (Employer Identification #)" },
+    { value: "US:DUNS", label: "US:DUNS" },
+  ],
+  AU: [
+    { value: "AU:ABN", label: "AU:ABN (Australian Business #)" },
+    { value: "AU:ACN", label: "AU:ACN (Australian Company #)" },
+  ],
+  CA: [
+    { value: "CA:CBN", label: "CA:CBN (Business #)" },
+  ],
+  DE: [
+    { value: "DE:HRB", label: "DE:HRB (Handelsregister)" },
+  ],
+  FR: [
+    { value: "FR:SIREN", label: "FR:SIREN" },
+  ],
+  IE: [
+    { value: "IE:CRO", label: "IE:CRO (Companies Reg Office)" },
+  ],
+  IN: [
+    { value: "IN:CIN", label: "IN:CIN (Corporate Identity #)" },
+  ],
+  SG: [
+    { value: "SG:UEN", label: "SG:UEN (Unique Entity #)" },
+  ],
+  AE: [
+    { value: "AE:TRN", label: "AE:TRN (Tax Reg #)" },
+  ],
+  DEFAULT: [
+    { value: "OTHER", label: "Other / Country-specific" },
+  ],
+};
 
 const REQUIRED_DOCS: Record<string, { type: string; label: string }[]> = {
   GB: [
@@ -56,13 +104,24 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<"list" | "create" | "documents">("list");
 
-  // Create form state
+  // Create form state — business info
   const [businessName, setBusinessName] = useState("");
   const [businessType, setBusinessType] = useState("limited_company");
+  const [businessRegAuthority, setBusinessRegAuthority] = useState("");
   const [businessRegNumber, setBusinessRegNumber] = useState("");
-  const [businessAddress, setBusinessAddress] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
+  const [businessWebsite, setBusinessWebsite] = useState("");
+  const [businessClassification, setBusinessClassification] = useState("INDEPENDENT_SOFTWARE_VENDOR");
+  // Address
+  const [addressStreet1, setAddressStreet1] = useState("");
+  const [addressStreet2, setAddressStreet2] = useState("");
+  const [addressCity, setAddressCity] = useState("");
+  const [addressSubdivision, setAddressSubdivision] = useState("");
+  const [addressPostalCode, setAddressPostalCode] = useState("");
+  // Authorized rep
+  const [repFirstName, setRepFirstName] = useState("");
+  const [repLastName, setRepLastName] = useState("");
+  const [repEmail, setRepEmail] = useState("");
+  const [repPhone, setRepPhone] = useState("");
   const [creating, setCreating] = useState(false);
 
   // Document state
@@ -99,10 +158,19 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
         countryCode: country?.code || "",
         businessName,
         businessType,
+        businessRegistrationAuthority: businessRegAuthority,
         businessRegistrationNumber: businessRegNumber,
-        businessAddress,
-        contactEmail,
-        contactPhone,
+        businessWebsite,
+        businessClassification,
+        addressStreet1,
+        addressStreet2,
+        addressCity,
+        addressSubdivision,
+        addressPostalCode,
+        representativeFirstName: repFirstName,
+        representativeLastName: repLastName,
+        representativeEmail: repEmail,
+        representativePhone: repPhone,
       });
       setBundles((prev) => [newBundle, ...prev]);
       setActiveBundleId(newBundle.id);
@@ -314,50 +382,132 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
           </p>
         </div>
 
-        <div className="space-y-3">
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Business Name *</label>
-            <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)}
-              placeholder="e.g. Acme Ltd"
-              className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+        <div className="space-y-5">
+          {/* ── Business ────────────────────────────────────────── */}
+          <div className="space-y-3">
+            <h4 className="text-[11px] uppercase tracking-wider text-ink-muted font-medium">
+              Business
+            </h4>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2">
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Business Name *</label>
+                <input type="text" value={businessName} onChange={(e) => setBusinessName(e.target.value)}
+                  placeholder="OCTOGLE TECHNOLOGIES LTD"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Business Type</label>
+                <NativeSelect value={businessType} onChange={(e) => setBusinessType(e.target.value)}>
+                  {BUSINESS_TYPES.map((bt) => (
+                    <option key={bt.value} value={bt.value}>{bt.label}</option>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Classification</label>
+                <NativeSelect value={businessClassification} onChange={(e) => setBusinessClassification(e.target.value)}>
+                  {BUSINESS_CLASSIFICATIONS.map((c) => (
+                    <option key={c.value} value={c.value}>{c.label}</option>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Registration Authority *</label>
+                <NativeSelect value={businessRegAuthority} onChange={(e) => setBusinessRegAuthority(e.target.value)}>
+                  <option value="">Select…</option>
+                  {(REGISTRATION_AUTHORITY_BY_COUNTRY[country?.code || ""] || REGISTRATION_AUTHORITY_BY_COUNTRY.DEFAULT).map((opt) => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </NativeSelect>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Registration Number *</label>
+                <input type="text" value={businessRegNumber} onChange={(e) => setBusinessRegNumber(e.target.value)}
+                  placeholder="14516092"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+              </div>
+              <div className="col-span-2">
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Business Website</label>
+                <input type="url" value={businessWebsite} onChange={(e) => setBusinessWebsite(e.target.value)}
+                  placeholder="https://www.octogle.com"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Business Type</label>
-            <select value={businessType} onChange={(e) => setBusinessType(e.target.value)}
-              className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink focus:outline-none focus:border-border-default">
-              {BUSINESS_TYPES.map((bt) => (
-                <option key={bt.value} value={bt.value}>{bt.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Registration Number</label>
-            <input type="text" value={businessRegNumber} onChange={(e) => setBusinessRegNumber(e.target.value)}
-              placeholder="e.g. 12345678"
-              className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
-          </div>
-
-          <div>
-            <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Business Address</label>
-            <input type="text" value={businessAddress} onChange={(e) => setBusinessAddress(e.target.value)}
-              placeholder="e.g. 123 High Street, London, EC1A 1BB"
-              className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+          {/* ── Registered Address ─────────────────────────────── */}
+          <div className="space-y-3">
+            <h4 className="text-[11px] uppercase tracking-wider text-ink-muted font-medium">
+              Registered Address
+            </h4>
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Contact Email</label>
-              <input type="email" value={contactEmail} onChange={(e) => setContactEmail(e.target.value)}
-                placeholder="compliance@company.com"
+              <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Street Line 1 *</label>
+              <input type="text" value={addressStreet1} onChange={(e) => setAddressStreet1(e.target.value)}
+                placeholder="319B Walton Road"
                 className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
             </div>
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Contact Phone</label>
-              <input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="+44 20 1234 5678"
+              <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Street Line 2</label>
+              <input type="text" value={addressStreet2} onChange={(e) => setAddressStreet2(e.target.value)}
+                placeholder="Optional"
                 className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">City *</label>
+                <input type="text" value={addressCity} onChange={(e) => setAddressCity(e.target.value)}
+                  placeholder="Molesey"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">State / Region</label>
+                <input type="text" value={addressSubdivision} onChange={(e) => setAddressSubdivision(e.target.value)}
+                  placeholder="England"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Postal Code *</label>
+                <input type="text" value={addressPostalCode} onChange={(e) => setAddressPostalCode(e.target.value)}
+                  placeholder="KT8 2QG"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+              </div>
+            </div>
+          </div>
+
+          {/* ── Authorized Representative ───────────────────────── */}
+          <div className="space-y-3">
+            <h4 className="text-[11px] uppercase tracking-wider text-ink-muted font-medium">
+              Authorized Representative
+            </h4>
+            <p className="text-[11px] text-ink-muted -mt-1">
+              The person Twilio can contact about this business — typically a director or officer.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">First Name *</label>
+                <input type="text" value={repFirstName} onChange={(e) => setRepFirstName(e.target.value)}
+                  placeholder="Yaseen"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Last Name *</label>
+                <input type="text" value={repLastName} onChange={(e) => setRepLastName(e.target.value)}
+                  placeholder="Chaudhry"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Work Email *</label>
+                <input type="email" value={repEmail} onChange={(e) => setRepEmail(e.target.value)}
+                  placeholder="yaseen@octogle.com"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Phone *</label>
+                <input type="tel" value={repPhone} onChange={(e) => setRepPhone(e.target.value)}
+                  placeholder="+447502241019"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+              </div>
             </div>
           </div>
         </div>

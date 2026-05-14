@@ -120,6 +120,21 @@ export const mockPhoneLines: PhoneLine[] = [
 
 // ── Regulatory Bundles ───────────────────────
 
+const emptyStructuredBundleFields = {
+  businessRegistrationAuthority: "",
+  businessWebsite: "",
+  businessClassification: "INDEPENDENT_SOFTWARE_VENDOR",
+  addressStreet1: "",
+  addressStreet2: "",
+  addressCity: "",
+  addressSubdivision: "",
+  addressPostalCode: "",
+  representativeFirstName: "",
+  representativeLastName: "",
+  representativeEmail: "",
+  representativePhone: "",
+};
+
 export const mockBundles: RegulatoryBundle[] = [
   {
     id: "bun_001",
@@ -134,6 +149,7 @@ export const mockBundles: RegulatoryBundle[] = [
     businessType: "corporation",
     contactEmail: "compliance@leadey.com",
     contactPhone: "+1 415 555 0100",
+    ...emptyStructuredBundleFields,
     createdAt: daysAgo(150),
   },
   {
@@ -149,6 +165,7 @@ export const mockBundles: RegulatoryBundle[] = [
     businessType: "limited_company",
     contactEmail: "compliance@leadey.com",
     contactPhone: "+44 20 7946 0958",
+    ...emptyStructuredBundleFields,
     createdAt: daysAgo(80),
   },
   {
@@ -164,6 +181,7 @@ export const mockBundles: RegulatoryBundle[] = [
     businessType: "limited_company",
     contactEmail: "compliance@leadey.com",
     contactPhone: "+49 30 1234 5678",
+    ...emptyStructuredBundleFields,
     createdAt: daysAgo(5),
   },
 ];
