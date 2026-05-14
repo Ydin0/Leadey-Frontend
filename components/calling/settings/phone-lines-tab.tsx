@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Plus, ArrowLeft, Loader2 } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
 import { getPhoneLines } from "@/lib/api/phone-lines";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { PhoneLineFilters, type PhoneLineFilterState } from "./phone-line-filters";
 import { PhoneLinesTable } from "./phone-lines-table";
 import { PhoneLineDetail } from "./phone-line-detail";
@@ -13,6 +15,8 @@ import type { PhoneLine } from "@/lib/types/calling";
 type PhoneLinesView = "list" | "provision" | "detail";
 
 export function PhoneLinesTab() {
+  const isAuthReady = useAuthReady();
+  const { orgId } = useAuth();
   const [view, setView] = useState<PhoneLinesView>("list");
   const [selectedLine, setSelectedLine] = useState<PhoneLine | null>(null);
   const [lines, setLines] = useState<PhoneLine[]>([]);
@@ -24,6 +28,7 @@ export function PhoneLinesTab() {
   });
 
   const fetchLines = useCallback(async () => {
+    if (!isAuthReady || !orgId) return;
     try {
       const data = await getPhoneLines();
       setLines(data);
@@ -32,11 +37,12 @@ export function PhoneLinesTab() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAuthReady, orgId]);
 
   useEffect(() => {
+    if (!isAuthReady || !orgId) return;
     fetchLines();
-  }, [fetchLines]);
+  }, [isAuthReady, orgId, fetchLines]);
 
   function handleSelectLine(line: PhoneLine) {
     setSelectedLine(line);

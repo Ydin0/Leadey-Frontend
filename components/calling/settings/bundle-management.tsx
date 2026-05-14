@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   Plus,
   Loader2,
@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import { countryOptions } from "@/lib/constants/calling";
 import {
@@ -25,6 +26,7 @@ import {
   uploadBundleDocument,
   deleteBundleDocument,
 } from "@/lib/api/phone-lines";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { BundleStatusBadge } from "./bundle-status-badge";
 import { BundleCreateForm } from "./bundle-create-form";
 import type { RegulatoryBundle, BundleDocument } from "@/lib/types/calling";
@@ -56,22 +58,35 @@ const REQUIRED_DOCS: Record<string, { type: string; label: string }[]> = {
 };
 
 export function BundleManagement() {
+  const isAuthReady = useAuthReady();
+  const { orgId } = useAuth();
   const [bundles, setBundles] = useState<RegulatoryBundle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    getBundles()
-      .then(setBundles)
-      .catch((err) => console.error("Failed to fetch bundles:", err))
-      .finally(() => setLoading(false));
-  }, []);
+  const reload = useCallback(async () => {
+    if (!isAuthReady || !orgId) return;
+    setError(null);
+    try {
+      const fresh = await getBundles();
+      setBundles(fresh);
+    } catch (err: any) {
+      console.error("[BundleManagement] /bundles failed:", err);
+      setError(err?.message || "Failed to load bundles");
+    } finally {
+      setLoading(false);
+    }
+  }, [isAuthReady, orgId]);
 
-  async function reload() {
-    const fresh = await getBundles().catch(() => null);
-    if (fresh) setBundles(fresh);
-  }
+  // Wait for active org before firing the API call — without orgId the
+  // backend returns an empty list and we end up showing "No bundles yet"
+  // even when rows exist.
+  useEffect(() => {
+    if (!isAuthReady || !orgId) return;
+    reload();
+  }, [isAuthReady, orgId, reload]);
 
   async function handleCreate(data: Parameters<typeof createBundle>[0]) {
     try {
@@ -118,7 +133,17 @@ export function BundleManagement() {
         </div>
       )}
 
-      {loading ? (
+      {error && (
+        <div className="mb-3 flex items-start gap-2 rounded-[8px] bg-signal-red/10 border border-signal-red-text/20 px-3 py-2">
+          <AlertCircle
+            size={13}
+            className="text-signal-red-text shrink-0 mt-0.5"
+          />
+          <p className="text-[11px] text-signal-red-text">{error}</p>
+        </div>
+      )}
+
+      {loading || !isAuthReady || !orgId ? (
         <div className="flex items-center justify-center py-6">
           <Loader2 size={18} className="animate-spin text-ink-muted" />
         </div>
