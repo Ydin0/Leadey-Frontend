@@ -54,6 +54,10 @@ export interface BundleCreateData {
 interface BundleCreateFormProps {
   onCancel: () => void;
   onCreate: (data: BundleCreateData) => Promise<void> | void;
+  /** When set, the form is in edit mode: country is read-only and the
+   *  submit button is labelled "Save changes". */
+  initialValues?: Partial<BundleCreateData>;
+  mode?: "create" | "edit";
 }
 
 const inputClass =
@@ -65,26 +69,33 @@ const labelClass =
 const sectionTitleClass =
   "text-[11px] uppercase tracking-wider text-ink-muted font-medium";
 
-export function BundleCreateForm({ onCancel, onCreate }: BundleCreateFormProps) {
+export function BundleCreateForm({
+  onCancel,
+  onCreate,
+  initialValues,
+  mode = "create",
+}: BundleCreateFormProps) {
   const [submitting, setSubmitting] = useState(false);
   const [d, setD] = useState<BundleCreateData>({
-    country: "",
-    countryCode: "",
-    businessName: "",
-    businessType: "limited_company",
-    businessClassification: "INDEPENDENT_SOFTWARE_VENDOR",
-    businessRegistrationNumber: "",
-    businessWebsite: "",
-    addressStreet1: "",
-    addressStreet2: "",
-    addressCity: "",
-    addressSubdivision: "",
-    addressPostalCode: "",
-    representativeFirstName: "",
-    representativeLastName: "",
-    representativeEmail: "",
-    representativePhone: "",
+    country: initialValues?.country || "",
+    countryCode: initialValues?.countryCode || "",
+    businessName: initialValues?.businessName || "",
+    businessType: initialValues?.businessType || "limited_company",
+    businessClassification:
+      initialValues?.businessClassification || "INDEPENDENT_SOFTWARE_VENDOR",
+    businessRegistrationNumber: initialValues?.businessRegistrationNumber || "",
+    businessWebsite: initialValues?.businessWebsite || "",
+    addressStreet1: initialValues?.addressStreet1 || "",
+    addressStreet2: initialValues?.addressStreet2 || "",
+    addressCity: initialValues?.addressCity || "",
+    addressSubdivision: initialValues?.addressSubdivision || "",
+    addressPostalCode: initialValues?.addressPostalCode || "",
+    representativeFirstName: initialValues?.representativeFirstName || "",
+    representativeLastName: initialValues?.representativeLastName || "",
+    representativeEmail: initialValues?.representativeEmail || "",
+    representativePhone: initialValues?.representativePhone || "",
   });
+  const isEdit = mode === "edit";
 
   function set<K extends keyof BundleCreateData>(k: K, v: BundleCreateData[K]) {
     setD((prev) => ({ ...prev, [k]: v }));
@@ -117,24 +128,31 @@ export function BundleCreateForm({ onCancel, onCreate }: BundleCreateFormProps) 
       {/* Country */}
       <div>
         <label className={labelClass}>Country *</label>
-        <NativeSelect
-          value={d.countryCode}
-          onChange={(e) => {
-            const opt = countryOptions.find((c) => c.code === e.target.value);
-            setD((prev) => ({
-              ...prev,
-              countryCode: opt?.code ?? "",
-              country: opt?.name ?? "",
-            }));
-          }}
-        >
-          <option value="">Select country…</option>
-          {countryOptions.map((c) => (
-            <option key={c.code} value={c.code}>
-              {c.flag} {c.name}
-            </option>
-          ))}
-        </NativeSelect>
+        {isEdit ? (
+          <div className="px-3 py-2 rounded-[10px] bg-surface text-[12px] text-ink-muted border border-border-subtle">
+            {countryOptions.find((c) => c.code === d.countryCode)?.flag}{" "}
+            {d.country} — cannot change after creation
+          </div>
+        ) : (
+          <NativeSelect
+            value={d.countryCode}
+            onChange={(e) => {
+              const opt = countryOptions.find((c) => c.code === e.target.value);
+              setD((prev) => ({
+                ...prev,
+                countryCode: opt?.code ?? "",
+                country: opt?.name ?? "",
+              }));
+            }}
+          >
+            <option value="">Select country…</option>
+            {countryOptions.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.flag} {c.name}
+              </option>
+            ))}
+          </NativeSelect>
+        )}
       </div>
 
       {/* Business */}
@@ -321,7 +339,9 @@ export function BundleCreateForm({ onCancel, onCreate }: BundleCreateFormProps) 
           disabled={!canSubmit || submitting}
           className="px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {submitting ? "Saving draft…" : "Save as draft"}
+          {submitting
+            ? isEdit ? "Saving…" : "Saving draft…"
+            : isEdit ? "Save changes" : "Save as draft"}
         </button>
         <button
           type="button"
@@ -330,9 +350,11 @@ export function BundleCreateForm({ onCancel, onCreate }: BundleCreateFormProps) 
         >
           Cancel
         </button>
-        <span className="text-[11px] text-ink-muted ml-2">
-          You&apos;ll upload documents and submit for review after saving.
-        </span>
+        {!isEdit && (
+          <span className="text-[11px] text-ink-muted ml-2">
+            You&apos;ll upload documents and submit for review after saving.
+          </span>
+        )}
       </div>
     </div>
   );

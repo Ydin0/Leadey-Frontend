@@ -163,6 +163,13 @@ export async function autoAllocatePhoneLine(payload: {
   });
 }
 
+export async function deleteBundle(bundleId: string): Promise<{ id: string; deleted: boolean }> {
+  return apiRequest<{ id: string; deleted: boolean }>(
+    `/phone-lines/bundles/${bundleId}`,
+    { method: "DELETE" },
+  );
+}
+
 export async function updateBundle(
   bundleId: string,
   data: Partial<{

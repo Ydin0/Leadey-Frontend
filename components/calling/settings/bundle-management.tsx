@@ -8,6 +8,7 @@ import {
   Send,
   Upload,
   Trash2,
+  Pencil,
   FileText,
   CheckCircle,
   AlertCircle,
@@ -20,6 +21,8 @@ import { countryOptions } from "@/lib/constants/calling";
 import {
   getBundles,
   createBundle,
+  updateBundle,
+  deleteBundle,
   submitBundle,
   refreshBundleStatus,
   getBundleDocuments,
@@ -184,32 +187,146 @@ function BundleRow({
   const country = countryOptions.find((c) => c.code === bundle.countryCode);
   const isDraft = bundle.status === "draft";
 
+  const [editing, setEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSaveEdit(data: Parameters<typeof updateBundle>[1]) {
+    setBusy(true);
+    try {
+      await updateBundle(bundle.id, data);
+      setEditing(false);
+      await onReload();
+    } catch (err: any) {
+      alert(err?.message || "Failed to save changes");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete() {
+    setBusy(true);
+    try {
+      await deleteBundle(bundle.id);
+      await onReload();
+    } catch (err: any) {
+      alert(err?.message || "Failed to delete bundle");
+    } finally {
+      setBusy(false);
+      setConfirmDelete(false);
+    }
+  }
+
   return (
     <div className="rounded-[10px] border border-border-subtle bg-section/40 overflow-hidden">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-hover/40 transition-colors text-left"
-      >
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-3 py-2.5 hover:bg-hover/40 transition-colors">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex items-center gap-3 flex-1 min-w-0 text-left"
+        >
           {expanded ? (
-            <ChevronDown size={14} className="text-ink-muted" />
+            <ChevronDown size={14} className="text-ink-muted shrink-0" />
           ) : (
-            <ChevronRight size={14} className="text-ink-muted" />
+            <ChevronRight size={14} className="text-ink-muted shrink-0" />
           )}
-          <span className="text-[14px]">{country?.flag ?? ""}</span>
-          <div>
-            <p className="text-[12px] text-ink font-medium">{bundle.name}</p>
-            <p className="text-[11px] text-ink-muted">
+          <span className="text-[14px] shrink-0">{country?.flag ?? ""}</span>
+          <div className="min-w-0">
+            <p className="text-[12px] text-ink font-medium truncate">
+              {bundle.name}
+            </p>
+            <p className="text-[11px] text-ink-muted truncate">
               {bundle.businessName} · {formatRelativeTime(bundle.createdAt)}
               {isDraft && " · draft"}
             </p>
           </div>
-        </div>
-        <BundleStatusBadge status={bundle.status} />
-      </button>
+        </button>
 
-      {expanded && (
+        <div className="flex items-center gap-1.5 shrink-0">
+          {isDraft && !editing && !confirmDelete && (
+            <>
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="p-1.5 rounded-md text-ink-secondary hover:bg-hover transition-colors"
+                title="Edit bundle fields"
+              >
+                <Pencil size={12} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="p-1.5 rounded-md text-ink-faint hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
+                title="Delete bundle"
+              >
+                <Trash2 size={12} />
+              </button>
+            </>
+          )}
+          <BundleStatusBadge status={bundle.status} />
+        </div>
+      </div>
+
+      {confirmDelete && (
+        <div className="border-t border-border-subtle bg-signal-red/5 px-3 py-3">
+          <p className="text-[12px] text-ink mb-2">
+            Delete this draft bundle? Uploaded documents will be removed too.
+            This can&apos;t be undone.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-[20px] bg-signal-red-text text-white text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {busy ? "Deleting…" : "Delete"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(false)}
+              disabled={busy}
+              className="px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {editing && (
+        <div className="border-t border-border-subtle px-3 py-3">
+          <BundleCreateForm
+            mode="edit"
+            initialValues={{
+              country: bundle.country,
+              countryCode: bundle.countryCode,
+              businessName: bundle.businessName,
+              businessType: bundle.businessType,
+              businessClassification: bundle.businessClassification,
+              businessRegistrationNumber: bundle.businessRegistrationNumber,
+              businessWebsite: bundle.businessWebsite,
+              addressStreet1: bundle.addressStreet1,
+              addressStreet2: bundle.addressStreet2,
+              addressCity: bundle.addressCity,
+              addressSubdivision: bundle.addressSubdivision,
+              addressPostalCode: bundle.addressPostalCode,
+              representativeFirstName: bundle.representativeFirstName,
+              representativeLastName: bundle.representativeLastName,
+              representativeEmail: bundle.representativeEmail,
+              representativePhone: bundle.representativePhone,
+            }}
+            onCancel={() => setEditing(false)}
+            onCreate={async (data) => {
+              // In edit mode, country fields are ignored server-side
+              const { country: _c, countryCode: _cc, ...patch } = data;
+              await handleSaveEdit(patch);
+            }}
+          />
+        </div>
+      )}
+
+      {expanded && !editing && (
         <div className="border-t border-border-subtle px-3 py-3">
           <BundleDocumentsSection bundle={bundle} onReload={onReload} />
         </div>
