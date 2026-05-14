@@ -1,6 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { BillingSection } from "./billing-section";
+import { TeamSection } from "./team-section";
+import { ProfileSection } from "./profile-section";
+import { OrganizationSection } from "./organization-section";
 import {
   Bell,
   Building2,
@@ -9,10 +13,8 @@ import {
   Phone,
   PlugZap,
   Save,
-  Shield,
   Users,
   UserCircle2,
-  UserPlus,
   X,
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -24,8 +26,6 @@ import { LinkedInTeamTab } from "./linkedin-team-tab";
 import type {
   AppSettingsSnapshot,
   IntegrationSettings,
-  TeamMemberSettings,
-  TeamRole,
 } from "@/lib/types/settings";
 
 type SettingsTab =
@@ -48,8 +48,6 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "integrations", label: "Integrations", icon: PlugZap },
 ];
-
-const roleOptions: TeamRole[] = ["admin", "manager", "rep", "viewer"];
 
 function SettingCard({
   title,
@@ -136,57 +134,6 @@ function ToggleField({
   );
 }
 
-function roleBadge(role: TeamRole) {
-  if (role === "admin") return "bg-signal-red text-signal-red-text";
-  if (role === "manager") return "bg-signal-blue text-signal-blue-text";
-  if (role === "rep") return "bg-signal-green text-signal-green-text";
-  return "bg-signal-slate text-signal-slate-text";
-}
-
-function nextTeamId(members: TeamMemberSettings[]) {
-  const max = members.reduce((acc, member) => {
-    const numeric = Number(member.id.replace("tm_", ""));
-    return Number.isFinite(numeric) ? Math.max(acc, numeric) : acc;
-  }, 0);
-  return `tm_${String(max + 1).padStart(3, "0")}`;
-}
-
-function cycleLabel(cycle: "monthly" | "annual") {
-  return cycle === "monthly" ? "Month" : "Year";
-}
-
-function TeamStatusBadge({ status }: { status: TeamMemberSettings["status"] }) {
-  const className =
-    status === "active"
-      ? "bg-signal-green text-signal-green-text"
-      : status === "invited"
-        ? "bg-signal-blue text-signal-blue-text"
-        : "bg-signal-red text-signal-red-text";
-  return (
-    <span className={cn("text-[10px] font-medium rounded-full px-2 py-0.5", className)}>
-      {status}
-    </span>
-  );
-}
-
-function InvoiceStatusBadge({
-  status,
-}: {
-  status: "paid" | "due" | "failed";
-}) {
-  const className =
-    status === "paid"
-      ? "bg-signal-green text-signal-green-text"
-      : status === "due"
-        ? "bg-signal-blue text-signal-blue-text"
-        : "bg-signal-red text-signal-red-text";
-  return (
-    <span className={cn("text-[10px] font-medium rounded-full px-2 py-0.5", className)}>
-      {status}
-    </span>
-  );
-}
-
 function IntegrationBadge({ integration }: { integration: IntegrationSettings }) {
   return (
     <span
@@ -206,17 +153,6 @@ export function SettingsShell() {
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [draft, setDraft] = useState<AppSettingsSnapshot>(mockSettings);
   const [savedState, setSavedState] = useState<AppSettingsSnapshot>(mockSettings);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<TeamRole>("rep");
-
-  const seatsUsed = draft.teamMembers.filter(
-    (member) => member.status === "active" || member.status === "invited"
-  ).length;
-  const seatLimit = 10;
-  const creditUsagePct = Math.min(
-    100,
-    Math.round((draft.billing.creditsUsedThisMonth / draft.billing.creditsIncludedMonthly) * 100)
-  );
 
   const hasUnsavedChanges = useMemo(
     () => JSON.stringify(draft) !== JSON.stringify(savedState),
@@ -229,44 +165,6 @@ export function SettingsShell() {
 
   function handleDiscard() {
     setDraft(savedState);
-  }
-
-  function inviteMember() {
-    const email = inviteEmail.trim();
-    if (!email || !email.includes("@")) return;
-    setDraft((prev) => ({
-      ...prev,
-      teamMembers: [
-        ...prev.teamMembers,
-        {
-          id: nextTeamId(prev.teamMembers),
-          name: email.split("@")[0],
-          email,
-          role: inviteRole,
-          status: "invited",
-          lastActive: null,
-          linkedinConnected: false,
-        },
-      ],
-    }));
-    setInviteEmail("");
-    setInviteRole("rep");
-  }
-
-  function updateTeamMemberRole(memberId: string, role: TeamRole) {
-    setDraft((prev) => ({
-      ...prev,
-      teamMembers: prev.teamMembers.map((member) =>
-        member.id === memberId ? { ...member, role } : member
-      ),
-    }));
-  }
-
-  function removeTeamMember(memberId: string) {
-    setDraft((prev) => ({
-      ...prev,
-      teamMembers: prev.teamMembers.filter((member) => member.id !== memberId),
-    }));
   }
 
   function toggleIntegration(integrationId: string) {
@@ -349,455 +247,25 @@ export function SettingsShell() {
 
         <div className="col-span-9 space-y-4">
           {activeTab === "profile" && (
-            <SettingCard
-              title="Profile Settings"
-              description="Your personal account details and security controls."
-            >
-              <div className="grid grid-cols-2 gap-3">
-                <InputField
-                  label="Full Name"
-                  value={draft.profile.fullName}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      profile: { ...prev.profile, fullName: value },
-                    }))
-                  }
-                />
-                <InputField
-                  label="Title"
-                  value={draft.profile.title}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      profile: { ...prev.profile, title: value },
-                    }))
-                  }
-                />
-                <InputField
-                  label="Email"
-                  type="email"
-                  value={draft.profile.email}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      profile: { ...prev.profile, email: value },
-                    }))
-                  }
-                />
-                <InputField
-                  label="Phone"
-                  value={draft.profile.phone}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      profile: { ...prev.profile, phone: value },
-                    }))
-                  }
-                />
-                <InputField
-                  label="Timezone"
-                  value={draft.profile.timezone}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      profile: { ...prev.profile, timezone: value },
-                    }))
-                  }
-                />
-                <InputField
-                  label="Locale"
-                  value={draft.profile.locale}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      profile: { ...prev.profile, locale: value },
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="mt-4 space-y-2">
-                <ToggleField
-                  label="Two-factor authentication"
-                  description="Require a second factor when signing in."
-                  checked={draft.profile.twoFactorEnabled}
-                  onToggle={() =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      profile: {
-                        ...prev.profile,
-                        twoFactorEnabled: !prev.profile.twoFactorEnabled,
-                      },
-                    }))
-                  }
-                />
-                <ToggleField
-                  label="Strict session timeout"
-                  description={`Auto-sign out after ${draft.profile.sessionTimeoutMinutes} minutes.`}
-                  checked={draft.profile.sessionTimeoutMinutes <= 60}
-                  onToggle={() =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      profile: {
-                        ...prev.profile,
-                        sessionTimeoutMinutes:
-                          prev.profile.sessionTimeoutMinutes <= 60 ? 240 : 60,
-                      },
-                    }))
-                  }
-                />
-              </div>
-            </SettingCard>
+            <ProfileSection />
           )}
 
           {activeTab === "organization" && (
-            <SettingCard
-              title="Organization Settings"
-              description="Workspace identity, defaults, and access policy."
-            >
-              <div className="grid grid-cols-2 gap-3">
-                <InputField
-                  label="Organization Name"
-                  value={draft.organization.organizationName}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      organization: { ...prev.organization, organizationName: value },
-                    }))
-                  }
-                />
-                <InputField
-                  label="Primary Domain"
-                  value={draft.organization.primaryDomain}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      organization: { ...prev.organization, primaryDomain: value },
-                    }))
-                  }
-                />
-                <InputField
-                  label="Website"
-                  type="url"
-                  value={draft.organization.website}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      organization: { ...prev.organization, website: value },
-                    }))
-                  }
-                />
-                <InputField
-                  label="Billing Email"
-                  type="email"
-                  value={draft.organization.billingEmail}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      organization: { ...prev.organization, billingEmail: value },
-                    }))
-                  }
-                />
-                <InputField
-                  label="Timezone"
-                  value={draft.organization.timezone}
-                  onChange={(value) =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      organization: { ...prev.organization, timezone: value },
-                    }))
-                  }
-                />
-                <div>
-                  <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">
-                    Default Currency
-                  </label>
-                  <select
-                    value={draft.organization.defaultCurrency}
-                    onChange={(e) =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        organization: {
-                          ...prev.organization,
-                          defaultCurrency: e.target.value as "USD" | "EUR" | "GBP",
-                        },
-                      }))
-                    }
-                    className="w-full px-3 py-2 rounded-[10px] bg-section text-[12px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30"
-                  >
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="GBP">GBP</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                <ToggleField
-                  label="Require SSO for all members"
-                  description="Force team login through your identity provider."
-                  checked={draft.organization.ssoRequired}
-                  onToggle={() =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      organization: {
-                        ...prev.organization,
-                        ssoRequired: !prev.organization.ssoRequired,
-                      },
-                    }))
-                  }
-                />
-                <ToggleField
-                  label="IP allowlist"
-                  description="Restrict workspace access to approved network ranges."
-                  checked={draft.organization.ipAllowlistEnabled}
-                  onToggle={() =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      organization: {
-                        ...prev.organization,
-                        ipAllowlistEnabled: !prev.organization.ipAllowlistEnabled,
-                      },
-                    }))
-                  }
-                />
-              </div>
-            </SettingCard>
+            <OrganizationSection />
           )}
 
           {activeTab === "team" && (
-            <>
-              <SettingCard
-                title="Seat Usage"
-                description={`${seatsUsed} / ${seatLimit} seats used`}
-              >
-                <div className="h-2 rounded bg-section">
-                  <div
-                    className="h-2 rounded bg-signal-blue-text"
-                    style={{ width: `${Math.min(100, Math.round((seatsUsed / seatLimit) * 100))}%` }}
-                  />
-                </div>
-              </SettingCard>
-
-              <SettingCard
-                title="Invite Team Member"
-                description="Invite teammates and assign default access role."
-              >
-                <div className="grid grid-cols-12 gap-2">
-                  <div className="col-span-7">
-                    <InputField
-                      label="Work Email"
-                      type="email"
-                      value={inviteEmail}
-                      onChange={setInviteEmail}
-                      placeholder="name@company.com"
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">
-                      Role
-                    </label>
-                    <select
-                      value={inviteRole}
-                      onChange={(e) => setInviteRole(e.target.value as TeamRole)}
-                      className="w-full px-3 py-2 rounded-[10px] bg-section text-[12px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30"
-                    >
-                      {roleOptions.map((role) => (
-                        <option key={role} value={role}>
-                          {role}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-span-2 flex items-end">
-                    <button
-                      type="button"
-                      onClick={inviteMember}
-                      className="w-full flex items-center justify-center gap-1 px-3 py-2 rounded-[10px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
-                    >
-                      <UserPlus size={13} strokeWidth={2} />
-                      Invite
-                    </button>
-                  </div>
-                </div>
-              </SettingCard>
-
-              <SettingCard
-                title="Team Members"
-                description="Manage roles and member status."
-              >
-                <div className="space-y-2">
-                  {draft.teamMembers.map((member) => (
-                    <div
-                      key={member.id}
-                      className="grid grid-cols-12 gap-2 items-center rounded-[10px] border border-border-subtle bg-section/40 px-3 py-2"
-                    >
-                      <div className="col-span-4 min-w-0">
-                        <p className="text-[12px] font-medium text-ink truncate">{member.name}</p>
-                        <p className="text-[11px] text-ink-muted truncate">{member.email}</p>
-                      </div>
-                      <div className="col-span-2">
-                        <span className={cn("text-[10px] font-medium rounded-full px-2 py-0.5", roleBadge(member.role))}>
-                          {member.role}
-                        </span>
-                      </div>
-                      <div className="col-span-2">
-                        <TeamStatusBadge status={member.status} />
-                      </div>
-                      <div className="col-span-2 text-[11px] text-ink-muted">
-                        {member.lastActive ? formatRelativeTime(member.lastActive) : "Never active"}
-                      </div>
-                      <div className="col-span-2 flex items-center justify-end gap-1">
-                        <select
-                          value={member.role}
-                          onChange={(e) => updateTeamMemberRole(member.id, e.target.value as TeamRole)}
-                          className="px-2 py-1 rounded-[8px] bg-surface text-[11px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30"
-                        >
-                          {roleOptions.map((role) => (
-                            <option key={role} value={role}>
-                              {role}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => removeTeamMember(member.id)}
-                          className="px-2 py-1 rounded-[8px] text-[11px] text-ink-muted hover:text-signal-red-text hover:bg-signal-red transition-colors"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </SettingCard>
-            </>
+            <TeamSection />
           )}
 
           {activeTab === "phone-lines" && <PhoneLinesTab />}
 
           {activeTab === "linkedin" && (
-            <LinkedInTeamTab members={draft.teamMembers} />
+            <LinkedInTeamTab />
           )}
 
           {activeTab === "billing" && (
-            <>
-              <SettingCard
-                title="Billing Plan"
-                description="Current subscription and credit limits."
-              >
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-[10px] border border-border-subtle bg-section/50 px-3 py-3">
-                    <p className="text-[10px] text-ink-faint uppercase tracking-wider">Current Plan</p>
-                    <p className="text-[14px] font-semibold text-ink mt-1">{draft.billing.planName}</p>
-                    <p className="text-[11px] text-ink-muted mt-0.5">
-                      ${draft.billing.monthlyPriceUsd} / {cycleLabel(draft.billing.billingCycle)}
-                    </p>
-                  </div>
-                  <div className="rounded-[10px] border border-border-subtle bg-section/50 px-3 py-3">
-                    <p className="text-[10px] text-ink-faint uppercase tracking-wider">Payment Method</p>
-                    <p className="text-[14px] font-semibold text-ink mt-1">{draft.billing.paymentMethodLabel}</p>
-                    <p className="text-[11px] text-ink-muted mt-0.5">
-                      Next invoice {draft.billing.nextInvoiceDate.toLocaleDateString("en-US")}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-4">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-[11px] text-ink-secondary">Credit usage this month</p>
-                    <p className="text-[11px] text-ink-muted">
-                      {draft.billing.creditsUsedThisMonth.toLocaleString()} / {draft.billing.creditsIncludedMonthly.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="h-2 rounded bg-section">
-                    <div
-                      className="h-2 rounded bg-signal-blue-text"
-                      style={{ width: `${creditUsagePct}%` }}
-                    />
-                  </div>
-                </div>
-              </SettingCard>
-
-              <SettingCard
-                title="Auto Top-Up"
-                description="Automatically purchase credits when balance drops."
-              >
-                <div className="space-y-2">
-                  <ToggleField
-                    label="Enable auto top-up"
-                    description="Prevents campaign interruptions when credits run low."
-                    checked={draft.billing.autoTopUpEnabled}
-                    onToggle={() =>
-                      setDraft((prev) => ({
-                        ...prev,
-                        billing: {
-                          ...prev.billing,
-                          autoTopUpEnabled: !prev.billing.autoTopUpEnabled,
-                        },
-                      }))
-                    }
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <InputField
-                      label="Top-up Threshold"
-                      type="number"
-                      value={String(draft.billing.autoTopUpThreshold)}
-                      onChange={(value) =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          billing: {
-                            ...prev.billing,
-                            autoTopUpThreshold: Number(value) || 0,
-                          },
-                        }))
-                      }
-                    />
-                    <InputField
-                      label="Top-up Amount"
-                      type="number"
-                      value={String(draft.billing.autoTopUpAmount)}
-                      onChange={(value) =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          billing: {
-                            ...prev.billing,
-                            autoTopUpAmount: Number(value) || 0,
-                          },
-                        }))
-                      }
-                    />
-                  </div>
-                </div>
-              </SettingCard>
-
-              <SettingCard
-                title="Invoices"
-                description="Recent billing history."
-              >
-                <div className="space-y-2">
-                  {draft.invoices.map((invoice) => (
-                    <div
-                      key={invoice.id}
-                      className="flex items-center justify-between rounded-[10px] border border-border-subtle bg-section/40 px-3 py-2"
-                    >
-                      <div>
-                        <p className="text-[12px] text-ink font-medium">{invoice.periodLabel}</p>
-                        <p className="text-[11px] text-ink-muted">{invoice.id} · {invoice.issuedAt.toLocaleDateString("en-US")}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-[12px] font-medium text-ink">${invoice.totalUsd}</span>
-                        <InvoiceStatusBadge status={invoice.status} />
-                        <button className="text-[11px] text-ink-muted hover:text-ink transition-colors">
-                          Download
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </SettingCard>
-            </>
+            <BillingSection />
           )}
 
           {activeTab === "notifications" && (
@@ -925,17 +393,6 @@ export function SettingsShell() {
             </SettingCard>
           )}
 
-          {activeTab === "billing" && (
-            <SettingCard
-              title="Security & Compliance"
-              description="Billing protection and account-level controls."
-            >
-              <div className="flex items-center gap-2 text-[11px] text-ink-secondary">
-                <Shield size={14} strokeWidth={1.8} className="text-signal-green-text" />
-                PCI-compliant billing provider. Card details are tokenized and never stored directly.
-              </div>
-            </SettingCard>
-          )}
         </div>
       </div>
     </div>
