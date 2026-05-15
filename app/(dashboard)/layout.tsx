@@ -13,10 +13,12 @@ export default function DashboardLayout({
     <AuthTokenSync>
       <CallProvider>
         <div className="min-h-screen bg-page">
-          <TrialBanner />
           <Sidebar />
           <Header />
-          <main className="ml-[56px] mt-14 p-6">{children}</main>
+          <main className="ml-[56px] mt-14">
+            <TrialBanner />
+            <div className="p-6">{children}</div>
+          </main>
         </div>
       </CallProvider>
     </AuthTokenSync>
