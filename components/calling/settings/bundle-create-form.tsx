@@ -12,11 +12,11 @@ const BUSINESS_TYPES = [
   { value: "nonprofit", label: "Non-Profit" },
 ];
 
+// Twilio's regulation enforces:
+//   business_identity ∈ {DIRECT_CUSTOMER, INDEPENDENT_SOFTWARE_VENDOR}
 const BUSINESS_CLASSIFICATIONS = [
-  { value: "INDEPENDENT_SOFTWARE_VENDOR", label: "Independent Software Vendor" },
-  { value: "RESELLER", label: "Reseller" },
-  { value: "ENTERPRISE", label: "Enterprise" },
-  { value: "CONSULTING_AGENCY", label: "Consulting / Agency" },
+  { value: "DIRECT_CUSTOMER", label: "Direct Customer (we use the number ourselves)" },
+  { value: "INDEPENDENT_SOFTWARE_VENDOR", label: "Software Vendor (number used in product)" },
 ];
 
 const REGISTRATION_NUMBER_HINT_BY_COUNTRY: Record<string, string> = {
