@@ -1,8 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { mockSettings } from "@/lib/mock-data/settings";
+import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { getTeamMembers } from "@/lib/api/team";
+import type { TeamMember } from "@/lib/types/team";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Loader2 } from "lucide-react";
 
 interface LineAssignmentSelectProps {
   currentAssignedTo: string | null;
@@ -10,17 +14,43 @@ interface LineAssignmentSelectProps {
   onAssign: (memberId: string | null, memberName: string | null) => void;
 }
 
+function memberName(m: TeamMember): string {
+  const full = [m.firstName, m.lastName].filter(Boolean).join(" ");
+  return full || m.email;
+}
+
 export function LineAssignmentSelect({
   currentAssignedTo,
   currentAssignedToName,
   onAssign,
 }: LineAssignmentSelectProps) {
+  const isAuthReady = useAuthReady();
+  const { orgId } = useAuth();
+
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
   const [pendingMemberId, setPendingMemberId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const activeMembers = mockSettings.teamMembers.filter(
-    (m) => m.status === "active" || m.status === "invited"
-  );
+  useEffect(() => {
+    if (!isAuthReady || !orgId) return;
+    let cancelled = false;
+    setLoading(true);
+    getTeamMembers()
+      .then((data) => {
+        if (cancelled) return;
+        setMembers(data.members);
+      })
+      .catch((err) => {
+        console.warn("[line-assignment] /team failed:", err?.message || err);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthReady, orgId]);
 
   function handleChange(memberId: string) {
     if (!memberId) {
@@ -36,14 +66,14 @@ export function LineAssignmentSelect({
       return;
     }
 
-    const member = activeMembers.find((m) => m.id === memberId);
-    onAssign(memberId, member?.name ?? null);
+    const m = members.find((x) => x.id === memberId);
+    onAssign(memberId, m ? memberName(m) : null);
   }
 
   function confirmReassign() {
     if (!pendingMemberId) return;
-    const member = activeMembers.find((m) => m.id === pendingMemberId);
-    onAssign(pendingMemberId, member?.name ?? null);
+    const m = members.find((x) => x.id === pendingMemberId);
+    onAssign(pendingMemberId, m ? memberName(m) : null);
     setShowConfirm(false);
     setPendingMemberId(null);
   }
@@ -54,7 +84,7 @@ export function LineAssignmentSelect({
   }
 
   const pendingMember = pendingMemberId
-    ? activeMembers.find((m) => m.id === pendingMemberId)
+    ? members.find((m) => m.id === pendingMemberId)
     : null;
 
   return (
@@ -62,23 +92,30 @@ export function LineAssignmentSelect({
       <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium">
         Assigned To
       </label>
-      <NativeSelect
-        value={currentAssignedTo ?? ""}
-        onChange={(e) => handleChange(e.target.value)}
-      >
-        <option value="">Unassigned (Org-wide)</option>
-        {activeMembers.map((m) => (
-          <option key={m.id} value={m.id}>
-            {m.name}
-          </option>
-        ))}
-      </NativeSelect>
+      {loading ? (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-[10px] bg-section text-[12px] text-ink-muted">
+          <Loader2 size={12} className="animate-spin" />
+          Loading team members…
+        </div>
+      ) : (
+        <NativeSelect
+          value={currentAssignedTo ?? ""}
+          onChange={(e) => handleChange(e.target.value)}
+        >
+          <option value="">Unassigned (Org-wide)</option>
+          {members.map((m) => (
+            <option key={m.id} value={m.id}>
+              {memberName(m)}
+            </option>
+          ))}
+        </NativeSelect>
+      )}
 
-      {showConfirm && (
+      {showConfirm && pendingMember && (
         <div className="rounded-[10px] border border-border-subtle bg-signal-blue/20 px-3 py-2">
           <p className="text-[11px] text-ink mb-2">
-            Currently assigned to <strong>{currentAssignedToName}</strong>. Reassign to{" "}
-            <strong>{pendingMember?.name}</strong>?
+            Currently assigned to <strong>{currentAssignedToName}</strong>. Reassign
+            to <strong>{memberName(pendingMember)}</strong>?
           </p>
           <div className="flex items-center gap-2">
             <button
