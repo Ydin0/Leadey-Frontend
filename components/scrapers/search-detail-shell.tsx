@@ -252,12 +252,15 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
   const jobsFilter = useJobsInlineFilters(runFilteredResults, resolvedRunId);
   const companiesFilter = useCompaniesInlineFilters(uniqueCompanies);
 
-  // Filter displayed rows
+  // Filter displayed rows. When a run is selected we use runFilteredResults
+  // (sourced from allResults, which fetches everything in 2000-row pages)
+  // rather than results.data (the 25-row server page) — otherwise the Jobs
+  // tab would only ever show 25 rows for a 257-result run.
   const displayedRows = useMemo(() => {
     if (!jobsFilter.isEmpty) return jobsFilter.filteredRows;
     if (!resolvedRunId) return results?.data || [];
-    return (results?.data || []).filter((r) => r.runId === resolvedRunId);
-  }, [results, resolvedRunId, jobsFilter.isEmpty, jobsFilter.filteredRows]);
+    return runFilteredResults;
+  }, [results, resolvedRunId, runFilteredResults, jobsFilter.isEmpty, jobsFilter.filteredRows]);
 
   const meta = results?.meta || { page: 1, pageSize: 25, totalCount: 0, totalPages: 0 };
 
