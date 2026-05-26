@@ -236,7 +236,9 @@ function BundleRow({
               {bundle.name}
             </p>
             <p className="text-[11px] text-ink-muted truncate">
-              {bundle.businessName} · {formatRelativeTime(bundle.createdAt)}
+              {bundle.businessName} · {bundle.numberType} · {bundle.endUserType}
+              {" · "}
+              {formatRelativeTime(bundle.createdAt)}
               {isDraft && " · draft"}
             </p>
           </div>
@@ -301,6 +303,8 @@ function BundleRow({
             initialValues={{
               country: bundle.country,
               countryCode: bundle.countryCode,
+              numberType: bundle.numberType,
+              endUserType: bundle.endUserType,
               businessName: bundle.businessName,
               businessType: bundle.businessType,
               businessClassification: bundle.businessClassification,

@@ -40,12 +40,19 @@ export interface PhoneLine {
 
 export type BundleStatus = "draft" | "pending-review" | "twilio-approved" | "twilio-rejected";
 
+export type BundleNumberType = "local" | "mobile" | "national" | "toll-free";
+export type BundleEndUserType = "business" | "individual";
+
 export interface RegulatoryBundle {
   id: string;
   name: string;
   country: string;
   countryCode: string;
   status: BundleStatus;
+
+  // Twilio regulation key: (country, numberType, endUserType) is unique.
+  numberType: BundleNumberType;
+  endUserType: BundleEndUserType;
 
   // Business
   businessName: string;

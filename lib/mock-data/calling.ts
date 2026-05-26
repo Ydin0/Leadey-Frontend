@@ -121,6 +121,8 @@ export const mockPhoneLines: PhoneLine[] = [
 // ── Regulatory Bundles ───────────────────────
 
 const emptyStructuredBundleFields = {
+  numberType: "local" as const,
+  endUserType: "business" as const,
   businessRegistrationAuthority: "",
   businessWebsite: "",
   businessClassification: "INDEPENDENT_SOFTWARE_VENDOR",

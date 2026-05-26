@@ -117,6 +117,8 @@ export async function createBundle(data: {
   name?: string;
   country: string;
   countryCode: string;
+  numberType?: "local" | "mobile" | "national" | "toll-free";
+  endUserType?: "business" | "individual";
   // Business
   businessName: string;
   businessType?: string;
@@ -174,6 +176,8 @@ export async function updateBundle(
   bundleId: string,
   data: Partial<{
     name: string;
+    numberType: "local" | "mobile" | "national" | "toll-free";
+    endUserType: "business" | "individual";
     businessName: string;
     businessType: string;
     businessRegistrationAuthority: string;

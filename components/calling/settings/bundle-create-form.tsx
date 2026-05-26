@@ -12,6 +12,18 @@ const BUSINESS_TYPES = [
   { value: "nonprofit", label: "Non-Profit" },
 ];
 
+// Twilio keys each regulation by (country, numberType, endUserType). Picking
+// the wrong numberType at bundle creation means the approved bundle can't be
+// used when provisioning that type. We expose only the types Twilio sells
+// regulated numbers for; toll-free in most regulated countries is non-geo
+// and rarely requires a bundle, so we include it for completeness.
+const NUMBER_TYPES = [
+  { value: "local", label: "Local — geographic area code" },
+  { value: "mobile", label: "Mobile — UK 07xx etc." },
+  { value: "national", label: "National — non-geographic" },
+  { value: "toll-free", label: "Toll-free" },
+];
+
 // Twilio's regulation enforces:
 //   business_identity ∈ {DIRECT_CUSTOMER, INDEPENDENT_SOFTWARE_VENDOR}
 const BUSINESS_CLASSIFICATIONS = [
@@ -35,6 +47,8 @@ const REGISTRATION_NUMBER_HINT_BY_COUNTRY: Record<string, string> = {
 export interface BundleCreateData {
   country: string;
   countryCode: string;
+  numberType: "local" | "mobile" | "national" | "toll-free";
+  endUserType: "business" | "individual";
   businessName: string;
   businessType: string;
   businessClassification: string;
@@ -79,6 +93,8 @@ export function BundleCreateForm({
   const [d, setD] = useState<BundleCreateData>({
     country: initialValues?.country || "",
     countryCode: initialValues?.countryCode || "",
+    numberType: initialValues?.numberType || "local",
+    endUserType: initialValues?.endUserType || "business",
     businessName: initialValues?.businessName || "",
     businessType: initialValues?.businessType || "limited_company",
     businessClassification:
@@ -125,34 +141,55 @@ export function BundleCreateForm({
 
   return (
     <div className="rounded-[10px] border border-border-subtle bg-section/50 p-4 space-y-5">
-      {/* Country */}
-      <div>
-        <label className={labelClass}>Country *</label>
-        {isEdit ? (
-          <div className="px-3 py-2 rounded-[10px] bg-surface text-[12px] text-ink-muted border border-border-subtle">
-            {countryOptions.find((c) => c.code === d.countryCode)?.flag}{" "}
-            {d.country} — cannot change after creation
-          </div>
-        ) : (
+      {/* Country + Number type */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={labelClass}>Country *</label>
+          {isEdit ? (
+            <div className="px-3 py-2 rounded-[10px] bg-surface text-[12px] text-ink-muted border border-border-subtle">
+              {countryOptions.find((c) => c.code === d.countryCode)?.flag}{" "}
+              {d.country} — cannot change after creation
+            </div>
+          ) : (
+            <NativeSelect
+              value={d.countryCode}
+              onChange={(e) => {
+                const opt = countryOptions.find((c) => c.code === e.target.value);
+                setD((prev) => ({
+                  ...prev,
+                  countryCode: opt?.code ?? "",
+                  country: opt?.name ?? "",
+                }));
+              }}
+            >
+              <option value="">Select country…</option>
+              {countryOptions.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.flag} {c.name}
+                </option>
+              ))}
+            </NativeSelect>
+          )}
+        </div>
+        <div>
+          <label className={labelClass}>Number Type *</label>
           <NativeSelect
-            value={d.countryCode}
-            onChange={(e) => {
-              const opt = countryOptions.find((c) => c.code === e.target.value);
-              setD((prev) => ({
-                ...prev,
-                countryCode: opt?.code ?? "",
-                country: opt?.name ?? "",
-              }));
-            }}
+            value={d.numberType}
+            onChange={(e) =>
+              set("numberType", e.target.value as BundleCreateData["numberType"])
+            }
           >
-            <option value="">Select country…</option>
-            {countryOptions.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.flag} {c.name}
+            {NUMBER_TYPES.map((nt) => (
+              <option key={nt.value} value={nt.value}>
+                {nt.label}
               </option>
             ))}
           </NativeSelect>
-        )}
+          <p className="mt-1 text-[10px] text-ink-muted leading-tight">
+            One bundle per number type. UK Mobile is a separate Twilio
+            regulation from UK Local.
+          </p>
+        </div>
       </div>
 
       {/* Business */}
