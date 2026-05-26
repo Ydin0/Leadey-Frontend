@@ -285,6 +285,22 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
   }, [displayedRows, resultsStartingRow, resultsRowLimit, jobsSearch]);
 
   const jobsCount = !jobsFilter.isEmpty ? rows.length : (resolvedRunId ? rows.length : meta.totalCount);
+
+  // When a run is selected or an inline filter is applied, we have the full
+  // result set in `rows` (sourced from allResults, not the server page). In
+  // that case we paginate client-side so the user still gets pagination +
+  // page-size controls — same pattern as CompaniesTab. For the unfiltered
+  // "all runs" view we keep server-side pagination via meta.*.
+  const clientPaginated = !jobsFilter.isEmpty || !!resolvedRunId;
+  const jobsTotalPages = clientPaginated
+    ? Math.max(1, Math.ceil(rows.length / pageSize))
+    : meta.totalPages;
+  const jobsSafePage = clientPaginated ? Math.min(Math.max(1, page), jobsTotalPages) : meta.page;
+  const paginatedJobsRows = useMemo(() => {
+    if (!clientPaginated) return rows;
+    const start = (jobsSafePage - 1) * pageSize;
+    return rows.slice(start, start + pageSize);
+  }, [rows, clientPaginated, jobsSafePage, pageSize]);
   const companiesCount = !companiesFilter.isEmpty ? companiesFilter.filteredCompanies.length : uniqueCompanies.length;
 
   // Cross-page selection
@@ -635,18 +651,20 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
             onSearchChange={setJobsSearch}
           />
           <ResultsTable
-            rows={rows}
-            page={!jobsFilter.isEmpty || resolvedRunId ? 1 : meta.page}
-            pageSize={!jobsFilter.isEmpty || resolvedRunId ? rows.length || 1 : pageSize}
-            totalCount={!jobsFilter.isEmpty || resolvedRunId ? rows.length : (resultsRowLimit !== null ? Math.min(resultsRowLimit, Math.max(0, meta.totalCount - resultsStartingRow)) : meta.totalCount)}
-            totalPages={!jobsFilter.isEmpty || resolvedRunId ? 1 : (resultsRowLimit !== null ? Math.max(1, Math.ceil(Math.min(resultsRowLimit, Math.max(0, meta.totalCount - resultsStartingRow)) / pageSize)) : meta.totalPages)}
+            rows={paginatedJobsRows}
+            page={clientPaginated ? jobsSafePage : meta.page}
+            pageSize={pageSize}
+            totalCount={clientPaginated ? rows.length : (resultsRowLimit !== null ? Math.min(resultsRowLimit, Math.max(0, meta.totalCount - resultsStartingRow)) : meta.totalCount)}
+            totalPages={clientPaginated ? jobsTotalPages : (resultsRowLimit !== null ? Math.max(1, Math.ceil(Math.min(resultsRowLimit, Math.max(0, meta.totalCount - resultsStartingRow)) / pageSize)) : meta.totalPages)}
             onPageChange={handlePageChange}
-            onPageSizeChange={!jobsFilter.isEmpty && !resolvedRunId ? handlePageSizeChange : undefined}
+            onPageSizeChange={handlePageSizeChange}
             selectedIds={jobsSelection.selectedIds}
             onSelectionChange={(ids) => {
-              // Bridge Set-based API to cross-page selection
-              // Determine which IDs were added/removed
-              const currentPageIds = rows.map((r) => r.id);
+              // Bridge Set-based API to cross-page selection. currentPageIds
+              // must reflect the rows actually rendered (paginatedJobsRows),
+              // not the full filtered set, or "select all on this page" will
+              // mis-fire when client-side pagination is active.
+              const currentPageIds = paginatedJobsRows.map((r) => r.id);
               const allOnPage = currentPageIds.every((id) => ids.has(id));
               const noneOnPage = !currentPageIds.some((id) => ids.has(id));
               if (allOnPage && !jobsSelection.isPageFullySelected(currentPageIds)) {
