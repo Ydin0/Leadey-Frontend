@@ -77,13 +77,13 @@ export function RecordingsTable({
       <Table>
         <TableHeader>
           <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
-            <TableHead className="text-left min-w-[200px]">Contact</TableHead>
-            <TableHead className="text-left min-w-[120px]">Rep</TableHead>
+            <TableHead className="text-left w-[220px]">Contact</TableHead>
+            <TableHead className="text-left w-[140px]">Rep</TableHead>
             <TableHead className="text-center w-[100px]">Direction</TableHead>
             <TableHead className="text-center w-[80px]">Duration</TableHead>
             <TableHead className="text-left w-[100px]">Date</TableHead>
             <TableHead className="text-center w-[90px]">Result</TableHead>
-            <TableHead className="text-left min-w-[200px]">Recording</TableHead>
+            <TableHead className="text-left w-[240px]">Recording</TableHead>
             <TableHead className="text-center w-[80px]">AI</TableHead>
           </TableRow>
         </TableHeader>

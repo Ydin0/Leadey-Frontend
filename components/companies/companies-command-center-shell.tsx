@@ -609,14 +609,14 @@ export function CompaniesCommandCenterShell() {
         <Table>
           <TableHeader>
             <TableRow className="bg-section/40 hover:bg-section/40">
-              <TableHead>Company</TableHead>
-              <TableHead>ICP</TableHead>
-              <TableHead>Owner</TableHead>
-              <TableHead className="text-center">Health</TableHead>
-              <TableHead className="text-center">Signals</TableHead>
-              <TableHead className="text-center">Coverage</TableHead>
-              <TableHead className="text-center">Stage</TableHead>
-              <TableHead>Next action</TableHead>
+              <TableHead className="w-[240px]">Company</TableHead>
+              <TableHead className="w-[140px]">ICP</TableHead>
+              <TableHead className="w-[140px]">Owner</TableHead>
+              <TableHead className="text-center w-[110px]">Health</TableHead>
+              <TableHead className="text-center w-[100px]">Signals</TableHead>
+              <TableHead className="text-center w-[120px]">Coverage</TableHead>
+              <TableHead className="text-center w-[110px]">Stage</TableHead>
+              <TableHead className="w-[200px]">Next action</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

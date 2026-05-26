@@ -12,7 +12,12 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
     >
       <table
         data-slot="table"
-        className={cn("w-full caption-bottom text-[11px]", className)}
+        // table-fixed: column widths come from the header row, not the
+        // currently-rendered cell content. Prevents columns shifting
+        // horizontally between pages (longer company names / salaries
+        // would otherwise resize the whole table). Callers should set
+        // widths on each TableHead; unsized columns get equal share.
+        className={cn("w-full caption-bottom text-[11px] table-fixed", className)}
         {...props}
       />
     </div>

@@ -143,17 +143,17 @@ export function ResultsTable({
                   className="rounded border-border-subtle"
                 />
               </TableHead>
-              <TableHead className="min-w-[200px]">
+              <TableHead className="w-[220px]">
                 <SortableHeader label="Company" field="company" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
-              <TableHead className="min-w-[180px]">
+              <TableHead className="w-[240px]">
                 <SortableHeader label="Job Title" field="jobTitle" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
-              <TableHead className="min-w-[80px]">Hiring Team</TableHead>
-              <TableHead>
+              <TableHead className="w-[110px]">Hiring Team</TableHead>
+              <TableHead className="w-[180px]">
                 <SortableHeader label="Location" field="location" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
-              <TableHead>Salary</TableHead>
+              <TableHead className="w-[120px]">Salary</TableHead>
               <TableHead className="w-20">
                 <SortableHeader label="Posted" field="postedAt" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
@@ -161,7 +161,7 @@ export function ResultsTable({
                 <SortableHeader label="Score" field="score" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
               <TableHead className="w-20">Status</TableHead>
-              <TableHead className="w-8" />
+              <TableHead className="w-12" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -185,16 +185,16 @@ export function ResultsTable({
                       className="rounded border-border-subtle"
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="overflow-hidden">
                     <CompanyCell
                       name={row.company}
                       domain={row.companyDomain}
                       industry={row.companyIndustry}
                     />
                   </TableCell>
-                  <TableCell>
-                    <div>
-                      <span className="text-[12px] font-medium text-ink">{row.jobTitle}</span>
+                  <TableCell className="overflow-hidden">
+                    <div className="min-w-0">
+                      <div className="text-[12px] font-medium text-ink truncate">{row.jobTitle}</div>
                       <div className="flex items-center gap-1 mt-0.5">
                         {row.seniority && (
                           <span className="text-[10px] font-medium rounded-full px-1.5 py-0 bg-section text-ink-muted">
@@ -202,7 +202,7 @@ export function ResultsTable({
                           </span>
                         )}
                         {row.employmentStatus && (
-                          <span className="text-[10px] text-ink-faint">
+                          <span className="text-[10px] text-ink-faint truncate">
                             {row.employmentStatus.replace(/_/g, " ")}
                           </span>
                         )}
@@ -212,25 +212,25 @@ export function ResultsTable({
                   <TableCell>
                     <HiringTeamPopover team={row.hiringTeam || []} />
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1">
+                  <TableCell className="overflow-hidden">
+                    <div className="flex items-center gap-1 min-w-0">
                       {row.location ? (
                         <>
                           <MapPin size={10} className="text-ink-faint flex-shrink-0" />
-                          <span className="text-[11px] text-ink-secondary truncate max-w-[120px]">{row.location}</span>
+                          <span className="text-[11px] text-ink-secondary truncate">{row.location}</span>
                         </>
                       ) : (
                         <span className="text-[10px] text-ink-faint">--</span>
                       )}
                       {row.isRemote && (
-                        <span className="text-[10px] font-medium rounded-full px-1.5 py-0 bg-signal-blue/20 text-signal-blue-text ml-1">
+                        <span className="text-[10px] font-medium rounded-full px-1.5 py-0 bg-signal-blue/20 text-signal-blue-text ml-1 flex-shrink-0">
                           <Wifi size={8} className="inline mr-0.5" />Remote
                         </span>
                       )}
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <span className="text-[11px] text-ink-secondary">{formatSalary(row)}</span>
+                  <TableCell className="overflow-hidden">
+                    <span className="text-[11px] text-ink-secondary truncate block">{formatSalary(row)}</span>
                   </TableCell>
                   <TableCell>
                     <span className="text-[11px] text-ink-muted">

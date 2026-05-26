@@ -150,20 +150,20 @@ export default function CompaniesPage() {
         <Table>
           <TableHeader>
             <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
-              <TableHead className="min-w-[220px]">
+              <TableHead className="w-[260px]">
                 <SortableHeader label="Company" field="name" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
-              <TableHead>
+              <TableHead className="w-[180px]">
                 <SortableHeader label="Industry" field="industry" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
               <TableHead className="text-center w-[100px]">
                 <SortableHeader label="Employees" field="employeeCount" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
-              <TableHead>
+              <TableHead className="w-[180px]">
                 <SortableHeader label="Location" field="city" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
-              <TableHead>Funding</TableHead>
-              <TableHead className="w-[80px]">LinkedIn</TableHead>
+              <TableHead className="w-[140px]">Funding</TableHead>
+              <TableHead className="w-[100px]">LinkedIn</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

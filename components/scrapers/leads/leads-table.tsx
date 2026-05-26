@@ -162,9 +162,9 @@ export function LeadsTable({
                     {contact.location || "-"}
                   </span>
                 </TableCell>
-                <TableCell>
+                <TableCell className="overflow-hidden">
                   {contact.email ? (
-                    <div>
+                    <div className="truncate">
                       <span className="text-[11px] text-ink-secondary">{contact.email}</span>
                       {contact.emailStatus && contact.emailStatus !== "verified" && (
                         <span className="ml-1 text-[9px] text-ink-muted">({contact.emailStatus})</span>
@@ -182,9 +182,9 @@ export function LeadsTable({
                     <span className="text-[11px] text-ink-muted">-</span>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell className="overflow-hidden">
                   {contact.phone ? (
-                    <span className="text-[11px] text-ink-secondary">{contact.phone}</span>
+                    <span className="text-[11px] text-ink-secondary truncate block">{contact.phone}</span>
                   ) : (
                     <span className="text-[11px] text-ink-muted">-</span>
                   )}

@@ -117,13 +117,13 @@ export function PhoneLinesTable({ lines, filters, onSelectLine, onProvision }: P
                 className="rounded"
               />
             </TableHead>
-            <TableHead>Number</TableHead>
-            <TableHead>Country</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Assigned To</TableHead>
-            <TableHead>Monthly Cost</TableHead>
-            <TableHead>Created</TableHead>
+            <TableHead className="w-[180px]">Number</TableHead>
+            <TableHead className="w-[140px]">Country</TableHead>
+            <TableHead className="w-[100px]">Type</TableHead>
+            <TableHead className="w-[110px]">Status</TableHead>
+            <TableHead className="w-[200px]">Assigned To</TableHead>
+            <TableHead className="w-[130px]">Monthly Cost</TableHead>
+            <TableHead className="w-[120px]">Created</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

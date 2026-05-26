@@ -200,13 +200,13 @@ export function LeadTable({ leads }: LeadTableProps) {
                   onChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead className="text-left">Name</TableHead>
-              <TableHead className="text-left">Title</TableHead>
-              <TableHead className="text-left">Company</TableHead>
-              <TableHead className="text-left">Location</TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-center">LinkedIn</TableHead>
-              <TableHead className="text-left">Contact</TableHead>
+              <TableHead className="text-left w-[200px]">Name</TableHead>
+              <TableHead className="text-left w-[180px]">Title</TableHead>
+              <TableHead className="text-left w-[160px]">Company</TableHead>
+              <TableHead className="text-left w-[140px]">Location</TableHead>
+              <TableHead className="text-center w-[100px]">Status</TableHead>
+              <TableHead className="text-center w-[90px]">LinkedIn</TableHead>
+              <TableHead className="text-left w-[200px]">Contact</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

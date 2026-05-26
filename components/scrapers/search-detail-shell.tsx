@@ -775,13 +775,13 @@ function HistoryTab({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Run</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Jobs Found</TableHead>
-            <TableHead>Signals Created</TableHead>
-            <TableHead>Started</TableHead>
-            <TableHead>Duration</TableHead>
-            <TableHead className="w-24" />
+            <TableHead className="w-[120px]">Run</TableHead>
+            <TableHead className="w-[140px]">Status</TableHead>
+            <TableHead className="w-[100px]">Jobs Found</TableHead>
+            <TableHead className="w-[120px]">Signals Created</TableHead>
+            <TableHead className="w-[120px]">Started</TableHead>
+            <TableHead className="w-[100px]">Duration</TableHead>
+            <TableHead className="w-[120px]" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -986,16 +986,16 @@ function CompaniesTab({
                   className="rounded border-border-subtle"
                 />
               </TableHead>
-              <TableHead className="min-w-[200px]">
+              <TableHead className="w-[280px]">
                 <SortableHeader label="Company" field="name" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
-              <TableHead>
+              <TableHead className="w-[200px]">
                 <SortableHeader label="Location" field="city" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
-              <TableHead>
+              <TableHead className="w-[110px]">
                 <SortableHeader label="Employees" field="employeeCount" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
-              <TableHead>
+              <TableHead className="w-[140px]">
                 <SortableHeader label="Funding" field="fundingStage" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
               <TableHead className="w-20">
@@ -1004,7 +1004,7 @@ function CompaniesTab({
               <TableHead className="w-20">
                 <SortableHeader label="Leads" field="leadCount" currentField={sortField} ascending={sortAsc} onSort={handleSort} />
               </TableHead>
-              <TableHead className="w-8" />
+              <TableHead className="w-16" />
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1021,11 +1021,11 @@ function CompaniesTab({
                       className="rounded border-border-subtle"
                     />
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="overflow-hidden">
                     <CompanyCell name={company.name} domain={company.domain} industry={company.industry} />
                   </TableCell>
-                  <TableCell>
-                    <span className="text-[11px] text-ink-secondary">
+                  <TableCell className="overflow-hidden">
+                    <span className="text-[11px] text-ink-secondary truncate block">
                       {[company.city, company.country].filter(Boolean).join(", ") || "--"}
                     </span>
                   </TableCell>

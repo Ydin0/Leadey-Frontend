@@ -303,10 +303,10 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
               <TableHeader>
                 <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
                   <TableHead className="w-8" />
-                  <TableHead className="text-left min-w-[200px]">Company</TableHead>
-                  <TableHead className="text-left min-w-[120px]">Industry</TableHead>
+                  <TableHead className="text-left w-[240px]">Company</TableHead>
+                  <TableHead className="text-left w-[160px]">Industry</TableHead>
                   <TableHead className="text-center w-[90px]">Employees</TableHead>
-                  <TableHead className="text-left min-w-[130px]">Location</TableHead>
+                  <TableHead className="text-left w-[160px]">Location</TableHead>
                   <TableHead className="text-center w-[80px]">Contacts</TableHead>
                   <TableHead className="text-center w-[100px]">Activity</TableHead>
                 </TableRow>
@@ -461,12 +461,12 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
                 <TableHead className="w-8 px-3">
                   <input type="checkbox" className="rounded" checked={allSelected} onChange={toggleSelectAll} />
                 </TableHead>
-                <TableHead className="text-left min-w-[220px]">Name</TableHead>
-                <TableHead className="text-center min-w-[100px]">Status</TableHead>
-                <TableHead className="text-center min-w-[80px]">Step</TableHead>
-                <TableHead className="text-center min-w-[100px]">Activity</TableHead>
-                <TableHead className="text-left min-w-[140px]">Next Due</TableHead>
-                <TableHead className="text-left min-w-[80px]">Source</TableHead>
+                <TableHead className="text-left w-[240px]">Name</TableHead>
+                <TableHead className="text-center w-[110px]">Status</TableHead>
+                <TableHead className="text-center w-[80px]">Step</TableHead>
+                <TableHead className="text-center w-[110px]">Activity</TableHead>
+                <TableHead className="text-left w-[160px]">Next Due</TableHead>
+                <TableHead className="text-left w-[100px]">Source</TableHead>
                 <TableHead className="text-center w-[120px]">Actions</TableHead>
               </TableRow>
             </TableHeader>

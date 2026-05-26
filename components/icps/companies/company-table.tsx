@@ -164,20 +164,20 @@ export function CompanyTable({ companies, leads, orgCharts }: CompanyTableProps)
                   onChange={toggleSelectAll}
                 />
               </TableHead>
-              <TableHead className="text-left cursor-pointer" onClick={() => handleSort("name")}>
+              <TableHead className="text-left cursor-pointer w-[260px]" onClick={() => handleSort("name")}>
                 Company <SortIcon field="name" />
               </TableHead>
-              <TableHead className="text-right cursor-pointer" onClick={() => handleSort("employeeCount")}>
+              <TableHead className="text-right cursor-pointer w-[110px]" onClick={() => handleSort("employeeCount")}>
                 Employees <SortIcon field="employeeCount" />
               </TableHead>
-              <TableHead className="text-center">Signals</TableHead>
-              <TableHead className="text-right cursor-pointer" onClick={() => handleSort("leadsEnriched")}>
+              <TableHead className="text-center w-[100px]">Signals</TableHead>
+              <TableHead className="text-right cursor-pointer w-[90px]" onClick={() => handleSort("leadsEnriched")}>
                 Leads <SortIcon field="leadsEnriched" />
               </TableHead>
-              <TableHead className="text-center cursor-pointer" onClick={() => handleSort("relevanceScore")}>
+              <TableHead className="text-center cursor-pointer w-[110px]" onClick={() => handleSort("relevanceScore")}>
                 Relevance <SortIcon field="relevanceScore" />
               </TableHead>
-              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-center w-[110px]">Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
