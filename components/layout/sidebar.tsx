@@ -7,7 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navItems } from "@/lib/mock-data";
 import { useSidebarFunnels } from "@/hooks/use-sidebar-funnels";
-import { LeadeyMark } from "@/components/brand/leadey-mark";
+import { LeadeyTileMark, LeadeyLogomark } from "@/components/brand/leadey-mark";
 
 export function Sidebar() {
   const [expanded, setExpanded] = useState(false);
@@ -40,24 +40,43 @@ export function Sidebar() {
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-[rgba(10,14,31,0.7)] backdrop-blur-md border-r border-white/[0.06] flex flex-col transition-all duration-200 ease-in-out",
+        "brand-chrome fixed left-0 top-0 z-40 h-screen border-r flex flex-col transition-all duration-200 ease-in-out",
         expanded ? "w-[200px]" : "w-[56px]"
       )}
     >
-      {/* Brand mark — icon only per brand guide; wordmark sits beside it
-          only when the sidebar is expanded so the chevron carries the
-          identity at the 56px collapsed width. Mark tinted periwinkle
-          so it lifts off the dark backdrop. */}
-      <div className="flex items-center h-14 px-4 gap-3 shrink-0">
-        <LeadeyMark size={20} className="text-[#C8CFE6]" />
-        <span
+      {/* Brand mark
+          - Collapsed: rounded navy tile with the gradient chevron (Figma
+            node 159:711) — reads as the app icon at the 56px rail width.
+          - Expanded: full LEADEY logomark from /public/logo/logomark-white.svg.
+          The two are stacked and cross-faded with opacity for a clean
+          transition; the tile is the resting state. */}
+      <div className="relative flex items-center h-14 pl-3 shrink-0">
+        <div
           className={cn(
-            "font-display text-[16px] font-light tracking-[0.18em] uppercase text-ink whitespace-nowrap transition-opacity duration-200",
-            expanded ? "opacity-100" : "opacity-0"
+            "absolute left-3 top-1/2 -translate-y-1/2 transition-opacity duration-200",
+            expanded ? "opacity-0 pointer-events-none" : "opacity-100",
           )}
         >
-          Leadey
-        </span>
+          <LeadeyTileMark size={32} />
+        </div>
+        <div
+          className={cn(
+            "absolute left-4 top-1/2 -translate-y-1/2 transition-opacity duration-200",
+            expanded ? "opacity-100" : "opacity-0 pointer-events-none",
+          )}
+        >
+          {/* On light backgrounds the logomark needs the dark variant so
+              it remains visible; the white variant works on dark. */}
+          <LeadeyLogomark
+            height={22}
+            className="hidden dark:block"
+          />
+          <LeadeyLogomark
+            height={22}
+            variant="color"
+            className="block dark:hidden"
+          />
+        </div>
       </div>
 
       {/* Navigation */}

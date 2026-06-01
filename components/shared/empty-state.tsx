@@ -11,7 +11,7 @@ interface EmptyStateProps {
 export function EmptyState({ icon: Icon, title, description, actionLabel, onAction }: EmptyStateProps) {
   return (
     <div className="card-brand bg-surface rounded-[16px] p-12 text-center">
-      <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 border border-white/8 bg-[rgba(151,164,214,0.08)]">
+      <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 border border-border-subtle bg-[rgba(151,164,214,0.10)]">
         <Icon size={22} strokeWidth={1.5} className="text-[#97A4D6]" />
       </div>
       <h3 className="font-display text-[18px] font-light tracking-[-0.01em] text-ink mb-1">{title}</h3>

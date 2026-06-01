@@ -88,10 +88,12 @@ export function TrialBanner() {
           onClick={handleUpgrade}
           disabled={loading}
           className={cn(
-            "px-3 py-0.5 rounded-[20px] text-[10px] font-semibold tracking-[0.04em] transition-opacity disabled:opacity-50",
+            "px-3.5 py-1 rounded-[20px] text-[11px] font-medium tracking-[0.02em] transition-opacity disabled:opacity-50",
+            // Dark navy pill with white text per Figma node 159:783 — same
+            // in both themes so the CTA stays consistently identifiable.
             isUrgent
               ? "bg-signal-red-text text-white hover:opacity-90"
-              : "pill-periwinkle hover:opacity-90",
+              : "bg-[#0F1730] text-white hover:bg-[#1A2347]",
           )}
         >
           Upgrade
