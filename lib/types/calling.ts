@@ -179,6 +179,19 @@ export interface CountryOption {
 
 // ── Call Context ─────────────────────────────
 
+/** Dispatched once the call has fully disconnected AND the call record has
+ *  been persisted server-side. The dialer subscribes to this so it can wire
+ *  the callRecordId into its /advance call. */
+export interface EndedCallInfo {
+  callSid: string | null;
+  callRecordId: string | null;
+  duration: number;
+  direction: "outbound" | "inbound";
+  from: string;
+  to: string;
+  endedAt: number; // epoch ms
+}
+
 export interface CallContextValue {
   activeCall: ActiveCall | null;
   phoneLines: PhoneLine[];
@@ -193,4 +206,7 @@ export interface CallContextValue {
   sendDtmf: (digit: string) => void;
   phoneLinesLoading: boolean;
   refreshPhoneLines: () => Promise<void>;
+  /** Last ended call + saved record id. Cleared when a new call starts.
+   *  Used by the power dialer to associate dispositions with the record. */
+  lastEndedCall: EndedCallInfo | null;
 }

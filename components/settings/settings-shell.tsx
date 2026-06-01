@@ -11,6 +11,7 @@ import {
   CreditCard,
   Linkedin,
   Phone,
+  PhoneCall,
   PlugZap,
   Save,
   Users,
@@ -22,6 +23,7 @@ import { mockSettings } from "@/lib/mock-data/settings";
 import { SmartleadIntegration } from "./smartlead-integration";
 import { UnipileIntegration } from "./unipile-integration";
 import { PhoneLinesTab } from "@/components/calling/settings/phone-lines-tab";
+import { DialerSettingsTab } from "@/components/dialer/settings/dialer-settings-tab";
 import { LinkedInTeamTab } from "./linkedin-team-tab";
 import type {
   AppSettingsSnapshot,
@@ -33,6 +35,7 @@ type SettingsTab =
   | "organization"
   | "team"
   | "phone-lines"
+  | "dialer"
   | "linkedin"
   | "billing"
   | "notifications"
@@ -43,6 +46,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "organization", label: "Organization", icon: Building2 },
   { id: "team", label: "Team", icon: Users },
   { id: "phone-lines", label: "Phone Lines", icon: Phone },
+  { id: "dialer", label: "Power Dialer", icon: PhoneCall },
   { id: "linkedin", label: "LinkedIn", icon: Linkedin },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "notifications", label: "Notifications", icon: Bell },
@@ -259,6 +263,8 @@ export function SettingsShell() {
           )}
 
           {activeTab === "phone-lines" && <PhoneLinesTab />}
+
+          {activeTab === "dialer" && <DialerSettingsTab />}
 
           {activeTab === "linkedin" && (
             <LinkedInTeamTab />

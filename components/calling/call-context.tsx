@@ -15,6 +15,7 @@ import type {
   CallContextValue,
   PhoneLine,
   CallRecord,
+  EndedCallInfo,
 } from "@/lib/types/calling";
 import { getPhoneLines, getCallRecords, saveCallRecord } from "@/lib/api/phone-lines";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -55,6 +56,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [callHistory, setCallHistory] = useState<CallRecord[]>([]);
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [deviceReady, setDeviceReady] = useState(false);
+  const [lastEndedCall, setLastEndedCall] = useState<EndedCallInfo | null>(null);
 
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -214,6 +216,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         const duration = Math.round(
           (Date.now() - callStartRef.current) / 1000
         );
+        const callSid = call.parameters?.CallSid || null;
 
         setActiveCall((prev) =>
           prev ? { ...prev, state: "ended" } : prev
@@ -234,16 +237,44 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         };
         setCallHistory((prev) => [record, ...prev]);
 
-        // Persist to backend
+        // Persist to backend, then publish the saved id so the dialer
+        // (or any other subscriber) can wire it into /advance. We rely on
+        // saveCallRecord returning the persisted row including its id.
         saveCallRecord({
           lineId: lineId !== "unknown" ? lineId : undefined,
-          twilioCallSid: call.parameters?.CallSid || undefined,
+          twilioCallSid: callSid || undefined,
           direction,
           fromNumber: from,
           toNumber: to,
           duration,
           disposition: "completed",
-        }).catch((err) => console.error("[CallProvider] Failed to save call record:", err));
+        })
+          .then((saved) => {
+            setLastEndedCall({
+              callSid,
+              callRecordId: saved?.id || null,
+              duration,
+              direction,
+              from,
+              to,
+              endedAt: Date.now(),
+            });
+          })
+          .catch((err) => {
+            console.error("[CallProvider] Failed to save call record:", err);
+            // Still publish the end event without a recordId so the dialer
+            // can advance — the disposition is more important than the
+            // record link.
+            setLastEndedCall({
+              callSid,
+              callRecordId: null,
+              duration,
+              direction,
+              from,
+              to,
+              endedAt: Date.now(),
+            });
+          });
 
         setTimeout(() => {
           setActiveCall(null);
@@ -294,6 +325,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
       // Strip formatting from the line number to get a clean caller ID
       const callerId = line.number.replace(/[^\d+]/g, "");
+
+      // Clear stale ended-call info so the dialer doesn't apply the
+      // previous call's record to this one if there's a race.
+      setLastEndedCall(null);
 
       try {
         const call = await deviceRef.current.connect({
@@ -375,6 +410,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         sendDtmf,
         phoneLinesLoading,
         refreshPhoneLines,
+        lastEndedCall,
       }}
     >
       {children}
