@@ -33,7 +33,7 @@ export function FunnelWizardShell() {
   async function handleCreate() {
     if (isCreating) return;
     if (!name.trim()) {
-      setError("Funnel name is required.");
+      setError("Campaign name is required.");
       return;
     }
     if (funnelSteps.length === 0) {
@@ -62,7 +62,7 @@ export function FunnelWizardShell() {
 
       router.push(`/dashboard/funnels/${funnel.id}`);
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create funnel";
+      const message = err instanceof Error ? err.message : "Failed to create campaign";
       setError(message);
       setIsCreating(false);
     }
@@ -78,7 +78,7 @@ export function FunnelWizardShell() {
             className="flex items-center gap-1 text-[11px] text-ink-muted hover:text-ink transition-colors"
           >
             <ArrowLeft size={14} strokeWidth={1.5} />
-            Back to Funnels
+            Back to Campaigns
           </button>
           <span className="text-[11px] text-ink-faint">Step {currentStep + 1} of {steps.length}</span>
         </div>
@@ -126,7 +126,7 @@ export function FunnelWizardShell() {
             disabled={isCreating}
             className="px-5 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isCreating ? "Creating..." : "Create Funnel"}
+            {isCreating ? "Creating..." : "Create Campaign"}
           </button>
         )}
       </div>

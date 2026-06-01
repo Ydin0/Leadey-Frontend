@@ -35,7 +35,7 @@ export default function FunnelsPage() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-[18px] font-semibold text-ink">Funnels</h1>
+          <h1 className="text-[18px] font-semibold text-ink">Campaigns</h1>
           <p className="text-[12px] text-ink-muted mt-0.5">Multi-channel outreach sequences to engage and convert leads</p>
         </div>
         {funnels.length > 0 && (
@@ -44,21 +44,21 @@ export default function FunnelsPage() {
             className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
           >
             <Plus size={14} strokeWidth={2} />
-            Create Funnel
+            Create Campaign
           </Link>
         )}
       </div>
 
       {loading && (
         <div className="rounded-[14px] border border-border-subtle bg-surface p-6">
-          <p className="text-[12px] text-ink-muted">Loading funnels...</p>
+          <p className="text-[12px] text-ink-muted">Loading campaigns...</p>
         </div>
       )}
 
       {error && !loading && (
         <div className="rounded-[14px] border border-signal-red-text/25 bg-signal-red/10 p-5 mb-4">
           <p className="text-[12px] font-medium text-signal-red-text mb-2">
-            Could not load funnels
+            Could not load campaigns
           </p>
           <p className="text-[11px] text-ink-secondary mb-3">{error}</p>
           <button

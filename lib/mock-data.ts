@@ -1,20 +1,14 @@
 import {
   LayoutDashboard,
   GitFork,
-  Radio,
-  Target,
   Building2,
-  Download,
-  BarChart3,
   Settings,
   MessageSquare,
   Send,
   Phone,
-  PhoneCall,
   Mail,
   Sparkles,
   Coins,
-  Briefcase,
   Search,
   Headphones,
   FileText,
@@ -31,19 +25,20 @@ import type {
 } from "./types";
 
 // ── Navigation ──────────────────────────────────────────────
+// Only ship-ready surfaces appear in the sidebar. "Coming Soon" pages
+// (Opportunities, Channels, ICPs, Exports, Analytics) are hidden until
+// they ship. The Power Dialer is reachable only from a Campaign step,
+// not as a top-level nav, so it stays out too.
+//
+// Funnels are surfaced as "Campaigns" in user-facing copy; the URL
+// stays /dashboard/funnels so we don't churn the route or backend.
 export const navItems: NavItem[] = [
   { id: "cockpit", label: "Cockpit", icon: LayoutDashboard, href: "/dashboard" },
-  { id: "funnels", label: "Funnels", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
+  { id: "funnels", label: "Campaigns", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
   { id: "scrapers", label: "Scrapers", icon: Search, href: "/dashboard/scrapers" },
-  { id: "dialer", label: "Power Dialer", icon: PhoneCall, href: "/dashboard/dialer" },
   { id: "recordings", label: "Recordings", icon: Headphones, href: "/dashboard/recordings" },
   { id: "templates", label: "Templates", icon: FileText, href: "/dashboard/templates" },
-  { id: "opportunities", label: "Opportunities", icon: Briefcase, href: "/dashboard/opportunities", comingSoon: true },
-  { id: "channels", label: "Channels", icon: Radio, href: "/dashboard/channels", comingSoon: true },
-  { id: "icps", label: "ICPs", icon: Target, href: "/dashboard/icps", comingSoon: true },
   { id: "companies", label: "Companies", icon: Building2, href: "/dashboard/companies" },
-  { id: "exports", label: "Exports", icon: Download, href: "/dashboard/exports", comingSoon: true },
-  { id: "analytics", label: "Analytics", icon: BarChart3, href: "/dashboard/analytics", comingSoon: true },
   { id: "settings", label: "Settings", icon: Settings, href: "/dashboard/settings" },
 ];
 

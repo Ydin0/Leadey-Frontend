@@ -108,7 +108,7 @@ export function SignalsFlow({ onDone }: { onDone: () => void }) {
         disabled={selectedIds.size === 0}
         className="px-5 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-40"
       >
-        Add {selectedContacts} Contacts to Funnel
+        Add {selectedContacts} Contacts to Campaign
       </button>
     </div>
   );

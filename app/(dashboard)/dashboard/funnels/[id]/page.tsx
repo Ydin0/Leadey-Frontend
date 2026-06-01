@@ -18,6 +18,7 @@ import { AnalyticsView } from "@/components/funnels/analytics/analytics-view";
 import { AddLeadsModal } from "@/components/funnels/add-leads/add-leads-modal";
 import { LeadFocusView } from "@/components/funnels/focus/lead-focus-view";
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
+import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
 import { focusDataMap } from "@/lib/mock-data/funnel-focus";
 import { getFunnelById, updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
 import type { Funnel, FunnelStatus } from "@/lib/types/funnel";
@@ -126,7 +127,7 @@ export default function FunnelDetailPage() {
   if (!funnel) {
     return (
       <div className="rounded-[14px] border border-border-subtle bg-surface p-6">
-        <p className="text-[12px] text-ink-muted">Funnel not found.</p>
+        <p className="text-[12px] text-ink-muted">Campaign not found.</p>
       </div>
     );
   }
@@ -152,7 +153,7 @@ export default function FunnelDetailPage() {
           className="flex items-center gap-1 text-[11px] text-ink-muted hover:text-ink transition-colors mb-3"
         >
           <ArrowLeft size={14} strokeWidth={1.5} />
-          Back to Funnels
+          Back to Campaigns
         </Link>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -192,6 +193,9 @@ export default function FunnelDetailPage() {
           <div className="flex items-center gap-3">
             <FunnelMembersPanel funnelId={funnel.id} />
             <div className="w-px h-5 bg-border-subtle" />
+            {/* Prominent power-dialer launcher — only renders if the
+                campaign has at least one call step. */}
+            <DialerLauncherButton steps={funnel.steps} />
             <button
               onClick={() => setShowAddLeads(true)}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
@@ -202,7 +206,7 @@ export default function FunnelDetailPage() {
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="p-1.5 rounded-md text-ink-muted hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
-              title="Delete funnel"
+              title="Delete campaign"
             >
               <Trash2 size={14} strokeWidth={1.5} />
             </button>
@@ -267,7 +271,7 @@ export default function FunnelDetailPage() {
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40">
           <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-sm shadow-xl">
-            <h3 className="text-[14px] font-semibold text-ink mb-2">Delete funnel?</h3>
+            <h3 className="text-[14px] font-semibold text-ink mb-2">Delete campaign?</h3>
             <p className="text-[12px] text-ink-secondary mb-5">
               This will permanently delete <span className="font-medium text-ink">{funnel.name}</span> and all its leads, events, and import history. This cannot be undone.
             </p>
@@ -284,7 +288,7 @@ export default function FunnelDetailPage() {
                 disabled={deleting}
                 className="px-4 py-1.5 rounded-[20px] bg-signal-red-text text-on-ink text-[11px] font-medium hover:bg-signal-red-text/90 transition-colors disabled:opacity-50"
               >
-                {deleting ? "Deleting..." : "Delete Funnel"}
+                {deleting ? "Deleting..." : "Delete Campaign"}
               </button>
             </div>
           </div>

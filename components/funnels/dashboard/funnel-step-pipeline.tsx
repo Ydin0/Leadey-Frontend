@@ -1,6 +1,5 @@
 import { Mail, Linkedin, Phone, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
 import type { FunnelStep, FunnelChannel } from "@/lib/types/funnel";
 
 const channelConfig: Record<FunnelChannel, { icon: typeof Mail; color: string; label: string }> = {
@@ -36,8 +35,6 @@ export function FunnelStepPipeline({ steps, compact = false }: FunnelStepPipelin
               <span className={cn("text-ink-faint whitespace-nowrap", compact ? "text-[9px]" : "text-[10px]")}>
                 Day {step.dayOffset}
               </span>
-              {/* Power-dialer launch button — only renders on call channel */}
-              <DialerLauncherButton step={step} variant="compact" />
             </div>
             {i < steps.length - 1 && (
               <div className="w-6 h-px bg-border-default shrink-0" />

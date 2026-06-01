@@ -9,12 +9,12 @@ interface FunnelBasicsStepProps {
 export function FunnelBasicsStep({ name, description, onChange }: FunnelBasicsStepProps) {
   return (
     <div>
-      <h2 className="text-[16px] font-semibold text-ink mb-1">Funnel Basics</h2>
-      <p className="text-[12px] text-ink-muted mb-6">Give your funnel a name and description</p>
+      <h2 className="text-[16px] font-semibold text-ink mb-1">Campaign Basics</h2>
+      <p className="text-[12px] text-ink-muted mb-6">Give your campaign a name and description</p>
 
       <div className="space-y-4">
         <div>
-          <label className="text-[11px] font-medium text-ink-secondary block mb-1.5">Funnel Name</label>
+          <label className="text-[11px] font-medium text-ink-secondary block mb-1.5">Campaign Name</label>
           <input
             type="text"
             value={name}
