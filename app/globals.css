@@ -1,44 +1,112 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* ─────────────────────────────────────────────────────────────────
+   Brand fonts (self-hosted from /public/fonts/)
+   General Sans      — body / UI / nav / forms
+   IBM Plex Sans     — display / hero / headlines
+   See Leadey_Brand_Style_Guide §6
+   ───────────────────────────────────────────────────────────────── */
+
+@font-face {
+  font-family: "General Sans";
+  font-style: normal;
+  font-weight: 200 700;
+  font-display: swap;
+  src: url("/fonts/general-sans/GeneralSans-Variable.ttf") format("truetype-variations");
+}
+@font-face {
+  font-family: "General Sans";
+  font-style: italic;
+  font-weight: 200 700;
+  font-display: swap;
+  src: url("/fonts/general-sans/GeneralSans-VariableItalic.ttf") format("truetype-variations");
+}
+
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-sans/IBMPlexSans-Light.ttf") format("truetype");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-sans/IBMPlexSans-Regular.ttf") format("truetype");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-sans/IBMPlexSans-Medium.ttf") format("truetype");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-sans/IBMPlexSans-SemiBold.ttf") format("truetype");
+}
+@font-face {
+  font-family: "IBM Plex Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/ibm-plex-sans/IBMPlexSans-Bold.ttf") format("truetype");
+}
+
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* ─────────────────────────────────────────────────────────────────
+   Design tokens — Leadey palette.
+   Dark is canonical (brand guide §10.2); light mode is secondary.
+   Variable names match the existing token API so no callsites need
+   to change — only the values shift to brand palette.
+   ───────────────────────────────────────────────────────────────── */
+
 @theme {
-  /* Core palette — light mode defaults */
-  --color-ink: #1A1A2E;
-  --color-ink-secondary: #6B6B80;
-  --color-ink-muted: #8E8EA0;
-  --color-ink-faint: #B0B0C0;
+  /* Light mode — inverted secondary experience */
+  --color-ink: #0C1122;             /* Midnight Navy — primary text on light */
+  --color-ink-secondary: #242E55;   /* Mid Navy */
+  --color-ink-muted: #6B7299;       /* Periwinkle blended toward navy */
+  --color-ink-faint: #97A4D6;       /* Periwinkle */
 
-  --color-page: #F8F9FB;
+  --color-page: #F4F5F9;            /* Cool off-white */
   --color-surface: #FFFFFF;
-  --color-section: #F3F4F6;
-  --color-hover: #F0F1F5;
+  --color-section: #EDEFF6;
+  --color-hover: #E4E7F1;
 
-  /* Borders */
-  --color-border-subtle: rgba(0, 0, 0, 0.04);
-  --color-border-default: rgba(0, 0, 0, 0.08);
+  --color-border-subtle: rgba(12, 17, 34, 0.06);
+  --color-border-default: rgba(12, 17, 34, 0.12);
 
-  /* On-ink: text that sits on bg-ink backgrounds */
-  --color-on-ink: #FFFFFF;
+  --color-on-ink: #FFFFFF;          /* Text on bg-ink (ink = navy) */
 
-  /* Accent — Contra purple/violet */
-  --color-accent: #A78BFA;
+  /* Accent — Periwinkle Blue (the brand's human moment, §4.2) */
+  --color-accent: #97A4D6;
   --color-accent-text: #FFFFFF;
 
-  /* Signal colors — vibrant palette */
-  --color-signal-blue: #F3E8FF;
-  --color-signal-blue-text: #A78BFA;
-  --color-signal-green: #ECFDF5;
-  --color-signal-green-text: #10B981;
-  --color-signal-red: #FEF2F2;
-  --color-signal-red-text: #EF4444;
-  --color-signal-slate: #F1F5F9;
-  --color-signal-slate-text: #64748B;
+  /* Signal colours — recoloured to live in the brand palette.
+     Bright web greens/reds would clash; these are tinted toward the
+     periwinkle/navy world so the UI stays cohesive. */
+  --color-signal-blue: rgba(151, 164, 214, 0.18);
+  --color-signal-blue-text: #97A4D6;
+  --color-signal-green: rgba(34, 197, 94, 0.16);
+  --color-signal-green-text: #22C55E;
+  --color-signal-red: rgba(244, 114, 114, 0.16);
+  --color-signal-red-text: #F47272;
+  --color-signal-slate: rgba(151, 164, 214, 0.12);
+  --color-signal-slate-text: #6B7299;
 
   --color-linkedin: #0A66C2;
 
-  --font-sans: var(--font-dm-sans), system-ui, sans-serif;
+  /* Typography tokens (referenced by Tailwind utilities + body) */
+  --font-sans: "General Sans", system-ui, -apple-system, sans-serif;
+  --font-display: "IBM Plex Sans", "General Sans", system-ui, sans-serif;
+  --font-body: "General Sans", system-ui, -apple-system, sans-serif;
 
   /* shadcn radius tokens */
   --radius-sm: calc(var(--radius) - 4px);
@@ -48,44 +116,49 @@
   --radius-2xl: calc(var(--radius) + 8px);
 }
 
-/* Dark mode overrides */
-[data-theme="dark"] {
-  --color-ink: #E2E8F0;
-  --color-ink-secondary: #94A3B8;
-  --color-ink-muted: #64748B;
-  --color-ink-faint: #475569;
+/* ─────────────────────────────────────────────────────────────────
+   Dark mode — canonical Leadey experience (brand guide §10.2).
+   This is the default the brand was designed around.
+   ───────────────────────────────────────────────────────────────── */
 
-  --color-page: #0F172A;
-  --color-surface: #1E293B;
-  --color-section: #1E293B;
-  --color-hover: #334155;
+[data-theme="dark"] {
+  --color-ink: #FFFFFF;             /* Pure White — primary text on dark */
+  --color-ink-secondary: #C8CFE6;   /* Lightened periwinkle */
+  --color-ink-muted: #97A4D6;       /* Periwinkle — secondary text */
+  --color-ink-faint: #6B7299;       /* Periwinkle dimmed */
+
+  --color-page: #0C1122;            /* Midnight Navy — base canvas */
+  --color-surface: #192039;         /* Deep Navy — cards, sidebar */
+  --color-section: #242E55;         /* Mid Navy — hovered / elevated */
+  --color-hover: #2E3964;           /* slightly lifted Mid Navy */
 
   --color-border-subtle: rgba(255, 255, 255, 0.06);
-  --color-border-default: rgba(255, 255, 255, 0.1);
+  --color-border-default: rgba(255, 255, 255, 0.12);
 
-  --color-on-ink: #0F172A;
+  --color-on-ink: #0C1122;          /* Text on bg-ink (ink = white) */
 
-  --color-accent: #D8B4FE;
-  --color-accent-text: #0F172A;
+  --color-accent: #97A4D6;          /* Periwinkle accent */
+  --color-accent-text: #0C1122;
 
-  --color-signal-blue: rgba(167, 139, 250, 0.15);
-  --color-signal-blue-text: #D8B4FE;
-  --color-signal-green: rgba(16, 185, 129, 0.15);
-  --color-signal-green-text: #34D399;
-  --color-signal-red: rgba(239, 68, 68, 0.15);
-  --color-signal-red-text: #F87171;
-  --color-signal-slate: rgba(100, 116, 139, 0.15);
-  --color-signal-slate-text: #94A3B8;
+  --color-signal-blue: rgba(151, 164, 214, 0.18);
+  --color-signal-blue-text: #C8CFE6;
+  --color-signal-green: rgba(74, 222, 128, 0.18);
+  --color-signal-green-text: #86EFAC;
+  --color-signal-red: rgba(248, 113, 113, 0.18);
+  --color-signal-red-text: #FCA5A5;
+  --color-signal-slate: rgba(151, 164, 214, 0.12);
+  --color-signal-slate-text: #97A4D6;
 
-  --color-linkedin: #D8B4FE;
+  --color-linkedin: #97A4D6;
 }
 
 /* Root variables for shadcn compatibility */
 :root {
   --radius: 0.625rem;
+  color-scheme: dark;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — tinted to the brand palette */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -96,25 +169,25 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D1D5DB;
+  background: rgba(151, 164, 214, 0.35);
   border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #9CA3AF;
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-  background: #475569;
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
-  background: #64748B;
+  background: rgba(151, 164, 214, 0.6);
 }
 
 body {
   font-size: 13px;
   color: var(--color-ink);
   background: var(--color-page);
-  font-family: var(--font-sans);
+  font-family: var(--font-body);
+  font-feature-settings: "cv11", "ss01", "ss03";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Display font utility — used for headlines in hero/auth contexts */
+.font-display {
+  font-family: var(--font-display);
 }

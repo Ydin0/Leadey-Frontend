@@ -7,6 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navItems } from "@/lib/mock-data";
 import { useSidebarFunnels } from "@/hooks/use-sidebar-funnels";
+import { LeadeyMark } from "@/components/brand/leadey-mark";
 
 export function Sidebar() {
   const [expanded, setExpanded] = useState(false);
@@ -43,14 +44,14 @@ export function Sidebar() {
         expanded ? "w-[200px]" : "w-[56px]"
       )}
     >
-      {/* Logo */}
+      {/* Brand mark — icon only per brand guide; wordmark sits beside it
+          only when the sidebar is expanded so the chevron carries the
+          identity at the 56px collapsed width. */}
       <div className="flex items-center h-14 px-4 gap-3 shrink-0">
-        <div className="w-7 h-7 rounded-lg bg-ink flex items-center justify-center shrink-0">
-          <span className="text-on-ink text-[11px] font-semibold">L</span>
-        </div>
+        <LeadeyMark size={20} className="text-ink" />
         <span
           className={cn(
-            "text-[15px] font-semibold text-ink whitespace-nowrap transition-opacity duration-200",
+            "font-display text-[16px] font-light tracking-[0.18em] uppercase text-ink whitespace-nowrap transition-opacity duration-200",
             expanded ? "opacity-100" : "opacity-0"
           )}
         >
