@@ -1,48 +1,106 @@
-export type OpportunityStage =
-  | "no_show"
-  | "demo_booked"
-  | "demo_completed"
-  | "negotiating"
-  | "contract_sent"
-  | "won"
-  | "lost";
+// ─── Opportunity CRM types (wire shape from the backend) ────────────
 
-export type OpportunityPriority = "high" | "medium" | "low";
+export type StageType = "open" | "won" | "lost";
 
-export interface OpportunityStageInfo {
-  value: OpportunityStage;
+export interface PipelineStage {
+  id: string;
+  pipelineId: string;
+  slug: string;
   label: string;
-  colorToken: string;
+  sortOrder: number;
+  type: StageType;
   defaultProbability: number;
+  color: string | null;
 }
 
-export const OPPORTUNITY_STAGES: OpportunityStageInfo[] = [
-  { value: "demo_booked", label: "Demo Booked", colorToken: "signal-blue", defaultProbability: 20 },
-  { value: "no_show", label: "No Show", colorToken: "signal-slate", defaultProbability: 5 },
-  { value: "demo_completed", label: "Demo Completed", colorToken: "signal-blue", defaultProbability: 40 },
-  { value: "negotiating", label: "Negotiating", colorToken: "signal-blue", defaultProbability: 60 },
-  { value: "contract_sent", label: "Contract Sent", colorToken: "signal-green", defaultProbability: 80 },
-  { value: "won", label: "Won", colorToken: "signal-green", defaultProbability: 100 },
-  { value: "lost", label: "Lost", colorToken: "signal-red", defaultProbability: 0 },
-];
+export interface Pipeline {
+  id: string;
+  name: string;
+  description: string;
+  isDefault: boolean;
+  sortOrder: number;
+  createdAt: string;
+  stages: PipelineStage[];
+}
 
 export interface Opportunity {
   id: string;
-  companyName: string;
-  companyDomain: string;
-  contactName: string;
-  contactTitle: string;
-  contactEmail: string;
-  stage: OpportunityStage;
+  pipelineId: string;
+  stageId: string;
+  name: string;
+  masterCompanyId: string | null;
+  masterContactId: string | null;
+  ownerId: string | null;
+  sourceLeadId: string | null;
   value: number;
-  annualValue: number;
-  probability: number;
-  ownerId: string;
-  closeDate: Date;
-  priority: OpportunityPriority;
-  sourceFunnelId?: string;
-  sourceLeadId?: string;
-  notes?: string;
-  createdAt: Date;
-  updatedAt: Date;
+  currency: string;
+  probabilityOverride: number | null;
+  expectedCloseDate: string | null; // YYYY-MM-DD
+  closedAt: string | null;
+  lostReason: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OpportunityCompany {
+  id: string;
+  name: string;
+  domain: string | null;
+  logo: string | null;
+  industry: string | null;
+}
+
+export interface OpportunityContact {
+  id: string;
+  fullName: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  email: string | null;
+  phone: string | null;
+  currentTitle: string | null;
+  linkedinUrl?: string | null;
+  role?: string | null;
+}
+
+export interface OpportunityDetail extends Opportunity {
+  company: OpportunityCompany | null;
+  primaryContact: OpportunityContact | null;
+  additionalContacts: OpportunityContact[];
+}
+
+export type OpportunityEventType =
+  | "created"
+  | "stage_changed"
+  | "owner_changed"
+  | "value_changed"
+  | "close_date_changed"
+  | "note_added"
+  | "won"
+  | "lost"
+  | "reopened"
+  | "contact_added"
+  | "contact_removed";
+
+export interface OpportunityEvent {
+  id: string;
+  opportunityId: string;
+  type: OpportunityEventType;
+  meta: Record<string, unknown> | null;
+  userId: string | null;
+  userName: string | null;
+  createdAt: string;
+}
+
+export interface OpportunitySummary {
+  totalCount: number;
+  openCount: number;
+  totalValue: number;
+  weightedValue: number;
+  byStage: Array<{ stageId: string; count: number; totalValue: number }>;
+  won: { count: number; totalValue: number };
+  lost: { count: number; totalValue: number };
+  wonThisMonth: { count: number; totalValue: number };
+  avgDealSize: number;
+  winRate: number;
 }

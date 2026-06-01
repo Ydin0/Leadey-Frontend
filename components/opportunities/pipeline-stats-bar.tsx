@@ -1,42 +1,66 @@
 "use client";
 
 import { DollarSign, Target, TrendingUp, Award } from "lucide-react";
-import type { Opportunity } from "@/lib/types/opportunity";
+import { formatCurrency } from "@/lib/utils";
+import type { OpportunitySummary } from "@/lib/types/opportunity";
 
 interface PipelineStatsBarProps {
-  opportunities: Opportunity[];
+  summary: OpportunitySummary | null;
+  loading?: boolean;
 }
 
-export function PipelineStatsBar({ opportunities }: PipelineStatsBarProps) {
-  const active = opportunities.filter((o) => o.stage !== "won" && o.stage !== "lost");
-  const won = opportunities.filter((o) => o.stage === "won");
-  const lost = opportunities.filter((o) => o.stage === "lost");
-  const closed = won.length + lost.length;
-
-  const totalPipeline = active.reduce((sum, o) => sum + o.annualValue, 0);
-  const weightedPipeline = active.reduce((sum, o) => sum + (o.annualValue * o.probability) / 100, 0);
-  const winRate = closed > 0 ? Math.round((won.length / closed) * 100) : 0;
-  const avgDealSize = won.length > 0 ? Math.round(won.reduce((sum, o) => sum + o.annualValue, 0) / won.length) : 0;
-
+/** Top-of-page stat strip for the kanban. Reads from the backend
+ *  summary endpoint instead of computing client-side, so it includes
+ *  closed opps that aren't in the current pipeline filter. */
+export function PipelineStatsBar({ summary, loading }: PipelineStatsBarProps) {
   const stats = [
-    { label: "Total Pipeline", value: `$${(totalPipeline / 1000).toFixed(0)}k`, icon: DollarSign, color: "text-signal-blue-text" },
-    { label: "Weighted", value: `$${(weightedPipeline / 1000).toFixed(0)}k`, icon: TrendingUp, color: "text-signal-green-text" },
-    { label: "Open Opps", value: active.length.toString(), icon: Target, color: "text-ink-secondary" },
-    { label: "Win Rate", value: `${winRate}%`, icon: Award, color: "text-signal-green-text" },
-    { label: "Avg Deal", value: avgDealSize > 0 ? `$${(avgDealSize / 1000).toFixed(1)}k` : "$0", icon: DollarSign, color: "text-ink-secondary" },
+    {
+      icon: DollarSign,
+      label: "Pipeline",
+      value: summary ? formatCurrency(summary.totalValue, "USD", { compact: true }) : "—",
+      sub: summary ? `${summary.openCount} open` : "",
+    },
+    {
+      icon: TrendingUp,
+      label: "Weighted",
+      value: summary ? formatCurrency(summary.weightedValue, "USD", { compact: true }) : "—",
+      sub: "by probability",
+    },
+    {
+      icon: Award,
+      label: "Won this month",
+      value: summary ? formatCurrency(summary.wonThisMonth.totalValue, "USD", { compact: true }) : "—",
+      sub: summary ? `${summary.wonThisMonth.count} deals` : "",
+    },
+    {
+      icon: Target,
+      label: "Win rate (90d)",
+      value: summary ? `${Math.round(summary.winRate * 100)}%` : "—",
+      sub: summary ? `avg ${formatCurrency(summary.avgDealSize, "USD", { compact: true })}` : "",
+    },
   ];
 
   return (
-    <div className="flex items-center gap-4 bg-surface rounded-[14px] border border-border-subtle px-4 py-3">
-      {stats.map((stat) => {
-        const Icon = stat.icon;
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      {stats.map((s) => {
+        const Icon = s.icon;
         return (
-          <div key={stat.label} className="flex items-center gap-2">
-            <Icon size={14} strokeWidth={1.5} className={stat.color} />
-            <div>
-              <p className="text-[10px] text-ink-muted font-medium uppercase tracking-wider">{stat.label}</p>
-              <p className="text-[14px] font-semibold text-ink">{stat.value}</p>
+          <div
+            key={s.label}
+            className="card-brand bg-surface rounded-[12px] px-4 py-3"
+          >
+            <div className="flex items-center gap-2 text-ink-muted mb-1.5">
+              <Icon size={12} strokeWidth={1.5} />
+              <span className="text-[10px] uppercase tracking-wider font-medium">
+                {s.label}
+              </span>
             </div>
+            <p className="text-[18px] font-semibold text-ink">
+              {loading ? "…" : s.value}
+            </p>
+            {s.sub && (
+              <p className="text-[11px] text-ink-muted mt-0.5">{s.sub}</p>
+            )}
           </div>
         );
       })}

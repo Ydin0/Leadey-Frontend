@@ -7,6 +7,7 @@ import { ProfileSection } from "./profile-section";
 import { OrganizationSection } from "./organization-section";
 import {
   Bell,
+  Briefcase,
   Building2,
   CreditCard,
   Linkedin,
@@ -24,6 +25,7 @@ import { SmartleadIntegration } from "./smartlead-integration";
 import { UnipileIntegration } from "./unipile-integration";
 import { PhoneLinesTab } from "@/components/calling/settings/phone-lines-tab";
 import { DialerSettingsTab } from "@/components/dialer/settings/dialer-settings-tab";
+import { PipelineSettings } from "@/components/opportunities/settings/pipeline-settings";
 import { LinkedInTeamTab } from "./linkedin-team-tab";
 import type {
   AppSettingsSnapshot,
@@ -36,6 +38,7 @@ type SettingsTab =
   | "team"
   | "phone-lines"
   | "dialer"
+  | "pipelines"
   | "linkedin"
   | "billing"
   | "notifications"
@@ -47,6 +50,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "team", label: "Team", icon: Users },
   { id: "phone-lines", label: "Phone Lines", icon: Phone },
   { id: "dialer", label: "Power Dialer", icon: PhoneCall },
+  { id: "pipelines", label: "Pipelines", icon: Briefcase },
   { id: "linkedin", label: "LinkedIn", icon: Linkedin },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "notifications", label: "Notifications", icon: Bell },
@@ -265,6 +269,8 @@ export function SettingsShell() {
           {activeTab === "phone-lines" && <PhoneLinesTab />}
 
           {activeTab === "dialer" && <DialerSettingsTab />}
+
+          {activeTab === "pipelines" && <PipelineSettings />}
 
           {activeTab === "linkedin" && (
             <LinkedInTeamTab />

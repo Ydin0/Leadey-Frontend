@@ -1,111 +1,102 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { MemberAvatar } from "@/components/shared/member-avatar";
-import { OPPORTUNITY_STAGES } from "@/lib/types/opportunity";
-import type { Opportunity, OpportunityStage } from "@/lib/types/opportunity";
+import Link from "next/link";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Calendar, Building2 } from "lucide-react";
+import { cn, formatCurrency, formatRelativeTime } from "@/lib/utils";
+import type { Opportunity, PipelineStage } from "@/lib/types/opportunity";
 
 interface OpportunityCardProps {
-  opportunity: Opportunity;
-  ownerName: string;
-  onMove: (id: string, stage: OpportunityStage) => void;
+  opp: Opportunity;
+  stage: PipelineStage | undefined;
+  /** Optional company label (we don't always join on the kanban). */
+  companyName?: string | null;
+  /** Optional owner initials, when ownerId resolves to a known user. */
+  ownerInitials?: string | null;
+  /** Render flag used by the DragOverlay clone so it can drop its
+   *  pointer-events / animation hooks. */
+  isOverlay?: boolean;
 }
 
-function probabilityColor(p: number): string {
-  if (p >= 60) return "text-signal-green-text";
-  if (p >= 30) return "text-signal-blue-text";
-  return "text-signal-red-text";
-}
+export function OpportunityCard({
+  opp,
+  stage,
+  companyName,
+  ownerInitials,
+  isOverlay,
+}: OpportunityCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: opp.id, data: { type: "opportunity", opp } });
 
-function formatCloseDate(date: Date): string {
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging && !isOverlay ? 0.3 : 1,
+  };
 
-export function OpportunityCard({ opportunity, ownerName, onMove }: OpportunityCardProps) {
-  const [showMenu, setShowMenu] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    }
-    if (showMenu) {
-      document.addEventListener("mousedown", handleClickOutside);
-    }
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showMenu]);
-
-  const otherStages = OPPORTUNITY_STAGES.filter((s) => s.value !== opportunity.stage);
+  const probability = opp.probabilityOverride ?? stage?.defaultProbability ?? 50;
+  const closeDate = opp.expectedCloseDate
+    ? new Date(opp.expectedCloseDate + "T00:00:00")
+    : null;
 
   return (
-    <div className="bg-surface rounded-[10px] border border-border-subtle p-3 hover:border-border-default transition-colors">
-      {/* Company + Contact */}
-      <div className="flex items-start gap-2 mb-2">
-        <img
-          src={`https://logo.clearbit.com/${opportunity.companyDomain}`}
-          alt=""
-          className="w-6 h-6 rounded-md shrink-0 mt-0.5"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-          }}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold text-ink truncate">{opportunity.companyName}</p>
-          <p className="text-[11px] text-ink-secondary truncate">
-            {opportunity.contactName}, {opportunity.contactTitle}
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className={cn(
+        "card-brand bg-surface rounded-[10px] p-3 cursor-grab active:cursor-grabbing select-none",
+        isOverlay && "shadow-xl rotate-[1.5deg]",
+      )}
+    >
+      <Link
+        href={`/dashboard/opportunities/${opp.id}`}
+        className="block"
+        onClick={(e) => {
+          if (isDragging) e.preventDefault();
+        }}
+      >
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <p className="text-[12px] font-medium text-ink leading-snug line-clamp-2 flex-1">
+            {opp.name}
           </p>
+          {ownerInitials && (
+            <div className="w-6 h-6 rounded-full bg-section text-[10px] font-medium text-ink-secondary flex items-center justify-center shrink-0">
+              {ownerInitials}
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Value + Probability */}
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[13px] font-semibold text-ink">
-          ${opportunity.value.toLocaleString()}/mo
-        </span>
-        <span className={cn("text-[12px] font-medium", probabilityColor(opportunity.probability))}>
-          {opportunity.probability}%
-        </span>
-      </div>
-
-      {/* Owner + Date + Move */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <MemberAvatar id={opportunity.ownerId} name={ownerName} />
-          <span className="text-[11px] text-ink-secondary truncate">{ownerName.split(" ")[0]}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] text-ink-muted">{formatCloseDate(opportunity.closeDate)}</span>
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] text-ink-muted hover:bg-hover transition-colors"
-            >
-              Move
-              <ChevronDown size={10} strokeWidth={2} />
-            </button>
-            {showMenu && (
-              <div className="absolute bottom-full right-0 mb-1 bg-surface rounded-[10px] border border-border-subtle shadow-lg z-20 min-w-[140px] py-1">
-                {otherStages.map((s) => (
-                  <button
-                    key={s.value}
-                    onClick={() => {
-                      onMove(opportunity.id, s.value);
-                      setShowMenu(false);
-                    }}
-                    className="w-full text-left px-3 py-1.5 text-[11px] text-ink-secondary hover:bg-hover/60 transition-colors"
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            )}
+        {companyName && (
+          <div className="flex items-center gap-1 text-[10px] text-ink-muted mb-2 truncate">
+            <Building2 size={10} className="shrink-0" />
+            <span className="truncate">{companyName}</span>
           </div>
+        )}
+
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[13px] font-semibold text-ink">
+            {formatCurrency(opp.value, opp.currency, { compact: true })}
+          </p>
+          <span className="text-[10px] text-ink-muted">{probability}%</span>
         </div>
-      </div>
+
+        {closeDate && (
+          <div className="flex items-center gap-1 mt-1.5 text-[10px] text-ink-muted">
+            <Calendar size={10} />
+            <span>
+              {closeDate.toLocaleDateString(undefined, {
+                month: "short",
+                day: "numeric",
+              })}
+            </span>
+            <span className="text-ink-faint">·</span>
+            <span>{formatRelativeTime(opp.updatedAt)}</span>
+          </div>
+        )}
+      </Link>
     </div>
   );
 }

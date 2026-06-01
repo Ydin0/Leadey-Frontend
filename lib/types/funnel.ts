@@ -61,6 +61,10 @@ export interface FunnelLead {
   notes?: Record<string, string>;
   linkedinUrl?: string;
   unipileProviderId?: string | null;
+  /** Set once the lead has been converted to an Opportunity. Drives the
+   *  "→ Opp" badge on the lead row and the "Open Opportunity" CTA in the
+   *  focus view. */
+  opportunityId?: string | null;
   events?: FunnelLeadEvent[];
 }
 

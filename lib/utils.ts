@@ -36,3 +36,43 @@ export function formatPhoneNumber(phone: string): string {
   }
   return phone;
 }
+
+/** Compact currency for opportunity values, stats cards, etc.
+ *  Drops cents for whole numbers and uses k/M suffixes when compact=true. */
+export function formatCurrency(
+  amount: number,
+  currency: string = "USD",
+  options?: { compact?: boolean },
+): string {
+  if (!Number.isFinite(amount)) return "—";
+  if (options?.compact) {
+    const abs = Math.abs(amount);
+    if (abs >= 1_000_000) {
+      const v = amount / 1_000_000;
+      return `${formatCurrencyBase(0, currency)}${(Math.round(v * 10) / 10).toFixed(1)}M`.replace(/0\.0/, "0");
+    }
+    if (abs >= 1_000) {
+      const v = amount / 1_000;
+      return `${formatCurrencyBase(0, currency)}${Math.round(v)}k`;
+    }
+  }
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: amount % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function formatCurrencyBase(amount: number, currency: string): string {
+  // Strips the digits so we can prefix the symbol manually for compact form.
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })
+    .format(amount)
+    .replace(/[0-9]/g, "")
+    .trim();
+}

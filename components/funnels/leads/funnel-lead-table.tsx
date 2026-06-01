@@ -12,6 +12,9 @@ import { FunnelLeadsFilterBar, DEFAULT_FUNNEL_LEADS_FILTERS, type FunnelLeadsFil
 import { statusDot, statusLabel, TERMINAL_STATUSES } from "@/lib/utils/lead-status";
 import { computeActivityCounts } from "@/lib/utils/lead-activity";
 import { useCallContext } from "@/components/calling/call-context";
+import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
+import Link from "next/link";
+import { Briefcase } from "lucide-react";
 import type { FunnelLead } from "@/lib/types/funnel";
 import type { LeadStatus } from "@/lib/types/funnel-focus";
 
@@ -59,6 +62,7 @@ function LeadActionMenu({
 }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showConvert, setShowConvert] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -83,6 +87,20 @@ function LeadActionMenu({
     }
   }, [funnelId, lead.id, onAdvanced]);
 
+  // Already converted? Show a quick link to the opp instead of the menu.
+  if (lead.opportunityId) {
+    return (
+      <Link
+        href={`/dashboard/opportunities/${lead.opportunityId}`}
+        onClick={(e) => e.stopPropagation()}
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-signal-blue/15 text-signal-blue-text text-[10px] font-medium hover:opacity-90"
+        title="Open linked opportunity"
+      >
+        <Briefcase size={10} /> Opp
+      </Link>
+    );
+  }
+
   if (TERMINAL_STATUSES.has(lead.status)) {
     return <span className="text-[10px] text-ink-faint">&mdash;</span>;
   }
@@ -97,7 +115,18 @@ function LeadActionMenu({
         <MoreHorizontal size={14} strokeWidth={1.5} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 min-w-[140px] bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+        <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(false);
+              setShowConvert(true);
+            }}
+            className="w-full text-left px-3 py-1.5 text-[11px] font-medium text-signal-blue-text hover:bg-hover transition-colors flex items-center gap-1.5"
+          >
+            <Briefcase size={11} /> Convert to Opportunity
+          </button>
+          <div className="my-1 border-t border-border-subtle" />
           {actionOptions.map((opt) => (
             <button
               key={opt.outcome}
@@ -109,6 +138,14 @@ function LeadActionMenu({
             </button>
           ))}
         </div>
+      )}
+      {showConvert && (
+        <ConvertToOpportunityModal
+          leadId={lead.id}
+          defaultName={`${lead.company || lead.name} — Opportunity`}
+          onClose={() => setShowConvert(false)}
+          onConverted={() => onAdvanced?.()}
+        />
       )}
     </div>
   );

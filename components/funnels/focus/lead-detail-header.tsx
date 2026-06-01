@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { FileText, Mail, Phone, ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { FileText, Mail, Phone, ChevronDown, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { statusDot, statusLabel } from "@/lib/utils/lead-status";
 import { CompanyAvatar } from "./company-avatar";
+import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
 import type { LeadStatus } from "@/lib/types/funnel-focus";
 
 const allStatuses = (Object.entries(statusLabel) as [LeadStatus, string][]).map(
@@ -12,6 +14,10 @@ const allStatuses = (Object.entries(statusLabel) as [LeadStatus, string][]).map(
 );
 
 interface LeadDetailHeaderProps {
+  leadId?: string;
+  /** When set, the lead has already been converted — show a link to the
+   *  opportunity instead of a Convert CTA. */
+  opportunityId?: string | null;
   companyName: string;
   companyDomain?: string;
   status: LeadStatus;
@@ -20,12 +26,15 @@ interface LeadDetailHeaderProps {
 }
 
 export function LeadDetailHeader({
+  leadId,
+  opportunityId,
   companyName,
   companyDomain,
   status,
   onStatusChange,
   localTime,
 }: LeadDetailHeaderProps) {
+  const [showConvert, setShowConvert] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -90,6 +99,25 @@ export function LeadDetailHeader({
 
       {/* Action buttons */}
       <div className="flex items-center gap-2">
+        {opportunityId ? (
+          <Link
+            href={`/dashboard/opportunities/${opportunityId}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-signal-blue/15 text-signal-blue-text border border-signal-blue-text/20 text-[11px] font-medium hover:opacity-90 transition-opacity"
+          >
+            <Briefcase size={13} strokeWidth={1.5} />
+            Open Opportunity
+          </Link>
+        ) : (
+          leadId && (
+            <button
+              onClick={() => setShowConvert(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-signal-green text-signal-green-text border border-signal-green-text/20 text-[11px] font-medium hover:opacity-90 transition-opacity"
+            >
+              <Briefcase size={13} strokeWidth={1.5} />
+              Convert to Opportunity
+            </button>
+          )
+        )}
         <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-surface border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors">
           <FileText size={13} strokeWidth={1.5} />
           Note
@@ -103,6 +131,13 @@ export function LeadDetailHeader({
           Call
         </button>
       </div>
+      {showConvert && leadId && (
+        <ConvertToOpportunityModal
+          leadId={leadId}
+          defaultName={`${companyName} — Opportunity`}
+          onClose={() => setShowConvert(false)}
+        />
+      )}
     </div>
   );
 }

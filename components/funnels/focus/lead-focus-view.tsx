@@ -144,6 +144,8 @@ export function LeadFocusView({
       <div className="flex-1 overflow-y-auto pb-20">
         <div className="max-w-2xl mx-auto px-6 py-6">
           <LeadDetailHeader
+            leadId={currentLead.id}
+            opportunityId={currentLead.opportunityId}
             companyName={currentLead.company}
             companyDomain={currentDomain}
             status={currentStatus}
