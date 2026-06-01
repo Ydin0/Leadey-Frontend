@@ -12,7 +12,9 @@ export default function DashboardLayout({
   return (
     <AuthTokenSync>
       <CallProvider>
-        <div className="min-h-screen bg-page">
+        {/* dashboard-backdrop applies the layered radial gradients per
+            the Figma reference. The class is no-op in light mode. */}
+        <div className="min-h-screen dashboard-backdrop bg-page">
           <Sidebar />
           <Header />
           <main className="ml-[56px] mt-14">

@@ -40,15 +40,16 @@ export function Sidebar() {
       onMouseEnter={() => setExpanded(true)}
       onMouseLeave={() => setExpanded(false)}
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen bg-surface border-r border-border-subtle flex flex-col transition-all duration-200 ease-in-out",
+        "fixed left-0 top-0 z-40 h-screen bg-[rgba(10,14,31,0.7)] backdrop-blur-md border-r border-white/[0.06] flex flex-col transition-all duration-200 ease-in-out",
         expanded ? "w-[200px]" : "w-[56px]"
       )}
     >
       {/* Brand mark — icon only per brand guide; wordmark sits beside it
           only when the sidebar is expanded so the chevron carries the
-          identity at the 56px collapsed width. */}
+          identity at the 56px collapsed width. Mark tinted periwinkle
+          so it lifts off the dark backdrop. */}
       <div className="flex items-center h-14 px-4 gap-3 shrink-0">
-        <LeadeyMark size={20} className="text-ink" />
+        <LeadeyMark size={20} className="text-[#C8CFE6]" />
         <span
           className={cn(
             "font-display text-[16px] font-light tracking-[0.18em] uppercase text-ink whitespace-nowrap transition-opacity duration-200",

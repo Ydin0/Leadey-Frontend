@@ -191,3 +191,70 @@ body {
 .font-display {
   font-family: var(--font-display);
 }
+
+/* ─────────────────────────────────────────────────────────────────
+   Atmospheric dashboard backdrop — layered radial gradients that
+   mirror the four ellipses Figma uses to give the canvas a
+   cinematic horizon glow. Applied on the dashboard shell so every
+   route inherits the same atmosphere without re-declaration.
+
+   The base is Midnight (#0A0E1F — slightly darker than the token
+   #0C1122 to widen the value range against the glows). Three
+   periwinkle-tinted ellipses layer on top:
+   1. A large soft glow centred lower-right (where Figma's main
+      light source sits).
+   2. A mid-radius glow centred behind the content card (lifts the
+      central content area).
+   3. A subtle blueish wash from the upper-right (matches Figma's
+      "horizon light from above").
+   ───────────────────────────────────────────────────────────────── */
+
+.dashboard-backdrop {
+  background-color: #0A0E1F;
+  background-image:
+    radial-gradient(60% 40% at 50% 78%, rgba(151, 164, 214, 0.14) 0%, rgba(151, 164, 214, 0) 60%),
+    radial-gradient(70% 60% at 100% 100%, rgba(74, 84, 120, 0.30) 0%, rgba(74, 84, 120, 0) 65%),
+    radial-gradient(50% 55% at 95% 0%, rgba(151, 164, 214, 0.10) 0%, rgba(151, 164, 214, 0) 60%),
+    linear-gradient(180deg, #0A0E1F 0%, #0C1122 50%, #0A0E1F 100%);
+  background-attachment: fixed;
+}
+
+/* Light-mode override — flatten the gradient so light surfaces don't
+   get washed out. */
+:root:not([data-theme="dark"]) .dashboard-backdrop {
+  background-color: var(--color-page);
+  background-image: none;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Brand card surface — the subtle elevated panel used for empty
+   states, dashboard widgets, and feature blocks. Top edge carries a
+   ~1px highlight (catches the imagined overhead light); body is a
+   linear gradient from Mid-Navy down to Deep-Navy, then a soft
+   periwinkle inner glow at the bottom-centre.
+   ───────────────────────────────────────────────────────────────── */
+
+[data-theme="dark"] .card-brand {
+  background-color: #141A30;
+  background-image:
+    radial-gradient(80% 60% at 50% 100%, rgba(151, 164, 214, 0.10) 0%, rgba(151, 164, 214, 0) 70%),
+    linear-gradient(180deg, #1A2140 0%, #141A30 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 24px 60px -20px rgba(0, 0, 0, 0.5);
+}
+
+/* Pill / chip variants the dashboard uses */
+[data-theme="dark"] .pill-periwinkle {
+  background: rgba(151, 164, 214, 0.14);
+  color: #C8CFE6;
+  border: 1px solid rgba(151, 164, 214, 0.22);
+}
+
+[data-theme="dark"] .trial-banner-pill {
+  background: rgba(20, 26, 48, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 32px -12px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(8px);
+}

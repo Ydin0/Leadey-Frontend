@@ -55,50 +55,55 @@ export function TrialBanner() {
 
   if (isExpired) {
     return (
-      <div className="bg-signal-red text-signal-red-text px-4 py-2.5 flex items-center justify-center gap-3 text-[12px] font-medium">
-        <span>Your 60-day free trial has expired. Upgrade now to keep using Leadey.</span>
-        <button
-          onClick={handleUpgrade}
-          disabled={loading}
-          className="px-3 py-1 rounded-[20px] bg-signal-red-text text-white text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          Upgrade Now
-        </button>
+      <div className="flex justify-center pt-4">
+        <div className="trial-banner-pill flex items-center gap-3 px-4 py-2 rounded-[24px] text-[12px] font-medium text-signal-red-text">
+          <Sparkles size={12} className="text-signal-red-text" />
+          <span>Your 60-day free trial has expired. Upgrade now to keep using Leadey.</span>
+          <button
+            onClick={handleUpgrade}
+            disabled={loading}
+            className="px-3 py-1 rounded-[20px] bg-signal-red-text text-white text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            Upgrade Now
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className={cn(
-      "px-4 py-2 flex items-center justify-center gap-3 text-[11px] font-medium",
-      isUrgent
-        ? "bg-signal-red/10 text-signal-red-text"
-        : "bg-signal-blue/10 text-signal-blue-text"
-    )}>
-      <Sparkles size={12} />
-      <span>
-        You&apos;re on the <strong className="font-semibold">Free</strong> plan —{" "}
-        {daysLeft === 1 ? "1 day" : `${daysLeft} days`} left of your 60-day trial.
-      </span>
-      <button
-        onClick={handleUpgrade}
-        disabled={loading}
+    <div className="flex justify-center pt-4">
+      <div
         className={cn(
-          "px-3 py-0.5 rounded-[20px] text-[10px] font-semibold transition-opacity disabled:opacity-50",
-          isUrgent
-            ? "bg-signal-red-text text-white hover:opacity-90"
-            : "bg-signal-blue-text text-white hover:opacity-90"
+          "trial-banner-pill flex items-center gap-3 px-4 py-1.5 rounded-[24px] text-[12px] font-medium",
+          isUrgent ? "text-signal-red-text" : "text-ink-secondary",
         )}
       >
-        Upgrade
-      </button>
-      <button
-        onClick={() => setDismissed(true)}
-        className="p-0.5 rounded hover:bg-ink/10 transition-colors ml-2"
-        aria-label="Dismiss"
-      >
-        <X size={12} />
-      </button>
+        <Sparkles size={12} className="text-[#97A4D6] shrink-0" />
+        <span className="whitespace-nowrap">
+          You&apos;re on the <strong className="font-semibold text-ink">Free</strong> plan —{" "}
+          {daysLeft === 1 ? "1 day" : `${daysLeft} days`} left of your 60-day trial.
+        </span>
+        <button
+          onClick={handleUpgrade}
+          disabled={loading}
+          className={cn(
+            "px-3 py-0.5 rounded-[20px] text-[10px] font-semibold tracking-[0.04em] transition-opacity disabled:opacity-50",
+            isUrgent
+              ? "bg-signal-red-text text-white hover:opacity-90"
+              : "pill-periwinkle hover:opacity-90",
+          )}
+        >
+          Upgrade
+        </button>
+        <button
+          onClick={() => setDismissed(true)}
+          className="p-0.5 rounded hover:bg-white/10 transition-colors text-ink-muted"
+          aria-label="Dismiss"
+        >
+          <X size={12} />
+        </button>
+      </div>
     </div>
   );
 }
