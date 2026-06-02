@@ -1,9 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Users, Building2, Sparkles, FolderInput, Loader2, ChevronDown,
-  EyeOff, Download, X as XIcon, Mail, CheckCircle2, Search,
+  EyeOff, Download, X as XIcon, Mail, CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -13,6 +13,7 @@ import {
   LeadsFilterBar, DEFAULT_LEADS_FILTERS, type LeadsFilters,
 } from "@/components/scrapers/leads/leads-filter-bar";
 import { useCrossPageSelection } from "@/lib/hooks/use-cross-page-selection";
+import { CompaniesTable } from "./companies-table";
 import {
   getContacts, getContactCompanyCounts, enrichContacts, pollEnrichmentAll,
   bulkUpdateContactStatus, sendContactsToFunnel, resetEnrichment,
@@ -38,7 +39,6 @@ export function LeadsPageShell() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<LeadsFilters>(DEFAULT_LEADS_FILTERS);
   const [companyOptions, setCompanyOptions] = useState<CompanyOption[]>([]);
-  const [companySearch, setCompanySearch] = useState("");
 
   const selection = useCrossPageSelection(totalCount);
   const [enrichRequestIds, setEnrichRequestIds] = useState<string[]>([]);
@@ -276,11 +276,6 @@ export function LeadsPageShell() {
     finally { setExporting(false); }
   }
 
-  const filteredCompanies = useMemo(() => {
-    const q = companySearch.trim().toLowerCase();
-    return q ? companyOptions.filter((c) => c.name.toLowerCase().includes(q)) : companyOptions;
-  }, [companyOptions, companySearch]);
-
   const hasUnenrichedSelected = contacts.some((c) => selection.selectedIds.has(c.id) && c.enrichmentStatus === "none");
 
   return (
@@ -360,12 +355,7 @@ export function LeadsPageShell() {
           />
         </>
       ) : (
-        <CompaniesView
-          companies={filteredCompanies}
-          search={companySearch}
-          onSearch={setCompanySearch}
-          onSelect={selectCompany}
-        />
+        <CompaniesTable onSelect={selectCompany} />
       )}
 
       {/* Bulk action bar */}
@@ -432,51 +422,3 @@ function StatCard({ icon: Icon, tone, label, value }: { icon: typeof Users; tone
   );
 }
 
-function CompaniesView({
-  companies, search, onSearch, onSelect,
-}: {
-  companies: CompanyOption[];
-  search: string;
-  onSearch: (v: string) => void;
-  onSelect: (name: string) => void;
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-2 bg-section border border-border-subtle rounded-full px-3 py-1.5 w-[280px] mb-3">
-        <Search size={13} className="text-ink-muted shrink-0" />
-        <input
-          value={search}
-          onChange={(e) => onSearch(e.target.value)}
-          placeholder="Search companies…"
-          className="bg-transparent text-[12px] text-ink outline-none w-full placeholder:text-ink-faint"
-        />
-      </div>
-      {companies.length === 0 ? (
-        <div className="bg-surface rounded-[14px] border border-border-subtle p-10 text-center text-[12px] text-ink-muted">
-          No companies found.
-        </div>
-      ) : (
-        <div className="grid grid-cols-3 gap-3">
-          {companies.map((c) => (
-            <button
-              key={c.name}
-              onClick={() => onSelect(c.name)}
-              className="text-left bg-surface rounded-[14px] border border-border-subtle p-4 hover:bg-hover transition-colors group"
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-8 h-8 rounded-[8px] bg-section flex items-center justify-center shrink-0">
-                  <Building2 size={14} className="text-ink-secondary" />
-                </div>
-                <span className="text-[12px] font-medium text-ink truncate">{c.name}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-ink-muted">{c.count} {c.count === 1 ? "lead" : "leads"}</span>
-                <span className="text-[10px] text-signal-blue-text opacity-0 group-hover:opacity-100 transition-opacity">View leads →</span>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}

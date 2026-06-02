@@ -5,6 +5,27 @@ import type {
   CompanyPriorityQueueItem,
 } from "@/lib/types/companies-command-center";
 
+/** A row in the org-wide companies table (Leads page → Companies view). */
+export interface CompanyListRow {
+  name: string;
+  domain: string | null;
+  linkedinUrl: string | null;
+  industry: string | null;
+  employeeCount: number | null;
+  fundingStage: string | null;
+  country: string | null;
+  city: string | null;
+  logo: string | null;
+  leadCount: number;
+  enrichedCount: number;
+  inCampaignCount: number;
+}
+
+/** GET /api/companies/list — every org company with lead counts + metadata. */
+export async function getCompaniesList(): Promise<CompanyListRow[]> {
+  return apiRequest<CompanyListRow[]>("/companies/list");
+}
+
 /** Wire shape — identical to the snapshot but with dates as ISO strings. */
 type RawAccount = Omit<
   CompanyCommandAccount,
