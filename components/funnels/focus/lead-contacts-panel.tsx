@@ -6,9 +6,11 @@ import type { FunnelLeadContact } from "@/lib/types/funnel-focus";
 
 interface LeadContactsPanelProps {
   contacts: FunnelLeadContact[];
+  /** Start a Twilio call to this number via the in-app dialer. */
+  onCall?: (phone: string) => void;
 }
 
-export function LeadContactsPanel({ contacts }: LeadContactsPanelProps) {
+export function LeadContactsPanel({ contacts, onCall }: LeadContactsPanelProps) {
   const [expanded, setExpanded] = useState(true);
 
   return (
@@ -39,12 +41,19 @@ export function LeadContactsPanel({ contacts }: LeadContactsPanelProps) {
                   <div className="text-[12px] font-medium text-ink">{contact.name}</div>
                   <div className="text-[11px] text-ink-muted">{contact.title}</div>
                   {contact.phone && (
-                    <a
-                      href={`tel:${contact.phone}`}
-                      className="text-[11px] text-ink hover:text-signal-blue-text transition-colors block mt-0.5"
-                    >
-                      {contact.phone}
-                    </a>
+                    onCall ? (
+                      <button
+                        onClick={() => onCall(contact.phone!)}
+                        className="text-[11px] text-ink hover:text-signal-green-text transition-colors block mt-0.5 text-left"
+                        title="Call via dialer"
+                      >
+                        {contact.phone}
+                      </button>
+                    ) : (
+                      <a href={`tel:${contact.phone}`} className="text-[11px] text-ink hover:text-signal-blue-text transition-colors block mt-0.5">
+                        {contact.phone}
+                      </a>
+                    )
                   )}
                   {contact.email && (
                     <div className="text-[11px] text-ink-secondary mt-0.5">{contact.email}</div>
@@ -83,9 +92,15 @@ export function LeadContactsPanel({ contacts }: LeadContactsPanelProps) {
 
                   {/* Phone */}
                   {contact.phone ? (
-                    <a href={`tel:${contact.phone}`} title={contact.phone} className="p-1 rounded-md hover:bg-section transition-colors">
-                      <Phone size={14} strokeWidth={1.5} className="text-ink-faint hover:text-ink" />
-                    </a>
+                    onCall ? (
+                      <button onClick={() => onCall(contact.phone!)} title={`Call ${contact.phone}`} className="p-1 rounded-md hover:bg-signal-green/10 transition-colors">
+                        <Phone size={14} strokeWidth={1.5} className="text-signal-green-text" />
+                      </button>
+                    ) : (
+                      <a href={`tel:${contact.phone}`} title={contact.phone} className="p-1 rounded-md hover:bg-section transition-colors">
+                        <Phone size={14} strokeWidth={1.5} className="text-ink-faint hover:text-ink" />
+                      </a>
+                    )
                   ) : (
                     <span title="No phone number" className="p-1 rounded-md relative cursor-not-allowed">
                       <Phone size={14} strokeWidth={1.5} className="text-ink-faint/30" />

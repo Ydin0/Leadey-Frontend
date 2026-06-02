@@ -9,12 +9,14 @@ import { LeadCustomFieldsPanel } from "./lead-custom-fields-panel";
 import { LeadActivityTimeline } from "./lead-activity-timeline";
 import { LeadFocusNavigation } from "./lead-focus-navigation";
 import { LeadStepTracker } from "./lead-step-tracker";
+import { FocusCallControls } from "./focus-call-controls";
 import { LeadEmailThread } from "@/components/email/lead-email-thread";
 import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
 import { generateFocusData } from "@/lib/utils/generate-focus-data";
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
 import { updateLeadStatus, advanceLead } from "@/lib/api/funnels";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
+import { useCallContext } from "@/components/calling/call-context";
 import { cn } from "@/lib/utils";
 import type { FunnelLead, FunnelStep, FunnelLeadEvent } from "@/lib/types/funnel";
 import type { FunnelLeadFocusData, FunnelLeadActivity } from "@/lib/types/funnel-focus";
@@ -27,6 +29,8 @@ interface LeadFocusViewProps {
   funnelName: string;
   steps?: FunnelStep[];
   onClose: () => void;
+  /** Persist a lead change back to the parent so it survives reopening. */
+  onLeadPatch?: (leadId: string, patch: Partial<FunnelLead>) => void;
 }
 
 /** Outcomes that end the sequence (lead stops advancing). */
@@ -46,6 +50,7 @@ export function LeadFocusView({
   funnelName,
   steps = [],
   onClose,
+  onLeadPatch,
 }: LeadFocusViewProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
@@ -57,6 +62,7 @@ export function LeadFocusView({
   const [advancing, setAdvancing] = useState(false);
   const [rightTab, setRightTab] = useState<"activity" | "thread">("activity");
   const { statuses } = useLeadStatuses();
+  const { startCall } = useCallContext();
 
   const currentLead = leads[currentIndex];
 
@@ -136,11 +142,13 @@ export function LeadFocusView({
       const leadId = currentLead.id;
       const previous = statusOverrides[leadId] ?? currentLead.status;
       setStatusOverrides((prev) => ({ ...prev, [leadId]: status }));
-      updateLeadStatus(funnelId, leadId, status).catch(() => {
-        setStatusOverrides((prev) => ({ ...prev, [leadId]: previous }));
-      });
+      updateLeadStatus(funnelId, leadId, status)
+        .then(() => onLeadPatch?.(leadId, { status })) // persist into parent so it survives reopening
+        .catch(() => {
+          setStatusOverrides((prev) => ({ ...prev, [leadId]: previous }));
+        });
     },
-    [currentLead, funnelId, statusOverrides],
+    [currentLead, funnelId, statusOverrides, onLeadPatch],
   );
 
   function logActivity(leadId: string, activity: FunnelLeadActivity) {
@@ -187,6 +195,7 @@ export function LeadFocusView({
 
       setAdvancing(true);
       advanceLead(funnelId, leadId, outcome)
+        .then(() => onLeadPatch?.(leadId, { currentStep: newStep, status: newStatus }))
         .catch(() => {
           // Revert on failure.
           setProgress((prev) => {
@@ -201,15 +210,27 @@ export function LeadFocusView({
         })
         .finally(() => setAdvancing(false));
     },
-    [currentLead, funnelId, progress, currentStatus],
+    [currentLead, funnelId, progress, currentStatus, onLeadPatch],
   );
 
-  /** A step's "Complete" CTA — email opens the composer, others log + advance. */
+  /** Phone to dial for this company — the focused lead's, else any contact's. */
+  const primaryPhone = currentLead?.phone || companyContacts.find((c) => c.phone)?.phone || "";
+
+  function dial(phone?: string) {
+    const num = (phone || primaryPhone || "").trim();
+    if (num) void startCall(num);
+  }
+
+  /** A step's "Complete" CTA — email opens the composer, call dials via the
+   *  Twilio dialer, others log + advance. */
   function handleCompleteStep(step: FunnelStep) {
     if (!currentLead) return;
     if (step.channel === "email") {
       setShowComposer(true);
       return;
+    }
+    if (step.channel === "call") {
+      dial(); // place the real Twilio call
     }
     const verb =
       step.channel === "call" ? "Call logged" :
@@ -296,6 +317,8 @@ export function LeadFocusView({
       {/* Center panel */}
       <div className="flex-1 overflow-y-auto pb-20">
         <div className="max-w-2xl mx-auto px-6 py-6">
+          <FocusCallControls steps={steps} />
+
           <LeadDetailHeader
             leadId={currentLead.id}
             opportunityId={currentLead.opportunityId}
@@ -307,6 +330,7 @@ export function LeadFocusView({
             localTime={currentFocusData?.localTime}
             onEmail={() => setShowComposer(true)}
             onNote={() => setNoteOpen(true)}
+            onCall={() => dial()}
           />
 
           {steps.length > 0 && (
@@ -324,7 +348,7 @@ export function LeadFocusView({
           {currentFocusData && (
             <>
               <LeadAboutPanel company={currentFocusData.company} />
-              <LeadContactsPanel contacts={companyContacts} />
+              <LeadContactsPanel contacts={companyContacts} onCall={(p) => dial(p)} />
               <LeadCustomFieldsPanel fields={currentFocusData.customFields} />
             </>
           )}

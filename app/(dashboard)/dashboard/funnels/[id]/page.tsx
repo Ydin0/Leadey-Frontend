@@ -143,6 +143,13 @@ export default function FunnelDetailPage() {
         funnelName={funnel.name}
         steps={funnel.steps}
         onClose={() => setFocusLeadIndex(null)}
+        onLeadPatch={(leadId, patch) =>
+          setFunnel((prev) =>
+            prev
+              ? { ...prev, leads: prev.leads.map((l) => (l.id === leadId ? { ...l, ...patch } : l)) }
+              : prev,
+          )
+        }
       />
     );
   }
