@@ -138,6 +138,7 @@ export default function FunnelDetailPage() {
         leads={funnel.leads}
         focusData={focusDataMap}
         initialIndex={focusLeadIndex}
+        funnelId={funnel.id}
         funnelName={funnel.name}
         onClose={() => setFocusLeadIndex(null)}
       />

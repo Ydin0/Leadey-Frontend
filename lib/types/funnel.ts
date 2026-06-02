@@ -48,7 +48,8 @@ export interface FunnelLead {
   email: string;
   currentStep: number;
   totalSteps: number;
-  status: LeadStatus;
+  /** Built-in status key or a custom org-defined status. */
+  status: string;
   nextAction: string;
   nextDate: Date;
   source: string;

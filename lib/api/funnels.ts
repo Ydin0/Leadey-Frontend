@@ -53,20 +53,12 @@ function asChannel(value: unknown): FunnelChannel {
   return "email";
 }
 
-function asLeadStatus(value: unknown): LeadStatus {
+function asLeadStatus(value: unknown): string {
   const normalized = asString(value).toLowerCase();
-  if (normalized === "contacted") return "contacted";
-  if (normalized === "no_answer") return "no_answer";
-  if (normalized === "interested") return "interested";
-  if (normalized === "not_interested") return "not_interested";
-  if (normalized === "callback") return "callback";
-  if (normalized === "competitor") return "competitor";
-  if (normalized === "dnc") return "dnc";
-  if (normalized === "other_contact") return "other_contact";
-  if (normalized === "qualified") return "qualified";
-  if (normalized === "bounced") return "bounced";
-  if (normalized === "completed") return "completed";
-  return "new";
+  // "pending" is the DB default for in-progress leads — surface it as "new".
+  if (!normalized || normalized === "pending") return "new";
+  // Preserve any other value (built-in or custom org status) verbatim.
+  return normalized;
 }
 
 function hydrateLead(raw: ApiFunnelLead): FunnelLead {
@@ -268,6 +260,21 @@ export async function advanceLead(
     lead: hydrateLead(raw.lead),
     funnel: hydrateFunnel(raw.funnel),
   };
+}
+
+/** Manually set a lead's status (built-in or custom) and persist it. */
+export async function updateLeadStatus(
+  funnelId: string,
+  leadId: string,
+  status: string
+): Promise<{ id: string; status: string }> {
+  return apiRequest<{ id: string; status: string }>(
+    `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/status`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    }
+  );
 }
 
 export async function deleteFunnel(funnelId: string): Promise<void> {

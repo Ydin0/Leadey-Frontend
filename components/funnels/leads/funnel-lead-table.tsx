@@ -9,14 +9,18 @@ import { useRowLimit } from "@/lib/hooks/use-row-limit";
 import { advanceLead } from "@/lib/api/funnels";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { FunnelLeadsFilterBar, DEFAULT_FUNNEL_LEADS_FILTERS, type FunnelLeadsFilters } from "./funnel-leads-filter-bar";
-import { statusDot, statusLabel, TERMINAL_STATUSES } from "@/lib/utils/lead-status";
+import {
+  getStatusDotClass,
+  getStatusLabel,
+  isTerminalStatus,
+} from "@/lib/utils/lead-status";
+import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { computeActivityCounts } from "@/lib/utils/lead-activity";
 import { useCallContext } from "@/components/calling/call-context";
 import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
 import Link from "next/link";
 import { Briefcase } from "lucide-react";
 import type { FunnelLead } from "@/lib/types/funnel";
-import type { LeadStatus } from "@/lib/types/funnel-focus";
 
 interface FunnelLeadTableProps {
   leads: FunnelLead[];
@@ -101,7 +105,7 @@ function LeadActionMenu({
     );
   }
 
-  if (TERMINAL_STATUSES.has(lead.status)) {
+  if (isTerminalStatus(lead.status)) {
     return <span className="text-[10px] text-ink-faint">&mdash;</span>;
   }
 
@@ -158,6 +162,7 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
   const [groupByCompany, setGroupByCompany] = useState(true);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const { startCall, activeCall } = useCallContext();
+  const { statuses } = useLeadStatuses();
 
   // Compute activity counts for all leads
   const activityMap = useMemo(() => {
@@ -178,7 +183,7 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
     const f = filters;
 
     if (f.statuses.length > 0) {
-      result = result.filter((l) => f.statuses.includes(l.status));
+      result = result.filter((l) => (f.statuses as string[]).includes(l.status));
     }
     if (f.companies.length > 0) {
       result = result.filter((l) => f.companies.includes(l.company));
@@ -202,7 +207,7 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
     if (f.isOverdue) {
       result = result.filter((l) =>
         l.nextDate.getTime() < Date.now() &&
-        !TERMINAL_STATUSES.has(l.status)
+        !isTerminalStatus(l.status)
       );
     }
     if (f.callCountMin !== null) {
@@ -222,13 +227,14 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
     }
 
     // Sort: active statuses first, then by next date
-    const statusPriority: Record<LeadStatus, number> = {
+    const statusPriority: Record<string, number> = {
       new: 0, contacted: 1, no_answer: 2, callback: 3, interested: 4,
       not_interested: 5, other_contact: 6, competitor: 7, dnc: 8,
       qualified: 9, bounced: 10, completed: 11,
     };
+    const priorityOf = (s: string) => statusPriority[s] ?? 99;
     return [...result].sort((a, b) => {
-      const byStatus = statusPriority[a.status] - statusPriority[b.status];
+      const byStatus = priorityOf(a.status) - priorityOf(b.status);
       if (byStatus !== 0) return byStatus;
       return a.nextDate.getTime() - b.nextDate.getTime();
     });
@@ -432,7 +438,7 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
                       {/* Expanded contacts */}
                       {isExpanded && companyLeads.map((lead) => {
                         const activity = activityMap.get(lead.id) || { calls: 0, emails: 0 };
-                        const isOverdue = lead.nextDate.getTime() < Date.now() && !TERMINAL_STATUSES.has(lead.status);
+                        const isOverdue = lead.nextDate.getTime() < Date.now() && !isTerminalStatus(lead.status);
 
                         return (
                           <TableRow
@@ -449,8 +455,8 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
                             </TableCell>
                             <TableCell>
                               <div className="flex items-center gap-1">
-                                <div className={cn("w-1.5 h-1.5 rounded-full", statusDot[lead.status])} />
-                                <span className="text-[10px] text-ink-secondary">{statusLabel[lead.status]}</span>
+                                <div className={cn("w-1.5 h-1.5 rounded-full", getStatusDotClass(lead.status, statuses))} />
+                                <span className="text-[10px] text-ink-secondary">{getStatusLabel(lead.status, statuses)}</span>
                               </div>
                             </TableCell>
                             <TableCell className="text-center">
@@ -512,7 +518,7 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
                 const activity = activityMap.get(lead.id) || { calls: 0, emails: 0 };
                 const isOverdue =
                   lead.nextDate.getTime() < Date.now() &&
-                  !TERMINAL_STATUSES.has(lead.status);
+                  !isTerminalStatus(lead.status);
 
                 return (
                   <TableRow
@@ -544,8 +550,8 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
 
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1.5">
-                        <div className={cn("w-1.5 h-1.5 rounded-full", statusDot[lead.status])} />
-                        <span className="text-[11px] text-ink-secondary">{statusLabel[lead.status]}</span>
+                        <div className={cn("w-1.5 h-1.5 rounded-full", getStatusDotClass(lead.status, statuses))} />
+                        <span className="text-[11px] text-ink-secondary">{getStatusLabel(lead.status, statuses)}</span>
                       </div>
                     </TableCell>
 

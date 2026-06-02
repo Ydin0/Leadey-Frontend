@@ -9,13 +9,16 @@ import { LeadCustomFieldsPanel } from "./lead-custom-fields-panel";
 import { LeadActivityTimeline } from "./lead-activity-timeline";
 import { LeadFocusNavigation } from "./lead-focus-navigation";
 import { generateFocusData } from "@/lib/utils/generate-focus-data";
+import { updateLeadStatus } from "@/lib/api/funnels";
+import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import type { FunnelLead } from "@/lib/types/funnel";
-import type { LeadStatus, FunnelLeadFocusData } from "@/lib/types/funnel-focus";
+import type { FunnelLeadFocusData } from "@/lib/types/funnel-focus";
 
 interface LeadFocusViewProps {
   leads: FunnelLead[];
   focusData: Record<string, FunnelLeadFocusData>;
   initialIndex: number;
+  funnelId: string;
   funnelName: string;
   onClose: () => void;
 }
@@ -24,11 +27,13 @@ export function LeadFocusView({
   leads,
   focusData,
   initialIndex,
+  funnelId,
   funnelName,
   onClose,
 }: LeadFocusViewProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, LeadStatus>>({});
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
+  const { statuses } = useLeadStatuses();
 
   const currentLead = leads[currentIndex];
 
@@ -101,10 +106,19 @@ export function LeadFocusView({
     setCurrentIndex(companyIndices[nextPos]);
   }, [currentCompanyPos, companyIndices]);
 
-  const handleStatusChange = useCallback((status: LeadStatus) => {
-    if (!currentLead) return;
-    setStatusOverrides((prev) => ({ ...prev, [currentLead.id]: status }));
-  }, [currentLead]);
+  const handleStatusChange = useCallback(
+    (status: string) => {
+      if (!currentLead) return;
+      const leadId = currentLead.id;
+      const previous = statusOverrides[leadId] ?? currentLead.status;
+      // Optimistic update, then persist; revert on failure.
+      setStatusOverrides((prev) => ({ ...prev, [leadId]: status }));
+      updateLeadStatus(funnelId, leadId, status).catch(() => {
+        setStatusOverrides((prev) => ({ ...prev, [leadId]: previous }));
+      });
+    },
+    [currentLead, funnelId, statusOverrides],
+  );
 
   // Keyboard navigation
   useEffect(() => {
@@ -149,6 +163,7 @@ export function LeadFocusView({
             companyName={currentLead.company}
             companyDomain={currentDomain}
             status={currentStatus}
+            statuses={statuses}
             onStatusChange={handleStatusChange}
             localTime={currentFocusData?.localTime}
           />

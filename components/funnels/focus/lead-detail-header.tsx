@@ -4,14 +4,14 @@ import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { FileText, Mail, Phone, ChevronDown, Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { statusDot, statusLabel } from "@/lib/utils/lead-status";
+import {
+  getStatusDotClass,
+  getStatusLabel,
+  BUILTIN_STATUS_OPTIONS,
+  type LeadStatusOption,
+} from "@/lib/utils/lead-status";
 import { CompanyAvatar } from "./company-avatar";
 import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
-import type { LeadStatus } from "@/lib/types/funnel-focus";
-
-const allStatuses = (Object.entries(statusLabel) as [LeadStatus, string][]).map(
-  ([value, label]) => ({ value, label })
-);
 
 interface LeadDetailHeaderProps {
   leadId?: string;
@@ -20,8 +20,10 @@ interface LeadDetailHeaderProps {
   opportunityId?: string | null;
   companyName: string;
   companyDomain?: string;
-  status: LeadStatus;
-  onStatusChange: (status: LeadStatus) => void;
+  status: string;
+  /** Built-in + custom statuses available for this org. */
+  statuses?: LeadStatusOption[];
+  onStatusChange: (status: string) => void;
   localTime?: string;
 }
 
@@ -31,6 +33,7 @@ export function LeadDetailHeader({
   companyName,
   companyDomain,
   status,
+  statuses = BUILTIN_STATUS_OPTIONS,
   onStatusChange,
   localTime,
 }: LeadDetailHeaderProps) {
@@ -49,7 +52,7 @@ export function LeadDetailHeader({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [dropdownOpen]);
 
-  const currentStatusLabel = allStatuses.find((s) => s.value === status)?.label ?? status;
+  const currentStatusLabel = getStatusLabel(status, statuses);
 
   return (
     <div className="mb-6">
@@ -63,25 +66,25 @@ export function LeadDetailHeader({
                 onClick={() => setDropdownOpen((v) => !v)}
                 className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors"
               >
-                <div className={cn("w-1.5 h-1.5 rounded-full", statusDot[status])} />
+                <div className={cn("w-1.5 h-1.5 rounded-full", getStatusDotClass(status, statuses))} />
                 {currentStatusLabel}
                 <ChevronDown size={11} strokeWidth={2} className="text-ink-faint" />
               </button>
               {dropdownOpen && (
-                <div className="absolute left-0 top-full mt-1 z-50 min-w-[160px] bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
-                  {allStatuses.map((s) => (
+                <div className="absolute left-0 top-full mt-1 z-50 min-w-[160px] max-h-[320px] overflow-y-auto bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+                  {statuses.map((s) => (
                     <button
-                      key={s.value}
+                      key={s.key}
                       onClick={() => {
-                        onStatusChange(s.value);
+                        onStatusChange(s.key);
                         setDropdownOpen(false);
                       }}
                       className={cn(
                         "w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover transition-colors flex items-center gap-2",
-                        s.value === status ? "text-ink font-medium" : "text-ink-secondary"
+                        s.key === status ? "text-ink font-medium" : "text-ink-secondary"
                       )}
                     >
-                      <div className={cn("w-1.5 h-1.5 rounded-full", statusDot[s.value])} />
+                      <div className={cn("w-1.5 h-1.5 rounded-full", getStatusDotClass(s.key, statuses))} />
                       {s.label}
                     </button>
                   ))}
