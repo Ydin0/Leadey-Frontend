@@ -216,9 +216,14 @@ export function LeadFocusView({
   /** Phone to dial for this company — the focused lead's, else any contact's. */
   const primaryPhone = currentLead?.phone || companyContacts.find((c) => c.phone)?.phone || "";
 
-  function dial(phone?: string) {
+  function dial(phone?: string, contactName?: string) {
     const num = (phone || primaryPhone || "").trim();
-    if (num) void startCall(num);
+    if (num)
+      void startCall(num, {
+        contactName: contactName || currentLead?.name || null,
+        companyName: currentLead?.company || null,
+        leadId: currentLead?.id || null,
+      });
   }
 
   /** A step's "Complete" CTA — email opens the composer, call dials via the
@@ -348,7 +353,7 @@ export function LeadFocusView({
           {currentFocusData && (
             <>
               <LeadAboutPanel company={currentFocusData.company} />
-              <LeadContactsPanel contacts={companyContacts} onCall={(p) => dial(p)} />
+              <LeadContactsPanel contacts={companyContacts} onCall={(p, n) => dial(p, n)} />
               <LeadCustomFieldsPanel fields={currentFocusData.customFields} />
             </>
           )}

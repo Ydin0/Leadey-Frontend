@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Headphones, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { useTeamMembers } from "@/hooks/use-team-members";
 import { FilterPopover } from "@/components/scrapers/filters/filter-popover";
 import { RecordingsTable } from "@/components/recordings/recordings-table";
 import { getCallRecords } from "@/lib/api/phone-lines";
@@ -24,6 +25,7 @@ const DISPOSITION_OPTIONS = [
 
 export default function RecordingsPage() {
   const isAuthReady = useAuthReady();
+  const { members } = useTeamMembers();
   const [records, setRecords] = useState<CallRecord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -35,6 +37,7 @@ export default function RecordingsPage() {
   const [direction, setDirection] = useState<string | null>(null);
   const [disposition, setDisposition] = useState<string | null>(null);
   const [hasRecording, setHasRecording] = useState<string | null>(null);
+  const [memberId, setMemberId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
 
   const fetchRecords = useCallback(async (p: number) => {
@@ -45,6 +48,7 @@ export default function RecordingsPage() {
         direction: direction || undefined,
         disposition: disposition || undefined,
         hasRecording: hasRecording || undefined,
+        userId: memberId || undefined,
         search: search || undefined,
       });
       setRecords(result.data);
@@ -55,7 +59,7 @@ export default function RecordingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [direction, disposition, hasRecording, search]);
+  }, [direction, disposition, hasRecording, memberId, search]);
 
   useEffect(() => {
     if (!isAuthReady) return;
@@ -75,9 +79,10 @@ export default function RecordingsPage() {
 
   useEffect(() => {
     handleFilterChange();
-  }, [direction, disposition, hasRecording]);
+  }, [direction, disposition, hasRecording, memberId]);
 
-  const hasFilters = !!direction || !!disposition || !!hasRecording;
+  const hasFilters = !!direction || !!disposition || !!hasRecording || !!memberId;
+  const selectedMember = members.find((m) => m.id === memberId);
 
   if (loading && records.length === 0) {
     return (
@@ -152,6 +157,38 @@ export default function RecordingsPage() {
           </div>
         </FilterPopover>
 
+        {/* Member */}
+        <FilterPopover
+          label={selectedMember ? selectedMember.name : "Member"}
+          isActive={!!memberId}
+          activeCount={memberId ? 1 : 0}
+        >
+          <div className="flex flex-col gap-0.5 max-h-64 overflow-y-auto min-w-[180px]">
+            {members.length === 0 ? (
+              <div className="px-2 py-1.5 text-[11px] text-ink-muted">No members.</div>
+            ) : (
+              members.map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setMemberId(memberId === m.id ? null : m.id)}
+                  className={cn(
+                    "flex items-center gap-2 px-2 py-1.5 rounded-[6px] text-[11px] font-medium transition-colors text-left",
+                    memberId === m.id
+                      ? "bg-signal-blue/15 text-signal-blue-text"
+                      : "text-ink-secondary hover:bg-hover"
+                  )}
+                >
+                  <span className="w-5 h-5 rounded-full bg-section flex items-center justify-center text-[9px] font-semibold text-ink-muted shrink-0">
+                    {m.name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="truncate">{m.name}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </FilterPopover>
+
         {/* Has Recording */}
         <FilterPopover
           label="Recording"
@@ -177,7 +214,7 @@ export default function RecordingsPage() {
         {hasFilters && (
           <button
             type="button"
-            onClick={() => { setDirection(null); setDisposition(null); setHasRecording(null); }}
+            onClick={() => { setDirection(null); setDisposition(null); setHasRecording(null); setMemberId(null); }}
             className="text-[11px] font-medium text-ink-muted hover:text-ink-secondary transition-colors ml-1"
           >
             Clear all

@@ -128,6 +128,14 @@ export interface CallRecord {
 
 export type CallState = "idle" | "ringing" | "connected" | "ended";
 
+/** Optional context attached when starting a call so the resulting record /
+ *  recording is attributable to a person & company, not just a number. */
+export interface CallMeta {
+  contactName?: string | null;
+  companyName?: string | null;
+  leadId?: string | null;
+}
+
 export interface ActiveCall {
   callId: string;
   state: CallState;
@@ -198,7 +206,7 @@ export interface CallContextValue {
   callHistory: CallRecord[];
   selectedLineId: string | null;
   setSelectedLineId: (id: string | null) => void;
-  startCall: (to: string) => void;
+  startCall: (to: string, meta?: CallMeta) => void;
   endCall: () => void;
   toggleMute: () => void;
   toggleHold: () => void;

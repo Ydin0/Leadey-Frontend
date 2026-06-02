@@ -7,7 +7,7 @@ import type { FunnelLeadContact } from "@/lib/types/funnel-focus";
 interface LeadContactsPanelProps {
   contacts: FunnelLeadContact[];
   /** Start a Twilio call to this number via the in-app dialer. */
-  onCall?: (phone: string) => void;
+  onCall?: (phone: string, contactName?: string) => void;
 }
 
 export function LeadContactsPanel({ contacts, onCall }: LeadContactsPanelProps) {
@@ -43,7 +43,7 @@ export function LeadContactsPanel({ contacts, onCall }: LeadContactsPanelProps) 
                   {contact.phone && (
                     onCall ? (
                       <button
-                        onClick={() => onCall(contact.phone!)}
+                        onClick={() => onCall(contact.phone!, contact.name)}
                         className="text-[11px] text-ink hover:text-signal-green-text transition-colors block mt-0.5 text-left"
                         title="Call via dialer"
                       >
@@ -93,7 +93,7 @@ export function LeadContactsPanel({ contacts, onCall }: LeadContactsPanelProps) 
                   {/* Phone */}
                   {contact.phone ? (
                     onCall ? (
-                      <button onClick={() => onCall(contact.phone!)} title={`Call ${contact.phone}`} className="p-1 rounded-md hover:bg-signal-green/10 transition-colors">
+                      <button onClick={() => onCall(contact.phone!, contact.name)} title={`Call ${contact.phone}`} className="p-1 rounded-md hover:bg-signal-green/10 transition-colors">
                         <Phone size={14} strokeWidth={1.5} className="text-signal-green-text" />
                       </button>
                     ) : (

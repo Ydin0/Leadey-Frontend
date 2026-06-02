@@ -284,9 +284,14 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
     if (absoluteIndex !== -1) onLeadClick(absoluteIndex);
   }
 
-  function handleCall(e: React.MouseEvent, phone: string) {
+  function handleCall(e: React.MouseEvent, lead: FunnelLead) {
     e.stopPropagation();
-    startCall(phone);
+    if (!lead.phone) return;
+    startCall(lead.phone, {
+      contactName: lead.name || null,
+      companyName: lead.company || null,
+      leadId: lead.id || null,
+    });
   }
 
   function handleEmail(e: React.MouseEvent, email: string) {
@@ -488,7 +493,7 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
 
                                 {/* Quick actions */}
                                 <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                  <button onClick={(e) => lead.phone ? handleCall(e, lead.phone) : e.stopPropagation()} disabled={!lead.phone || !!activeCall} title="Call"
+                                  <button onClick={(e) => lead.phone ? handleCall(e, lead) : e.stopPropagation()} disabled={!lead.phone || !!activeCall} title="Call"
                                     className={cn("p-1 rounded-md transition-colors", lead.phone ? "text-signal-green-text hover:bg-signal-green/10" : "text-ink-faint cursor-not-allowed")}>
                                     <Phone size={12} strokeWidth={1.5} />
                                   </button>
@@ -609,7 +614,7 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-0.5">
                         <button
-                          onClick={(e) => lead.phone ? handleCall(e, lead.phone) : e.stopPropagation()}
+                          onClick={(e) => lead.phone ? handleCall(e, lead) : e.stopPropagation()}
                           disabled={!lead.phone || !!activeCall}
                           className={cn("p-1.5 rounded-md transition-colors", lead.phone ? "text-signal-green-text hover:bg-signal-green/10" : "text-ink-faint cursor-not-allowed")}
                         >

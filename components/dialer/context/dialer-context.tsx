@@ -184,7 +184,11 @@ export function DialerProvider({ sessionId, children }: DialerProviderProps) {
     if (!currentItem) return;
     if (awaitingDisposition) return;
     if (call.activeCall) return;
-    call.startCall(currentItem.leadPhone);
+    call.startCall(currentItem.leadPhone, {
+      contactName: currentItem.lead?.name || null,
+      companyName: currentItem.lead?.company || null,
+      leadId: currentItem.leadId || null,
+    });
   }, [currentItem, awaitingDisposition, call]);
 
   const advance = useCallback(

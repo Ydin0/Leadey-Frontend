@@ -13,6 +13,7 @@ import { Device, Call } from "@twilio/voice-sdk";
 import type {
   ActiveCall,
   CallContextValue,
+  CallMeta,
   PhoneLine,
   CallRecord,
   EndedCallInfo,
@@ -179,16 +180,25 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   // ── Bind Twilio Call events to state ──────────
   const bindCallEvents = useCallback(
-    (call: Call, direction: "outbound" | "inbound") => {
+    (call: Call, direction: "outbound" | "inbound", meta?: CallMeta) => {
       const lineId = selectedLineId || "unknown";
+      const contactName = meta?.contactName || null;
+      const companyName = meta?.companyName || null;
+      // On outbound calls the Twilio Voice SDK populates `call.parameters` with
+      // the `To` and `CallerId` we passed to connect() — there is NO `From`. So
+      // for outbound the "from" number is our selected line's caller ID. Getting
+      // this right matters: the backend rejects records with an empty fromNumber,
+      // which is why call records previously never saved.
+      const selectedLine = phoneLines.find((l) => l.id === selectedLineId);
+      const lineNumber = selectedLine?.number || "";
       const to =
         direction === "outbound"
           ? call.parameters?.To || ""
           : call.parameters?.From || "";
       const from =
         direction === "outbound"
-          ? call.parameters?.From || ""
-          : call.parameters?.To || "";
+          ? call.parameters?.From || call.parameters?.CallerId || lineNumber
+          : call.parameters?.To || lineNumber;
       const callId = call.parameters?.CallSid || `call_${Date.now()}`;
 
       setActiveCall({
@@ -197,7 +207,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         direction,
         from,
         to,
-        contactName: null,
+        contactName,
         lineId,
         isMuted: false,
         isOnHold: false,
@@ -228,8 +238,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           direction,
           from,
           to,
-          contactName: null,
-          companyName: null,
+          contactName,
+          companyName,
           lineId,
           duration,
           disposition: "completed",
@@ -246,6 +256,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           direction,
           fromNumber: from,
           toNumber: to,
+          contactName: contactName || undefined,
+          companyName: companyName || undefined,
           duration,
           disposition: "completed",
         })
@@ -308,12 +320,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         callRef.current = null;
       });
     },
-    [selectedLineId]
+    [selectedLineId, phoneLines]
   );
 
   // ── Start an outbound call ────────────────────
   const startCall = useCallback(
-    async (to: string) => {
+    async (to: string, meta?: CallMeta) => {
       if (activeCall) return;
       if (!deviceRef.current || !deviceReady) {
         console.error("[Twilio] Device not ready");
@@ -339,7 +351,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         });
 
         callRef.current = call;
-        bindCallEvents(call, "outbound");
+        bindCallEvents(call, "outbound", meta);
       } catch (err) {
         console.error("[Twilio] Connect failed:", err);
       }
