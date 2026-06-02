@@ -446,45 +446,63 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
                             className={cn("bg-section/20", onLeadClick && "cursor-pointer hover:bg-hover/50")}
                             onClick={() => handleRowClick(lead)}
                           >
-                            <TableCell className="w-8" />
-                            <TableCell>
-                              <div className="pl-10">
-                                <span className="text-[12px] font-medium text-ink">{lead.name}</span>
-                                <div className="text-[10px] text-ink-muted">{lead.title}</div>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <div className={cn("w-1.5 h-1.5 rounded-full", getStatusDotClass(lead.status, statuses))} />
-                                <span className="text-[10px] text-ink-secondary">{getStatusLabel(lead.status, statuses)}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <ProgressDots current={lead.currentStep} total={lead.totalSteps} />
-                            </TableCell>
-                            <TableCell>
-                              <span className={cn("text-[10px]", isOverdue ? "text-signal-red-text" : "text-ink-muted")}>
-                                {lead.nextDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                                {isOverdue ? " overdue" : ""}
-                              </span>
-                            </TableCell>
-                            <TableCell />
-                            <TableCell className="text-center">
-                              <div className="flex items-center justify-center gap-0.5">
-                                <button onClick={(e) => lead.phone ? handleCall(e, lead.phone) : e.stopPropagation()} disabled={!lead.phone || !!activeCall}
-                                  className={cn("p-1 rounded-md transition-colors", lead.phone ? "text-signal-green-text hover:bg-signal-green/10" : "text-ink-faint cursor-not-allowed")}>
-                                  <Phone size={12} strokeWidth={1.5} />
-                                </button>
-                                <button onClick={(e) => lead.email ? handleEmail(e, lead.email) : e.stopPropagation()} disabled={!lead.email}
-                                  className={cn("p-1 rounded-md transition-colors", lead.email ? "text-signal-blue-text hover:bg-signal-blue/10" : "text-ink-faint cursor-not-allowed")}>
-                                  <Mail size={12} strokeWidth={1.5} />
-                                </button>
-                                {lead.linkedinUrl && (
-                                  <button onClick={(e) => handleLinkedIn(e, lead.linkedinUrl!)} className="p-1 rounded-md text-[#0A66C2] hover:bg-[#0A66C2]/10 transition-colors">
-                                    <Linkedin size={12} strokeWidth={1.5} />
+                            {/* Lead detail rendered as one clean strip — it isn't
+                                column-aligned to the company's Industry/Employees/
+                                Location headers (those describe the company row). */}
+                            <TableCell colSpan={7} className="py-2">
+                              <div className="flex items-center gap-3 pl-[60px] pr-2">
+                                {/* Name + title */}
+                                <div className="flex-1 min-w-0">
+                                  <span className="text-[12px] font-medium text-ink">{lead.name}</span>
+                                  <div className="text-[10px] text-ink-muted truncate">{lead.title}</div>
+                                </div>
+
+                                {/* Status */}
+                                <div className="flex items-center gap-1.5 w-[120px] shrink-0">
+                                  <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", getStatusDotClass(lead.status, statuses))} />
+                                  <span className="text-[11px] text-ink-secondary truncate">{getStatusLabel(lead.status, statuses)}</span>
+                                </div>
+
+                                {/* Step progress */}
+                                <div className="w-[64px] shrink-0 flex justify-center">
+                                  <ProgressDots current={lead.currentStep} total={lead.totalSteps} />
+                                </div>
+
+                                {/* Touch counts — how many times called / emailed */}
+                                <div className="flex items-center gap-2.5 w-[78px] shrink-0">
+                                  <span className="flex items-center gap-1 text-[11px] text-ink-muted tabular-nums" title={`${activity.calls} calls logged`}>
+                                    <Phone size={11} strokeWidth={1.5} /> {activity.calls}
+                                  </span>
+                                  <span className="flex items-center gap-1 text-[11px] text-ink-muted tabular-nums" title={`${activity.emails} emails sent`}>
+                                    <Mail size={11} strokeWidth={1.5} /> {activity.emails}
+                                  </span>
+                                </div>
+
+                                {/* Next due */}
+                                <div className="w-[100px] shrink-0">
+                                  <span className={cn("text-[11px]", isOverdue ? "text-signal-red-text" : "text-ink-muted")}>
+                                    {lead.nextDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                                    {isOverdue ? " overdue" : ""}
+                                  </span>
+                                </div>
+
+                                {/* Quick actions */}
+                                <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                  <button onClick={(e) => lead.phone ? handleCall(e, lead.phone) : e.stopPropagation()} disabled={!lead.phone || !!activeCall} title="Call"
+                                    className={cn("p-1 rounded-md transition-colors", lead.phone ? "text-signal-green-text hover:bg-signal-green/10" : "text-ink-faint cursor-not-allowed")}>
+                                    <Phone size={12} strokeWidth={1.5} />
                                   </button>
-                                )}
-                                <LeadActionMenu lead={lead} funnelId={funnelId} onAdvanced={onLeadAdvanced} />
+                                  <button onClick={(e) => lead.email ? handleEmail(e, lead.email) : e.stopPropagation()} disabled={!lead.email} title="Email"
+                                    className={cn("p-1 rounded-md transition-colors", lead.email ? "text-signal-blue-text hover:bg-signal-blue/10" : "text-ink-faint cursor-not-allowed")}>
+                                    <Mail size={12} strokeWidth={1.5} />
+                                  </button>
+                                  {lead.linkedinUrl && (
+                                    <button onClick={(e) => handleLinkedIn(e, lead.linkedinUrl!)} title="LinkedIn" className="p-1 rounded-md text-[#0A66C2] hover:bg-[#0A66C2]/10 transition-colors">
+                                      <Linkedin size={12} strokeWidth={1.5} />
+                                    </button>
+                                  )}
+                                  <LeadActionMenu lead={lead} funnelId={funnelId} onAdvanced={onLeadAdvanced} />
+                                </div>
                               </div>
                             </TableCell>
                           </TableRow>
