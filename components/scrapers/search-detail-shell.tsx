@@ -49,6 +49,7 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
   const [assignment, setAssignment] = useState<ScraperAssignmentRow | null>(null);
   const [results, setResults] = useState<PaginatedResponse<SearchResultRow> | null>(null);
   const [allResults, setAllResults] = useState<SearchResultRow[]>([]);
+  const [loadingAllResults, setLoadingAllResults] = useState(true);
   const [runs, setRuns] = useState<ScraperRunRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -118,6 +119,7 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
 
   // Fetch all results for company dedup + inline filters
   const fetchAllResults = useCallback(async () => {
+    setLoadingAllResults(true);
     try {
       const PAGE_SIZE = 2000;
       const firstPage = await getSearchResults(searchId, { page: 1, pageSize: PAGE_SIZE });
@@ -128,7 +130,10 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
         if (next.data?.length) all.push(...next.data);
       }
       setAllResults(all);
-    } catch {}
+    } catch {
+    } finally {
+      setLoadingAllResults(false);
+    }
   }, [searchId]);
 
   // Fetch company lead counts — store under multiple keys for flexible matching
@@ -527,7 +532,11 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
         <span className="text-border-default">&middot;</span>
         <span>{meta.totalCount.toLocaleString()} results</span>
         <span className="text-border-default">&middot;</span>
-        <span>{uniqueCompanies.length.toLocaleString()} companies</span>
+        <span>
+          {loadingAllResults && uniqueCompanies.length === 0
+            ? "counting companies…"
+            : `${uniqueCompanies.length.toLocaleString()} companies`}
+        </span>
         {resolvedRunId && (
           <>
             <span className="text-border-default">&middot;</span>

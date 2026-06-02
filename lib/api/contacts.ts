@@ -130,13 +130,30 @@ export async function bulkUpdateContactStatus(
 
 // ─── Send to Funnel ─────────────────────────────────────────────────
 
+/** Filter set mirroring the contacts list query — used to send every
+ *  contact matching the current filters ("Select all matching"). */
+export interface ContactFilterPayload {
+  assignmentId?: string;
+  status?: string;
+  enrichmentStatus?: string;
+  company?: string;
+  title?: string;
+  location?: string;
+  hasEmail?: string;
+  hasPhone?: string;
+}
+
+export type ContactSelection =
+  | { contactIds: string[] }
+  | { allMatching: true; filters: ContactFilterPayload };
+
 export async function sendContactsToFunnel(
-  contactIds: string[],
   funnelId: string,
+  selection: ContactSelection,
 ): Promise<{ created: number; skipped: number; funnelId: string; funnelName: string }> {
   return apiRequest(`/contacts/send-to-funnel`, {
     method: "POST",
-    body: JSON.stringify({ contactIds, funnelId }),
+    body: JSON.stringify({ funnelId, ...selection }),
   });
 }
 

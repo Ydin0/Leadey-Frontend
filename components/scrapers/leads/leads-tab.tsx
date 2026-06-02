@@ -444,15 +444,39 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
     setShowFunnelPicker(!showFunnelPicker);
   }
 
+  // Maps the active filter UI state to the backend contact-filter query.
+  const currentFilterPayload = useCallback(
+    () => ({
+      assignmentId,
+      status: filters.contactStatus || undefined,
+      enrichmentStatus: filters.enrichmentStatus || undefined,
+      company: filters.companies.length > 0 ? filters.companies.join(",") : undefined,
+      title: filters.title || undefined,
+      location: filters.location || undefined,
+      hasEmail: filters.hasEmail || undefined,
+      hasPhone: filters.hasPhone || undefined,
+    }),
+    [assignmentId, filters],
+  );
+
   async function handleSendToFunnel(funnelId: string) {
+    const isAll = selection.isAllMatching;
     const ids = Array.from(selection.selectedIds);
-    if (ids.length === 0) return;
+    if (!isAll && ids.length === 0) return;
     setSendingToFunnel(true);
     setShowFunnelPicker(false);
     try {
-      const result = await sendContactsToFunnel(ids, funnelId);
+      const result = await sendContactsToFunnel(
+        funnelId,
+        isAll
+          ? { allMatching: true, filters: currentFilterPayload() }
+          : { contactIds: ids },
+      );
       selection.clearSelection();
-      showStatus("success", `${result.created} contacts sent to "${result.funnelName}" (${result.skipped} skipped)`);
+      showStatus(
+        "success",
+        `${result.created} contacts sent to "${result.funnelName}" (${result.skipped} already in funnel)`,
+      );
       await fetchContacts(page);
     } catch (err) {
       showStatus("error", "Failed to send contacts to funnel");

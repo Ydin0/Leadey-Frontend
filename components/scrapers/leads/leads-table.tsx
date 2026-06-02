@@ -83,10 +83,10 @@ export function LeadsTable({
 
   return (
     <div>
-      <div className="border border-border-subtle rounded-[14px] overflow-hidden">
+      <div className="bg-surface border border-border-subtle rounded-[14px] overflow-hidden">
         <Table className="table-fixed">
           <TableHeader>
-            <TableRow className="border-b border-border-subtle">
+            <TableRow>
               <TableHead className="w-10">
                 <input
                   type="checkbox"
