@@ -12,6 +12,7 @@ import { LeadStepTracker } from "./lead-step-tracker";
 import { LeadEmailThread } from "@/components/email/lead-email-thread";
 import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
 import { generateFocusData } from "@/lib/utils/generate-focus-data";
+import { mapEventsToActivities } from "@/lib/utils/lead-activity";
 import { updateLeadStatus, advanceLead } from "@/lib/api/funnels";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { cn } from "@/lib/utils";
@@ -275,9 +276,11 @@ export function LeadFocusView({
     currentStep: progress[lead.id]?.currentStep ?? lead.currentStep,
   }));
 
+  // Real activity = this session's actions (optimistic) + the lead's actual
+  // backend events. No more mock focus-data activities.
   const timelineActivities = [
     ...(extraActivities[currentLead.id] ?? []),
-    ...(currentFocusData?.activities ?? []),
+    ...mapEventsToActivities(currentLead.events ?? []),
   ];
 
   return (

@@ -118,9 +118,11 @@ export function LeadActivityTimeline({ activities }: LeadActivityTimelineProps) 
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <div className="w-5 h-5 rounded-full bg-section flex items-center justify-center">
-                          <span className="text-[8px] font-medium text-ink-muted">{activity.userInitials}</span>
-                        </div>
+                        {activity.userInitials && (
+                          <div className="w-5 h-5 rounded-full bg-section flex items-center justify-center">
+                            <span className="text-[8px] font-medium text-ink-muted">{activity.userInitials}</span>
+                          </div>
+                        )}
                         <span className="text-[10px] text-ink-faint whitespace-nowrap">
                           {formatRelativeTime(activity.timestamp)}
                         </span>

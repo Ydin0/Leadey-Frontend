@@ -1,4 +1,59 @@
 import type { FunnelLeadEvent } from "@/lib/types/funnel";
+import type { FunnelLeadActivity } from "@/lib/types/funnel-focus";
+
+function labelize(s: string): string {
+  return (s || "")
+    .split("_")
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+/** Maps a lead's real backend events into the timeline's activity shape, so
+ *  the Activity panel reflects actual history instead of mock focus data. */
+export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActivity[] {
+  return [...events]
+    .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+    .map((e): FunnelLeadActivity => {
+      const channel = (e.meta?.channel as string) || "";
+      const outcome = e.outcome || "";
+      let type: FunnelLeadActivity["type"] = "note";
+      let summary = "Activity";
+
+      if (e.type === "imported") {
+        type = "import";
+        const source = (e.meta?.source as string) || "";
+        summary = source === "contact_discovery"
+          ? "Imported from Contact Discovery"
+          : "Imported into campaign";
+      } else if (e.type === "status_change") {
+        type = "status_change";
+        summary = outcome ? `Status changed to ${labelize(outcome)}` : "Status changed";
+      } else if (e.type === "smartlead_webhook") {
+        if (outcome === "opened") { type = "email_opened"; summary = "Email opened"; }
+        else if (outcome === "clicked") { type = "email_opened"; summary = "Email link clicked"; }
+        else if (outcome === "replied") { type = "email_sent"; summary = "Lead replied to email"; }
+        else if (outcome === "bounced") { type = "email_sent"; summary = "Email bounced"; }
+        else { type = "email_sent"; summary = "Email sent"; }
+      } else if (e.type === "step_outcome") {
+        if (channel === "call") { type = "call"; summary = outcome === "sent" ? "Call logged" : `Call — ${labelize(outcome)}`; }
+        else if (channel === "linkedin") { type = "linkedin"; summary = outcome === "sent" ? "LinkedIn message sent" : `LinkedIn — ${labelize(outcome)}`; }
+        else if (channel === "email") { type = outcome === "opened" ? "email_opened" : "email_sent"; summary = outcome === "sent" ? "Email sent" : `Email — ${labelize(outcome)}`; }
+        else { type = "status_change"; summary = labelize(outcome) || "Step completed"; }
+      } else if (e.type === "linkedin_action") {
+        type = "linkedin";
+        summary = labelize(outcome) || "LinkedIn action";
+      } else if (e.type === "reply_handled") {
+        type = "status_change";
+        summary = "Reply handled";
+      } else {
+        type = "note";
+        summary = labelize(e.type);
+      }
+
+      return { id: e.id, type, summary, timestamp: e.timestamp, userInitials: "" };
+    });
+}
 
 export function computeActivityCounts(events: FunnelLeadEvent[]) {
   let calls = 0;
