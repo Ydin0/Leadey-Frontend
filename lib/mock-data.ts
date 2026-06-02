@@ -15,6 +15,7 @@ import {
   Inbox,
   Users,
   UsersRound,
+  GraduationCap,
 } from "lucide-react";
 import type {
   NavItem,
@@ -45,6 +46,7 @@ export const navItems: NavItem[] = [
   { id: "templates", label: "Templates", icon: FileText, href: "/dashboard/templates" },
   { id: "leads", label: "Leads", icon: Users, href: "/dashboard/leads" },
   { id: "team", label: "Team", icon: UsersRound, href: "/dashboard/team" },
+  { id: "knowledge-base", label: "Knowledge Base", icon: GraduationCap, href: "/dashboard/knowledge-base" },
   { id: "settings", label: "Settings", icon: Settings, href: "/dashboard/settings" },
 ];
 

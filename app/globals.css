@@ -273,8 +273,11 @@ body {
   --border-strong: var(--color-border-default);
   --signal-green: var(--color-signal-green);
   --signal-green-text: var(--color-signal-green-text);
+  --signal-red: var(--color-signal-red);
   --signal-red-text: var(--color-signal-red-text);
+  --signal-blue: var(--color-signal-blue);
   --signal-blue-text: var(--color-signal-blue-text);
+  --on-accent: #ffffff;
   --shadow-card: 0 1px 3px rgba(12, 17, 34, 0.05);
   --shadow-pop: 0 24px 60px -20px rgba(0, 0, 0, 0.45);
   color: var(--fg1);
@@ -343,3 +346,8 @@ body {
 
 @keyframes teamFadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .team-root .fade, .team-scrim { animation: teamFadeUp .22s ease both; }
+
+/* Knowledge Base additions (reuses .team-root) */
+.team-root .eyebrow { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: var(--fg-muted); }
+.team-root .scroll-y { overflow-y: auto; }
+.team-root .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
