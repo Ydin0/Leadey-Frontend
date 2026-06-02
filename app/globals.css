@@ -251,3 +251,95 @@ body {
 .prose-email ol { list-style: decimal; padding-left: 1.25em; margin: 0 0 0.6em; }
 .prose-email li { margin: 0.15em 0; }
 .prose-email .ProseMirror { min-height: inherit; outline: none; }
+
+/* ── Team Management feature (scoped to .team-root) ──────────────────────
+   Aliases the design prototype's CSS vars to our theme tokens so the ported
+   Team components stay theme-aware, then ports the prototype's kit classes
+   scoped under .team-root to avoid leaking generic names globally. */
+.team-root {
+  --fg1: var(--color-ink);
+  --fg2: var(--color-ink-secondary);
+  --fg-muted: var(--color-ink-muted);
+  --fg-faint: var(--color-ink-faint);
+  --accent: var(--color-accent);
+  --section: var(--color-section);
+  --surface: var(--color-surface);
+  --page: var(--color-page);
+  --hover: var(--color-hover);
+  --ink: var(--color-ink);
+  --on-ink: var(--color-on-ink);
+  --border-subtle: var(--color-border-subtle);
+  --border-default: var(--color-border-default);
+  --border-strong: var(--color-border-default);
+  --signal-green: var(--color-signal-green);
+  --signal-green-text: var(--color-signal-green-text);
+  --signal-red-text: var(--color-signal-red-text);
+  --signal-blue-text: var(--color-signal-blue-text);
+  --shadow-card: 0 1px 3px rgba(12, 17, 34, 0.05);
+  --shadow-pop: 0 24px 60px -20px rgba(0, 0, 0, 0.45);
+  color: var(--fg1);
+}
+
+.team-root .row { display: flex; align-items: center; }
+.team-root .col { display: flex; flex-direction: column; }
+.team-root .between { display: flex; align-items: center; justify-content: space-between; }
+.team-root .grow { flex: 1; min-width: 0; }
+.team-root .truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.team-root .sec-h { font-size: 15px; font-weight: 600; color: var(--fg1); }
+
+.team-root .card { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: 14px; box-shadow: var(--shadow-card); }
+.team-root .card-brand {
+  background-color: var(--surface);
+  background-image: radial-gradient(80% 60% at 50% 100%, rgba(151,164,214,0.10) 0%, rgba(151,164,214,0) 70%);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+}
+
+.team-root .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; border-radius: 9999px; padding: 7px 14px; transition: .15s; white-space: nowrap; }
+.team-root .pill-primary { background: var(--ink); color: var(--on-ink); }
+.team-root .pill-primary:hover { opacity: .9; }
+.team-root .pill-soft { background: var(--section); color: var(--fg2); }
+.team-root .pill-soft:hover { background: var(--hover); }
+
+.team-root .badge { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; border-radius: 9999px; padding: 3px 8px; line-height: 1; }
+.team-root .avatar { display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--section); font-weight: 500; color: var(--fg2); flex-shrink: 0; }
+
+.team-root .seg { display: inline-flex; background: var(--section); border-radius: 9999px; padding: 3px; border: 1px solid var(--border-subtle); gap: 2px; }
+.team-root .seg-btn { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; border-radius: 9999px; padding: 6px 13px; color: var(--fg-muted); transition: .15s; white-space: nowrap; }
+.team-root .seg-btn:hover { color: var(--fg2); }
+.team-root .seg-btn.on { background: var(--surface); color: var(--fg1); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+
+.team-root .tab { position: relative; font-size: 13px; font-weight: 500; color: var(--fg-muted); padding: 14px 2px; transition: color .15s; }
+.team-root .tab:hover { color: var(--fg2); }
+.team-root .tab.on { color: var(--fg1); }
+.team-root .tab.on::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--accent); border-radius: 2px; }
+
+.team-root .tt { width: 100%; border-collapse: collapse; }
+.team-root .tt th { text-align: left; font-size: 11px; font-weight: 500; color: var(--fg-muted); padding: 11px 14px; white-space: nowrap; }
+.team-root .tt td { padding: 13px 14px; font-size: 12px; border-top: 1px solid var(--border-subtle); }
+.team-root .tt tbody tr { transition: background .12s; }
+.team-root .tt tbody tr.click { cursor: pointer; }
+.team-root .tt tbody tr.click:hover { background: var(--hover); }
+
+.team-root .meter { height: 6px; border-radius: 9999px; background: var(--section); overflow: hidden; }
+.team-root .meter > span { display: block; height: 100%; border-radius: 9999px; transition: width .4s ease; }
+
+.team-root .field { width: 100%; background: var(--page); border: 1px solid var(--border-default); border-radius: 8px; padding: 9px 12px; font-size: 13px; color: var(--fg1); transition: border-color .15s, box-shadow .15s; }
+.team-root .field:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(151,164,214,0.25); }
+.team-root .field::placeholder { color: var(--fg-faint); }
+.team-root .lbl { font-size: 11px; font-weight: 500; color: var(--fg-muted); display: block; margin-bottom: 6px; }
+
+.team-root .stepper { display: flex; align-items: center; background: var(--page); border: 1px solid var(--border-default); border-radius: 8px; overflow: hidden; }
+.team-root .stepper button { width: 32px; height: 36px; display: flex; align-items: center; justify-content: center; color: var(--fg-muted); transition: .12s; }
+.team-root .stepper button:hover { background: var(--section); color: var(--fg1); }
+.team-root .stepper input { width: 48px; text-align: center; background: transparent; border: 0; color: var(--fg1); font-size: 13px; font-weight: 600; -moz-appearance: textfield; }
+.team-root .stepper input::-webkit-outer-spin-button, .team-root .stepper input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+.team-root .medal { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 11px; font-weight: 700; }
+
+.team-scrim { position: fixed; inset: 0; background: rgba(8,11,24,0.72); backdrop-filter: blur(4px); z-index: 80; display: flex; align-items: flex-start; justify-content: center; padding: 64px 24px; overflow-y: auto; }
+.team-scrim .modal { width: 100%; max-width: 520px; background: var(--surface); border: 1px solid var(--border-default); border-radius: 16px; box-shadow: var(--shadow-pop); color: var(--color-ink); }
+
+@keyframes teamFadeUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.team-root .fade, .team-scrim { animation: teamFadeUp .22s ease both; }

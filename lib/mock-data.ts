@@ -14,6 +14,7 @@ import {
   Briefcase,
   Inbox,
   Users,
+  UsersRound,
 } from "lucide-react";
 import type {
   NavItem,
@@ -43,6 +44,7 @@ export const navItems: NavItem[] = [
   { id: "recordings", label: "Recordings", icon: Headphones, href: "/dashboard/recordings" },
   { id: "templates", label: "Templates", icon: FileText, href: "/dashboard/templates" },
   { id: "leads", label: "Leads", icon: Users, href: "/dashboard/leads" },
+  { id: "team", label: "Team", icon: UsersRound, href: "/dashboard/team" },
   { id: "settings", label: "Settings", icon: Settings, href: "/dashboard/settings" },
 ];
 
