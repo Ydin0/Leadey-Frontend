@@ -4,21 +4,23 @@ import { Icon } from "./icon";
 import { Avatar, StatusDot, Panel, ChannelLegend } from "./team-shared";
 import { TrendChart, Ring, Meter, attColor } from "./charts";
 import {
-  MEMBERS, CH_IDS, CH_MAP, WIN_MAP, attainment, bucketed, workingDays, winSlice,
+  CH_IDS, CH_MAP, WIN_MAP, attainment, bucketed, workingDays, winSlice,
   type WindowId,
 } from "@/lib/team/team-data";
+import { useTeamData } from "@/lib/team/team-data-context";
 
 export function TeamRep({ memberId, win, trendMode, onEdit }: {
   memberId: string; win: WindowId; trendMode: "area" | "bars"; onEdit: (id: string) => void;
 }) {
-  const m = MEMBERS.find((x) => x.id === memberId);
+  const { activeMembers } = useTeamData();
+  const m = activeMembers.find((x) => x.id === memberId);
   if (!m) return null;
   const a = attainment(m, win);
   const chart = bucketed(m, win);
   const tot = a.got;
   const wlabel = WIN_MAP[win].label.toLowerCase();
 
-  const rank = MEMBERS.map((x) => ({ id: x.id, v: attainment(x, win).overall })).sort((p, q) => q.v - p.v).findIndex((x) => x.id === m.id) + 1;
+  const rank = activeMembers.map((x) => ({ id: x.id, v: attainment(x, win).overall })).sort((p, q) => q.v - p.v).findIndex((x) => x.id === m.id) + 1;
 
   const summary: [string, number, string][] = [
     ["Meetings booked", tot.meetings, "calendar-check"],
@@ -41,7 +43,7 @@ export function TeamRep({ memberId, win, trendMode, onEdit }: {
           </div>
         </div>
         <div className="row" style={{ gap: 10 }}>
-          <span className="pill pill-soft" style={{ pointerEvents: "none" }}><Icon name="award" size={13} />Rank #{rank} of {MEMBERS.length}</span>
+          <span className="pill pill-soft" style={{ pointerEvents: "none" }}><Icon name="award" size={13} />Rank #{rank} of {activeMembers.length}</span>
           <button className="pill pill-soft" onClick={() => onEdit(m.id)}><Icon name="sliders-horizontal" size={13} />Edit targets</button>
         </div>
       </div>

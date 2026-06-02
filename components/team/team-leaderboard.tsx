@@ -5,17 +5,19 @@ import { Avatar } from "./team-shared";
 import { Sparkline, Meter, attColor } from "./charts";
 import { DeltaPill } from "./team-shared";
 import {
-  MEMBERS, CH_IDS, CH_MAP, attainment, prevSlice, sumSlice, bucketed,
+  CH_IDS, CH_MAP, attainment, prevSlice, sumSlice, bucketed,
   type ChannelId, type WindowId,
 } from "@/lib/team/team-data";
+import { useTeamData } from "@/lib/team/team-data-context";
 
 export function TeamLeaderboard({ win, podium, onPickRep }: {
   win: WindowId; podium: boolean; onPickRep: (id: string) => void;
 }) {
+  const { activeMembers } = useTeamData();
   const [rankBy, setRankBy] = React.useState<string>("attainment");
   const [pod, setPod] = React.useState<string>("all");
 
-  let members = MEMBERS;
+  let members = activeMembers;
   if (pod !== "all") members = members.filter((m) => m.pod === pod);
 
   const rows = members.map((m) => {

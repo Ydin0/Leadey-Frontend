@@ -3,8 +3,9 @@
 import React from "react";
 import { Icon } from "./icon";
 import { Avatar, StatusDot, POD_COLOR } from "./team-shared";
+import { useTeamData } from "@/lib/team/team-data-context";
 import {
-  MEMBERS, CH_IDS, CH_MAP, ROLE_TARGETS, type Member, type Targets, type ChannelId,
+  CH_IDS, CH_MAP, ROLE_TARGETS, type Member, type Targets, type ChannelId,
 } from "@/lib/team/team-data";
 
 export function KpiStepper({ value, onChange, step = 5 }: {
@@ -23,16 +24,20 @@ export interface MemberFormData {
   name: string; email: string; role: string; pod: string; targets: Targets;
 }
 
-export function MemberModal({ mode, member, onClose, onSave }: {
+export function MemberModal({ mode, member, seatUsage, onClose, onSave }: {
   mode: "add" | "edit"; member: Member | null;
-  onClose: () => void; onSave: (data: MemberFormData) => void;
+  seatUsage: { used: number; included: number };
+  onClose: () => void; onSave: (data: MemberFormData) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [name, setName] = React.useState(member ? member.name : "");
   const [email, setEmail] = React.useState(member ? (member.email || "") : "");
   const [role, setRole] = React.useState(member ? member.role : "SDR");
   const [pod, setPod] = React.useState(member ? member.pod : "Enterprise");
   const [targets, setTargets] = React.useState<Targets>(member ? { ...member.targets } : { ...ROLE_TARGETS.SDR });
+  const [saving, setSaving] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
   const editing = mode === "edit";
+  const seatsFull = seatUsage.used >= seatUsage.included;
 
   function pickRole(r: string) {
     setRole(r);
@@ -40,7 +45,17 @@ export function MemberModal({ mode, member, onClose, onSave }: {
   }
   const setT = (ch: ChannelId, v: number) => setTargets((t) => ({ ...t, [ch]: v }));
   const dailyTotal = CH_IDS.reduce((a, ch) => a + (targets[ch] || 0), 0);
-  const valid = name.trim().length > 1;
+  const valid = editing
+    ? true
+    : name.trim().length > 1 && /\S+@\S+\.\S+/.test(email) && !seatsFull;
+
+  async function submit() {
+    setSaving(true);
+    setError(null);
+    const res = await onSave({ name: name.trim(), email, role, pod, targets });
+    if (res.ok) onClose();
+    else { setError(res.error || "Failed to save."); setSaving(false); }
+  }
 
   return (
     <div className="team-scrim team-root" onClick={onClose}>
@@ -61,9 +76,24 @@ export function MemberModal({ mode, member, onClose, onSave }: {
         <div style={{ padding: 22, display: "grid", gap: 16 }}>
           {!editing && (
             <>
+              {/* Seat usage */}
+              <div className="between" style={{ background: "var(--page)", border: `1px solid ${seatsFull ? "var(--signal-red-text)" : "var(--border-subtle)"}`, borderRadius: 10, padding: "10px 14px" }}>
+                <span className="row" style={{ gap: 8, fontSize: 12, color: "var(--fg2)" }}>
+                  <Icon name="users-round" size={14} style={{ color: "var(--fg-muted)" }} />
+                  Seats
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: seatsFull ? "var(--signal-red-text)" : "var(--fg1)" }}>
+                  {seatUsage.used} / {seatUsage.included} used
+                </span>
+              </div>
+              {seatsFull && (
+                <div style={{ fontSize: 11, color: "var(--signal-red-text)", marginTop: -6 }}>
+                  All seats are in use. Upgrade your plan to invite more members.
+                </div>
+              )}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div><label className="lbl">Full name</label><input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jordan Avery" autoFocus /></div>
-                <div><label className="lbl">Work email</label><input className="field" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jordan@leadey.com" /></div>
+                <div><label className="lbl">Full name</label><input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Jordan Avery" autoFocus disabled={seatsFull} /></div>
+                <div><label className="lbl">Work email</label><input className="field" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="jordan@leadey.com" disabled={seatsFull} /></div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
@@ -105,12 +135,16 @@ export function MemberModal({ mode, member, onClose, onSave }: {
           </div>
         </div>
 
-        <div className="row" style={{ justifyContent: "flex-end", gap: 10, padding: "16px 22px", borderTop: "1px solid var(--border-subtle)" }}>
-          <button className="pill pill-soft" onClick={onClose}>Cancel</button>
-          <button className="pill pill-primary" style={{ opacity: valid ? 1 : 0.45, pointerEvents: valid ? "auto" : "none" }}
-            onClick={() => onSave({ name: name.trim(), email, role, pod, targets })}>
-            <Icon name={editing ? "check" : "user-plus"} size={13} />{editing ? "Save targets" : "Add member"}
-          </button>
+        <div className="between" style={{ gap: 10, padding: "16px 22px", borderTop: "1px solid var(--border-subtle)" }}>
+          <span style={{ fontSize: 11, color: "var(--signal-red-text)" }}>{error || ""}</span>
+          <div className="row" style={{ gap: 10 }}>
+            <button className="pill pill-soft" onClick={onClose}>Cancel</button>
+            <button className="pill pill-primary" style={{ opacity: valid && !saving ? 1 : 0.45, pointerEvents: valid && !saving ? "auto" : "none" }}
+              onClick={submit}>
+              {saving ? <Icon name="activity" size={13} /> : <Icon name={editing ? "check" : "user-plus"} size={13} />}
+              {editing ? "Save targets" : "Send invite"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -120,7 +154,7 @@ export function MemberModal({ mode, member, onClose, onSave }: {
 export function TeamMembers({ onPickRep, onEdit }: {
   onPickRep: (id: string) => void; onEdit: (id: string) => void;
 }) {
-  const members = MEMBERS;
+  const { members } = useTeamData();
   return (
     <div className="fade card" style={{ overflow: "hidden", padding: 0 }}>
       <table className="tt">
@@ -140,8 +174,9 @@ export function TeamMembers({ onPickRep, onEdit }: {
         <tbody>
           {members.map((m) => {
             const daily = CH_IDS.reduce((a, ch) => a + m.targets[ch], 0);
+            const drillable = m.status !== "pending";
             return (
-              <tr key={m.id} className="click" onClick={() => onPickRep(m.id)}>
+              <tr key={m.id} className={drillable ? "click" : ""} onClick={() => drillable && onPickRep(m.id)}>
                 <td>
                   <div className="row" style={{ gap: 11 }}>
                     <Avatar name={m.name} pod={m.pod} size={34} />

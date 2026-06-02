@@ -4,14 +4,22 @@ import { Icon } from "./icon";
 import { StatCard, Panel, ChannelLegend, Avatar, DeltaPill, POD_COLOR } from "./team-shared";
 import { TrendChart, Donut, Ring, Meter, attColor } from "./charts";
 import {
-  MEMBERS, CH_IDS, CH_MAP, WIN_MAP, teamTotals, bucketed, attainment, sparkFor,
+  CH_IDS, CH_MAP, WIN_MAP, teamTotals, bucketed, attainment, sparkFor,
   type WindowId,
 } from "@/lib/team/team-data";
+import { useTeamData } from "@/lib/team/team-data-context";
 
 export function TeamAnalytics({ win, trendMode, onPickRep }: {
   win: WindowId; trendMode: "area" | "bars"; onPickRep: (id: string) => void;
 }) {
-  const members = MEMBERS;
+  const { activeMembers: members } = useTeamData();
+  if (members.length === 0) {
+    return (
+      <div className="card fade" style={{ padding: 48, textAlign: "center" }}>
+        <p style={{ fontSize: 13, color: "var(--fg-muted)" }}>No active reps yet. Invite your team to see activity here.</p>
+      </div>
+    );
+  }
   const tot = teamTotals(members, win);
   const chart = bucketed(members, win);
 
@@ -36,6 +44,10 @@ export function TeamAnalytics({ win, trendMode, onPickRep }: {
 
   return (
     <div className="fade" style={{ display: "grid", gap: 16 }}>
+      <div className="row" style={{ gap: 7, fontSize: 11, color: "var(--fg-faint)" }}>
+        <Icon name="activity" size={12} />
+        Activity is projected from each rep&apos;s KPI targets until live channel tracking is enabled.
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
         {CH_IDS.map((ch) => (
           <StatCard key={ch} ch={ch} total={tot.cur[ch]} delta={tot.delta[ch]} spark={sparkFor(members, win, ch)} />

@@ -5,6 +5,27 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; seatUsa
   return apiRequest<{ members: TeamMember[]; seatUsage: SeatUsage }>("/team");
 }
 
+/** Per-member sales role / pod / daily KPI targets, keyed by lowercased email. */
+export interface TeamKpiEntry {
+  role?: string;
+  pod?: string;
+  targets?: { calls: number; emails: number; sms: number; linkedin: number };
+}
+export type TeamKpiConfig = Record<string, TeamKpiEntry>;
+
+export async function getTeamKpiConfig(): Promise<TeamKpiConfig> {
+  return apiRequest<TeamKpiConfig>("/team/kpi-config");
+}
+
+export async function saveTeamKpiConfig(
+  entry: { key: string } & TeamKpiEntry,
+): Promise<TeamKpiConfig> {
+  return apiRequest<TeamKpiConfig>("/team/kpi-config", {
+    method: "PUT",
+    body: JSON.stringify(entry),
+  });
+}
+
 export async function inviteTeamMember(
   email: string,
   role: string,

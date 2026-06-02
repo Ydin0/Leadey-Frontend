@@ -17,6 +17,7 @@ export const STATUS_META: Record<string, [string, string]> = {
   active: ["var(--signal-green-text)", "Active"],
   away: ["var(--fg-faint)", "Away"],
   ramping: ["var(--signal-blue-text)", "Ramping"],
+  pending: ["var(--signal-blue-text)", "Invited"],
 };
 
 export function Avatar({ name, size = 32, pod }: { name: string; size?: number; pod?: string }) {

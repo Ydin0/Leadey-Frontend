@@ -13,7 +13,7 @@
 
 export type ChannelId = "calls" | "emails" | "sms" | "linkedin";
 export type WindowId = "today" | "week" | "month" | "quarter";
-export type MemberStatus = "active" | "away" | "ramping";
+export type MemberStatus = "active" | "away" | "ramping" | "pending";
 
 export interface Channel {
   id: ChannelId;
@@ -91,19 +91,6 @@ export const ROLE_TARGETS: Record<string, Targets> = {
   Manager: { calls: 12, emails: 25, sms: 6, linkedin: 12 },
 };
 
-const SEED_MEMBERS: Omit<Member, "targets" | "series">[] = [
-  { id: "m1", name: "Marcus Johnson", role: "SDR", pod: "Enterprise", perf: 1.18, ramp: false, status: "active" },
-  { id: "m2", name: "Priya Patel", role: "SDR", pod: "Enterprise", perf: 1.07, ramp: false, status: "active" },
-  { id: "m3", name: "Daniel Kim", role: "SDR", pod: "Mid-Market", perf: 0.92, ramp: false, status: "active" },
-  { id: "m4", name: "Sofia Alvarez", role: "SDR", pod: "Mid-Market", perf: 1.26, ramp: false, status: "active" },
-  { id: "m5", name: "James Park", role: "AE", pod: "Enterprise", perf: 1.04, ramp: false, status: "active" },
-  { id: "m6", name: "Emma Wilson", role: "SDR", pod: "SMB", perf: 0.78, ramp: true, status: "active" },
-  { id: "m7", name: "Liam O'Brien", role: "SDR", pod: "SMB", perf: 0.88, ramp: false, status: "away" },
-  { id: "m8", name: "Nina Petrova", role: "AE", pod: "Mid-Market", perf: 1.12, ramp: false, status: "active" },
-  { id: "m9", name: "Tomás García", role: "SDR", pod: "Enterprise", perf: 0.97, ramp: false, status: "active" },
-  { id: "m10", name: "Hannah Lee", role: "SDR", pod: "SMB", perf: 0.62, ramp: true, status: "active" },
-];
-
 // ── deterministic PRNG ──────────────────────────────────────────────────
 function mulberry32(a: number) {
   return function () {
@@ -113,10 +100,16 @@ function mulberry32(a: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-function hashSeed(str: string): number {
+export function hashSeed(str: string): number {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
   return h >>> 0;
+}
+
+/** Stable pseudo-performance multiplier in [lo,hi] derived from a key — gives
+ *  each real rep a deterministic but varied activity profile. */
+export function hashFloat(key: string, lo: number, hi: number): number {
+  return lo + (hashSeed(key) / 4294967296) * (hi - lo);
 }
 
 export const DAYS = 90;
@@ -155,12 +148,6 @@ export function buildSeries(member: Member): DayRec[] {
   }
   return days;
 }
-
-export const MEMBERS: Member[] = SEED_MEMBERS.map((m) => {
-  const member = { ...m, targets: { ...ROLE_TARGETS[m.role] } } as Member;
-  member.series = buildSeries(member);
-  return member;
-});
 
 // ── time windows ────────────────────────────────────────────────────────
 export const WINDOWS: TimeWindow[] = [
@@ -279,21 +266,5 @@ export function sparkFor(members: Member[], winId: WindowId, ch: ChannelId): num
 }
 
 export function initialsOf(name: string): string {
-  return name.split(" ").map((n) => n[0]).join("").slice(0, 2);
-}
-
-let _seq = 100;
-export function addMember(data: {
-  name: string; email?: string; role: string; pod: string; targets?: Partial<Targets>;
-}): Member {
-  const id = "m" + (++_seq);
-  const m: Member = {
-    id, name: data.name, email: data.email, role: data.role, pod: data.pod,
-    perf: 0.5, ramp: true, status: "active",
-    targets: { ...(ROLE_TARGETS[data.role] || ROLE_TARGETS.SDR), ...data.targets },
-    series: [],
-  };
-  m.series = buildSeries(m);
-  MEMBERS.push(m);
-  return m;
+  return name.split(/[\s@.]/).filter(Boolean).map((n) => n[0]).join("").slice(0, 2).toUpperCase();
 }
