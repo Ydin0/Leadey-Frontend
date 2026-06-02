@@ -42,18 +42,19 @@ export async function cancelDiscoveryRun(
 // ─── Company Counts ─────────────────────────────────────────────────
 
 export async function getContactCompanyCounts(
-  assignmentId: string,
+  assignmentId?: string,
 ): Promise<{ companyLinkedinUrl: string | null; companyName: string | null; count: number }[]> {
-  const result = await apiRequest<{ companyLinkedinUrl: string | null; companyName: string | null; count: number }[]>(
-    `/contacts/company-counts?assignmentId=${assignmentId}`,
+  const qs = assignmentId ? `?assignmentId=${assignmentId}` : "";
+  return apiRequest<{ companyLinkedinUrl: string | null; companyName: string | null; count: number }[]>(
+    `/contacts/company-counts${qs}`,
   );
-  return result;
 }
 
 // ─── Contacts ───────────────────────────────────────────────────────
 
 export async function getContacts(opts: {
-  assignmentId: string;
+  /** Omit for an org-wide query (the Leads page). */
+  assignmentId?: string;
   page?: number;
   pageSize?: number;
   status?: string;
@@ -65,7 +66,7 @@ export async function getContacts(opts: {
   hasPhone?: string;
 }): Promise<{ data: ScraperContactRow[]; meta: { page: number; pageSize: number; totalCount: number; totalPages: number } }> {
   const params = new URLSearchParams();
-  params.set("assignmentId", opts.assignmentId);
+  if (opts.assignmentId) params.set("assignmentId", opts.assignmentId);
   if (opts.page) params.set("page", String(opts.page));
   if (opts.pageSize) params.set("pageSize", String(opts.pageSize));
   if (opts.status) params.set("status", opts.status);

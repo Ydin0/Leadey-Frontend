@@ -1,7 +1,6 @@
 import {
   LayoutDashboard,
   GitFork,
-  Building2,
   Settings,
   MessageSquare,
   Send,
@@ -14,6 +13,7 @@ import {
   FileText,
   Briefcase,
   Inbox,
+  Users,
 } from "lucide-react";
 import type {
   NavItem,
@@ -42,7 +42,7 @@ export const navItems: NavItem[] = [
   { id: "scrapers", label: "Scrapers", icon: Search, href: "/dashboard/scrapers" },
   { id: "recordings", label: "Recordings", icon: Headphones, href: "/dashboard/recordings" },
   { id: "templates", label: "Templates", icon: FileText, href: "/dashboard/templates" },
-  { id: "companies", label: "Companies", icon: Building2, href: "/dashboard/companies" },
+  { id: "leads", label: "Leads", icon: Users, href: "/dashboard/leads" },
   { id: "settings", label: "Settings", icon: Settings, href: "/dashboard/settings" },
 ];
 
