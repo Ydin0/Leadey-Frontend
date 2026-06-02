@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Plus, Loader2 } from "lucide-react";
 import { EmptyState } from "@/components/shared/empty-state";
@@ -9,12 +9,12 @@ import {
   getScraperAssignments,
   deleteScraperAssignment,
   createScraperAssignment,
-  triggerScraperRun,
   type ScraperAssignmentRow,
 } from "@/lib/api/scrapers";
 import type { SavedSearch } from "@/lib/types/scraper";
 import { formatRelativeTime } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { useScraperRuns } from "@/components/providers/scraper-runs-provider";
 
 function toSavedSearch(row: ScraperAssignmentRow): SavedSearch {
   return {
@@ -38,7 +38,7 @@ export function SearchesLibraryShell() {
   const isAuthReady = useAuthReady();
   const [searches, setSearches] = useState<SavedSearch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [runningIds, setRunningIds] = useState<Set<string>>(new Set());
+  const { startRun, isRunning, runs } = useScraperRuns();
 
   const fetchSearches = useCallback(async () => {
     try {
@@ -56,21 +56,18 @@ export function SearchesLibraryShell() {
     fetchSearches();
   }, [fetchSearches, isAuthReady]);
 
-  const handleRun = useCallback(async (id: string) => {
-    setRunningIds((prev) => new Set(prev).add(id));
-    try {
-      await triggerScraperRun(id);
-      await fetchSearches();
-    } catch (err) {
-      console.error("Run failed:", err);
-    } finally {
-      setRunningIds((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
-    }
-  }, [fetchSearches]);
+  const handleRun = useCallback((id: string) => {
+    const search = searches.find((s) => s.id === id);
+    startRun(id, search?.searchName || "Scraper");
+  }, [searches, startRun]);
+
+  // Refresh the list whenever a run finishes (running count drops).
+  const runningCount = runs.filter((r) => r.status === "running").length;
+  const prevRunningCount = useRef(runningCount);
+  useEffect(() => {
+    if (runningCount < prevRunningCount.current) void fetchSearches();
+    prevRunningCount.current = runningCount;
+  }, [runningCount, fetchSearches]);
 
   const handleDuplicate = useCallback(async (id: string) => {
     const source = searches.find((s) => s.id === id);
@@ -166,7 +163,7 @@ export function SearchesLibraryShell() {
               onRun={handleRun}
               onDuplicate={handleDuplicate}
               onDelete={handleDelete}
-              isRunning={runningIds.has(search.id)}
+              isRunning={isRunning(search.id)}
             />
           ))}
         </div>

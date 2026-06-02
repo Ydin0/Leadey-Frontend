@@ -30,11 +30,12 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { SortableHeader } from "@/components/ui/sortable-header";
 import { generateCSV, downloadCSV } from "@/lib/export-csv";
 import {
-  getScraperAssignments, getSearchResults, triggerScraperRun,
+  getScraperAssignments, getSearchResults,
   bulkUpdateSignalStatus, getScraperRuns,
   type ScraperAssignmentRow, type ScraperRunRow,
 } from "@/lib/api/scrapers";
 import { getContacts } from "@/lib/api/contacts";
+import { useScraperRuns } from "@/components/providers/scraper-runs-provider";
 import type { SearchResultRow, PaginatedResponse } from "@/lib/types/scraper";
 
 type Tab = "jobs" | "companies" | "leads" | "history";
@@ -52,7 +53,8 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
   const [loadingAllResults, setLoadingAllResults] = useState(true);
   const [runs, setRuns] = useState<ScraperRunRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [running, setRunning] = useState(false);
+  const { startRun, isRunning } = useScraperRuns();
+  const running = isRunning(searchId);
   const [bulkAction, setBulkAction] = useState<string | null>(null);
 
   // URL-backed state
@@ -180,29 +182,33 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
     fetchData(page);
   }, [fetchData, page, isAuthReady]);
 
-  const handleRunConfirm = useCallback(async () => {
+  const handleRunConfirm = useCallback(() => {
     if (running) return;
     setShowRunModal(false);
-    setRunning(true);
-    try {
-      const { updateSavedSearch } = await import("@/lib/api/scrapers");
-      await updateSavedSearch(searchId, { maxSignalsPerRun: runLimit });
-      await triggerScraperRun(searchId);
-    } catch (err) {
-      console.error("Run failed:", err);
-    }
-    // Always refresh data after run (even if partially failed — signals may have been created)
-    try {
+    // Run is owned by the global ScraperRunsProvider so it survives navigation
+    // and surfaces in the bottom-right status widget.
+    startRun(
+      searchId,
+      assignment?.searchName || assignment?.scraperName || "Scraper",
+      { maxSignalsPerRun: runLimit },
+    );
+  }, [running, searchId, runLimit, startRun, assignment]);
+
+  // When this assignment's run finishes (running → not), refresh the page data
+  // if we're still on it.
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (running) {
+      wasRunning.current = true;
+    } else if (wasRunning.current) {
+      wasRunning.current = false;
       setPage(1);
       setActiveRunId("");
-      await fetchData(1);
-      await fetchAllResults();
-      await fetchCompanyLeadCounts();
-    } catch {
-    } finally {
-      setRunning(false);
+      void fetchData(1);
+      void fetchAllResults();
+      void fetchCompanyLeadCounts();
     }
-  }, [running, searchId, runLimit, fetchData, fetchAllResults, fetchCompanyLeadCounts, setPage, setActiveRunId]);
+  }, [running, fetchData, fetchAllResults, fetchCompanyLeadCounts, setPage, setActiveRunId]);
 
   const handlePageChange = useCallback((p: number) => {
     setPage(p);

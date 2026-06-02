@@ -116,10 +116,11 @@ export async function deleteScraperAssignment(id: string): Promise<void> {
 
 export async function triggerScraperRun(
   assignmentId: string,
+  signal?: AbortSignal,
 ): Promise<RunResult> {
   return apiRequest<RunResult>(
     `/scrapers/assignments/${assignmentId}/run`,
-    { method: "POST" },
+    { method: "POST", signal },
   );
 }
 
