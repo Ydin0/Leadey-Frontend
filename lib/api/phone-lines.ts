@@ -98,6 +98,28 @@ export async function saveCallRecord(data: {
   });
 }
 
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:3001";
+
+/** Fetches the call's audio through our authenticated backend proxy (Twilio
+ *  recording URLs require Basic Auth and can't be loaded by a bare <audio>
+ *  tag). Returns an object URL the caller must revoke when done. */
+export async function fetchCallRecordingBlobUrl(callRecordId: string): Promise<string> {
+  const token = getAuthToken();
+  const res = await fetch(
+    `${API_BASE_URL}/api/phone-lines/call-records/${callRecordId}/recording`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to load recording (${res.status})`);
+  }
+  const blob = await res.blob();
+  return URL.createObjectURL(blob);
+}
+
 export async function summarizeCall(
   callRecordId: string,
 ): Promise<{ transcript: string | null; summary: string | null }> {
