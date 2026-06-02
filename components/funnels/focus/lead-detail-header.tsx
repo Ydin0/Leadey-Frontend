@@ -25,6 +25,9 @@ interface LeadDetailHeaderProps {
   statuses?: LeadStatusOption[];
   onStatusChange: (status: string) => void;
   localTime?: string;
+  onEmail?: () => void;
+  onNote?: () => void;
+  onCall?: () => void;
 }
 
 export function LeadDetailHeader({
@@ -36,6 +39,9 @@ export function LeadDetailHeader({
   statuses = BUILTIN_STATUS_OPTIONS,
   onStatusChange,
   localTime,
+  onEmail,
+  onNote,
+  onCall,
 }: LeadDetailHeaderProps) {
   const [showConvert, setShowConvert] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -121,15 +127,24 @@ export function LeadDetailHeader({
             </button>
           )
         )}
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-surface border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors">
+        <button
+          onClick={onNote}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-surface border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+        >
           <FileText size={13} strokeWidth={1.5} />
           Note
         </button>
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-surface border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors">
+        <button
+          onClick={onEmail}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-surface border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+        >
           <Mail size={13} strokeWidth={1.5} />
           Email
         </button>
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors">
+        <button
+          onClick={onCall}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
+        >
           <Phone size={13} strokeWidth={1.5} />
           Call
         </button>

@@ -1,6 +1,12 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { Mail, Eye, MessageSquare, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { getEmailStats } from "@/lib/api/email";
 import type { EmailSummary } from "@/lib/types";
+import type { EmailStats } from "@/lib/types/email";
 
 const typeColors = {
   bounce: "bg-signal-red text-signal-red-text",
@@ -15,10 +21,26 @@ const typeLabels = {
 };
 
 interface EmailSectionProps {
+  /** Fallback shown until honest email stats load. The dashboard endpoint's
+   *  `sentToday` counts lead updates (not real sends), so we override it with
+   *  getEmailStats() — which is sourced from real send events. */
   email: EmailSummary;
 }
 
-export function EmailSection({ email: data }: EmailSectionProps) {
+export function EmailSection({ email: fallback }: EmailSectionProps) {
+  const isAuthReady = useAuthReady();
+  const [stats, setStats] = useState<EmailStats | EmailSummary>(fallback);
+
+  useEffect(() => {
+    if (!isAuthReady) return;
+    let cancelled = false;
+    getEmailStats()
+      .then((s) => !cancelled && setStats(s))
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isAuthReady]);
+
+  const data = stats;
   return (
     <section>
       <div className="flex items-center gap-3 mb-4">

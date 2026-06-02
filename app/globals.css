@@ -241,3 +241,13 @@ body {
   background: rgba(10, 14, 31, 0.7);
   border-color: rgba(255, 255, 255, 0.06);
 }
+
+/* Rich email editor (TipTap) content styling */
+.prose-email p { margin: 0 0 0.6em; }
+.prose-email p:last-child { margin-bottom: 0; }
+.prose-email strong { font-weight: 600; }
+.prose-email a { color: var(--color-accent); text-decoration: underline; }
+.prose-email ul { list-style: disc; padding-left: 1.25em; margin: 0 0 0.6em; }
+.prose-email ol { list-style: decimal; padding-left: 1.25em; margin: 0 0 0.6em; }
+.prose-email li { margin: 0.15em 0; }
+.prose-email .ProseMirror { min-height: inherit; outline: none; }

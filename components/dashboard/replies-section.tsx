@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Mail, Linkedin, MessageSquare, ChevronDown, ChevronUp, Clock, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatRelativeTime } from "@/lib/utils";
@@ -71,13 +72,13 @@ function ReplyCard({ reply, onAction }: { reply: Reply; onAction: (id: string, a
 
       {/* Actions */}
       <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border-subtle">
-        <button
-          onClick={() => onAction(reply.id, "open")}
+        <Link
+          href={`/dashboard/inbox?thread=${encodeURIComponent(reply.id)}`}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
         >
           <ExternalLink size={12} strokeWidth={1.5} />
           Open Thread
-        </button>
+        </Link>
         <button
           onClick={() => onAction(reply.id, "interested")}
           className="px-3 py-1.5 rounded-[20px] bg-signal-green text-signal-green-text text-[11px] font-medium hover:bg-signal-green/80 transition-colors"

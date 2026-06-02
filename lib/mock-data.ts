@@ -13,6 +13,7 @@ import {
   Headphones,
   FileText,
   Briefcase,
+  Inbox,
 } from "lucide-react";
 import type {
   NavItem,
@@ -36,6 +37,7 @@ import type {
 export const navItems: NavItem[] = [
   { id: "cockpit", label: "Cockpit", icon: LayoutDashboard, href: "/dashboard" },
   { id: "funnels", label: "Campaigns", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
+  { id: "inbox", label: "Inbox", icon: Inbox, href: "/dashboard/inbox" },
   { id: "opportunities", label: "Opportunities", icon: Briefcase, href: "/dashboard/opportunities" },
   { id: "scrapers", label: "Scrapers", icon: Search, href: "/dashboard/scrapers" },
   { id: "recordings", label: "Recordings", icon: Headphones, href: "/dashboard/recordings" },

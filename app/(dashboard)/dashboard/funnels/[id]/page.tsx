@@ -15,6 +15,7 @@ import { FunnelTabNav, type FunnelTab } from "@/components/funnels/dashboard/fun
 import { FunnelLeadTable } from "@/components/funnels/leads/funnel-lead-table";
 import { CockpitView } from "@/components/funnels/cockpit/cockpit-view";
 import { AnalyticsView } from "@/components/funnels/analytics/analytics-view";
+import { EmailPerformancePanel } from "@/components/funnels/email-performance-panel";
 import { AddLeadsModal } from "@/components/funnels/add-leads/add-leads-modal";
 import { LeadFocusView } from "@/components/funnels/focus/lead-focus-view";
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
@@ -140,6 +141,7 @@ export default function FunnelDetailPage() {
         initialIndex={focusLeadIndex}
         funnelId={funnel.id}
         funnelName={funnel.name}
+        steps={funnel.steps}
         onClose={() => setFocusLeadIndex(null)}
       />
     );
@@ -252,11 +254,17 @@ export default function FunnelDetailPage() {
       )}
 
       {activeTab === "analytics" && (
-        <AnalyticsView
-          metrics={funnel.metrics}
-          analyticsSteps={funnel.analyticsSteps}
-          sources={funnel.sources}
-        />
+        <div className="space-y-6">
+          <AnalyticsView
+            metrics={funnel.metrics}
+            analyticsSteps={funnel.analyticsSteps}
+            sources={funnel.sources}
+          />
+          <div>
+            <h3 className="text-[13px] font-semibold text-ink mb-3">Email performance</h3>
+            <EmailPerformancePanel funnelId={funnel.id} />
+          </div>
+        </div>
       )}
 
       {/* Add Leads Modal */}
