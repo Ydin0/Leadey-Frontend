@@ -7,7 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navItems } from "@/lib/mock-data";
 import { useSidebarFunnels } from "@/hooks/use-sidebar-funnels";
-import { LeadeyTileMark, LeadeyLogomark } from "@/components/brand/leadey-mark";
+import { LeadeyMark, LeadeyWordmark } from "@/components/brand/leadey-mark";
 
 export function Sidebar() {
   const [expanded, setExpanded] = useState(false);
@@ -44,39 +44,21 @@ export function Sidebar() {
         expanded ? "w-[200px]" : "w-[56px]"
       )}
     >
-      {/* Brand mark
-          - Collapsed: rounded navy tile with the gradient chevron (Figma
-            node 159:711) — reads as the app icon at the 56px rail width.
-          - Expanded: full LEADEY logomark from /public/logo/logomark-white.svg.
-          The two are stacked and cross-faded with opacity for a clean
-          transition; the tile is the resting state. */}
-      <div className="relative flex items-center h-14 pl-3 shrink-0">
-        <div
+      {/* Brand mark — a single crisp inline chevron that never changes size
+          or position; the LEADEY wordmark fades/slides in when expanded.
+          Both inherit `currentColor` via text-ink, so they stay sharp at any
+          DPI and adapt to the theme. */}
+      <div className="relative flex items-center h-14 pl-[18px] gap-[7px] shrink-0 overflow-hidden">
+        <LeadeyMark size={20} className="text-ink shrink-0" />
+        <LeadeyWordmark
+          height={18}
           className={cn(
-            "absolute left-3 top-1/2 -translate-y-1/2 transition-opacity duration-200",
-            expanded ? "opacity-0 pointer-events-none" : "opacity-100",
+            "text-ink shrink-0 transition-all duration-200 ease-out",
+            expanded
+              ? "opacity-100 translate-x-0"
+              : "opacity-0 -translate-x-1 pointer-events-none",
           )}
-        >
-          <LeadeyTileMark size={32} />
-        </div>
-        <div
-          className={cn(
-            "absolute left-4 top-1/2 -translate-y-1/2 transition-opacity duration-200",
-            expanded ? "opacity-100" : "opacity-0 pointer-events-none",
-          )}
-        >
-          {/* On light backgrounds the logomark needs the dark variant so
-              it remains visible; the white variant works on dark. */}
-          <LeadeyLogomark
-            height={22}
-            className="hidden dark:block"
-          />
-          <LeadeyLogomark
-            height={22}
-            variant="color"
-            className="block dark:hidden"
-          />
-        </div>
+        />
       </div>
 
       {/* Navigation */}
