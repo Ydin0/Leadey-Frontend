@@ -180,25 +180,39 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   // ── Bind Twilio Call events to state ──────────
   const bindCallEvents = useCallback(
-    (call: Call, direction: "outbound" | "inbound", meta?: CallMeta) => {
+    (
+      call: Call,
+      direction: "outbound" | "inbound",
+      meta?: CallMeta,
+      known?: { to?: string; from?: string },
+    ) => {
       const lineId = selectedLineId || "unknown";
       const contactName = meta?.contactName || null;
       const companyName = meta?.companyName || null;
-      // On outbound calls the Twilio Voice SDK populates `call.parameters` with
-      // the `To` and `CallerId` we passed to connect() — there is NO `From`. So
-      // for outbound the "from" number is our selected line's caller ID. Getting
-      // this right matters: the backend rejects records with an empty fromNumber,
-      // which is why call records previously never saved.
+      // IMPORTANT: for OUTBOUND calls the Twilio Voice SDK does NOT populate
+      // `call.parameters.To/From` — the values we passed to connect() live in
+      // `call.customParameters` (a Map). Reading `call.parameters.To` returns
+      // empty, so the saved record had an empty toNumber/fromNumber and the
+      // backend rejected it (400) → nothing ever showed in Recordings.
+      // We therefore prefer the values we already know at dial time (`known`),
+      // then customParameters, then call.parameters as a last resort.
       const selectedLine = phoneLines.find((l) => l.id === selectedLineId);
       const lineNumber = selectedLine?.number || "";
+      const cp = (key: string) => {
+        try {
+          return call.customParameters?.get?.(key) || "";
+        } catch {
+          return "";
+        }
+      };
       const to =
         direction === "outbound"
-          ? call.parameters?.To || ""
+          ? known?.to || cp("To") || call.parameters?.To || ""
           : call.parameters?.From || "";
       const from =
         direction === "outbound"
-          ? call.parameters?.From || call.parameters?.CallerId || lineNumber
-          : call.parameters?.To || lineNumber;
+          ? known?.from || cp("CallerId") || lineNumber || call.parameters?.From || ""
+          : call.parameters?.To || lineNumber || "";
       const callId = call.parameters?.CallSid || `call_${Date.now()}`;
 
       setActiveCall({
@@ -351,7 +365,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         });
 
         callRef.current = call;
-        bindCallEvents(call, "outbound", meta);
+        // Pass the numbers we already know — see bindCallEvents for why we
+        // can't rely on call.parameters for outbound.
+        bindCallEvents(call, "outbound", meta, { to, from: line.number });
       } catch (err) {
         console.error("[Twilio] Connect failed:", err);
       }
