@@ -31,7 +31,7 @@ export function AddLeadsModal({ funnelId, onClose, onLeadsImported }: AddLeadsMo
       <div className="absolute inset-0 bg-ink/50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="relative bg-surface rounded-[14px] border border-border-subtle shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto mx-4">
+      <div className="relative bg-surface rounded-[14px] border border-border-subtle shadow-xl w-full max-w-2xl max-h-[85vh] overflow-y-auto mx-4">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle sticky top-0 bg-surface rounded-t-[14px] z-10">
           <div className="flex items-center gap-2">

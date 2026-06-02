@@ -217,21 +217,34 @@ export interface CsvColumnMapping {
   autoMapped?: boolean;
 }
 
+export type CsvGroupBy = "domain" | "name" | "linkedin";
+
 export interface ImportCsvPayload {
   fileName: string;
   mappings: CsvColumnMapping[];
   rows: Record<string, string>[];
+  /** How leads are grouped into companies (default: domain). */
+  groupBy?: CsvGroupBy;
+  /** When true, validate + return the review preview without writing. */
+  dryRun?: boolean;
 }
 
 export interface ImportCsvResult {
-  importId: string;
-  funnelId: string;
-  fileName: string;
+  importId?: string;
+  funnelId?: string;
+  fileName?: string;
+  dryRun?: boolean;
   totalRows: number;
   importedRows: number;
   skippedRows: number;
+  duplicateLeads: number;
+  invalidRows: number;
+  companiesTotal: number;
+  existingCompanies: number;
+  newCompanies: number;
+  groupBy: CsvGroupBy;
   errors: Array<{ row: number; reason: string }>;
-  addedLeadIds: string[];
+  addedLeadIds?: string[];
 }
 
 export async function importCsvLeads(
