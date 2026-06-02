@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   AlertTriangle,
@@ -23,14 +23,36 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { mockCompaniesCommandCenter } from "@/lib/mock-data/companies-command-center";
+import { getCompaniesCommandCenter } from "@/lib/api/companies";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
 import type {
+  CompaniesCommandCenterSnapshot,
   CompanyActionPriority,
   CompanyCommandAccount,
   CompanyLifecycleStage,
   CompanyRiskLevel,
 } from "@/lib/types/companies-command-center";
 import { cn, formatRelativeTime } from "@/lib/utils";
+
+/** Safe placeholder so the data-derived hooks below can run before the
+ *  first fetch resolves (and if it fails). */
+const EMPTY_SNAPSHOT: CompaniesCommandCenterSnapshot = {
+  generatedAt: new Date(0),
+  overview: {
+    totalCompanies: 0,
+    monitoredCompanies: 0,
+    atRiskCompanies: 0,
+    unassignedCompanies: 0,
+    avgHealthScore: 0,
+    avgCoveragePct: 0,
+    totalSignalsLast7d: 0,
+    dueTodayActions: 0,
+  },
+  owners: [],
+  ownerPerformance: [],
+  queue: [],
+  accounts: [],
+};
 
 type SortKey = "health" | "signals" | "coverage" | "pipeline";
 
@@ -157,7 +179,24 @@ function MetricCard({
 }
 
 export function CompaniesCommandCenterShell() {
-  const data = mockCompaniesCommandCenter;
+  const isAuthReady = useAuthReady();
+  const [snapshot, setSnapshot] =
+    useState<CompaniesCommandCenterSnapshot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const data = snapshot ?? EMPTY_SNAPSHOT;
+
+  useEffect(() => {
+    if (!isAuthReady) return;
+    const controller = new AbortController();
+    setLoading(true);
+    getCompaniesCommandCenter(controller.signal)
+      .then(setSnapshot)
+      .catch(() => {
+        /* aborted or failed — fall back to the empty snapshot */
+      })
+      .finally(() => setLoading(false));
+    return () => controller.abort();
+  }, [isAuthReady]);
 
   const [query, setQuery] = useState("");
   const [riskFilter, setRiskFilter] = useState<CompanyRiskLevel | "all">("all");
@@ -765,7 +804,11 @@ export function CompaniesCommandCenterShell() {
             {pagedAccounts.length === 0 && (
               <TableRow className="hover:bg-transparent">
                 <TableCell colSpan={8} className="py-10 text-center text-[12px] text-ink-muted">
-                  No companies match the selected filters.
+                  {loading
+                    ? "Loading companies…"
+                    : data.accounts.length === 0
+                      ? "No companies yet — discovered companies will appear here as scrapers and discovery runs surface them."
+                      : "No companies match the selected filters."}
                 </TableCell>
               </TableRow>
             )}

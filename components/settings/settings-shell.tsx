@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { BillingSection } from "./billing-section";
 import { TeamSection } from "./team-section";
 import { ProfileSection } from "./profile-section";
@@ -157,8 +158,25 @@ function IntegrationBadge({ integration }: { integration: IntegrationSettings })
   );
 }
 
+const VALID_TABS: SettingsTab[] = [
+  "profile",
+  "organization",
+  "team",
+  "phone-lines",
+  "dialer",
+  "pipelines",
+  "linkedin",
+  "billing",
+  "notifications",
+  "integrations",
+];
+
 export function SettingsShell() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const searchParams = useSearchParams();
+  const requestedTab = searchParams.get("tab") as SettingsTab | null;
+  const initialTab: SettingsTab =
+    requestedTab && VALID_TABS.includes(requestedTab) ? requestedTab : "profile";
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [draft, setDraft] = useState<AppSettingsSnapshot>(mockSettings);
   const [savedState, setSavedState] = useState<AppSettingsSnapshot>(mockSettings);
 
