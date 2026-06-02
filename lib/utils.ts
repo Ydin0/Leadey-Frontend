@@ -37,6 +37,42 @@ export function formatPhoneNumber(phone: string): string {
   return phone;
 }
 
+/** Format an E.164 / international number for display.
+ *  Groups the national digits so "+447576550311" → "+44 7576 550311" and
+ *  "+12015550123" → "+1 (201) 555-0123". Falls back to a lightly-grouped
+ *  rendering for country codes we don't special-case. */
+export function formatPhoneIntl(phone: string): string {
+  if (!phone) return "";
+  const raw = phone.trim();
+  const hasPlus = raw.startsWith("+");
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return raw;
+
+  // US / Canada (+1)
+  if (digits.length === 11 && digits[0] === "1") {
+    return `+1 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  if (digits.length === 10 && !hasPlus) {
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  }
+
+  // UK (+44) — typical mobile is 11 national digits after the country code
+  if (hasPlus && digits.startsWith("44")) {
+    const rest = digits.slice(2);
+    return `+44 ${rest.slice(0, 4)} ${rest.slice(4)}`.trim();
+  }
+
+  // Generic international: keep the country code, group the rest in 3s.
+  if (hasPlus) {
+    const cc = digits.length > 10 ? digits.slice(0, 2) : digits.slice(0, 1);
+    const rest = digits.slice(cc.length);
+    const groups = rest.match(/.{1,3}/g) || [rest];
+    return `+${cc} ${groups.join(" ")}`.trim();
+  }
+
+  return raw;
+}
+
 /** Compact currency for opportunity values, stats cards, etc.
  *  Drops cents for whole numbers and uses k/M suffixes when compact=true. */
 export function formatCurrency(
