@@ -275,6 +275,26 @@ export async function advanceLead(
   };
 }
 
+/** Logs a real phone call against a lead. Always counts as a call touch; ticks
+ *  the step forward only when the lead's current step is a call step. */
+export async function logLeadCall(
+  funnelId: string,
+  leadId: string,
+  outcome: string = "completed",
+): Promise<{ lead: FunnelLead; funnel: Funnel }> {
+  const raw = await apiRequest<{ lead: ApiFunnelLead; funnel: ApiFunnel }>(
+    `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/log-call`,
+    {
+      method: "POST",
+      body: JSON.stringify({ outcome }),
+    },
+  );
+  return {
+    lead: hydrateLead(raw.lead),
+    funnel: hydrateFunnel(raw.funnel),
+  };
+}
+
 /** Manually set a lead's status (built-in or custom) and persist it. */
 export async function updateLeadStatus(
   funnelId: string,
@@ -361,6 +381,34 @@ export async function updateFunnelStatus(
       method: "PATCH",
       body: JSON.stringify({ status }),
     }
+  );
+  return hydrateFunnel(data);
+}
+
+export interface UpdateFunnelPayload {
+  name?: string;
+  description?: string;
+  steps?: Array<
+    Pick<FunnelStep, "channel" | "label" | "dayOffset"> & {
+      subject?: string;
+      emailBody?: string;
+      action?: string;
+    }
+  >;
+}
+
+/** Edit a campaign's name / description / steps. Replacing steps clamps each
+ *  lead's progress to the new step count on the backend. */
+export async function updateFunnel(
+  funnelId: string,
+  payload: UpdateFunnelPayload,
+): Promise<Funnel> {
+  const data = await apiRequest<ApiFunnel>(
+    `/funnels/${encodeURIComponent(funnelId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
   );
   return hydrateFunnel(data);
 }

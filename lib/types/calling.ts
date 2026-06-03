@@ -134,6 +134,9 @@ export interface CallMeta {
   contactName?: string | null;
   companyName?: string | null;
   leadId?: string | null;
+  /** Campaign this lead belongs to — set so the call is logged as a step
+   *  touch (advances the call step + increments the call counter). */
+  funnelId?: string | null;
 }
 
 export interface ActiveCall {
@@ -198,6 +201,10 @@ export interface EndedCallInfo {
   from: string;
   to: string;
   endedAt: number; // epoch ms
+  /** Lead/campaign this call was placed against, if any — lets list views
+   *  refresh the right campaign once the call is logged. */
+  leadId?: string | null;
+  funnelId?: string | null;
 }
 
 export interface CallContextValue {
@@ -217,4 +224,7 @@ export interface CallContextValue {
   /** Last ended call + saved record id. Cleared when a new call starts.
    *  Used by the power dialer to associate dispositions with the record. */
   lastEndedCall: EndedCallInfo | null;
+  /** Fires after a call has been logged against a campaign lead (step ticked +
+   *  call counter incremented), so list views can refresh the right campaign. */
+  lastLoggedCall: { leadId: string; funnelId: string; at: number } | null;
 }

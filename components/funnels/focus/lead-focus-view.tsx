@@ -223,6 +223,7 @@ export function LeadFocusView({
         contactName: contactName || currentLead?.name || null,
         companyName: currentLead?.company || null,
         leadId: currentLead?.id || null,
+        funnelId,
       });
   }
 

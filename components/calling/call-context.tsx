@@ -19,6 +19,7 @@ import type {
   EndedCallInfo,
 } from "@/lib/types/calling";
 import { getPhoneLines, getCallRecords, saveCallRecord } from "@/lib/api/phone-lines";
+import { logLeadCall } from "@/lib/api/funnels";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 
 const CallContext = createContext<CallContextValue | null>(null);
@@ -58,6 +59,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null);
   const [deviceReady, setDeviceReady] = useState(false);
   const [lastEndedCall, setLastEndedCall] = useState<EndedCallInfo | null>(null);
+  const [lastLoggedCall, setLastLoggedCall] = useState<
+    { leadId: string; funnelId: string; at: number } | null
+  >(null);
 
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -189,6 +193,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       const lineId = selectedLineId || "unknown";
       const contactName = meta?.contactName || null;
       const companyName = meta?.companyName || null;
+      const leadId = meta?.leadId || null;
+      const funnelId = meta?.funnelId || null;
       // IMPORTANT: for OUTBOUND calls the Twilio Voice SDK does NOT populate
       // `call.parameters.To/From` — the values we passed to connect() live in
       // `call.customParameters` (a Map). Reading `call.parameters.To` returns
@@ -264,6 +270,16 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         // Persist to backend, then publish the saved id so the dialer
         // (or any other subscriber) can wire it into /advance. We rely on
         // saveCallRecord returning the persisted row including its id.
+        // If this call was placed against a campaign lead, log it so the
+        // lead's call counter increments and the call step ticks forward.
+        if (leadId && funnelId) {
+          logLeadCall(funnelId, leadId)
+            .then(() => setLastLoggedCall({ leadId, funnelId, at: Date.now() }))
+            .catch((err) =>
+              console.error("[CallProvider] Failed to log call against lead:", err),
+            );
+        }
+
         saveCallRecord({
           lineId: lineId !== "unknown" ? lineId : undefined,
           twilioCallSid: callSid || undefined,
@@ -283,6 +299,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
               direction,
               from,
               to,
+              leadId,
+              funnelId,
               endedAt: Date.now(),
             });
           })
@@ -298,6 +316,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
               direction,
               from,
               to,
+              leadId,
+              funnelId,
               endedAt: Date.now(),
             });
           });
@@ -439,6 +459,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         phoneLinesLoading,
         refreshPhoneLines,
         lastEndedCall,
+        lastLoggedCall,
       }}
     >
       {children}

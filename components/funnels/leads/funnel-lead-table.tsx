@@ -161,8 +161,18 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
   const [currentPage, setCurrentPage] = useState(1);
   const [groupByCompany, setGroupByCompany] = useState(true);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
-  const { startCall, activeCall } = useCallContext();
+  const { startCall, activeCall, lastLoggedCall } = useCallContext();
   const { statuses } = useLeadStatuses();
+
+  // When a call placed against a lead in THIS campaign has been logged, reload
+  // so the call counter + step dots reflect it immediately.
+  const handledLogRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!lastLoggedCall || lastLoggedCall.funnelId !== funnelId) return;
+    if (handledLogRef.current === lastLoggedCall.at) return;
+    handledLogRef.current = lastLoggedCall.at;
+    onLeadAdvanced?.();
+  }, [lastLoggedCall, funnelId, onLeadAdvanced]);
 
   // Compute activity counts for all leads
   const activityMap = useMemo(() => {
@@ -291,6 +301,7 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
       contactName: lead.name || null,
       companyName: lead.company || null,
       leadId: lead.id || null,
+      funnelId,
     });
   }
 
