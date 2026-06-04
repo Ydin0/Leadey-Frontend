@@ -24,6 +24,14 @@ import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launch
 import { getFunnelById, updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
 import type { Funnel, FunnelStatus } from "@/lib/types/funnel";
 
+/** Stale-while-revalidate cache so re-opening a campaign renders instantly
+ *  from memory while a fresh copy loads in the background. Lives for the
+ *  browser session. */
+const funnelCache = new Map<string, Funnel>();
+/** Org-wide company backfill is expensive — only ever attempt it once per
+ *  page session, and never on the critical render path. */
+let backfillAttempted = false;
+
 export default function FunnelDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -44,28 +52,46 @@ export default function FunnelDetailPage() {
   const loadFunnel = useCallback(async () => {
     if (!funnelId) return;
 
-    setLoading(true);
+    // Instant paint from cache (stale-while-revalidate). Only show the
+    // "Loading…" state when we have nothing cached for this campaign.
+    const cached = funnelCache.get(funnelId);
+    if (cached) {
+      setFunnel(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     setError(null);
+
     try {
-      let data = await getFunnelById(funnelId);
-
-      // Auto-backfill company data if any leads are missing it
-      const hasMissingData = data.leads.some((l) => l.company && !l.companyDomain && !l.companyIndustry);
-      if (hasMissingData) {
-        try {
-          const result = await backfillCompanyData();
-          if (result.updated > 0) {
-            data = await getFunnelById(funnelId);
-          }
-        } catch {}
-      }
-
+      const data = await getFunnelById(funnelId);
+      funnelCache.set(funnelId, data);
       setFunnel(data);
+      setLoading(false);
+
+      // Backfill missing company data from scraper signals in the BACKGROUND —
+      // never block the render on it (it scans the whole org). Run at most once
+      // per session and only refresh if it actually changed anything.
+      const hasMissingData = data.leads.some((l) => l.company && !l.companyDomain && !l.companyIndustry);
+      if (hasMissingData && !backfillAttempted) {
+        backfillAttempted = true;
+        void backfillCompanyData()
+          .then(async (result) => {
+            if (result.updated > 0) {
+              const refreshed = await getFunnelById(funnelId);
+              funnelCache.set(funnelId, refreshed);
+              setFunnel(refreshed);
+            }
+          })
+          .catch(() => {});
+      }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to load funnel";
-      setError(message);
-      setFunnel(null);
-    } finally {
+      // Keep showing cached data on a refresh error rather than blanking out.
+      if (!funnelCache.get(funnelId)) {
+        const message = err instanceof Error ? err.message : "Failed to load funnel";
+        setError(message);
+        setFunnel(null);
+      }
       setLoading(false);
     }
   }, [funnelId]);
@@ -100,6 +126,12 @@ export default function FunnelDetailPage() {
     if (!isAuthReady) return;
     void loadFunnel();
   }, [isAuthReady, loadFunnel]);
+
+  // Keep the session cache in sync with any local mutation (status change,
+  // edit, lead patch) so navigating away and back shows the latest state.
+  useEffect(() => {
+    if (funnel) funnelCache.set(funnelId, funnel);
+  }, [funnel, funnelId]);
 
   if (loading) {
     return (
