@@ -12,7 +12,7 @@ import {
 
 // ── Field vocabulary (grouped, Close-style) ──────────────────────────────
 const LEAD_FIELDS = ["Lead Name", "Lead Email", "Lead Title", "Lead Phone", "Lead LinkedIn"] as const;
-const COMPANY_FIELDS = ["Company Name", "Company Domain", "Company LinkedIn", "Company Industry", "Company Location", "Company Size"] as const;
+const COMPANY_FIELDS = ["Company Name", "Company Domain", "Company LinkedIn", "Company Industry", "Company Location", "Company Size", "Company Description", "Company Annual Revenue", "Company Hiring Roles"] as const;
 const OTHER_FIELDS = ["Notes", "--- Skip ---"] as const;
 const ALL_FIELDS = [...LEAD_FIELDS, ...COMPANY_FIELDS, ...OTHER_FIELDS];
 type MappedField = (typeof ALL_FIELDS)[number];
@@ -73,6 +73,9 @@ function autoMapField(header: string): MappedField {
   if (n.includes("industry") || n.includes("sector") || n.includes("vertical")) return "Company Industry";
   if (n.includes("employees") || n.includes("companysize") || n.includes("headcount") || n.includes("staffcount")) return "Company Size";
   if (n.includes("location") || n.includes("city") || n.includes("country") || n.includes("region") || n.includes("headquarters") || n === "hq") return "Company Location";
+  if (n.includes("hiring") || n.includes("openroles") || n.includes("openpositions") || n.includes("jobtitles") || n.includes("rolesopen") || (n.includes("roles") && n.includes("company"))) return "Company Hiring Roles";
+  if (n.includes("revenue") || n.includes("arr") || n.includes("turnover")) return "Company Annual Revenue";
+  if ((n.includes("company") && n.includes("description")) || n === "description" || n === "about" || n === "companyabout" || n === "companybio") return "Company Description";
   if (n === "companyname" || n === "company" || n === "account" || n === "accountname" || n === "organization" || n === "organisation") return "Company Name";
   if (n.includes("email")) return "Lead Email";
   if (n.includes("linkedin") || n.includes("profileurl")) return "Lead LinkedIn";

@@ -6,24 +6,23 @@ import { LeadDetailHeader } from "./lead-detail-header";
 import { LeadAboutPanel } from "./lead-about-panel";
 import { LeadContactsPanel } from "./lead-contacts-panel";
 import { LeadCustomFieldsPanel } from "./lead-custom-fields-panel";
+import { LeadHiringPanel } from "./lead-hiring-panel";
 import { LeadActivityTimeline } from "./lead-activity-timeline";
 import { LeadFocusNavigation } from "./lead-focus-navigation";
 import { LeadStepTracker } from "./lead-step-tracker";
 import { FocusCallControls } from "./focus-call-controls";
 import { LeadEmailThread } from "@/components/email/lead-email-thread";
 import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
-import { generateFocusData } from "@/lib/utils/generate-focus-data";
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
 import { updateLeadStatus, advanceLead, markLeadDnc } from "@/lib/api/funnels";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { useCallContext } from "@/components/calling/call-context";
 import { cn } from "@/lib/utils";
 import type { FunnelLead, FunnelStep, FunnelLeadEvent } from "@/lib/types/funnel";
-import type { FunnelLeadFocusData, FunnelLeadActivity } from "@/lib/types/funnel-focus";
+import type { FunnelLeadActivity, FunnelLeadCompany, FunnelLeadCustomField } from "@/lib/types/funnel-focus";
 
 interface LeadFocusViewProps {
   leads: FunnelLead[];
-  focusData: Record<string, FunnelLeadFocusData>;
   initialIndex: number;
   funnelId: string;
   funnelName: string;
@@ -47,7 +46,6 @@ interface ProgressOverride {
 
 export function LeadFocusView({
   leads,
-  focusData,
   initialIndex,
   funnelId,
   funnelName,
@@ -101,20 +99,10 @@ export function LeadFocusView({
     }
   }
 
-  const completeFocusData = useMemo(() => {
-    const map: Record<string, FunnelLeadFocusData> = {};
-    for (const lead of leads) {
-      map[lead.id] = focusData[lead.id] ?? generateFocusData(lead);
-    }
-    return map;
-  }, [leads, focusData]);
-
   const companyFirstLead = useMemo(() => {
     if (!currentLead) return null;
     return leads.find((l) => l.company === currentLead.company) || currentLead;
   }, [leads, currentLead]);
-
-  const currentFocusData = companyFirstLead ? completeFocusData[companyFirstLead.id] : null;
 
   // Effective (override-aware) per-lead state.
   const leadProgress = currentLead ? progress[currentLead.id] : undefined;
@@ -143,6 +131,45 @@ export function LeadFocusView({
         isPrimary: l.id === currentLead.id,
       }));
   }, [leads, currentLead]);
+
+  // Real company "About" data derived from the imported lead — no mock. Missing
+  // fields stay empty so the UI shows "Not available" rather than fabricated text.
+  const realCompany = useMemo<FunnelLeadCompany | null>(() => {
+    const l = companyFirstLead || currentLead;
+    if (!l) return null;
+    const domain =
+      l.companyDomain || (l.email?.includes("@") ? l.email.split("@")[1] : "") || "";
+    return {
+      name: l.company,
+      domain,
+      website: domain ? `https://${domain}` : null,
+      address: l.companyLocation || null,
+      description: l.companyDescription || null,
+      industry: l.companyIndustry || "",
+      employeeCount: l.companyEmployeeCount ?? 0,
+      linkedinUrl: l.companyLinkedin || null,
+    };
+  }, [companyFirstLead, currentLead]);
+
+  // Real custom fields — only what we actually have (company LinkedIn, revenue,
+  // source, and any extra columns captured at import into notes).
+  const realCustomFields = useMemo<FunnelLeadCustomField[]>(() => {
+    const l = currentLead;
+    if (!l) return [];
+    const fields: FunnelLeadCustomField[] = [];
+    if (l.companyLinkedin) fields.push({ label: "Company LinkedIn", value: l.companyLinkedin, isLink: true });
+    if (l.companyAnnualRevenue) fields.push({ label: "Annual Revenue", value: l.companyAnnualRevenue });
+    if (l.source) fields.push({ label: "Lead Source", value: l.source });
+    if (l.notes) {
+      for (const [k, v] of Object.entries(l.notes)) {
+        if (v) fields.push({ label: k, value: String(v) });
+      }
+    }
+    return fields;
+  }, [currentLead]);
+
+  const hiringRoles =
+    currentLead?.companyHiringRoles ?? companyFirstLead?.companyHiringRoles ?? [];
 
   const companyIndices = useMemo(() => {
     const seen = new Set<string>();
@@ -368,7 +395,7 @@ export function LeadFocusView({
             status={currentStatus}
             statuses={statuses}
             onStatusChange={handleStatusChange}
-            localTime={currentFocusData?.localTime}
+            localTime={undefined}
             onEmail={() => setShowComposer(true)}
             onNote={() => setNoteOpen(true)}
             onCall={() => dial()}
@@ -386,15 +413,16 @@ export function LeadFocusView({
             />
           )}
 
-          {currentFocusData && (
+          {currentLead && realCompany && (
             <>
-              <LeadAboutPanel company={currentFocusData.company} />
+              <LeadAboutPanel company={realCompany} />
+              <LeadHiringPanel roles={hiringRoles} />
               <LeadContactsPanel
                 contacts={companyContacts}
                 onCall={(p, n) => dial(p, n)}
                 onDnc={(contact) => handleDncContact(contact)}
               />
-              <LeadCustomFieldsPanel fields={currentFocusData.customFields} />
+              <LeadCustomFieldsPanel fields={realCustomFields} />
             </>
           )}
         </div>

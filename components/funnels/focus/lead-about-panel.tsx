@@ -37,11 +37,11 @@ export function LeadAboutPanel({ company }: LeadAboutPanelProps) {
           ) : (
             <div className="flex items-center gap-2">
               <MapPin size={14} strokeWidth={1.5} className="text-ink-faint shrink-0" />
-              <span className="text-[11px] text-ink-faint">Add address...</span>
+              <span className="text-[11px] text-ink-faint">Not available</span>
             </div>
           )}
 
-          {company.website ? (
+          {company.website && company.domain ? (
             <div className="flex items-center gap-2">
               <Globe size={14} strokeWidth={1.5} className="text-ink-faint shrink-0" />
               <a
@@ -56,7 +56,7 @@ export function LeadAboutPanel({ company }: LeadAboutPanelProps) {
           ) : (
             <div className="flex items-center gap-2">
               <Globe size={14} strokeWidth={1.5} className="text-ink-faint shrink-0" />
-              <span className="text-[11px] text-ink-faint">Add website...</span>
+              <span className="text-[11px] text-ink-faint">Not available</span>
             </div>
           )}
 
@@ -68,18 +68,22 @@ export function LeadAboutPanel({ company }: LeadAboutPanelProps) {
           ) : (
             <div className="flex items-center gap-2">
               <FileText size={14} strokeWidth={1.5} className="text-ink-faint shrink-0" />
-              <span className="text-[11px] text-ink-faint">Add description...</span>
+              <span className="text-[11px] text-ink-faint">Not available</span>
             </div>
           )}
 
           <div className="flex items-center gap-2">
             <Building2 size={14} strokeWidth={1.5} className="text-ink-faint shrink-0" />
-            <span className="text-[11px] text-ink">
-              {company.industry}
-              {company.employeeCount > 0 && (
-                <span className={cn("text-ink-muted")}> &middot; {company.employeeCount.toLocaleString()} employees</span>
-              )}
-            </span>
+            {company.industry || company.employeeCount > 0 ? (
+              <span className="text-[11px] text-ink">
+                {company.industry || "Industry not available"}
+                {company.employeeCount > 0 && (
+                  <span className={cn("text-ink-muted")}> &middot; {company.employeeCount.toLocaleString()} employees</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-[11px] text-ink-faint">Not available</span>
+            )}
           </div>
         </div>
       )}

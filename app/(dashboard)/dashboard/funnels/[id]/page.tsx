@@ -21,7 +21,6 @@ import { EditCampaignModal } from "@/components/funnels/edit-campaign-modal";
 import { LeadFocusView } from "@/components/funnels/focus/lead-focus-view";
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
 import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
-import { focusDataMap } from "@/lib/mock-data/funnel-focus";
 import { getFunnelById, updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
 import type { Funnel, FunnelStatus } from "@/lib/types/funnel";
 
@@ -139,7 +138,6 @@ export default function FunnelDetailPage() {
     return (
       <LeadFocusView
         leads={funnel.leads}
-        focusData={focusDataMap}
         initialIndex={focusLeadIndex}
         funnelId={funnel.id}
         funnelName={funnel.name}

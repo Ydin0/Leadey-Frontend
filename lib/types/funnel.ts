@@ -59,6 +59,11 @@ export interface FunnelLead {
   companyIndustry?: string;
   companyEmployeeCount?: number;
   companyLocation?: string;
+  companyDescription?: string;
+  companyLinkedin?: string;
+  companyAnnualRevenue?: string;
+  /** Roles the company is actively hiring for (from a job scraper / CSV). */
+  companyHiringRoles?: string[];
   notes?: Record<string, string>;
   linkedinUrl?: string;
   unipileProviderId?: string | null;
