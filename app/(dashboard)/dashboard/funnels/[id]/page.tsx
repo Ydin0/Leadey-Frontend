@@ -152,6 +152,7 @@ export default function FunnelDetailPage() {
               : prev,
           )
         }
+        onLeadsChanged={() => void loadFunnel()}
       />
     );
   }

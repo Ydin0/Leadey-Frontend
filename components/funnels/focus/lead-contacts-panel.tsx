@@ -1,17 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Mail, Linkedin, Phone } from "lucide-react";
+import { ChevronDown, ChevronRight, Mail, Linkedin, Phone, Ban, Loader2 } from "lucide-react";
 import type { FunnelLeadContact } from "@/lib/types/funnel-focus";
 
 interface LeadContactsPanelProps {
   contacts: FunnelLeadContact[];
   /** Start a Twilio call to this number via the in-app dialer. */
   onCall?: (phone: string, contactName?: string) => void;
+  /** Mark this single person as Do-Not-Call (removes them from all campaigns). */
+  onDnc?: (contact: FunnelLeadContact) => Promise<void> | void;
 }
 
-export function LeadContactsPanel({ contacts, onCall }: LeadContactsPanelProps) {
+export function LeadContactsPanel({ contacts, onCall, onDnc }: LeadContactsPanelProps) {
   const [expanded, setExpanded] = useState(true);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [dncingId, setDncingId] = useState<string | null>(null);
+
+  async function handleDnc(contact: FunnelLeadContact) {
+    if (!onDnc) return;
+    setDncingId(contact.id);
+    try {
+      await onDnc(contact);
+    } finally {
+      setDncingId(null);
+      setConfirmId(null);
+    }
+  }
 
   return (
     <div className="border-b border-border-subtle pb-4 mb-4">
@@ -107,8 +122,45 @@ export function LeadContactsPanel({ contacts, onCall }: LeadContactsPanelProps) 
                       <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[18px] h-px bg-signal-red-text/40 rotate-[-45deg]" />
                     </span>
                   )}
+
+                  {/* Do Not Call (compliance) */}
+                  {onDnc && (
+                    <button
+                      onClick={() => setConfirmId(confirmId === contact.id ? null : contact.id)}
+                      title="Mark Do Not Call — removes this person from all campaigns"
+                      className="p-1 rounded-md hover:bg-signal-red/10 transition-colors"
+                    >
+                      <Ban size={14} strokeWidth={1.5} className="text-ink-faint hover:text-signal-red-text" />
+                    </button>
+                  )}
                 </div>
               </div>
+
+              {/* DNC confirmation */}
+              {confirmId === contact.id && (
+                <div className="mt-2 flex items-center justify-between gap-2 rounded-[8px] bg-signal-red/10 border border-signal-red-text/20 px-2.5 py-2">
+                  <span className="text-[10px] text-signal-red-text leading-snug">
+                    Mark <strong>{contact.name}</strong> Do-Not-Call and remove them from every campaign?
+                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      onClick={() => setConfirmId(null)}
+                      disabled={dncingId === contact.id}
+                      className="px-2 py-0.5 rounded-full bg-section text-ink-secondary text-[10px] font-medium hover:bg-hover transition-colors border border-border-subtle disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => handleDnc(contact)}
+                      disabled={dncingId === contact.id}
+                      className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-signal-red-text text-on-ink text-[10px] font-medium hover:bg-signal-red-text/90 transition-colors disabled:opacity-50"
+                    >
+                      {dncingId === contact.id ? <Loader2 size={9} className="animate-spin" /> : <Ban size={9} />}
+                      Confirm DNC
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { LeadListSidebar } from "./lead-list-sidebar";
 import { LeadDetailHeader } from "./lead-detail-header";
 import { LeadAboutPanel } from "./lead-about-panel";
@@ -14,7 +14,7 @@ import { LeadEmailThread } from "@/components/email/lead-email-thread";
 import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
 import { generateFocusData } from "@/lib/utils/generate-focus-data";
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
-import { updateLeadStatus, advanceLead } from "@/lib/api/funnels";
+import { updateLeadStatus, advanceLead, markLeadDnc } from "@/lib/api/funnels";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { useCallContext } from "@/components/calling/call-context";
 import { cn } from "@/lib/utils";
@@ -31,6 +31,9 @@ interface LeadFocusViewProps {
   onClose: () => void;
   /** Persist a lead change back to the parent so it survives reopening. */
   onLeadPatch?: (leadId: string, patch: Partial<FunnelLead>) => void;
+  /** Reload the campaign from the server (e.g. after a contact is DNC'd and
+   *  removed from this and other campaigns). */
+  onLeadsChanged?: () => void;
 }
 
 /** Outcomes that end the sequence (lead stops advancing). */
@@ -51,6 +54,7 @@ export function LeadFocusView({
   steps = [],
   onClose,
   onLeadPatch,
+  onLeadsChanged,
 }: LeadFocusViewProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [statusOverrides, setStatusOverrides] = useState<Record<string, string>>({});
@@ -65,6 +69,37 @@ export function LeadFocusView({
   const { startCall } = useCallContext();
 
   const currentLead = leads[currentIndex];
+
+  // Keep currentIndex pointing at the SAME lead when the leads array changes
+  // underneath us (e.g. a contact is DNC'd and removed). If the focused lead
+  // itself was removed, leave the focus view.
+  const currentLeadIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentLead) currentLeadIdRef.current = currentLead.id;
+  }, [currentLead]);
+  useEffect(() => {
+    const id = currentLeadIdRef.current;
+    if (!id) return;
+    const idx = leads.findIndex((l) => l.id === id);
+    if (idx === -1) {
+      onClose();
+    } else if (idx !== currentIndex) {
+      setCurrentIndex(idx);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leads]);
+
+  async function handleDncContact(contact: { id: string }) {
+    try {
+      await markLeadDnc(funnelId, contact.id);
+    } catch (err) {
+      console.error("Failed to mark DNC:", err);
+    } finally {
+      // Reload the campaign so the person disappears from every list. The
+      // effect above re-syncs / closes as needed.
+      onLeadsChanged?.();
+    }
+  }
 
   const completeFocusData = useMemo(() => {
     const map: Record<string, FunnelLeadFocusData> = {};
@@ -354,7 +389,11 @@ export function LeadFocusView({
           {currentFocusData && (
             <>
               <LeadAboutPanel company={currentFocusData.company} />
-              <LeadContactsPanel contacts={companyContacts} onCall={(p, n) => dial(p, n)} />
+              <LeadContactsPanel
+                contacts={companyContacts}
+                onCall={(p, n) => dial(p, n)}
+                onDnc={(contact) => handleDncContact(contact)}
+              />
               <LeadCustomFieldsPanel fields={currentFocusData.customFields} />
             </>
           )}

@@ -295,6 +295,23 @@ export async function logLeadCall(
   };
 }
 
+/** Marks a single person as Do-Not-Call (compliance) and removes them from
+ *  every campaign in the org. Does not affect the rest of their company. */
+export async function markLeadDnc(
+  funnelId: string,
+  leadId: string,
+): Promise<{ name: string; removedFromCampaigns: number; funnel: Funnel }> {
+  const raw = await apiRequest<{ name: string; removedFromCampaigns: number; funnel: ApiFunnel }>(
+    `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/dnc`,
+    { method: "POST" },
+  );
+  return {
+    name: raw.name,
+    removedFromCampaigns: raw.removedFromCampaigns,
+    funnel: hydrateFunnel(raw.funnel),
+  };
+}
+
 /** Manually set a lead's status (built-in or custom) and persist it. */
 export async function updateLeadStatus(
   funnelId: string,
