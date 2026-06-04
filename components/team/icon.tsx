@@ -8,6 +8,7 @@ import {
   ChevronRight, ChevronDown, FolderPlus, Settings2, Play, BookOpen, Clock,
   Layers, GraduationCap, Link, FilePlus2, AlertTriangle, ShieldAlert, Download,
   Pause, Gauge, Volume2, Maximize, Circle, RotateCcw, ArrowRight,
+  Pencil, Trash2, ExternalLink, Loader2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -61,6 +62,10 @@ const MAP: Record<string, LucideIcon> = {
   circle: Circle,
   "rotate-ccw": RotateCcw,
   "arrow-right": ArrowRight,
+  pencil: Pencil,
+  "trash-2": Trash2,
+  "external-link": ExternalLink,
+  loader: Loader2,
 };
 
 export function Icon({

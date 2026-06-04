@@ -3,7 +3,10 @@
 import React from "react";
 import { Icon } from "@/components/team/icon";
 import { OfferLogo } from "./kb-shared";
-import { TYPES, type LessonType } from "@/lib/kb/kb-data";
+import { TYPES, type LessonType, type Lesson, type Offer, type LinkItem, type ArticleBlock, type FaqItem, type QuizQuestion } from "@/lib/types/kb";
+import type { LessonInput } from "@/lib/api/kb";
+import { useTeamMembers } from "@/hooks/use-team-members";
+import { getOfferProgress } from "@/lib/api/kb";
 
 const KB_ACCENTS = ["#97A4D6", "#6E7BCB", "#86EFAC", "#C8CFE6", "#E8C45C", "#F8A1A1"];
 const KB_CATS = ["SaaS", "Coaching", "Agency", "Fintech", "E-commerce", "Onboarding"];
@@ -14,7 +17,7 @@ function ModalShell({ icon, title, sub, onClose, children, footer, width = 540 }
 }) {
   return (
     <div className="team-scrim team-root" onClick={onClose}>
-      <div className="modal" style={{ maxWidth: width }} onClick={(e) => e.stopPropagation()}>
+      <div className="modal" style={{ maxWidth: width, maxHeight: "88vh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
         <div className="between" style={{ padding: "18px 22px", borderBottom: "1px solid var(--border-subtle)" }}>
           <div className="row" style={{ gap: 12 }}>
             <div className="row" style={{ width: 34, height: 34, borderRadius: 10, background: "var(--section)", justifyContent: "center" }}><Icon name={icon} size={16} style={{ color: "var(--accent)" }} /></div>
@@ -22,29 +25,39 @@ function ModalShell({ icon, title, sub, onClose, children, footer, width = 540 }
           </div>
           <button onClick={onClose} className="row" style={{ width: 30, height: 30, borderRadius: 8, justifyContent: "center", color: "var(--fg-muted)" }}><Icon name="x" size={16} /></button>
         </div>
-        <div style={{ padding: 22, display: "grid", gap: 16 }}>{children}</div>
+        <div style={{ padding: 22, display: "grid", gap: 16, overflowY: "auto" }}>{children}</div>
         <div className="row" style={{ justifyContent: "flex-end", gap: 10, padding: "16px 22px", borderTop: "1px solid var(--border-subtle)" }}>{footer}</div>
       </div>
     </div>
   );
 }
 
-export function OfferModal({ onClose, onSave }: {
-  onClose: () => void; onSave: (data: { name: string; tagline: string; category: string; level: string; accent: string }) => void;
+function SaveBtn({ valid, onClick, label }: { valid: boolean; onClick: () => void; label: string }) {
+  return (
+    <button className="pill pill-primary" style={{ opacity: valid ? 1 : 0.45, pointerEvents: valid ? "auto" : "none" }} onClick={onClick}>
+      <Icon name="check" size={13} />{label}
+    </button>
+  );
+}
+
+/* ───────────────────────── Offer ───────────────────────── */
+export function OfferModal({ initial, onClose, onSave }: {
+  initial?: Offer;
+  onClose: () => void;
+  onSave: (data: { name: string; tagline: string; category: string; level: string; accent: string; about: string }) => void;
 }) {
-  const [name, setName] = React.useState("");
-  const [tagline, setTagline] = React.useState("");
-  const [cat, setCat] = React.useState("SaaS");
-  const [level, setLevel] = React.useState("New");
-  const [accent, setAccent] = React.useState("#97A4D6");
+  const [name, setName] = React.useState(initial?.name || "");
+  const [tagline, setTagline] = React.useState(initial?.tagline || "");
+  const [cat, setCat] = React.useState(initial?.category || "SaaS");
+  const [level, setLevel] = React.useState(initial?.level || "New");
+  const [accent, setAccent] = React.useState(initial?.accent || "#97A4D6");
+  const [about, setAbout] = React.useState(initial?.about || "");
   const valid = name.trim().length > 1;
   const preview = { name: name || "New Offer", accent };
   return (
-    <ModalShell icon="folder-plus" title="Create offer" sub="A client company or product your reps will sell" onClose={onClose}
-      footer={<>
-        <button className="pill pill-soft" onClick={onClose}>Cancel</button>
-        <button className="pill pill-primary" style={{ opacity: valid ? 1 : 0.45, pointerEvents: valid ? "auto" : "none" }} onClick={() => onSave({ name: name.trim(), tagline, category: cat, level, accent })}><Icon name="check" size={13} />Create offer</button>
-      </>}>
+    <ModalShell icon="folder-plus" title={initial ? "Edit offer" : "Create offer"} sub="A client company or product your reps will sell" onClose={onClose}
+      footer={<><button className="pill pill-soft" onClick={onClose}>Cancel</button>
+        <SaveBtn valid={valid} label={initial ? "Save changes" : "Create offer"} onClick={() => onSave({ name: name.trim(), tagline, category: cat, level, accent, about })} /></>}>
       <div className="row" style={{ gap: 14, alignItems: "center", padding: "4px 0" }}>
         <OfferLogo offer={preview} size={52} />
         <div style={{ fontSize: 12, color: "var(--fg-muted)" }}>Accent</div>
@@ -60,43 +73,97 @@ export function OfferModal({ onClose, onSave }: {
         <div><label className="lbl">Category</label><select className="field" value={cat} onChange={(e) => setCat(e.target.value)}>{KB_CATS.map((c) => <option key={c}>{c}</option>)}</select></div>
         <div><label className="lbl">Level</label><select className="field" value={level} onChange={(e) => setLevel(e.target.value)}>{["New", "Core offer", "Required"].map((c) => <option key={c}>{c}</option>)}</select></div>
       </div>
+      <div><label className="lbl">About</label><textarea className="field" rows={3} value={about} onChange={(e) => setAbout(e.target.value)} placeholder="A short description of this offer for reps." style={{ resize: "vertical" }} /></div>
     </ModalShell>
   );
 }
 
-export function ModuleModal({ onClose, onSave }: { onClose: () => void; onSave: (title: string) => void }) {
-  const [title, setTitle] = React.useState("");
+/* ───────────────────────── Module ───────────────────────── */
+export function ModuleModal({ initial, onClose, onSave }: { initial?: string; onClose: () => void; onSave: (title: string) => void }) {
+  const [title, setTitle] = React.useState(initial || "");
   const valid = title.trim().length > 1;
   return (
-    <ModalShell icon="layers" title="Add module" sub="A group of lessons within this offer" onClose={onClose} width={460}
-      footer={<>
-        <button className="pill pill-soft" onClick={onClose}>Cancel</button>
-        <button className="pill pill-primary" style={{ opacity: valid ? 1 : 0.45, pointerEvents: valid ? "auto" : "none" }} onClick={() => onSave(title.trim())}><Icon name="check" size={13} />Add module</button>
-      </>}>
+    <ModalShell icon="layers" title={initial !== undefined ? "Rename module" : "Add module"} sub="A group of lessons within this offer" onClose={onClose} width={460}
+      footer={<><button className="pill pill-soft" onClick={onClose}>Cancel</button>
+        <SaveBtn valid={valid} label={initial !== undefined ? "Save" : "Add module"} onClick={() => onSave(title.trim())} /></>}>
       <div><label className="lbl">Module title</label><input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Know the product" autoFocus /></div>
     </ModalShell>
   );
 }
 
-export function LessonModal({ onClose, onSave }: {
-  onClose: () => void; onSave: (data: { title: string; type: LessonType; loom: string; dur: string; summary: string }) => void;
+/* ───────────────────────── Lesson ───────────────────────── */
+const fieldStyle: React.CSSProperties = { };
+
+function ListSection({ title, addLabel, onAdd, children }: { title: string; addLabel: string; onAdd: () => void; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="lbl">{title}</label>
+      <div className="col" style={{ gap: 8 }}>{children}</div>
+      <button className="row" onClick={onAdd} style={{ gap: 6, marginTop: 8, padding: "7px 11px", fontSize: 11.5, color: "var(--fg-muted)", borderRadius: 8, border: "1px dashed var(--border-default)" }}>
+        <Icon name="plus" size={12} />{addLabel}
+      </button>
+    </div>
+  );
+}
+
+function RemoveBtn({ onClick }: { onClick: () => void }) {
+  return <button onClick={onClick} className="row" style={{ width: 28, height: 28, borderRadius: 7, justifyContent: "center", color: "var(--signal-red-text)", background: "var(--section)", flexShrink: 0 }}><Icon name="x" size={13} /></button>;
+}
+
+export function LessonModal({ initial, onClose, onSave }: {
+  initial?: Lesson;
+  onClose: () => void;
+  onSave: (data: LessonInput) => void;
 }) {
-  const [title, setTitle] = React.useState("");
-  const [type, setType] = React.useState<LessonType>("video");
-  const [loom, setLoom] = React.useState("");
-  const [dur, setDur] = React.useState("");
-  const [summary, setSummary] = React.useState("");
+  const [title, setTitle] = React.useState(initial?.title || "");
+  const [type, setType] = React.useState<LessonType>(initial?.type || "video");
+  const [dur, setDur] = React.useState(initial?.dur || "");
+  const [mins, setMins] = React.useState<number>(initial?.mins || 0);
+  const [summary, setSummary] = React.useState(initial?.summary || "");
+
+  // Per-type content state
+  const [loom, setLoom] = React.useState(initial?.loom || "");
+  const [transcript, setTranscript] = React.useState(initial?.transcript || "");
+  const [resources, setResources] = React.useState<LinkItem[]>(initial?.resources || []);
+  const [body, setBody] = React.useState<ArticleBlock[]>(initial?.body || [{ h: "", p: "" }]);
+  const [hook, setHook] = React.useState(initial?.script?.hook || "");
+  const [points, setPoints] = React.useState<string[]>(initial?.script?.points || [""]);
+  const [objections, setObjections] = React.useState<{ o: string; a: string }[]>(initial?.script?.objections || [{ o: "", a: "" }]);
+  const [questions, setQuestions] = React.useState<QuizQuestion[]>(initial?.questions || [{ q: "", options: ["", ""], answer: 0 }]);
+  const [items, setItems] = React.useState<FaqItem[]>(initial?.items || [{ q: "", a: "" }]);
+  const [files, setFiles] = React.useState<LinkItem[]>(initial?.files || []);
+
   const valid = title.trim().length > 1;
   const typeKeys = Object.keys(TYPES) as LessonType[];
   const loomOk = /loom\.com\//i.test(loom);
 
+  function buildContent(): Record<string, unknown> {
+    switch (type) {
+      case "video": return { loom, transcript, resources: resources.filter((r) => r.name && r.url) };
+      case "article": return { body: body.filter((b) => b.h || b.p) };
+      case "script": return { script: { hook, points: points.filter(Boolean), objections: objections.filter((o) => o.o || o.a) } };
+      case "quiz": return { questions: questions.filter((q) => q.q && q.options.filter(Boolean).length >= 2) };
+      case "faq": return { items: items.filter((it) => it.q || it.a) };
+      case "file": return { files: files.filter((f) => f.name && f.url) };
+      default: return {};
+    }
+  }
+
+  function submit() {
+    onSave({
+      title: title.trim(),
+      type,
+      dur: dur || (type === "video" ? "0:00" : TYPES[type].label),
+      mins: mins || (type === "video" ? 6 : 4),
+      summary,
+      content: buildContent(),
+    });
+  }
+
   return (
-    <ModalShell icon="file-plus-2" title="Add lesson" sub="Video, article, script, resource, FAQ or quiz" onClose={onClose}
-      footer={<>
-        <button className="pill pill-soft" onClick={onClose}>Cancel</button>
-        <button className="pill pill-primary" style={{ opacity: valid ? 1 : 0.45, pointerEvents: valid ? "auto" : "none" }}
-          onClick={() => onSave({ title: title.trim(), type, loom, dur: dur || (type === "video" ? "0:00" : TYPES[type].label), summary })}><Icon name="check" size={13} />Add lesson</button>
-      </>}>
+    <ModalShell icon="file-plus-2" title={initial ? "Edit lesson" : "Add lesson"} sub="Video, article, script, resource, FAQ or quiz" onClose={onClose} width={620}
+      footer={<><button className="pill pill-soft" onClick={onClose}>Cancel</button>
+        <SaveBtn valid={valid} label={initial ? "Save lesson" : "Add lesson"} onClick={submit} /></>}>
       <div><label className="lbl">Lesson title</label><input className="field" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Live demo walkthrough" autoFocus /></div>
       <div>
         <label className="lbl">Type</label>
@@ -112,27 +179,187 @@ export function LessonModal({ onClose, onSave }: {
           })}
         </div>
       </div>
-      {type === "video" && (
-        <div>
-          <label className="lbl">Loom share link</label>
-          <div className="row" style={{ gap: 8, background: "var(--page)", border: "1px solid var(--border-default)", borderRadius: 8, padding: "2px 2px 2px 12px" }}>
-            <Icon name="link" size={14} style={{ color: "var(--fg-muted)" }} />
-            <input style={{ flex: 1, background: "transparent", border: 0, color: "var(--fg1)", fontSize: 13, padding: "8px 0", outline: "none" }} value={loom} onChange={(e) => setLoom(e.target.value)} placeholder="https://www.loom.com/share/…" />
-          </div>
-          {loom && (
-            <div className="row" style={{ gap: 10, marginTop: 10, padding: 10, borderRadius: 10, background: "var(--page)", border: "1px solid var(--border-subtle)" }}>
-              <div className="row" style={{ width: 64, height: 38, borderRadius: 6, justifyContent: "center", background: "linear-gradient(150deg,#141A30,#0A0E1F)", border: "1px solid var(--border-subtle)" }}>
-                <Icon name={loomOk ? "play-circle" : "alert-triangle"} size={16} style={{ color: loomOk ? "var(--accent)" : "var(--signal-red-text)" }} />
-              </div>
-              <span style={{ fontSize: 11.5, color: loomOk ? "var(--fg2)" : "var(--signal-red-text)" }}>{loomOk ? "Loom embed detected — preview ready." : "Paste a valid loom.com share link."}</span>
-            </div>
-          )}
-        </div>
-      )}
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: 12 }}>
-        <div><label className="lbl">Duration</label><input className="field" value={dur} onChange={(e) => setDur(e.target.value)} placeholder={type === "video" ? "8:24" : "5 min read"} /></div>
+        <div><label className="lbl">Duration label</label><input className="field" style={fieldStyle} value={dur} onChange={(e) => setDur(e.target.value)} placeholder={type === "video" ? "8:24" : "5 min read"} /></div>
         <div><label className="lbl">Summary</label><input className="field" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="One line on what this covers." /></div>
       </div>
+      <div style={{ width: 140 }}><label className="lbl">Minutes (for totals)</label><input className="field" type="number" min={0} value={mins} onChange={(e) => setMins(Number(e.target.value) || 0)} /></div>
+
+      {/* ── Per-type content ── */}
+      {type === "video" && (
+        <>
+          <div>
+            <label className="lbl">Loom / video share link</label>
+            <input className="field" value={loom} onChange={(e) => setLoom(e.target.value)} placeholder="https://www.loom.com/share/…" />
+            {loom && <div style={{ fontSize: 11, marginTop: 6, color: loomOk ? "var(--fg2)" : "var(--signal-red-text)" }}>{loomOk ? "Loom link detected." : "Tip: paste a loom.com share link."}</div>}
+          </div>
+          <div><label className="lbl">Transcript</label><textarea className="field" rows={3} value={transcript} onChange={(e) => setTranscript(e.target.value)} placeholder="Optional — paste the transcript." style={{ resize: "vertical" }} /></div>
+          <ListSection title="Resources (links)" addLabel="Add resource link" onAdd={() => setResources([...resources, { name: "", url: "" }])}>
+            {resources.map((r, i) => (
+              <div key={i} className="row" style={{ gap: 8 }}>
+                <input className="field" style={{ flex: 1 }} value={r.name} onChange={(e) => setResources(resources.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="Name" />
+                <input className="field" style={{ flex: 1.4 }} value={r.url} onChange={(e) => setResources(resources.map((x, j) => j === i ? { ...x, url: e.target.value } : x))} placeholder="https://…" />
+                <RemoveBtn onClick={() => setResources(resources.filter((_, j) => j !== i))} />
+              </div>
+            ))}
+          </ListSection>
+        </>
+      )}
+
+      {type === "article" && (
+        <ListSection title="Article sections" addLabel="Add section" onAdd={() => setBody([...body, { h: "", p: "" }])}>
+          {body.map((b, i) => (
+            <div key={i} className="col" style={{ gap: 6, padding: 10, borderRadius: 10, border: "1px solid var(--border-subtle)", background: "var(--page)" }}>
+              <div className="row" style={{ gap: 8 }}>
+                <input className="field" style={{ flex: 1 }} value={b.h} onChange={(e) => setBody(body.map((x, j) => j === i ? { ...x, h: e.target.value } : x))} placeholder="Heading" />
+                <RemoveBtn onClick={() => setBody(body.filter((_, j) => j !== i))} />
+              </div>
+              <textarea className="field" rows={2} value={b.p} onChange={(e) => setBody(body.map((x, j) => j === i ? { ...x, p: e.target.value } : x))} placeholder="Paragraph…" style={{ resize: "vertical" }} />
+            </div>
+          ))}
+        </ListSection>
+      )}
+
+      {type === "script" && (
+        <>
+          <div><label className="lbl">Opening hook</label><textarea className="field" rows={2} value={hook} onChange={(e) => setHook(e.target.value)} placeholder="Hi {{first_name}}, the reason for my call is…" style={{ resize: "vertical" }} /></div>
+          <ListSection title="Talking points" addLabel="Add point" onAdd={() => setPoints([...points, ""])}>
+            {points.map((p, i) => (
+              <div key={i} className="row" style={{ gap: 8 }}>
+                <input className="field" style={{ flex: 1 }} value={p} onChange={(e) => setPoints(points.map((x, j) => j === i ? e.target.value : x))} placeholder="Talking point" />
+                <RemoveBtn onClick={() => setPoints(points.filter((_, j) => j !== i))} />
+              </div>
+            ))}
+          </ListSection>
+          <ListSection title="Objection handlers" addLabel="Add objection" onAdd={() => setObjections([...objections, { o: "", a: "" }])}>
+            {objections.map((ob, i) => (
+              <div key={i} className="col" style={{ gap: 6, padding: 10, borderRadius: 10, border: "1px solid var(--border-subtle)", background: "var(--page)" }}>
+                <div className="row" style={{ gap: 8 }}>
+                  <input className="field" style={{ flex: 1 }} value={ob.o} onChange={(e) => setObjections(objections.map((x, j) => j === i ? { ...x, o: e.target.value } : x))} placeholder="Objection" />
+                  <RemoveBtn onClick={() => setObjections(objections.filter((_, j) => j !== i))} />
+                </div>
+                <textarea className="field" rows={2} value={ob.a} onChange={(e) => setObjections(objections.map((x, j) => j === i ? { ...x, a: e.target.value } : x))} placeholder="How to respond…" style={{ resize: "vertical" }} />
+              </div>
+            ))}
+          </ListSection>
+        </>
+      )}
+
+      {type === "quiz" && (
+        <ListSection title="Questions" addLabel="Add question" onAdd={() => setQuestions([...questions, { q: "", options: ["", ""], answer: 0 }])}>
+          {questions.map((q, qi) => (
+            <div key={qi} className="col" style={{ gap: 8, padding: 12, borderRadius: 10, border: "1px solid var(--border-subtle)", background: "var(--page)" }}>
+              <div className="row" style={{ gap: 8 }}>
+                <input className="field" style={{ flex: 1 }} value={q.q} onChange={(e) => setQuestions(questions.map((x, j) => j === qi ? { ...x, q: e.target.value } : x))} placeholder={`Question ${qi + 1}`} />
+                <RemoveBtn onClick={() => setQuestions(questions.filter((_, j) => j !== qi))} />
+              </div>
+              <div className="col" style={{ gap: 6 }}>
+                {q.options.map((opt, oi) => (
+                  <div key={oi} className="row" style={{ gap: 8 }}>
+                    <button onClick={() => setQuestions(questions.map((x, j) => j === qi ? { ...x, answer: oi } : x))} title="Mark correct"
+                      className="row" style={{ width: 22, height: 22, borderRadius: "50%", justifyContent: "center", flexShrink: 0, border: "1.5px solid " + (q.answer === oi ? "var(--signal-green-text)" : "var(--border-default)"), color: "var(--signal-green-text)" }}>
+                      {q.answer === oi && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "currentColor" }} />}
+                    </button>
+                    <input className="field" style={{ flex: 1 }} value={opt} onChange={(e) => setQuestions(questions.map((x, j) => j === qi ? { ...x, options: x.options.map((o, k) => k === oi ? e.target.value : o) } : x))} placeholder={`Option ${oi + 1}`} />
+                    {q.options.length > 2 && <RemoveBtn onClick={() => setQuestions(questions.map((x, j) => j === qi ? { ...x, options: x.options.filter((_, k) => k !== oi), answer: Math.min(x.answer, x.options.length - 2) } : x))} />}
+                  </div>
+                ))}
+                <button className="row" onClick={() => setQuestions(questions.map((x, j) => j === qi ? { ...x, options: [...x.options, ""] } : x))} style={{ gap: 6, fontSize: 11, color: "var(--fg-muted)", marginLeft: 30 }}><Icon name="plus" size={11} />Add option</button>
+              </div>
+            </div>
+          ))}
+        </ListSection>
+      )}
+
+      {type === "faq" && (
+        <ListSection title="Questions & answers" addLabel="Add Q&A" onAdd={() => setItems([...items, { q: "", a: "" }])}>
+          {items.map((it, i) => (
+            <div key={i} className="col" style={{ gap: 6, padding: 10, borderRadius: 10, border: "1px solid var(--border-subtle)", background: "var(--page)" }}>
+              <div className="row" style={{ gap: 8 }}>
+                <input className="field" style={{ flex: 1 }} value={it.q} onChange={(e) => setItems(items.map((x, j) => j === i ? { ...x, q: e.target.value } : x))} placeholder="Question" />
+                <RemoveBtn onClick={() => setItems(items.filter((_, j) => j !== i))} />
+              </div>
+              <textarea className="field" rows={2} value={it.a} onChange={(e) => setItems(items.map((x, j) => j === i ? { ...x, a: e.target.value } : x))} placeholder="Answer…" style={{ resize: "vertical" }} />
+            </div>
+          ))}
+        </ListSection>
+      )}
+
+      {type === "file" && (
+        <ListSection title="Resource links" addLabel="Add resource" onAdd={() => setFiles([...files, { name: "", url: "" }])}>
+          {files.map((f, i) => (
+            <div key={i} className="row" style={{ gap: 8 }}>
+              <input className="field" style={{ flex: 1 }} value={f.name} onChange={(e) => setFiles(files.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="File name" />
+              <input className="field" style={{ flex: 1.4 }} value={f.url} onChange={(e) => setFiles(files.map((x, j) => j === i ? { ...x, url: e.target.value } : x))} placeholder="https://…" />
+              <RemoveBtn onClick={() => setFiles(files.filter((_, j) => j !== i))} />
+            </div>
+          ))}
+        </ListSection>
+      )}
+    </ModalShell>
+  );
+}
+
+/* ───────────────────────── Assign members ───────────────────────── */
+export function AssignMembersModal({ offer, assignedUserIds, onClose, onSave }: {
+  offer: Offer;
+  assignedUserIds: string[];
+  onClose: () => void;
+  onSave: (userIds: string[]) => void;
+}) {
+  const { members } = useTeamMembers();
+  const [selected, setSelected] = React.useState<Set<string>>(new Set(assignedUserIds));
+  const [progressByUser, setProgressByUser] = React.useState<Record<string, number>>({});
+  const [totalLessons, setTotalLessons] = React.useState(0);
+
+  React.useEffect(() => {
+    getOfferProgress(offer.id)
+      .then((p) => {
+        setTotalLessons(p.totalLessons);
+        const m: Record<string, number> = {};
+        for (const row of p.members) m[row.userId] = row.completed;
+        setProgressByUser(m);
+      })
+      .catch(() => {});
+  }, [offer.id]);
+
+  const toggle = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  return (
+    <ModalShell icon="user-plus" title="Assign members" sub={`Who should learn "${offer.name}"`} onClose={onClose} width={520}
+      footer={<><button className="pill pill-soft" onClick={onClose}>Cancel</button>
+        <SaveBtn valid label="Save assignments" onClick={() => onSave(Array.from(selected))} /></>}>
+      {members.length === 0 ? (
+        <div style={{ fontSize: 12, color: "var(--fg-muted)", textAlign: "center", padding: 12 }}>No team members yet. Invite members from Settings → Team.</div>
+      ) : (
+        <div className="col" style={{ gap: 4 }}>
+          {members.map((m) => {
+            const on = selected.has(m.id);
+            const done = progressByUser[m.id] || 0;
+            return (
+              <button key={m.id} onClick={() => toggle(m.id)} className="row" style={{ gap: 12, padding: "10px 12px", borderRadius: 10, textAlign: "left", background: on ? "rgba(151,164,214,0.10)" : "transparent", border: "1px solid " + (on ? "var(--accent)" : "var(--border-subtle)") }}>
+                <span className="row" style={{ width: 20, height: 20, borderRadius: 6, justifyContent: "center", flexShrink: 0, border: "1.5px solid " + (on ? "var(--accent)" : "var(--border-default)"), background: on ? "var(--accent)" : "transparent", color: "var(--on-accent)" }}>
+                  {on && <Icon name="check" size={12} strokeWidth={3} />}
+                </span>
+                <span className="grow">
+                  <span style={{ display: "block", fontSize: 12.5, fontWeight: 500 }}>{m.name}</span>
+                  <span style={{ display: "block", fontSize: 10.5, color: "var(--fg-muted)" }}>{m.email}</span>
+                </span>
+                {on && totalLessons > 0 && (
+                  <span style={{ fontSize: 11, color: done >= totalLessons ? "var(--signal-green-text)" : "var(--fg-muted)" }}>{done}/{totalLessons} done</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </ModalShell>
   );
 }

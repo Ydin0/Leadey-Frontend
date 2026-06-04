@@ -147,16 +147,18 @@ function ScriptView({ lesson }: { lesson: Lesson }) {
 }
 
 function FileView({ lesson }: { lesson: Lesson }) {
+  const files = lesson.files || [];
   return (
     <Panel title="Resources">
       <div className="col" style={{ gap: 10 }}>
-        {(lesson.files || []).map((f, i) => (
+        {files.length === 0 && <div style={{ fontSize: 11.5, color: "var(--fg-faint)" }}>No resources added.</div>}
+        {files.map((f, i) => (
           <div key={i} className="between" style={{ padding: "12px 14px", borderRadius: 10, background: "var(--page)", border: "1px solid var(--border-subtle)" }}>
             <div className="row" style={{ gap: 12 }}>
               <div className="row" style={{ width: 36, height: 36, borderRadius: 8, justifyContent: "center", background: "var(--section)" }}><Icon name="file-text" size={16} style={{ color: "var(--fg-muted)" }} /></div>
-              <div><div style={{ fontSize: 12.5, fontWeight: 500 }}>{f.name}</div><div style={{ fontSize: 10.5, color: "var(--fg-faint)" }}>{f.type} · {f.size}</div></div>
+              <div><div style={{ fontSize: 12.5, fontWeight: 500 }}>{f.name}</div>{f.type && <div style={{ fontSize: 10.5, color: "var(--fg-faint)" }}>{f.type}</div>}</div>
             </div>
-            <button className="pill pill-soft"><Icon name="download" size={13} />Download</button>
+            <a className="pill pill-soft" href={f.url} target="_blank" rel="noopener noreferrer"><Icon name="external-link" size={13} />Open</a>
           </div>
         ))}
       </div>
@@ -249,7 +251,11 @@ function VideoTabs({ lesson }: { lesson: Lesson }) {
         {tab === "transcript" && <p style={{ fontSize: 12.5, color: "var(--fg-muted)", lineHeight: 1.8, fontStyle: "italic" }}>{lesson.transcript}</p>}
         {tab === "resources" && (
           <div className="col" style={{ gap: 8 }}>
-            {(lesson.resources || []).map((r, i) => <div key={i} className="row" style={{ gap: 10, fontSize: 12.5, color: "var(--fg2)" }}><Icon name="paperclip" size={14} style={{ color: "var(--fg-muted)" }} />{r}</div>)}
+            {(lesson.resources || []).map((r, i) => (
+              <a key={i} href={r.url} target="_blank" rel="noopener noreferrer" className="row" style={{ gap: 10, fontSize: 12.5, color: "var(--signal-blue-text)" }}>
+                <Icon name="paperclip" size={14} style={{ color: "var(--fg-muted)" }} />{r.name}
+              </a>
+            ))}
           </div>
         )}
       </div>
