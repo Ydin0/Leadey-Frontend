@@ -31,6 +31,7 @@ export interface FunnelLeadContact {
   phone: string | null;
   linkedinUrl: string | null;
   isPrimary: boolean;
+  doNotCall?: boolean;
 }
 
 export interface FunnelLeadActivity {

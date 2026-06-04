@@ -9,6 +9,7 @@ import {
   useRef,
 } from "react";
 import { useCallContext } from "@/components/calling/call-context";
+import { confirmDncCall } from "@/lib/utils/dnc";
 import {
   getCurrent,
   advanceSession,
@@ -184,6 +185,8 @@ export function DialerProvider({ sessionId, children }: DialerProviderProps) {
     if (!currentItem) return;
     if (awaitingDisposition) return;
     if (call.activeCall) return;
+    // Confirm before dialing a Do-Not-Contact lead (covers the button + SPACE).
+    if (currentItem.lead?.doNotCall && !confirmDncCall(currentItem.lead?.name)) return;
     call.startCall(currentItem.leadPhone, {
       contactName: currentItem.lead?.name || null,
       companyName: currentItem.lead?.company || null,

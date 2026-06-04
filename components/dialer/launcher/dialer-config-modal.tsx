@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { X, Loader2, ShieldCheck, Clock, Calendar, AlertCircle } from "lucide-react";
-import { createSession } from "@/lib/api/dialer";
+import { X, Loader2, ShieldCheck, Clock, Calendar, AlertCircle, Play } from "lucide-react";
+import { createSession, getActiveSession, endSession } from "@/lib/api/dialer";
 import type { FunnelStep } from "@/lib/types/funnel";
 
 interface DialerConfigModalProps {
@@ -19,6 +19,8 @@ export function DialerConfigModal({ step, onClose }: DialerConfigModalProps) {
   const [maxAttempts, setMaxAttempts] = useState<number | null>(3);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [ending, setEnding] = useState(false);
 
   async function handleStart() {
     setStarting(true);
@@ -31,13 +33,34 @@ export function DialerConfigModal({ step, onClose }: DialerConfigModalProps) {
       router.push(`/dashboard/dialer/${session.id}`);
     } catch (err: any) {
       const msg = err?.message || "Failed to start dialer";
-      if (msg.includes("active dialer session")) {
-        // Soft hint to take over
-        setError(`${msg} — open /dashboard/dialer to resume or end it first.`);
+      if (msg.toLowerCase().includes("active dialer session")) {
+        // Offer to resume / end the existing session rather than dead-ending.
+        try {
+          const active = await getActiveSession();
+          setActiveSessionId(active?.id ?? null);
+        } catch {
+          setActiveSessionId(null);
+        }
+        setError("You already have a power dialer in progress.");
       } else {
         setError(msg);
       }
       setStarting(false);
+    }
+  }
+
+  async function handleEndAndStart() {
+    if (!activeSessionId) return;
+    setEnding(true);
+    try {
+      await endSession(activeSessionId);
+      setActiveSessionId(null);
+      setError(null);
+      await handleStart();
+    } catch {
+      setError("Couldn't end the active session. Try again.");
+    } finally {
+      setEnding(false);
     }
   }
 
@@ -108,9 +131,31 @@ export function DialerConfigModal({ step, onClose }: DialerConfigModalProps) {
           </div>
 
           {error && (
-            <div className="flex items-start gap-2 rounded-[8px] bg-signal-red/10 border border-signal-red-text/20 px-3 py-2">
-              <AlertCircle size={12} className="text-signal-red-text shrink-0 mt-0.5" />
-              <p className="text-[11px] text-signal-red-text">{error}</p>
+            <div className="rounded-[8px] bg-signal-red/10 border border-signal-red-text/20 px-3 py-2.5">
+              <div className="flex items-start gap-2">
+                <AlertCircle size={12} className="text-signal-red-text shrink-0 mt-0.5" />
+                <p className="text-[11px] text-signal-red-text">{error}</p>
+              </div>
+              {activeSessionId && (
+                <div className="flex items-center gap-2 mt-2.5 pl-5">
+                  <button
+                    type="button"
+                    onClick={() => router.push(`/dashboard/dialer/${activeSessionId}`)}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-[20px] bg-signal-green text-signal-green-text text-[11px] font-medium hover:opacity-90 transition-opacity"
+                  >
+                    <Play size={11} /> Resume it
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleEndAndStart()}
+                    disabled={ending || starting}
+                    className="flex items-center gap-1.5 px-3 py-1 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle disabled:opacity-50"
+                  >
+                    {ending ? <Loader2 size={11} className="animate-spin" /> : null}
+                    End & start new
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>

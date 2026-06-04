@@ -74,6 +74,7 @@ export interface DialerLead {
   status: string;
   currentStep: number;
   totalSteps: number;
+  doNotCall?: boolean;
 }
 
 export interface DialerMasterContact {

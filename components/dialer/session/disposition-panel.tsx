@@ -98,10 +98,14 @@ function DispoBucket({
 }
 
 function SessionStats() {
-  const { session } = useDialerContext();
+  const { session, dispositions } = useDialerContext();
   if (!session) return null;
   const counts = session.dispositions || {};
   const entries = Object.entries(counts);
+  const labelBySlug = new Map(dispositions.map((d) => [d.slug, d.label]));
+  const pretty = (slug: string) =>
+    labelBySlug.get(slug) ||
+    slug.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   return (
     <div className="mt-2 pt-3 border-t border-border-subtle">
       <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-2">
@@ -114,7 +118,7 @@ function SessionStats() {
         <ul className="space-y-1">
           {entries.map(([slug, count]) => (
             <li key={slug} className="flex items-center justify-between text-[11px]">
-              <span className="text-ink-muted">{slug}</span>
+              <span className="text-ink-muted">{pretty(slug)}</span>
               <span className="text-ink">{count}</span>
             </li>
           ))}

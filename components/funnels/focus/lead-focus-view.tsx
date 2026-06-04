@@ -15,6 +15,7 @@ import { LeadEmailThread } from "@/components/email/lead-email-thread";
 import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
 import { updateLeadStatus, advanceLead, markLeadDnc } from "@/lib/api/funnels";
+import { confirmDncCall } from "@/lib/utils/dnc";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { useCallContext } from "@/components/calling/call-context";
 import { cn } from "@/lib/utils";
@@ -87,14 +88,13 @@ export function LeadFocusView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leads]);
 
-  async function handleDncContact(contact: { id: string }) {
+  async function handleDncContact(contact: { id: string }, value: boolean) {
     try {
-      await markLeadDnc(funnelId, contact.id);
+      await markLeadDnc(funnelId, contact.id, value);
     } catch (err) {
-      console.error("Failed to mark DNC:", err);
+      console.error("Failed to toggle DNC:", err);
     } finally {
-      // Reload the campaign so the person disappears from every list. The
-      // effect above re-syncs / closes as needed.
+      // Reload so the red flag / un-flag is reflected everywhere.
       onLeadsChanged?.();
     }
   }
@@ -129,6 +129,7 @@ export function LeadFocusView({
         phone: l.phone || null,
         linkedinUrl: l.linkedinUrl || null,
         isPrimary: l.id === currentLead.id,
+        doNotCall: l.doNotCall,
       }));
   }, [leads, currentLead]);
 
@@ -289,6 +290,13 @@ export function LeadFocusView({
       });
   }
 
+  /** Primary Call button (header / call step) — confirms when the focused lead
+   *  is marked Do-Not-Contact. (Per-contact calls confirm in the contacts panel.) */
+  function dialPrimary() {
+    if (currentLead?.doNotCall && !confirmDncCall(currentLead.name)) return;
+    dial();
+  }
+
   /** A step's "Complete" CTA — email opens the composer, call dials via the
    *  Twilio dialer, others log + advance. */
   function handleCompleteStep(step: FunnelStep) {
@@ -298,7 +306,7 @@ export function LeadFocusView({
       return;
     }
     if (step.channel === "call") {
-      dial(); // place the real Twilio call
+      dialPrimary(); // place the real Twilio call (confirms if DNC)
     }
     const verb =
       step.channel === "call" ? "Call logged" :
@@ -398,7 +406,7 @@ export function LeadFocusView({
             localTime={undefined}
             onEmail={() => setShowComposer(true)}
             onNote={() => setNoteOpen(true)}
-            onCall={() => dial()}
+            onCall={() => dialPrimary()}
           />
 
           {steps.length > 0 && (
@@ -420,7 +428,7 @@ export function LeadFocusView({
               <LeadContactsPanel
                 contacts={companyContacts}
                 onCall={(p, n) => dial(p, n)}
-                onDnc={(contact) => handleDncContact(contact)}
+                onDnc={(contact, value) => handleDncContact(contact, value)}
               />
               <LeadCustomFieldsPanel fields={realCustomFields} />
             </>

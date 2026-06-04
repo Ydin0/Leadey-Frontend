@@ -97,6 +97,7 @@ function hydrateLead(raw: ApiFunnelLead): FunnelLead {
     companyLinkedin: (raw as any).companyLinkedin || undefined,
     companyAnnualRevenue: (raw as any).companyAnnualRevenue || undefined,
     companyHiringRoles: Array.isArray((raw as any).companyHiringRoles) ? (raw as any).companyHiringRoles : undefined,
+    doNotCall: !!(raw as any).doNotCall,
     notes: notes && typeof notes === "object" && !Array.isArray(notes) ? notes : undefined,
     linkedinUrl: (raw as any).linkedinUrl || undefined,
     unipileProviderId: (raw as any).unipileProviderId || null,
@@ -300,19 +301,21 @@ export async function logLeadCall(
   };
 }
 
-/** Marks a single person as Do-Not-Call (compliance) and removes them from
- *  every campaign in the org. Does not affect the rest of their company. */
+/** Toggles a single person's Do-Not-Contact flag (compliance). Non-destructive:
+ *  the person stays in every campaign but is shown in red and calls confirm.
+ *  Returns the refreshed funnel. */
 export async function markLeadDnc(
   funnelId: string,
   leadId: string,
-): Promise<{ name: string; removedFromCampaigns: number; funnel: Funnel }> {
-  const raw = await apiRequest<{ name: string; removedFromCampaigns: number; funnel: ApiFunnel }>(
+  value = true,
+): Promise<{ name: string; doNotCall: boolean; funnel: Funnel }> {
+  const raw = await apiRequest<{ name: string; doNotCall: boolean; funnel: ApiFunnel }>(
     `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/dnc`,
-    { method: "POST" },
+    { method: "POST", body: JSON.stringify({ value }) },
   );
   return {
     name: raw.name,
-    removedFromCampaigns: raw.removedFromCampaigns,
+    doNotCall: raw.doNotCall,
     funnel: hydrateFunnel(raw.funnel),
   };
 }

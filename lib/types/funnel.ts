@@ -66,6 +66,8 @@ export interface FunnelLead {
   companyAnnualRevenue?: string;
   /** Roles the company is actively hiring for (from a job scraper / CSV). */
   companyHiringRoles?: string[];
+  /** Per-person Do-Not-Contact flag (compliance). Shown in red; calls confirm. */
+  doNotCall?: boolean;
   notes?: Record<string, string>;
   linkedinUrl?: string;
   unipileProviderId?: string | null;

@@ -17,22 +17,28 @@ export function LeadContextPanel({ item }: LeadContextPanelProps) {
   }
   const lead = item.lead;
   const master = item.masterContact;
+  const isDnc = !!lead.doNotCall || !!master?.doNotCall;
 
   return (
     <aside className="flex flex-col h-full overflow-y-auto px-5 py-5 space-y-4">
       <header>
         <div className="flex items-center gap-2 mb-1">
-          {master?.doNotCall && (
+          {isDnc && (
             <span className="text-[10px] font-medium rounded-full px-2 py-0.5 bg-signal-red/15 text-signal-red-text flex items-center gap-1">
-              <AlertCircle size={10} /> DNC
+              <AlertCircle size={10} /> Do Not Contact
             </span>
           )}
           <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">
             Lead {item.position + 1}
           </span>
         </div>
-        <h1 className="text-[18px] font-semibold text-ink">{lead.name}</h1>
+        <h1 className={`text-[18px] font-semibold ${isDnc ? "text-signal-red-text" : "text-ink"}`}>{lead.name}</h1>
         <p className="text-[12px] text-ink-secondary">{lead.title}</p>
+        {isDnc && (
+          <p className="mt-2 text-[11px] text-signal-red-text bg-signal-red/10 border border-signal-red-text/20 rounded-[8px] px-2.5 py-1.5">
+            This contact is marked Do Not Contact. Confirm before dialing.
+          </p>
+        )}
       </header>
 
       <Section title="Contact">

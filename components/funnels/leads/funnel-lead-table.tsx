@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "react";
-import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, ChevronRight, Users } from "lucide-react";
+import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, ChevronRight, Users, Ban } from "lucide-react";
+import { confirmDncCall } from "@/lib/utils/dnc";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
@@ -300,6 +301,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
   function handleCall(e: React.MouseEvent, lead: FunnelLead) {
     e.stopPropagation();
     if (!lead.phone) return;
+    if (lead.doNotCall && !confirmDncCall(lead.name)) return;
     startCall(lead.phone, {
       contactName: lead.name || null,
       companyName: lead.company || null,
@@ -375,10 +377,11 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
               <TableHeader>
                 <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
                   <TableHead className="w-8" />
-                  <TableHead className="text-left w-[240px]">Company</TableHead>
-                  <TableHead className="text-left w-[160px]">Industry</TableHead>
+                  <TableHead className="text-left w-[220px]">Company</TableHead>
+                  <TableHead className="text-left w-[130px]">Status</TableHead>
+                  <TableHead className="text-left w-[150px]">Industry</TableHead>
                   <TableHead className="text-center w-[90px]">Employees</TableHead>
-                  <TableHead className="text-left w-[160px]">Location</TableHead>
+                  <TableHead className="text-left w-[150px]">Location</TableHead>
                   <TableHead className="text-center w-[80px]">Contacts</TableHead>
                   <TableHead className="text-center w-[100px]">Activity</TableHead>
                 </TableRow>
@@ -407,6 +410,12 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
                   const totalCalls = companyLeads.reduce((sum, l) => sum + (activityMap.get(l.id)?.calls ?? 0), 0);
                   const totalEmails = companyLeads.reduce((sum, l) => sum + (activityMap.get(l.id)?.emails ?? 0), 0);
 
+                  // Status is company-level (synced across contacts). Prefer a
+                  // meaningful status over "new"/"pending" if any contact differs.
+                  const companyStatus =
+                    companyLeads.find((l) => l.status !== "new" && l.status !== "pending")?.status ||
+                    firstLead?.status || "new";
+
                   return (
                     <Fragment key={companyName}>
                       {/* Company row */}
@@ -431,6 +440,12 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
                               <span className="text-[12px] font-medium text-ink">{companyName}</span>
                               {domain && <div className="text-[10px] text-ink-faint">{domain}</div>}
                             </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1.5">
+                            <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", getStatusDotClass(companyStatus, statuses))} />
+                            <span className="text-[11px] text-ink-secondary truncate">{getStatusLabel(companyStatus, statuses)}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -478,18 +493,20 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
                             {/* Lead detail rendered as one clean strip — it isn't
                                 column-aligned to the company's Industry/Employees/
                                 Location headers (those describe the company row). */}
-                            <TableCell colSpan={7} className="py-2">
+                            <TableCell colSpan={8} className="py-2">
                               <div className="flex items-center gap-3 pl-[60px] pr-2">
-                                {/* Name + title */}
+                                {/* Name + title — red when Do-Not-Contact. Status
+                                    is company-level so it isn't repeated here. */}
                                 <div className="flex-1 min-w-0">
-                                  <span className="text-[12px] font-medium text-ink">{lead.name}</span>
+                                  <span className={cn("text-[12px] font-medium inline-flex items-center gap-1.5", lead.doNotCall ? "text-signal-red-text" : "text-ink")}>
+                                    {lead.name}
+                                    {lead.doNotCall && (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-signal-red/10 text-signal-red-text text-[9px] font-semibold uppercase tracking-wide">
+                                        <Ban size={9} strokeWidth={2} /> DNC
+                                      </span>
+                                    )}
+                                  </span>
                                   <div className="text-[10px] text-ink-muted truncate">{lead.title}</div>
-                                </div>
-
-                                {/* Status */}
-                                <div className="flex items-center gap-1.5 w-[120px] shrink-0">
-                                  <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", getStatusDotClass(lead.status, statuses))} />
-                                  <span className="text-[11px] text-ink-secondary truncate">{getStatusLabel(lead.status, statuses)}</span>
                                 </div>
 
                                 {/* Step progress */}
@@ -590,7 +607,11 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
                           <span className={cn("text-[12px] font-medium", onLeadClick ? "text-signal-blue-text" : "text-ink")}>
                             {lead.company}
                           </span>
-                          <div className="text-[10px] text-ink-muted">{lead.name} &middot; {lead.title}</div>
+                          <div className="text-[10px] text-ink-muted">
+                            <span className={cn("inline-flex items-center gap-1", lead.doNotCall && "text-signal-red-text font-medium")}>
+                              {lead.doNotCall && <Ban size={9} strokeWidth={2} />}{lead.name}
+                            </span> &middot; {lead.title}
+                          </div>
                         </div>
                       </div>
                     </TableCell>

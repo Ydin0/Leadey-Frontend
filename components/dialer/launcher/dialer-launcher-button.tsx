@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { PhoneCall, ChevronDown, Phone } from "lucide-react";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { PhoneCall, ChevronDown, Phone, Play, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { getActiveSession, endSession } from "@/lib/api/dialer";
 import { DialerConfigModal } from "./dialer-config-modal";
 import type { FunnelStep } from "@/lib/types/funnel";
 
@@ -19,10 +22,31 @@ interface DialerLauncherButtonProps {
  *  config modal directly. Multiple call steps: opens a picker dropdown
  *  so the rep can choose which step's queue to load. */
 export function DialerLauncherButton({ steps, className }: DialerLauncherButtonProps) {
+  const router = useRouter();
+  const isAuthReady = useAuthReady();
   const callSteps = steps.filter((s) => s.channel === "call");
   const [selectedStep, setSelectedStep] = useState<FunnelStep | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Detect an in-progress dialer session so we can offer Resume instead of a
+  // dead-end "you already have a session" error.
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [ending, setEnding] = useState(false);
+
+  const refreshActive = useCallback(async () => {
+    try {
+      const s = await getActiveSession();
+      setActiveSessionId(s?.id ?? null);
+    } catch {
+      setActiveSessionId(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthReady) return;
+    void refreshActive();
+  }, [isAuthReady, refreshActive]);
 
   // Close picker on outside click
   useEffect(() => {
@@ -45,6 +69,46 @@ export function DialerLauncherButton({ steps, className }: DialerLauncherButtonP
     "shadow-sm hover:shadow-md",
     className,
   );
+
+  // An active session exists anywhere in the org for this user → Resume + End,
+  // instead of starting a new one (the backend only allows one at a time).
+  if (activeSessionId) {
+    async function handleEnd() {
+      if (!activeSessionId) return;
+      setEnding(true);
+      try {
+        await endSession(activeSessionId);
+        setActiveSessionId(null);
+      } catch {
+        // leave it; user can retry
+      } finally {
+        setEnding(false);
+      }
+    }
+    return (
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => router.push(`/dashboard/dialer/${activeSessionId}`)}
+          className={buttonBaseClass}
+          title="A power dialer session is in progress"
+        >
+          <Play size={14} strokeWidth={2} />
+          Resume Power Dialer
+        </button>
+        <button
+          type="button"
+          onClick={() => void handleEnd()}
+          disabled={ending}
+          title="End the active session"
+          className="flex items-center gap-1 px-2.5 py-2 rounded-[20px] text-[11px] font-medium bg-section text-ink-secondary border border-border-subtle hover:bg-hover transition-colors disabled:opacity-50"
+        >
+          {ending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} strokeWidth={2} />}
+          End
+        </button>
+      </div>
+    );
+  }
 
   // Single call step — clicking the button opens the config modal directly.
   if (callSteps.length === 1) {
