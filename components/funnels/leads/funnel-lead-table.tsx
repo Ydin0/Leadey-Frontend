@@ -37,7 +37,7 @@ interface FunnelLeadTableProps {
   onLeadClick?: (leadIndex: number) => void;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 25;
 
 function ProgressDots({ current, total }: { current: number; total: number }) {
   return (
@@ -168,6 +168,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
   const [stepFilter, setStepFilter] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [groupByCompany, setGroupByCompany] = useState(true);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const { startCall, activeCall, lastLoggedCall } = useCallContext();
@@ -272,9 +273,9 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
     resetPage,
   );
 
-  const totalPages = Math.max(1, Math.ceil(limited.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(limited.length / pageSize));
   const paginatedPage = Math.min(currentPage, totalPages);
-  const paginatedKeys = limited.slice((paginatedPage - 1) * PAGE_SIZE, paginatedPage * PAGE_SIZE);
+  const paginatedKeys = limited.slice((paginatedPage - 1) * pageSize, paginatedPage * pageSize);
   const paginated = groupByCompany ? [] as FunnelLead[] : paginatedKeys as unknown as FunnelLead[];
 
   function toggleSelect(id: string) {
@@ -698,9 +699,10 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
           <DataTablePagination
             currentPage={paginatedPage}
             totalPages={totalPages}
-            pageSize={PAGE_SIZE}
+            pageSize={pageSize}
             totalItems={limited.length}
             onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => { setPageSize(size); setCurrentPage(1); }}
             startingRow={startingRow}
             rowLimit={rowLimit}
             unfilteredTotal={unfilteredTotal}
