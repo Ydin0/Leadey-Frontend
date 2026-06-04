@@ -5,92 +5,48 @@ import { Icon } from "@/components/team/icon";
 import { LeadeyMark } from "@/components/brand/leadey-mark";
 import { TypeChip, Panel, LessonRow } from "./kb-shared";
 import {
-  OFFER_MAP, lessonById, lessonsOf, offerProgress, nextLesson, prevLesson, progress, initials,
-  type Lesson, type Offer,
+  OFFER_MAP, lessonById, lessonsOf, offerProgress, nextLesson, prevLesson, progress,
+  type Lesson,
 } from "@/lib/kb/kb-data";
 
-/* ── Mock Loom-style video player ──────────────────────────────────────── */
-function LoomPlayer({ lesson, offer, onEnded }: { lesson: Lesson; offer: Offer; onEnded?: () => void }) {
-  const [playing, setPlaying] = React.useState(false);
-  const [pct, setPct] = React.useState(0);
-  const raf = React.useRef(0);
-  const start = React.useRef(0);
-  const SIM = 7000;
+/* ── Real video embed (Loom / YouTube / Vimeo) ─────────────────────────── */
+function videoEmbedUrl(raw?: string): string | null {
+  if (!raw) return null;
+  const url = raw.trim();
+  let m = url.match(/loom\.com\/(?:share|embed)\/([a-zA-Z0-9]+)/i);
+  if (m) return `https://www.loom.com/embed/${m[1]}`;
+  m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/i);
+  if (m) return `https://www.youtube.com/embed/${m[1]}`;
+  m = url.match(/vimeo\.com\/(?:video\/)?(\d+)/i);
+  if (m) return `https://player.vimeo.com/video/${m[1]}`;
+  if (/^[a-zA-Z0-9]{20,}$/.test(url)) return `https://www.loom.com/embed/${url}`;
+  return null;
+}
 
-  React.useEffect(() => {
-    if (!playing) return;
-    start.current = performance.now() - (pct / 100) * SIM;
-    const tick = (t: number) => {
-      const p = Math.min(100, ((t - start.current) / SIM) * 100);
-      setPct(p);
-      if (p >= 100) { setPlaying(false); onEnded?.(); return; }
-      raf.current = requestAnimationFrame(tick);
-    };
-    raf.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [playing]);
-
-  const cur = Math.round((pct / 100) * (lesson.mins * 60));
-  const mmss = (s: number) => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
-
-  return (
-    <div style={{ borderRadius: 14, overflow: "hidden", border: "1px solid var(--border-subtle)", background: "#0A0E1F", boxShadow: "var(--shadow-card)" }}>
-      <div style={{ position: "relative", aspectRatio: "16 / 9",
-        background: `radial-gradient(120% 120% at 70% 10%, ${offer.accent}33 0%, rgba(10,14,31,0) 55%), linear-gradient(160deg, #141A30 0%, #0A0E1F 100%)` }}>
-        <div style={{ position: "absolute", inset: "14% 12% 22%", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)",
-          background: "linear-gradient(160deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01))", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <div className="row" style={{ gap: 5, padding: "8px 10px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#F87171" }}></span>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#E8C45C" }}></span>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#86EFAC" }}></span>
-          </div>
-          <div style={{ flex: 1, padding: 14, display: "flex", flexDirection: "column", gap: 8, opacity: 0.5 }}>
-            <div style={{ height: 7, width: "45%", borderRadius: 4, background: offer.accent + "66" }}></div>
-            <div style={{ height: 5, width: "80%", borderRadius: 4, background: "rgba(255,255,255,0.12)" }}></div>
-            <div style={{ height: 5, width: "68%", borderRadius: 4, background: "rgba(255,255,255,0.10)" }}></div>
-            <div style={{ height: 5, width: "74%", borderRadius: 4, background: "rgba(255,255,255,0.08)" }}></div>
-          </div>
-        </div>
-
-        <div style={{ position: "absolute", bottom: 58, left: 18, width: 46, height: 46, borderRadius: "50%",
-          background: `linear-gradient(150deg, ${offer.accent}, ${offer.accent}99)`, border: "2px solid rgba(255,255,255,0.25)",
-          display: "flex", alignItems: "center", justifyContent: "center", color: "#0C1122", fontWeight: 700, fontSize: 14 }}>
-          {initials(offer.name)}
-        </div>
-
-        {!playing && (
-          <button onClick={() => setPlaying(true)} style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(10,14,31,0.25)" }}>
-            <span className="row" style={{ width: 66, height: 66, borderRadius: "50%", justifyContent: "center", background: "rgba(255,255,255,0.95)", boxShadow: "0 14px 40px -8px rgba(0,0,0,0.6)" }}>
-              <Icon name="play" size={26} style={{ color: "#0C1122", marginLeft: 4 }} strokeWidth={2} />
-            </span>
-          </button>
+function VideoEmbed({ lesson }: { lesson: Lesson }) {
+  const src = videoEmbedUrl(lesson.loom);
+  if (!src) {
+    return (
+      <div className="card" style={{ padding: 24, textAlign: "center" }}>
+        {lesson.loom ? (
+          <a href={lesson.loom} target="_blank" rel="noopener noreferrer" className="pill pill-primary" style={{ display: "inline-flex" }}>
+            <Icon name="external-link" size={13} />Open video
+          </a>
+        ) : (
+          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>No video link added.</span>
         )}
-
-        <div className="between" style={{ position: "absolute", top: 12, left: 14, right: 14 }}>
-          <span className="row" style={{ gap: 6, fontSize: 10.5, fontWeight: 600, color: "#fff", background: "rgba(10,14,31,0.6)", borderRadius: 9999, padding: "4px 10px", backdropFilter: "blur(6px)" }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F87171" }}></span>Loom
-          </span>
-          {playing && <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.8)", background: "rgba(10,14,31,0.6)", borderRadius: 9999, padding: "4px 10px" }}>Playing…</span>}
-        </div>
-
-        <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "10px 14px 12px",
-          background: "linear-gradient(0deg, rgba(10,14,31,0.85), rgba(10,14,31,0))" }}>
-          <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.2)", marginBottom: 9, cursor: "pointer" }}
-            onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setPct(Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100))); }}>
-            <div style={{ width: pct + "%", height: "100%", borderRadius: 2, background: "#fff" }}></div>
-          </div>
-          <div className="between">
-            <div className="row" style={{ gap: 12 }}>
-              <button onClick={() => setPlaying((p) => !p)} style={{ color: "#fff" }}><Icon name={playing ? "pause" : "play"} size={16} /></button>
-              <span style={{ fontSize: 11, color: "rgba(255,255,255,0.85)", fontVariantNumeric: "tabular-nums" }}>{mmss(cur)} / {lesson.dur}</span>
-            </div>
-            <div className="row" style={{ gap: 14, color: "rgba(255,255,255,0.85)" }}>
-              <Icon name="gauge" size={15} /><Icon name="volume-2" size={15} /><Icon name="maximize" size={15} />
-            </div>
-          </div>
-        </div>
       </div>
+    );
+  }
+  return (
+    <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 14, overflow: "hidden", border: "1px solid var(--border-subtle)", boxShadow: "var(--shadow-card)", background: "#000" }}>
+      <iframe
+        src={src}
+        title={lesson.title}
+        allow="autoplay; fullscreen; picture-in-picture"
+        allowFullScreen
+        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }}
+      />
     </div>
   );
 }
@@ -303,7 +259,7 @@ export function KBLesson({ lessonId, onOpenLesson, onBackOffer, onBackHome, tick
             <h1 style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.01em" }}>{l.title}</h1>
           </div>
 
-          {l.type === "video" && <LoomPlayer lesson={l} offer={offer} onEnded={() => complete(false)} />}
+          {l.type === "video" && <VideoEmbed lesson={l} />}
           {l.type === "video" && <VideoTabs lesson={l} />}
           {l.type === "article" && <ArticleBody lesson={l} />}
           {l.type === "script" && <ScriptView lesson={l} />}
