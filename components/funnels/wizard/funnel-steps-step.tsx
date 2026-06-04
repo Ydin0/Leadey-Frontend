@@ -1,7 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Plus, X, Mail, Linkedin, Phone, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { listTemplates } from "@/lib/api/templates";
+import type { Template } from "@/lib/types/template";
 import type { FunnelStep, FunnelChannel } from "@/lib/types/funnel";
 
 const channels: { value: FunnelChannel; icon: typeof Mail; label: string }[] = [
@@ -23,6 +28,25 @@ interface FunnelStepsStepProps {
 }
 
 export function FunnelStepsStep({ steps, onChange }: FunnelStepsStepProps) {
+  // Saved templates from the Templates sidebar — usable when building a step.
+  const [emailTemplates, setEmailTemplates] = useState<Template[]>([]);
+  const [linkedinTemplates, setLinkedinTemplates] = useState<Template[]>([]);
+  const isAuthReady = useAuthReady();
+
+  useEffect(() => {
+    if (!isAuthReady) return;
+    listTemplates("email").then(setEmailTemplates).catch(() => {});
+    listTemplates("linkedin").then(setLinkedinTemplates).catch(() => {});
+  }, [isAuthReady]);
+
+  function applyTemplate(index: number, t: Template) {
+    if (t.channel === "email") {
+      updateStep(index, { subject: t.subject || "", emailBody: t.body });
+    } else {
+      updateStep(index, { emailBody: t.body });
+    }
+  }
+
   function addStep() {
     const newStep: FunnelStep = {
       id: `new_${Date.now()}`,
@@ -129,6 +153,11 @@ export function FunnelStepsStep({ steps, onChange }: FunnelStepsStepProps) {
             {/* Email subject + body (only for email channel) */}
             {step.channel === "email" && (
               <div className="mt-3 space-y-2">
+                <TemplatePicker
+                  templates={emailTemplates}
+                  channel="email"
+                  onPick={(t) => applyTemplate(index, t)}
+                />
                 <div>
                   <label className="text-[10px] text-ink-muted block mb-1">Subject Line</label>
                   <input
@@ -154,7 +183,12 @@ export function FunnelStepsStep({ steps, onChange }: FunnelStepsStepProps) {
 
             {/* LinkedIn message (for send_connection / send_message) */}
             {step.channel === "linkedin" && (step.action || "send_connection") !== "view_profile" && (
-              <div className="mt-3">
+              <div className="mt-3 space-y-2">
+                <TemplatePicker
+                  templates={linkedinTemplates}
+                  channel="linkedin"
+                  onPick={(t) => applyTemplate(index, t)}
+                />
                 <label className="text-[10px] text-ink-muted block mb-1">
                   {(step.action || "send_connection") === "send_connection" ? "Connection Note" : "Message"}
                 </label>
@@ -196,6 +230,45 @@ export function FunnelStepsStep({ steps, onChange }: FunnelStepsStepProps) {
         <Plus size={13} strokeWidth={2} />
         Add Step
       </button>
+    </div>
+  );
+}
+
+/** Dropdown to pull a saved Template (from the Templates page) into a step. */
+function TemplatePicker({
+  templates,
+  channel,
+  onPick,
+}: {
+  templates: Template[];
+  channel: "email" | "linkedin";
+  onPick: (t: Template) => void;
+}) {
+  if (templates.length === 0) {
+    return (
+      <p className="text-[10px] text-ink-faint">
+        No saved {channel === "email" ? "email" : "LinkedIn"} templates yet —{" "}
+        <Link href="/dashboard/templates" className="text-signal-blue-text hover:underline">create one</Link>.
+      </p>
+    );
+  }
+  return (
+    <div>
+      <label className="text-[10px] text-ink-muted block mb-1">Start from a saved template</label>
+      <select
+        value=""
+        onChange={(e) => {
+          const t = templates.find((x) => x.id === e.target.value);
+          if (t) onPick(t);
+          e.target.value = "";
+        }}
+        className="w-full px-3 py-1.5 rounded-[8px] bg-section border border-border-subtle text-[11px] text-ink focus:outline-none focus:border-border-default"
+      >
+        <option value="">Choose a template…</option>
+        {templates.map((t) => (
+          <option key={t.id} value={t.id}>{t.name}</option>
+        ))}
+      </select>
     </div>
   );
 }

@@ -70,8 +70,9 @@ export function FunnelWizardShell() {
 
   return (
     <div>
-      {/* Sticky Step Indicator */}
-      <div className="sticky top-14 z-20 bg-page pt-4 pb-4 -mx-6 px-6 border-b border-border-subtle">
+      {/* Sticky Step Indicator — pulled flush under the navbar (cancels the
+          dashboard layout's top padding so there's no gap above it). */}
+      <div className="sticky top-14 z-20 bg-page pt-3 pb-4 -mx-6 -mt-6 px-6 border-b border-border-subtle">
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => router.push("/dashboard/funnels")}
