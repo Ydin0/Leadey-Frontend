@@ -100,6 +100,7 @@ function hydrateLead(raw: ApiFunnelLead): FunnelLead {
     notes: notes && typeof notes === "object" && !Array.isArray(notes) ? notes : undefined,
     linkedinUrl: (raw as any).linkedinUrl || undefined,
     unipileProviderId: (raw as any).unipileProviderId || null,
+    createdAt: (raw as any).createdAt ? parseDate((raw as any).createdAt) : undefined,
     events,
   };
 }

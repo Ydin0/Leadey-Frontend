@@ -20,11 +20,18 @@ import { useCallContext } from "@/components/calling/call-context";
 import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
 import Link from "next/link";
 import { Briefcase } from "lucide-react";
-import type { FunnelLead } from "@/lib/types/funnel";
+import type { FunnelLead, FunnelStep } from "@/lib/types/funnel";
+import { LeadSortMenu } from "./lead-sort-menu";
+import { LeadStepFilter } from "./lead-step-filter";
+import type { LeadSortKey } from "@/lib/utils/sort-leads";
 
 interface FunnelLeadTableProps {
   leads: FunnelLead[];
   funnelId: string;
+  /** Campaign sequence steps — powers the "Step" filter. */
+  steps?: FunnelStep[];
+  sortBy?: LeadSortKey;
+  onSortChange?: (key: LeadSortKey) => void;
   onLeadAdvanced?: () => void;
   onLeadClick?: (leadIndex: number) => void;
 }
@@ -155,8 +162,9 @@ function LeadActionMenu({
   );
 }
 
-export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }: FunnelLeadTableProps) {
+export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortChange, onLeadAdvanced, onLeadClick }: FunnelLeadTableProps) {
   const [filters, setFilters] = useState<FunnelLeadsFilters>(DEFAULT_FUNNEL_LEADS_FILTERS);
+  const [stepFilter, setStepFilter] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [groupByCompany, setGroupByCompany] = useState(true);
@@ -235,20 +243,15 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
           l.email.toLowerCase().includes(q)
       );
     }
+    // Sequence-step filter — show only leads sitting on a given campaign step.
+    if (stepFilter !== null) {
+      result = result.filter((l) => (l.currentStep || 1) === stepFilter);
+    }
 
-    // Sort: active statuses first, then by next date
-    const statusPriority: Record<string, number> = {
-      new: 0, contacted: 1, no_answer: 2, callback: 3, interested: 4,
-      not_interested: 5, other_contact: 6, competitor: 7, dnc: 8,
-      qualified: 9, bounced: 10, completed: 11,
-    };
-    const priorityOf = (s: string) => statusPriority[s] ?? 99;
-    return [...result].sort((a, b) => {
-      const byStatus = priorityOf(a.status) - priorityOf(b.status);
-      if (byStatus !== 0) return byStatus;
-      return a.nextDate.getTime() - b.nextDate.getTime();
-    });
-  }, [leads, filters, activityMap]);
+    // Preserve the incoming order (the page sorts leads deterministically and
+    // shares that order with the focus view — we must not re-sort here).
+    return result;
+  }, [leads, filters, stepFilter, activityMap]);
 
   // Group leads by company
   const companyGroups = useMemo(() => {
@@ -333,12 +336,17 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
         sourceOptions={sourceOptions}
       />
 
-      {/* Count + group toggle */}
-      <div className="flex items-center gap-3 mb-4">
+      {/* Count + step filter + group toggle + sort */}
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
         <span className="text-[12px] font-medium text-ink">
           {filtered.length} leads
           {groupByCompany && <span className="text-ink-muted"> in {companyGroups.size} companies</span>}
         </span>
+        <LeadStepFilter
+          steps={steps}
+          value={stepFilter}
+          onChange={(s) => { setStepFilter(s); setCurrentPage(1); }}
+        />
         <button
           onClick={() => { setGroupByCompany(!groupByCompany); setExpandedCompanies(new Set()); setCurrentPage(1); }}
           className={cn(
@@ -351,6 +359,11 @@ export function FunnelLeadTable({ leads, funnelId, onLeadAdvanced, onLeadClick }
           <Building2 size={11} />
           Group by company
         </button>
+        {onSortChange && sortBy && (
+          <div className="ml-auto">
+            <LeadSortMenu value={sortBy} onChange={onSortChange} />
+          </div>
+        )}
       </div>
 
       {/* Table */}

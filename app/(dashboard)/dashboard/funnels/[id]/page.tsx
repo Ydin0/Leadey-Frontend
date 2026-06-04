@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,7 @@ import { FunnelStatsBar } from "@/components/funnels/dashboard/funnel-stats-bar"
 import { FunnelTabNav, type FunnelTab } from "@/components/funnels/dashboard/funnel-tab-nav";
 
 import { FunnelLeadTable } from "@/components/funnels/leads/funnel-lead-table";
+import { LeadSortMenu } from "@/components/funnels/leads/lead-sort-menu";
 import { CockpitView } from "@/components/funnels/cockpit/cockpit-view";
 import { AnalyticsView } from "@/components/funnels/analytics/analytics-view";
 import { EmailPerformancePanel } from "@/components/funnels/email-performance-panel";
@@ -22,7 +23,10 @@ import { LeadFocusView } from "@/components/funnels/focus/lead-focus-view";
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
 import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
 import { getFunnelById, updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
+import { sortLeads, DEFAULT_LEAD_SORT, type LeadSortKey } from "@/lib/utils/sort-leads";
 import type { Funnel, FunnelStatus } from "@/lib/types/funnel";
+
+const SORT_STORAGE_KEY = "leadey:campaign-lead-sort";
 
 /** Stale-while-revalidate cache so re-opening a campaign renders instantly
  *  from memory while a fresh copy loads in the background. Lives for the
@@ -47,7 +51,25 @@ export default function FunnelDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [focusLeadIndex, setFocusLeadIndex] = useState<number | null>(null);
+  const [sortBy, setSortBy] = useState<LeadSortKey>(DEFAULT_LEAD_SORT);
   const isAuthReady = useAuthReady();
+
+  // Persist the sort preference so the order is stable across navigation.
+  useEffect(() => {
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem(SORT_STORAGE_KEY) : null;
+    if (saved) setSortBy(saved as LeadSortKey);
+  }, []);
+  const changeSort = useCallback((key: LeadSortKey) => {
+    setSortBy(key);
+    if (typeof window !== "undefined") window.localStorage.setItem(SORT_STORAGE_KEY, key);
+  }, []);
+
+  // Deterministically sorted leads — shared by the table AND the focus view so
+  // their order always matches and never flip-flops between renders.
+  const sortedLeads = useMemo(
+    () => (funnel ? sortLeads(funnel.leads, sortBy) : []),
+    [funnel, sortBy],
+  );
 
   const loadFunnel = useCallback(async () => {
     if (!funnelId) return;
@@ -169,7 +191,7 @@ export default function FunnelDetailPage() {
   if (focusLeadIndex !== null) {
     return (
       <LeadFocusView
-        leads={funnel.leads}
+        leads={sortedLeads}
         initialIndex={focusLeadIndex}
         funnelId={funnel.id}
         funnelName={funnel.name}
@@ -285,8 +307,11 @@ export default function FunnelDetailPage() {
       {/* Tab Content */}
       {activeTab === "leads" && (
         <FunnelLeadTable
-          leads={funnel.leads}
+          leads={sortedLeads}
+          steps={funnel.steps}
           funnelId={funnel.id}
+          sortBy={sortBy}
+          onSortChange={changeSort}
           onLeadAdvanced={() => void loadFunnel()}
           onLeadClick={(index) => setFocusLeadIndex(index)}
         />

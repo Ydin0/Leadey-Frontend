@@ -55,6 +55,8 @@ export interface FunnelLead {
   source: string;
   score: number;
   phone?: string | null;
+  /** When the lead was added to the campaign — used for "recently added" sort. */
+  createdAt?: Date;
   companyDomain?: string;
   companyIndustry?: string;
   companyEmployeeCount?: number;
