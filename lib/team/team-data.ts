@@ -1,14 +1,10 @@
 /**
- * Leadey — Team feature data + analytics helpers.
+ * Leadey — Team feature analytics helpers.
  *
- * Generates deterministic 90-day daily activity per rep per channel so every
- * time window (today / week / month / quarter) and the leaderboard derive from
- * one source of truth.
- *
- * NOTE: This is a self-contained seeded mock layer (ported from the design
- * handoff) so the feature is fully interactive now. To go live, swap these
- * functions for real endpoints — members from /api/team, activity counts from
- * leadEvents/call records — keeping the same return shapes. // TODO(backend)
+ * Operates on a real 90-day daily activity series per rep (calls + meetings are
+ * live from the backend; email/SMS/LinkedIn arrive with their integrations).
+ * Every time window (today / week / month / quarter) and the leaderboard derive
+ * from that one series. The series is fetched via GET /api/team/analytics.
  */
 
 export type ChannelId = "calls" | "emails" | "sms" | "linkedin";
@@ -48,8 +44,6 @@ export interface Member {
   name: string;
   role: string;
   pod: string;
-  perf: number;
-  ramp: boolean;
   status: MemberStatus;
   email?: string;
   targets: Targets;
@@ -91,67 +85,55 @@ export const ROLE_TARGETS: Record<string, Targets> = {
   Manager: { calls: 12, emails: 25, sms: 6, linkedin: 12 },
 };
 
-// ── deterministic PRNG ──────────────────────────────────────────────────
-function mulberry32(a: number) {
-  return function () {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-export function hashSeed(str: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
-  return h >>> 0;
-}
-
-/** Stable pseudo-performance multiplier in [lo,hi] derived from a key — gives
- *  each real rep a deterministic but varied activity profile. */
-export function hashFloat(key: string, lo: number, hi: number): number {
-  return lo + (hashSeed(key) / 4294967296) * (hi - lo);
-}
-
 export const DAYS = 90;
 const DAY_MS = 86400000;
-/** "Today" anchored to a fixed clock so the demo is stable. */
-export const TODAY = (() => { const d = new Date(2026, 5, 2); d.setHours(0, 0, 0, 0); return d; })();
 
-export function buildSeries(member: Member): DayRec[] {
-  const rnd = mulberry32(hashSeed(member.id));
+/** Raw daily record from GET /api/team/analytics. */
+export interface ApiDayRec {
+  date: string;
+  calls: number;
+  emails: number;
+  sms: number;
+  linkedin: number;
+  meetings: number;
+  replies: number;
+}
+
+/** Convert a backend series into the DayRec shape the analytics engine uses. */
+export function hydrateSeries(api: ApiDayRec[]): DayRec[] {
+  return api.map((r) => {
+    const total = (r.calls || 0) + (r.emails || 0) + (r.sms || 0) + (r.linkedin || 0);
+    const date = new Date(r.date);
+    return {
+      date,
+      ts: date.getTime(),
+      calls: r.calls || 0,
+      emails: r.emails || 0,
+      sms: r.sms || 0,
+      linkedin: r.linkedin || 0,
+      meetings: r.meetings || 0,
+      replies: r.replies || 0,
+      total,
+    };
+  });
+}
+
+/** A zero-filled 90-day series anchored to today — used when a member has no
+ *  activity rows yet, so windowing/charts still render (as zeros). */
+export function emptySeries(): DayRec[] {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
   const days: DayRec[] = [];
   for (let i = 0; i < DAYS; i++) {
-    const date = new Date(TODAY.getTime() - (DAYS - 1 - i) * DAY_MS);
-    const dow = date.getDay();
-    const weekend = dow === 0 || dow === 6;
-    const ramp = member.ramp ? 0.45 + 0.55 * (i / (DAYS - 1)) : 1;
-    const momentum = 0.9 + 0.2 * (i / (DAYS - 1));
-    const rec = { date, ts: date.getTime() } as DayRec;
-    let total = 0;
-    CH_IDS.forEach((ch) => {
-      const base = member.targets[ch];
-      let v: number;
-      if (weekend) {
-        v = rnd() < 0.78 ? 0 : Math.round(base * 0.18 * rnd());
-      } else {
-        const noise = 0.68 + rnd() * 0.62;
-        v = Math.round(base * member.perf * ramp * momentum * noise);
-      }
-      if (member.status === "away" && i >= DAYS - 3) v = 0;
-      rec[ch] = Math.max(0, v);
-      total += rec[ch];
-    });
-    rec.meetings = Math.round((rec.calls + rec.linkedin) / 55 + rnd() * 0.6);
-    rec.replies = Math.round(total / 38 + rnd());
-    rec.total = total;
-    days.push(rec);
+    const date = new Date(start.getTime() - (DAYS - 1 - i) * DAY_MS);
+    days.push({ date, ts: date.getTime(), calls: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 });
   }
   return days;
 }
 
 // ── time windows ────────────────────────────────────────────────────────
 export const WINDOWS: TimeWindow[] = [
-  { id: "today", label: "Today", short: "1D", days: 1, bucket: "hour" },
+  { id: "today", label: "Today", short: "1D", days: 1, bucket: "day" },
   { id: "week", label: "Week", short: "1W", days: 7, bucket: "day" },
   { id: "month", label: "Month", short: "1M", days: 30, bucket: "day" },
   { id: "quarter", label: "Quarter", short: "1Q", days: 90, bucket: "week" },
@@ -209,17 +191,6 @@ export interface Bucketed {
 export function bucketed(members: Member | Member[], winId: WindowId): Bucketed {
   const w = WIN_MAP[winId];
   const list = Array.isArray(members) ? members : [members];
-
-  if (w.bucket === "hour") {
-    const todays = list.map((m) => m.series[DAYS - 1]);
-    const weights = [0.04, 0.09, 0.13, 0.12, 0.06, 0.11, 0.14, 0.12, 0.09, 0.06, 0.03, 0.01];
-    const labels = ["8a", "9a", "10a", "11a", "12p", "1p", "2p", "3p", "4p", "5p", "6p", "7p"];
-    const series = {} as Record<ChannelId, number[]>;
-    CH_IDS.forEach((ch) => (series[ch] = weights.map(() => 0)));
-    todays.forEach((d) => CH_IDS.forEach((ch) => { weights.forEach((wt, i) => { series[ch][i] += Math.round((d[ch] || 0) * wt); }); }));
-    const totals = labels.map((_, i) => CH_IDS.reduce((a, ch) => a + series[ch][i], 0));
-    return { labels, series, totals };
-  }
 
   const slices = list.map((m) => winSlice(m.series, winId));
   const n = slices[0].length;

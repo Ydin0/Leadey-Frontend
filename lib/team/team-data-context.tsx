@@ -4,10 +4,11 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import {
   getTeamMembers, getPendingInvitations, inviteTeamMember,
-  getTeamKpiConfig, saveTeamKpiConfig, type TeamKpiConfig,
+  getTeamKpiConfig, saveTeamKpiConfig, getTeamAnalytics,
+  type TeamKpiConfig, type TeamAnalyticsDay,
 } from "@/lib/api/team";
 import {
-  ROLE_TARGETS, buildSeries, hashFloat, DAYS, TODAY,
+  ROLE_TARGETS, hydrateSeries, emptySeries,
   type Member, type Targets, type DayRec, type MemberStatus,
 } from "./team-data";
 
@@ -29,27 +30,16 @@ export function useTeamData() {
   return ctx;
 }
 
-const DAY_MS = 86400000;
-function zeroSeries(): DayRec[] {
-  return Array.from({ length: DAYS }, (_, i) => {
-    const date = new Date(TODAY.getTime() - (DAYS - 1 - i) * DAY_MS);
-    return { date, ts: date.getTime(), calls: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
-  });
-}
-
 function makeMember(opts: {
-  id: string; name: string; email: string; status: MemberStatus; cfg?: TeamKpiConfig[string];
+  id: string; name: string; email: string; status: MemberStatus; cfg?: TeamKpiConfig[string]; series: DayRec[];
 }): Member {
   const role = opts.cfg?.role || "SDR";
   const pod = opts.cfg?.pod || "Enterprise";
   const targets = opts.cfg?.targets || ROLE_TARGETS[role] || ROLE_TARGETS.SDR;
-  const member: Member = {
+  return {
     id: opts.id, name: opts.name, email: opts.email, role, pod,
-    perf: opts.status === "pending" ? 0 : hashFloat(opts.email || opts.id, 0.72, 1.24),
-    ramp: false, status: opts.status, targets: { ...targets }, series: [],
+    status: opts.status, targets: { ...targets }, series: opts.series,
   };
-  member.series = opts.status === "pending" ? zeroSeries() : buildSeries(member);
-  return member;
 }
 
 export function TeamDataProvider({ children }: { children: React.ReactNode }) {
@@ -60,12 +50,15 @@ export function TeamDataProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [team, invites, cfg] = await Promise.all([
+      const [team, invites, cfg, analytics] = await Promise.all([
         getTeamMembers(),
         getPendingInvitations().catch(() => []),
         getTeamKpiConfig().catch(() => ({} as TeamKpiConfig)),
+        getTeamAnalytics().catch(() => ({ members: [] as { id: string; series: TeamAnalyticsDay[] }[] })),
       ]);
       const byEmail = (e: string) => cfg[(e || "").toLowerCase()];
+      // Real activity series keyed by member id.
+      const seriesById = new Map(analytics.members.map((a) => [a.id, hydrateSeries(a.series)]));
 
       const real = team.members.map((m) =>
         makeMember({
@@ -74,6 +67,7 @@ export function TeamDataProvider({ children }: { children: React.ReactNode }) {
           email: m.email,
           status: "active",
           cfg: byEmail(m.email),
+          series: seriesById.get(m.id) ?? emptySeries(),
         }),
       );
       const memberEmails = new Set(team.members.map((m) => m.email.toLowerCase()));
@@ -86,6 +80,7 @@ export function TeamDataProvider({ children }: { children: React.ReactNode }) {
             email: inv.emailAddress,
             status: "pending",
             cfg: byEmail(inv.emailAddress),
+            series: emptySeries(),
           }),
         );
 

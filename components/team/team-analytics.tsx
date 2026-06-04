@@ -46,7 +46,7 @@ export function TeamAnalytics({ win, trendMode, onPickRep }: {
     <div className="fade" style={{ display: "grid", gap: 16 }}>
       <div className="row" style={{ gap: 7, fontSize: 11, color: "var(--fg-faint)" }}>
         <Icon name="activity" size={12} />
-        Activity is projected from each rep&apos;s KPI targets until live channel tracking is enabled.
+        Calls &amp; meetings are tracked live. Email, SMS &amp; LinkedIn populate once their integrations are connected.
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
         {CH_IDS.map((ch) => (

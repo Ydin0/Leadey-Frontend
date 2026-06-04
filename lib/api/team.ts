@@ -17,6 +17,23 @@ export async function getTeamKpiConfig(): Promise<TeamKpiConfig> {
   return apiRequest<TeamKpiConfig>("/team/kpi-config");
 }
 
+/** Real 90-day daily activity series per member (calls + meetings live;
+ *  email/sms/linkedin = 0 until those integrations land). */
+export interface TeamAnalyticsDay {
+  date: string;
+  calls: number;
+  emails: number;
+  sms: number;
+  linkedin: number;
+  meetings: number;
+  replies: number;
+}
+export async function getTeamAnalytics(): Promise<{
+  members: { id: string; series: TeamAnalyticsDay[] }[];
+}> {
+  return apiRequest("/team/analytics");
+}
+
 export async function saveTeamKpiConfig(
   entry: { key: string } & TeamKpiEntry,
 ): Promise<TeamKpiConfig> {
