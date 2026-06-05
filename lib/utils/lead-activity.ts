@@ -19,6 +19,7 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
       const outcome = e.outcome || "";
       let type: FunnelLeadActivity["type"] = "note";
       let summary = "Activity";
+      let detail = "";
 
       if (e.type === "imported") {
         type = "import";
@@ -49,12 +50,18 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
       } else if (e.type === "note") {
         type = "note";
         summary = (e.meta?.text as string) || "Note";
+      } else if (e.type === "converted") {
+        type = "opportunity";
+        summary = "Converted to an opportunity";
+        const oppName = (e.meta?.oppName as string) || "";
+        const who = (e.meta?.userName as string) || "";
+        detail = [oppName, who ? `by ${who}` : ""].filter(Boolean).join(" · ");
       } else {
         type = "note";
         summary = labelize(e.type);
       }
 
-      return { id: e.id, type, summary, timestamp: e.timestamp, userInitials: "" };
+      return { id: e.id, type, summary, detail: detail || undefined, timestamp: e.timestamp, userInitials: "" };
     });
 }
 

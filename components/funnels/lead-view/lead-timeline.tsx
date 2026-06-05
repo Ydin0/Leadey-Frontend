@@ -16,6 +16,7 @@ import {
   Check,
   Pencil,
   Trash2,
+  Trophy,
   type LucideIcon,
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -38,6 +39,7 @@ const TYPE_META: Record<string, KindMeta> = {
   status_change: { icon: Flag, tint: "bg-signal-slate", fg: "text-signal-slate-text" },
   note: { icon: FileText, tint: "bg-section", fg: "text-ink-muted" },
   import: { icon: Download, tint: "bg-signal-slate", fg: "text-signal-slate-text" },
+  opportunity: { icon: Trophy, tint: "bg-signal-green", fg: "text-signal-green-text" },
 };
 
 type FeedItem =
@@ -336,7 +338,7 @@ export function LeadTimeline({ activities, callRecords, onAddNote, onEditNote, o
     return feed.filter((item) => {
       const type = item.kind === "call" ? "call" : item.activity.type;
       if (filter === "All") return true;
-      if (filter === "Important") return type === "call" || type === "status_change";
+      if (filter === "Important") return type === "call" || type === "status_change" || type === "opportunity";
       if (filter === "Conversations") return conv.has(type);
       if (filter === "Notes") return type === "note" || type === "call";
       return true;
