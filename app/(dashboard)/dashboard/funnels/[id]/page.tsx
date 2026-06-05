@@ -19,7 +19,6 @@ import { AnalyticsView } from "@/components/funnels/analytics/analytics-view";
 import { EmailPerformancePanel } from "@/components/funnels/email-performance-panel";
 import { AddLeadsModal } from "@/components/funnels/add-leads/add-leads-modal";
 import { EditCampaignModal } from "@/components/funnels/edit-campaign-modal";
-import { LeadFocusView } from "@/components/funnels/focus/lead-focus-view";
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
 import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
 import { getFunnelById, updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
@@ -50,7 +49,6 @@ export default function FunnelDetailPage() {
   const [statusChanging, setStatusChanging] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [focusLeadIndex, setFocusLeadIndex] = useState<number | null>(null);
   const [sortBy, setSortBy] = useState<LeadSortKey>(DEFAULT_LEAD_SORT);
   const isAuthReady = useAuthReady();
 
@@ -188,27 +186,6 @@ export default function FunnelDetailPage() {
     );
   }
 
-  if (focusLeadIndex !== null) {
-    return (
-      <LeadFocusView
-        leads={sortedLeads}
-        initialIndex={focusLeadIndex}
-        funnelId={funnel.id}
-        funnelName={funnel.name}
-        steps={funnel.steps}
-        onClose={() => setFocusLeadIndex(null)}
-        onLeadPatch={(leadId, patch) =>
-          setFunnel((prev) =>
-            prev
-              ? { ...prev, leads: prev.leads.map((l) => (l.id === leadId ? { ...l, ...patch } : l)) }
-              : prev,
-          )
-        }
-        onLeadsChanged={() => void loadFunnel()}
-      />
-    );
-  }
-
   return (
     <div>
       {/* Header */}
@@ -313,7 +290,10 @@ export default function FunnelDetailPage() {
           sortBy={sortBy}
           onSortChange={changeSort}
           onLeadAdvanced={() => void loadFunnel()}
-          onLeadClick={(index) => setFocusLeadIndex(index)}
+          onLeadClick={(index) => {
+            const lead = sortedLeads[index];
+            if (lead) router.push(`/dashboard/funnels/${funnel.id}/leads/${lead.id}`);
+          }}
         />
       )}
 

@@ -118,7 +118,11 @@ export default function OpportunitiesListPage() {
                   <TableRow key={opp.id}>
                     <TableCell className="overflow-hidden">
                       <Link
-                        href={`/dashboard/opportunities/${opp.id}`}
+                        href={
+                          opp.sourceLeadId && opp.funnelId
+                            ? `/dashboard/funnels/${opp.funnelId}/leads/${opp.sourceLeadId}`
+                            : `/dashboard/opportunities/${opp.id}`
+                        }
                         className="text-[12px] font-medium text-ink hover:text-signal-blue-text truncate block"
                       >
                         {opp.name}

@@ -32,6 +32,9 @@ export interface Opportunity {
   masterContactId: string | null;
   ownerId: string | null;
   sourceLeadId: string | null;
+  /** Funnel (campaign) of the source lead, when converted from a campaign lead.
+   *  Lets opportunity clicks deep-link into the Lead View. Null for manual opps. */
+  funnelId: string | null;
   value: number;
   currency: string;
   probabilityOverride: number | null;

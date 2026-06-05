@@ -39,6 +39,12 @@ export function OpportunityCard({
   const closeDate = opp.expectedCloseDate
     ? new Date(opp.expectedCloseDate + "T00:00:00")
     : null;
+  // Opportunities converted from a campaign lead open the Lead View; manual
+  // opportunities keep the dedicated opportunity page.
+  const href =
+    opp.sourceLeadId && opp.funnelId
+      ? `/dashboard/funnels/${opp.funnelId}/leads/${opp.sourceLeadId}`
+      : `/dashboard/opportunities/${opp.id}`;
 
   return (
     <div
@@ -52,7 +58,7 @@ export function OpportunityCard({
       )}
     >
       <Link
-        href={`/dashboard/opportunities/${opp.id}`}
+        href={href}
         className="block"
         onClick={(e) => {
           if (isDragging) e.preventDefault();

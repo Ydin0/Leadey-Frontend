@@ -288,6 +288,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           toNumber: to,
           contactName: contactName || undefined,
           companyName: companyName || undefined,
+          leadId: leadId || undefined,
+          funnelId: funnelId || undefined,
           duration,
           disposition: "completed",
         })

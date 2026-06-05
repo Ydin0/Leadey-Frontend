@@ -61,6 +61,7 @@ export async function getCallRecords(params?: {
   disposition?: string;
   hasRecording?: string;
   search?: string;
+  leadId?: string;
   page?: number;
   limit?: number;
   offset?: number;
@@ -72,6 +73,7 @@ export async function getCallRecords(params?: {
   if (params?.disposition) searchParams.set("disposition", params.disposition);
   if (params?.hasRecording) searchParams.set("hasRecording", params.hasRecording);
   if (params?.search) searchParams.set("search", params.search);
+  if (params?.leadId) searchParams.set("leadId", params.leadId);
   if (params?.page) searchParams.set("page", String(params.page));
   if (params?.limit) searchParams.set("limit", String(params.limit));
   if (params?.offset) searchParams.set("offset", String(params.offset));
@@ -87,6 +89,8 @@ export async function saveCallRecord(data: {
   toNumber: string;
   contactName?: string | null;
   companyName?: string | null;
+  leadId?: string | null;
+  funnelId?: string | null;
   duration: number;
   disposition: string;
   userId?: string;
