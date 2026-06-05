@@ -11,7 +11,7 @@ import { FocusCallControls } from "@/components/funnels/focus/focus-call-control
 import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
 import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
-import { updateLeadStatus, advanceLead } from "@/lib/api/funnels";
+import { updateLeadStatus, advanceLead, logLeadNote } from "@/lib/api/funnels";
 import { getCallRecords } from "@/lib/api/phone-lines";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
@@ -288,13 +288,19 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) 
 
   function addNote(text: string) {
     if (!currentLead || !text.trim()) return;
+    const clean = text.trim();
+    // Optimistic — show immediately, then persist as a real lead event so it
+    // survives a reload (loaded back via the lead's events on next fetch).
     logActivity(currentLead.id, {
       id: `act_${Date.now()}`,
       type: "note",
-      summary: text.trim(),
+      summary: clean,
       timestamp: new Date(),
       userInitials: "You",
     });
+    void logLeadNote(funnelId, currentLead.id, clean).catch((err) =>
+      console.error("Failed to save note:", err),
+    );
   }
 
   if (!currentLead) {

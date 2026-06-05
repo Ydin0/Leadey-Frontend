@@ -46,6 +46,9 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
       } else if (e.type === "reply_handled") {
         type = "status_change";
         summary = "Reply handled";
+      } else if (e.type === "note") {
+        type = "note";
+        summary = (e.meta?.text as string) || "Note";
       } else {
         type = "note";
         summary = labelize(e.type);

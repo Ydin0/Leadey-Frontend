@@ -301,6 +301,19 @@ export async function logLeadCall(
   };
 }
 
+/** Persists a free-text note as a lead event so it survives reloads and shows
+ *  in the lead's activity timeline. */
+export async function logLeadNote(
+  funnelId: string,
+  leadId: string,
+  text: string,
+): Promise<{ id: string }> {
+  return apiRequest<{ id: string }>(
+    `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/notes`,
+    { method: "POST", body: JSON.stringify({ text }) },
+  );
+}
+
 /** Toggles a single person's Do-Not-Contact flag (compliance). Non-destructive:
  *  the person stays in every campaign but is shown in red and calls confirm.
  *  Returns the refreshed funnel. */
