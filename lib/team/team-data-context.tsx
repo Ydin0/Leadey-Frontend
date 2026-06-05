@@ -102,7 +102,8 @@ export function TeamDataProvider({ children }: { children: React.ReactNode }) {
     async (data: { name: string; email: string; role: string; pod: string; targets: Targets }) => {
       if (!data.email.trim()) return { ok: false, error: "A work email is required to invite." };
       try {
-        await inviteTeamMember(data.email.trim(), "org:member");
+        const [firstName, ...rest] = (data.name || "").trim().split(/\s+/).filter(Boolean);
+        await inviteTeamMember(data.email.trim(), "org:member", firstName || undefined, rest.join(" ") || undefined);
         await saveTeamKpiConfig({ key: data.email.trim(), role: data.role, pod: data.pod, targets: data.targets });
         await refresh();
         return { ok: true };

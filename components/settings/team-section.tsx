@@ -40,6 +40,8 @@ export function TeamSection() {
 
   // Invite form
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteFirstName, setInviteFirstName] = useState("");
+  const [inviteLastName, setInviteLastName] = useState("");
   const [inviteRole, setInviteRole] = useState("org:member");
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
@@ -79,8 +81,15 @@ export function TeamSection() {
     setInviteError(null);
     setInviteSuccess(false);
     try {
-      await inviteTeamMember(inviteEmail.trim(), inviteRole);
+      await inviteTeamMember(
+        inviteEmail.trim(),
+        inviteRole,
+        inviteFirstName.trim() || undefined,
+        inviteLastName.trim() || undefined,
+      );
       setInviteEmail("");
+      setInviteFirstName("");
+      setInviteLastName("");
       setInviteSuccess(true);
       setTimeout(() => setInviteSuccess(false), 3000);
       await loadData();
@@ -163,7 +172,26 @@ export function TeamSection() {
       {/* Invite Form */}
       <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
         <h3 className="text-[14px] font-semibold text-ink mb-1">Invite Team Member</h3>
-        <p className="text-[11px] text-ink-muted mb-4">Send an invitation email to add a teammate.</p>
+        <p className="text-[11px] text-ink-muted mb-4">Add their name and email — they&apos;ll get a sign-in link to join your team.</p>
+
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <input
+            type="text"
+            value={inviteFirstName}
+            onChange={(e) => setInviteFirstName(e.target.value)}
+            placeholder="First name"
+            disabled={seatsFull}
+            className="px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default disabled:opacity-50"
+          />
+          <input
+            type="text"
+            value={inviteLastName}
+            onChange={(e) => setInviteLastName(e.target.value)}
+            placeholder="Last name"
+            disabled={seatsFull}
+            className="px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default disabled:opacity-50"
+          />
+        </div>
 
         <div className="flex items-center gap-2">
           <input

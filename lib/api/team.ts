@@ -46,10 +46,12 @@ export async function saveTeamKpiConfig(
 export async function inviteTeamMember(
   email: string,
   role: string,
+  firstName?: string,
+  lastName?: string,
 ): Promise<PendingInvitation> {
   return apiRequest<PendingInvitation>("/team/invite", {
     method: "POST",
-    body: JSON.stringify({ email, role }),
+    body: JSON.stringify({ email, role, firstName, lastName }),
   });
 }
 
