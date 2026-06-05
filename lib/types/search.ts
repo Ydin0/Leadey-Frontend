@@ -13,6 +13,9 @@ export interface SearchResult {
   subtitle: string;
   href: string;
   imageUrl?: string | null;
+  /** Company domain — its favicon is shown as the result icon (with the
+   *  group's lucide icon as a fallback). */
+  domain?: string | null;
 }
 
 export interface GlobalSearchResponse {

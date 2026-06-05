@@ -38,6 +38,41 @@ const GROUP_ORDER: SearchResultType[] = [
   "member",
 ];
 
+function faviconUrl(domain: string): string {
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+}
+
+/** Result icon: the company favicon (or member avatar) when available, with the
+ *  group's lucide icon as a graceful fallback. */
+function ResultAvatar({
+  result,
+  Icon,
+}: {
+  result: SearchResult;
+  Icon: typeof Search;
+}) {
+  const [failed, setFailed] = useState(false);
+  const src = result.imageUrl || (result.domain ? faviconUrl(result.domain) : null);
+
+  if (src && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt=""
+        onError={() => setFailed(true)}
+        className="size-7 rounded-full object-cover bg-section border border-border-subtle shrink-0"
+      />
+    );
+  }
+
+  return (
+    <span className="flex items-center justify-center size-7 rounded-full bg-section border border-border-subtle shrink-0">
+      <Icon size={13} strokeWidth={1.5} className="text-ink-secondary" />
+    </span>
+  );
+}
+
 export function GlobalSearch() {
   const router = useRouter();
   const isAuthReady = useAuthReady();
@@ -192,13 +227,7 @@ export function GlobalSearch() {
                             idx === activeIndex ? "bg-hover" : "hover:bg-hover",
                           )}
                         >
-                          <span className="flex items-center justify-center size-7 rounded-full bg-section border border-border-subtle shrink-0">
-                            <GroupIcon
-                              size={13}
-                              strokeWidth={1.5}
-                              className="text-ink-secondary"
-                            />
-                          </span>
+                          <ResultAvatar result={r} Icon={GroupIcon} />
                           <span className="min-w-0 flex-1">
                             <span className="block text-[12px] text-ink truncate">
                               {r.title}
