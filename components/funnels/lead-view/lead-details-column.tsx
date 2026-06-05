@@ -12,8 +12,11 @@ import {
   Mail,
   Phone,
   Building2,
+  Ban,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { confirmDncCall } from "@/lib/utils/dnc";
 import type { FunnelLead } from "@/lib/types/funnel";
 import type {
   FunnelLeadCompany,
@@ -36,6 +39,7 @@ interface LeadDetailsColumnProps {
   opportunityId: string | null;
   onConvert: () => void;
   onCall: (phone: string, name: string) => void;
+  onDnc: (contactId: string, value: boolean) => void | Promise<void>;
   leads: FunnelLead[];
   statuses: LeadStatusOption[];
   /** Per-lead campaign progress (LeadStepTracker), rendered atop the Details tab. */
@@ -51,37 +55,116 @@ function initials(name: string): string {
     .join("");
 }
 
-function ContactRow({ c, onCall }: { c: FunnelLeadContact; onCall: (phone: string, name: string) => void }) {
+function ContactRow({
+  c,
+  onCall,
+  onDnc,
+}: {
+  c: FunnelLeadContact;
+  onCall: (phone: string, name: string) => void;
+  onDnc?: (contactId: string, value: boolean) => void | Promise<void>;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  function call() {
+    if (!c.phone) return;
+    if (c.doNotCall && !confirmDncCall(c.name)) return;
+    onCall(c.phone, c.name);
+  }
+
+  async function applyDnc(value: boolean) {
+    if (!onDnc) return;
+    setBusy(true);
+    try {
+      await onDnc(c.id, value);
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  }
+
   return (
-    <div className="group flex items-center gap-2.5 py-2 px-1 rounded-lg hover:bg-hover/50 transition-colors">
-      <div className="w-7 h-7 rounded-full bg-section flex items-center justify-center text-[10px] font-medium text-ink-secondary shrink-0">
-        {initials(c.name)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-1.5">
-          <span className={cn("text-[12.5px] font-medium truncate", c.doNotCall ? "text-signal-red-text" : "text-ink")}>
-            {c.name}
-          </span>
-          {c.isPrimary && (
-            <span className="text-[9px] font-medium rounded-full px-1.5 py-px bg-signal-slate text-signal-slate-text">
-              Primary
+    <div className="rounded-lg hover:bg-hover/50 transition-colors">
+      <div className="group flex items-center gap-2.5 py-2 px-1">
+        <div className="w-7 h-7 rounded-full bg-section flex items-center justify-center text-[10px] font-medium text-ink-secondary shrink-0">
+          {initials(c.name)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className={cn("text-[12.5px] font-medium truncate", c.doNotCall ? "text-signal-red-text" : "text-ink")}>
+              {c.name}
             </span>
+            {c.isPrimary && (
+              <span className="text-[9px] font-medium rounded-full px-1.5 py-px bg-signal-slate text-signal-slate-text">
+                Primary
+              </span>
+            )}
+            {c.doNotCall && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full bg-signal-red/15 text-signal-red-text text-[9px] font-semibold uppercase tracking-wide">
+                <Ban size={9} strokeWidth={2} /> DNC
+              </span>
+            )}
+          </div>
+          {c.title && <div className="text-[11px] text-ink-muted truncate">{c.title}</div>}
+        </div>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {c.email && (
+            <a
+              href={`mailto:${c.email}`}
+              className="flex items-center justify-center w-[22px] h-[22px] rounded-md text-ink-muted hover:bg-hover hover:text-ink-secondary transition-colors"
+              title={c.email}
+            >
+              <Mail size={13} />
+            </a>
+          )}
+          {c.phone && <MiniBtn icon={Phone} title={`Call ${c.phone}`} onClick={call} />}
+          {onDnc && (
+            <button
+              type="button"
+              onClick={() => setConfirming((v) => !v)}
+              title={c.doNotCall ? "Remove Do Not Contact" : "Mark Do Not Contact"}
+              className={cn(
+                "flex items-center justify-center w-[22px] h-[22px] rounded-md transition-colors",
+                c.doNotCall
+                  ? "bg-signal-red/15 text-signal-red-text"
+                  : "text-ink-muted hover:bg-signal-red/10 hover:text-signal-red-text",
+              )}
+            >
+              <Ban size={13} />
+            </button>
           )}
         </div>
-        {c.title && <div className="text-[11px] text-ink-muted truncate">{c.title}</div>}
       </div>
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        {c.email && (
-          <a
-            href={`mailto:${c.email}`}
-            className="flex items-center justify-center w-[22px] h-[22px] rounded-md text-ink-muted hover:bg-hover hover:text-ink-secondary transition-colors"
-            title={c.email}
-          >
-            <Mail size={13} />
-          </a>
-        )}
-        {c.phone && <MiniBtn icon={Phone} title={c.phone} onClick={() => onCall(c.phone!, c.name)} />}
-      </div>
+
+      {confirming && onDnc && (
+        <div className="mx-1 mb-2 flex items-center justify-between gap-2 rounded-[8px] bg-signal-red/10 border border-signal-red-text/20 px-2.5 py-2">
+          <span className="text-[10px] text-signal-red-text leading-snug">
+            {c.doNotCall ? (
+              <>Remove the Do Not Contact flag from <strong>{c.name}</strong>?</>
+            ) : (
+              <>Mark <strong>{c.name}</strong> as Do Not Contact? They stay in the campaign but show red and calls confirm first.</>
+            )}
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => setConfirming(false)}
+              disabled={busy}
+              className="px-2 py-0.5 rounded-full bg-section text-ink-secondary text-[10px] font-medium hover:bg-hover transition-colors border border-border-subtle disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => applyDnc(!c.doNotCall)}
+              disabled={busy}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-signal-red-text text-on-ink text-[10px] font-medium hover:bg-signal-red-text/90 transition-colors disabled:opacity-50"
+            >
+              {busy ? <Loader2 size={9} className="animate-spin" /> : <Ban size={9} />}
+              {c.doNotCall ? "Remove DNC" : "Confirm DNC"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -96,6 +179,7 @@ export function LeadDetailsColumn({
   opportunityId,
   onConvert,
   onCall,
+  onDnc,
   leads,
   statuses,
   stepTracker,
@@ -185,7 +269,7 @@ export function LeadDetailsColumn({
           <Section icon={Users} title="Contacts" count={contacts.length}>
             <div className="flex flex-col">
               {contacts.length ? (
-                contacts.map((c) => <ContactRow key={c.id} c={c} onCall={onCall} />)
+                contacts.map((c) => <ContactRow key={c.id} c={c} onCall={onCall} onDnc={onDnc} />)
               ) : (
                 <p className="text-[12px] text-ink-faint px-1">No other contacts at this company.</p>
               )}

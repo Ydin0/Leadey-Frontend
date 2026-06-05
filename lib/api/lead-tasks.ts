@@ -7,6 +7,9 @@ export interface LeadTask {
   label: string;
   dueAt: string | null;
   done: boolean;
+  assigneeId: string | null;
+  assigneeName: string | null;
+  createdBy: string | null;
   createdAt: string;
 }
 
@@ -17,7 +20,7 @@ export async function getLeadTasks(funnelId: string, leadId: string): Promise<Le
 export async function createLeadTask(
   funnelId: string,
   leadId: string,
-  data: { label: string; dueAt?: string | null },
+  data: { label: string; dueAt?: string | null; assigneeId?: string | null },
 ): Promise<LeadTask> {
   return apiRequest<LeadTask>(`/funnels/${funnelId}/leads/${leadId}/tasks`, {
     method: "POST",
@@ -27,7 +30,7 @@ export async function createLeadTask(
 
 export async function updateLeadTask(
   taskId: string,
-  data: Partial<{ label: string; done: boolean; dueAt: string | null }>,
+  data: Partial<{ label: string; done: boolean; dueAt: string | null; assigneeId: string | null }>,
 ): Promise<LeadTask> {
   return apiRequest<LeadTask>(`/lead-tasks/${taskId}`, {
     method: "PATCH",

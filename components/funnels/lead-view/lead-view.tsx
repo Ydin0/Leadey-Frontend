@@ -11,7 +11,7 @@ import { FocusCallControls } from "@/components/funnels/focus/focus-call-control
 import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
 import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
-import { updateLeadStatus, advanceLead, logLeadNote } from "@/lib/api/funnels";
+import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc } from "@/lib/api/funnels";
 import { getCallRecords } from "@/lib/api/phone-lines";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
@@ -40,7 +40,7 @@ interface ProgressOverride {
   events: FunnelLeadEvent[];
 }
 
-export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) {
+export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }: LeadViewProps) {
   const steps = funnel.steps;
   const funnelId = funnel.id;
   const router = useRouter();
@@ -50,6 +50,10 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) 
   const [statusOverride, setStatusOverride] = useState<Record<string, string>>({});
   const [progress, setProgress] = useState<Record<string, ProgressOverride>>({});
   const [extraActivities, setExtraActivities] = useState<Record<string, FunnelLeadActivity[]>>({});
+  // Local note edit/delete overlays applied on top of the merged timeline so
+  // edits/deletes reflect instantly without a full refetch.
+  const [editedNotes, setEditedNotes] = useState<Record<string, string>>({});
+  const [deletedNotes, setDeletedNotes] = useState<Set<string>>(new Set());
   const [advancing, setAdvancing] = useState(false);
   const [showComposer, setShowComposer] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
@@ -289,18 +293,72 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) 
   function addNote(text: string) {
     if (!currentLead || !text.trim()) return;
     const clean = text.trim();
+    const leadIdLocal = currentLead.id;
+    const tmpId = `tmp_${Date.now()}`;
     // Optimistic — show immediately, then persist as a real lead event so it
-    // survives a reload (loaded back via the lead's events on next fetch).
-    logActivity(currentLead.id, {
-      id: `act_${Date.now()}`,
+    // survives a reload. On success, swap the temp id for the real event id so
+    // edit/delete target the backend row.
+    logActivity(leadIdLocal, {
+      id: tmpId,
       type: "note",
       summary: clean,
       timestamp: new Date(),
       userInitials: "You",
     });
-    void logLeadNote(funnelId, currentLead.id, clean).catch((err) =>
-      console.error("Failed to save note:", err),
-    );
+    void logLeadNote(funnelId, leadIdLocal, clean)
+      .then((res) => {
+        if (res?.id) {
+          setExtraActivities((prev) => ({
+            ...prev,
+            [leadIdLocal]: (prev[leadIdLocal] ?? []).map((a) =>
+              a.id === tmpId ? { ...a, id: res.id } : a,
+            ),
+          }));
+        }
+      })
+      .catch((err) => console.error("Failed to save note:", err));
+  }
+
+  function editNote(activityId: string, text: string) {
+    if (!currentLead || !text.trim()) return;
+    const clean = text.trim();
+    // Reflect locally in both session items and persisted-event overlay.
+    setExtraActivities((prev) => ({
+      ...prev,
+      [currentLead.id]: (prev[currentLead.id] ?? []).map((a) =>
+        a.id === activityId ? { ...a, summary: clean } : a,
+      ),
+    }));
+    setEditedNotes((prev) => ({ ...prev, [activityId]: clean }));
+    if (!activityId.startsWith("tmp_")) {
+      void updateLeadNote(funnelId, currentLead.id, activityId, clean).catch((err) =>
+        console.error("Failed to edit note:", err),
+      );
+    }
+  }
+
+  function deleteNote(activityId: string) {
+    if (!currentLead) return;
+    setExtraActivities((prev) => ({
+      ...prev,
+      [currentLead.id]: (prev[currentLead.id] ?? []).filter((a) => a.id !== activityId),
+    }));
+    setDeletedNotes((prev) => new Set(prev).add(activityId));
+    if (!activityId.startsWith("tmp_")) {
+      void deleteLeadNote(funnelId, currentLead.id, activityId).catch((err) =>
+        console.error("Failed to delete note:", err),
+      );
+    }
+  }
+
+  async function handleDnc(contactId: string, value: boolean) {
+    try {
+      await markLeadDnc(funnelId, contactId, value);
+    } catch (err) {
+      console.error("Failed to toggle DNC:", err);
+    } finally {
+      onLeadsChanged?.();
+    }
   }
 
   if (!currentLead) {
@@ -312,11 +370,22 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) 
   }
 
   // Timeline activities = session + real backend events (calls come from the
-  // real call records instead, so we drop event-derived "call" rows).
+  // real call records instead, so we drop event-derived "call" rows). Apply
+  // the note edit/delete overlays and dedupe by id (a freshly-added note can
+  // exist both as a session item and a refetched event with the same id).
+  const seenActivityIds = new Set<string>();
   const timelineActivities = [
     ...(extraActivities[currentLead.id] ?? []),
     ...mapEventsToActivities(currentLead.events ?? []),
-  ].filter((a) => a.type !== "call");
+  ]
+    .filter((a) => a.type !== "call")
+    .filter((a) => !deletedNotes.has(a.id))
+    .filter((a) => {
+      if (seenActivityIds.has(a.id)) return false;
+      seenActivityIds.add(a.id);
+      return true;
+    })
+    .map((a) => (editedNotes[a.id] ? { ...a, summary: editedNotes[a.id] } : a));
 
   return (
     <div className="-m-6 h-[calc(100vh-3.5rem)] flex flex-col bg-page">
@@ -351,6 +420,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) 
             opportunityId={currentLead.opportunityId ?? null}
             onConvert={() => setShowConvert(true)}
             onCall={(phone, name) => dial(phone, name)}
+            onDnc={handleDnc}
             leads={leads}
             statuses={statuses}
             stepTracker={
@@ -374,6 +444,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) 
             activities={timelineActivities}
             callRecords={callRecords}
             onAddNote={addNote}
+            onEditNote={editNote}
+            onDeleteNote={deleteNote}
           />
         </section>
       </div>

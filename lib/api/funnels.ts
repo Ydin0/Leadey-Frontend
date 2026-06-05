@@ -314,6 +314,31 @@ export async function logLeadNote(
   );
 }
 
+/** Edits a previously-saved note (lead event of type "note"). */
+export async function updateLeadNote(
+  funnelId: string,
+  leadId: string,
+  eventId: string,
+  text: string,
+): Promise<{ id: string }> {
+  return apiRequest<{ id: string }>(
+    `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/notes/${encodeURIComponent(eventId)}`,
+    { method: "PATCH", body: JSON.stringify({ text }) },
+  );
+}
+
+/** Deletes a previously-saved note. */
+export async function deleteLeadNote(
+  funnelId: string,
+  leadId: string,
+  eventId: string,
+): Promise<void> {
+  await apiRequest(
+    `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/notes/${encodeURIComponent(eventId)}`,
+    { method: "DELETE" },
+  );
+}
+
 /** Toggles a single person's Do-Not-Contact flag (compliance). Non-destructive:
  *  the person stays in every campaign but is shown in red and calls confirm.
  *  Returns the refreshed funnel. */

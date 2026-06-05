@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-import { CircleCheck, Plus, Check, X, Calendar } from "lucide-react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useAuth } from "@clerk/nextjs";
+import { CircleCheck, Plus, Check, X, Calendar, ChevronDown, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { usePermissions } from "@/lib/hooks/use-permissions";
+import { getTeamMembers } from "@/lib/api/team";
+import type { TeamMember } from "@/lib/types/team";
 import {
   getLeadTasks,
   createLeadTask,
@@ -31,12 +35,92 @@ function dueLabel(dueAt: string | null): { text: string; urgent: boolean } | nul
   };
 }
 
+function memberName(m: TeamMember): string {
+  return [m.firstName, m.lastName].filter(Boolean).join(" ").trim() || m.email;
+}
+
+function initials(name: string): string {
+  return name.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
+}
+
+/** Compact member picker (admins only) used in the add-task form. */
+function AssigneePicker({
+  members,
+  value,
+  currentUserId,
+  onChange,
+}: {
+  members: TeamMember[];
+  value: string | null;
+  currentUserId: string | null;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    function onClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [open]);
+
+  const selected = members.find((m) => m.id === value);
+  const label = selected ? (selected.id === currentUserId ? "Me" : memberName(selected)) : "Assign…";
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-border-subtle text-[11px] text-ink-secondary hover:bg-hover transition-colors"
+      >
+        <User size={11} className="text-ink-muted" />
+        <span className="max-w-[90px] truncate">{label}</span>
+        <ChevronDown size={10} className="text-ink-faint" />
+      </button>
+      {open && (
+        <div className="absolute left-0 bottom-full mb-1 z-50 min-w-[180px] max-h-[220px] overflow-y-auto bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+          {members.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => {
+                onChange(m.id);
+                setOpen(false);
+              }}
+              className={cn(
+                "w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover transition-colors flex items-center gap-2",
+                m.id === value ? "text-ink font-medium" : "text-ink-secondary",
+              )}
+            >
+              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-section text-[8px] font-medium text-ink-secondary shrink-0">
+                {initials(memberName(m))}
+              </span>
+              <span className="truncate">
+                {memberName(m)}
+                {m.id === currentUserId ? " (me)" : ""}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadId: string }) {
   const isAuthReady = useAuthReady();
+  const { userId } = useAuth();
+  const { isManager } = usePermissions();
+
   const [tasks, setTasks] = useState<LeadTask[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
   const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState("");
   const [due, setDue] = useState("");
+  const [assignee, setAssignee] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -51,6 +135,19 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
     if (!isAuthReady) return;
     void load();
   }, [isAuthReady, load]);
+
+  // Admins/managers can assign to anyone → load the roster for the picker.
+  useEffect(() => {
+    if (!isAuthReady || !isManager) return;
+    getTeamMembers()
+      .then((res) => setMembers(res.members))
+      .catch(() => setMembers([]));
+  }, [isAuthReady, isManager]);
+
+  function startAdding() {
+    setAssignee(userId ?? null);
+    setAdding(true);
+  }
 
   async function toggle(task: LeadTask) {
     const next = !task.done;
@@ -81,6 +178,8 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
       const created = await createLeadTask(funnelId, leadId, {
         label: label.trim(),
         dueAt: due ? new Date(due + "T12:00:00").toISOString() : null,
+        // Members can only self-assign; admins pick anyone.
+        assigneeId: isManager ? assignee : userId,
       });
       setTasks((prev) => [...prev, created]);
       setLabel("");
@@ -100,11 +199,13 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
       icon={CircleCheck}
       title="Tasks"
       count={openCount}
-      actions={<MiniBtn icon={Plus} title="Add task" onClick={() => setAdding(true)} />}
+      actions={<MiniBtn icon={Plus} title="Add task" onClick={startAdding} />}
     >
       <div className="flex flex-col gap-0.5">
         {tasks.map((task) => {
           const d = dueLabel(task.dueAt);
+          const assigneeLabel =
+            task.assigneeId && task.assigneeId === userId ? "Me" : task.assigneeName || null;
           return (
             <div
               key={task.id}
@@ -122,14 +223,22 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
               >
                 {task.done && <Check size={10} strokeWidth={2.5} className="text-signal-green-text" />}
               </button>
-              <span
-                className={cn(
-                  "flex-1 text-[12px] leading-snug",
-                  task.done ? "text-ink-faint line-through" : "text-ink-secondary",
+              <div className="flex-1 min-w-0">
+                <span
+                  className={cn(
+                    "block text-[12px] leading-snug truncate",
+                    task.done ? "text-ink-faint line-through" : "text-ink-secondary",
+                  )}
+                >
+                  {task.label}
+                </span>
+                {assigneeLabel && (
+                  <span className="flex items-center gap-1 text-[10px] text-ink-faint mt-0.5">
+                    <User size={9} />
+                    {assigneeLabel}
+                  </span>
                 )}
-              >
-                {task.label}
-              </span>
+              </div>
               {d && (
                 <span
                   className={cn(
@@ -165,8 +274,8 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
               placeholder="Add a task…"
               className="w-full bg-transparent text-[12px] text-ink placeholder:text-ink-faint focus:outline-none"
             />
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 text-ink-faint">
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="flex items-center gap-1.5 text-ink-faint cursor-pointer">
                 <Calendar size={12} />
                 <input
                   type="date"
@@ -174,7 +283,15 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
                   onChange={(e) => setDue(e.target.value)}
                   className="bg-transparent text-[11px] text-ink-secondary focus:outline-none"
                 />
-              </div>
+              </label>
+              {isManager && members.length > 0 && (
+                <AssigneePicker
+                  members={members}
+                  value={assignee}
+                  currentUserId={userId ?? null}
+                  onChange={setAssignee}
+                />
+              )}
               <div className="flex-1" />
               <button
                 onClick={() => setAdding(false)}
@@ -194,7 +311,7 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
         ) : (
           tasks.length === 0 && (
             <button
-              onClick={() => setAdding(true)}
+              onClick={startAdding}
               className="flex items-center gap-2 py-1.5 px-1 text-[11.5px] text-ink-muted hover:text-ink-secondary transition-colors"
             >
               <Plus size={12} />
