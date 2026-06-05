@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LeadActionBar } from "./lead-action-bar";
 import { LeadDetailsColumn } from "./lead-details-column";
 import { LeadTimeline } from "./lead-timeline";
@@ -41,6 +43,7 @@ interface ProgressOverride {
 export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) {
   const steps = funnel.steps;
   const funnelId = funnel.id;
+  const router = useRouter();
   const { statuses } = useLeadStatuses();
   const { startCall, lastEndedCall } = useCallContext();
 
@@ -55,6 +58,18 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) 
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
 
   const currentLead = useMemo(() => leads.find((l) => l.id === leadId) || null, [leads, leadId]);
+
+  // ── Prev / next lead navigation (buttons + arrow keys) ──
+  const currentIndex = useMemo(() => leads.findIndex((l) => l.id === leadId), [leads, leadId]);
+  const prevLead = currentIndex > 0 ? leads[currentIndex - 1] : null;
+  const nextLead = currentIndex >= 0 && currentIndex < leads.length - 1 ? leads[currentIndex + 1] : null;
+
+  const goToLead = useCallback(
+    (lead: FunnelLead | null) => {
+      if (lead) router.push(`/dashboard/funnels/${funnelId}/leads/${lead.id}`);
+    },
+    [router, funnelId],
+  );
 
   // ── Real per-lead call records (audio + AI summary in the timeline) ──
   const reloadCalls = useCallback(async () => {
@@ -76,6 +91,22 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) 
     const t = setTimeout(() => void reloadCalls(), 1500);
     return () => clearTimeout(t);
   }, [lastEndedCall, leadId, reloadCalls]);
+
+  // ← / → arrow keys jump between leads — ignored while typing or with a
+  // modal/composer open.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (showComposer || noteOpen || showConvert) return;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) {
+        return;
+      }
+      if (e.key === "ArrowLeft") goToLead(prevLead);
+      else if (e.key === "ArrowRight") goToLead(nextLead);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [goToLead, prevLead, nextLead, showComposer, noteOpen, showConvert]);
 
   const leadProgress = currentLead ? progress[currentLead.id] : undefined;
   const currentStatus = currentLead
@@ -340,6 +371,31 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch }: LeadViewProps) 
           />
         </section>
       </div>
+
+      {/* Prev / next lead navigation — bottom right (also ← / → keys) */}
+      {leads.length > 1 && currentIndex >= 0 && (
+        <div className="fixed bottom-6 right-6 z-30 flex items-center gap-1 rounded-full bg-surface border border-border-default shadow-xl px-1.5 py-1.5">
+          <button
+            onClick={() => goToLead(prevLead)}
+            disabled={!prevLead}
+            title="Previous lead (←)"
+            className="flex items-center justify-center w-8 h-8 rounded-full text-ink-secondary hover:bg-hover transition-colors disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <ChevronLeft size={16} strokeWidth={2} />
+          </button>
+          <span className="text-[11px] text-ink-muted tabular-nums px-1.5 select-none">
+            {currentIndex + 1} / {leads.length}
+          </span>
+          <button
+            onClick={() => goToLead(nextLead)}
+            disabled={!nextLead}
+            title="Next lead (→)"
+            className="flex items-center justify-center w-8 h-8 rounded-full text-ink-secondary hover:bg-hover transition-colors disabled:opacity-30 disabled:pointer-events-none"
+          >
+            <ChevronRight size={16} strokeWidth={2} />
+          </button>
+        </div>
+      )}
 
       {/* Email composer */}
       <EmailComposerDrawer
