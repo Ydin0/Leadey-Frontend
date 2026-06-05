@@ -419,6 +419,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
             hiringRoles={hiringRoles}
             opportunityId={currentLead.opportunityId ?? null}
             onConvert={() => setShowConvert(true)}
+            onOpportunityChanged={() => onLeadsChanged?.()}
             onCall={(phone, name) => dial(phone, name)}
             onDnc={handleDnc}
             leads={leads}

@@ -38,6 +38,7 @@ interface LeadDetailsColumnProps {
   hiringRoles: string[];
   opportunityId: string | null;
   onConvert: () => void;
+  onOpportunityChanged: () => void;
   onCall: (phone: string, name: string) => void;
   onDnc: (contactId: string, value: boolean) => void | Promise<void>;
   leads: FunnelLead[];
@@ -178,6 +179,7 @@ export function LeadDetailsColumn({
   hiringRoles,
   opportunityId,
   onConvert,
+  onOpportunityChanged,
   onCall,
   onDnc,
   leads,
@@ -263,7 +265,11 @@ export function LeadDetailsColumn({
           <LeadTasksSection funnelId={funnelId} leadId={leadId} />
 
           {/* Opportunities */}
-          <LeadOpportunitySection opportunityId={opportunityId} onConvert={onConvert} />
+          <LeadOpportunitySection
+            opportunityId={opportunityId}
+            onConvert={onConvert}
+            onChanged={onOpportunityChanged}
+          />
 
           {/* Contacts */}
           <Section icon={Users} title="Contacts" count={contacts.length}>
