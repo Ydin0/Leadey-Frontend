@@ -121,7 +121,7 @@ export default function OpportunitiesListPage() {
                         href={
                           opp.sourceLeadId && opp.funnelId
                             ? `/dashboard/funnels/${opp.funnelId}/leads/${opp.sourceLeadId}`
-                            : `/dashboard/opportunities/${opp.id}`
+                            : `/dashboard/opportunities`
                         }
                         className="text-[12px] font-medium text-ink hover:text-signal-blue-text truncate block"
                       >

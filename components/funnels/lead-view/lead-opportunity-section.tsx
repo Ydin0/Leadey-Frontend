@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Briefcase, Plus, ExternalLink } from "lucide-react";
+import { Briefcase, Plus } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getOpportunity, listPipelines } from "@/lib/api/opportunities";
@@ -87,13 +86,6 @@ export function LeadOpportunitySection({ opportunityId, onConvert }: LeadOpportu
               </span>
             )}
           </div>
-          <Link
-            href={`/dashboard/opportunities/${opportunityId}`}
-            className="flex items-center gap-1.5 mt-3 text-[11px] text-signal-blue-text hover:opacity-80 transition-opacity"
-          >
-            <ExternalLink size={11} />
-            Open opportunity
-          </Link>
         </div>
       ) : (
         <button

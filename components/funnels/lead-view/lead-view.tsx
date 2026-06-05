@@ -498,6 +498,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
           leadId={currentLead.id}
           defaultName={`${currentLead.company} — Opportunity`}
           onClose={() => setShowConvert(false)}
+          onConverted={() => onLeadsChanged?.()}
         />
       )}
 

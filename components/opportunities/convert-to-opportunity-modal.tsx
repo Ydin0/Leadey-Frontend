@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2, X, Briefcase } from "lucide-react";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { convertLead, listPipelines } from "@/lib/api/opportunities";
@@ -22,7 +21,6 @@ export function ConvertToOpportunityModal({
   onClose,
   onConverted,
 }: ConvertToOpportunityModalProps) {
-  const router = useRouter();
   const { members } = useTeamMembers();
 
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -91,8 +89,10 @@ export function ConvertToOpportunityModal({
         ownerId: ownerId || undefined,
         notes: notes.trim() || undefined,
       });
+      // The dedicated opportunity page is gone — let the caller decide where to
+      // go (the lead view refreshes in place / navigates to the lead).
       onConverted?.(opp.id);
-      router.push(`/dashboard/opportunities/${opp.id}`);
+      onClose();
     } catch (err: any) {
       setError(err?.message || "Failed to convert lead");
       setSubmitting(false);

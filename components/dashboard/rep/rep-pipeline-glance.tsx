@@ -112,7 +112,7 @@ export function RepPipelineGlance({ summary, pipelines, opps }: RepPipelineGlanc
                 href={
                   o.sourceLeadId && o.funnelId
                     ? `/dashboard/funnels/${o.funnelId}/leads/${o.sourceLeadId}`
-                    : `/dashboard/opportunities/${o.id}`
+                    : `/dashboard/opportunities`
                 }
                 className="flex items-center gap-2.5 px-2 py-2 rounded-[9px] hover:bg-section transition-colors"
               >

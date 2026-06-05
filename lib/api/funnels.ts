@@ -98,6 +98,7 @@ function hydrateLead(raw: ApiFunnelLead): FunnelLead {
     companyAnnualRevenue: (raw as any).companyAnnualRevenue || undefined,
     companyHiringRoles: Array.isArray((raw as any).companyHiringRoles) ? (raw as any).companyHiringRoles : undefined,
     doNotCall: !!(raw as any).doNotCall,
+    opportunityId: (raw as any).opportunityId || null,
     notes: notes && typeof notes === "object" && !Array.isArray(notes) ? notes : undefined,
     linkedinUrl: (raw as any).linkedinUrl || undefined,
     unipileProviderId: (raw as any).unipileProviderId || null,

@@ -39,12 +39,12 @@ export function OpportunityCard({
   const closeDate = opp.expectedCloseDate
     ? new Date(opp.expectedCloseDate + "T00:00:00")
     : null;
-  // Opportunities converted from a campaign lead open the Lead View; manual
-  // opportunities keep the dedicated opportunity page.
+  // Opportunities open their source lead in the Lead View (there's no longer a
+  // dedicated opportunity page). Fall back to the pipeline if the lead is gone.
   const href =
     opp.sourceLeadId && opp.funnelId
       ? `/dashboard/funnels/${opp.funnelId}/leads/${opp.sourceLeadId}`
-      : `/dashboard/opportunities/${opp.id}`;
+      : `/dashboard/opportunities`;
 
   return (
     <div
