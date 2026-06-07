@@ -222,27 +222,27 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
           {fileName} · {csvRows.length.toLocaleString()} rows · match each column to a lead or company field.
         </p>
 
-        <div className="bg-surface rounded-[14px] border border-border-subtle overflow-hidden mb-3 max-h-[340px] overflow-y-auto">
-          <table className="w-full">
-            <thead className="sticky top-0 bg-section/95 backdrop-blur">
+        <div className="bg-surface rounded-[14px] border border-border-subtle overflow-hidden mb-3 max-h-[52vh] overflow-y-auto">
+          <table className="w-full table-fixed">
+            <thead className="sticky top-0 bg-section/95 backdrop-blur z-10">
               <tr className="border-b border-border-subtle">
-                <th className="text-left text-[10px] uppercase tracking-wider text-ink-muted font-medium px-3 py-2">CSV column</th>
-                <th className="text-left text-[10px] uppercase tracking-wider text-ink-muted font-medium px-3 py-2">Sample</th>
-                <th className="text-left text-[10px] uppercase tracking-wider text-ink-muted font-medium px-3 py-2 w-[200px]">Maps to</th>
+                <th className="text-left text-[10px] uppercase tracking-wider text-ink-muted font-medium px-3 py-2 w-[32%]">CSV column</th>
+                <th className="text-left text-[10px] uppercase tracking-wider text-ink-muted font-medium px-3 py-2 w-[30%]">Sample</th>
+                <th className="text-left text-[10px] uppercase tracking-wider text-ink-muted font-medium px-3 py-2 w-[38%]">Maps to</th>
               </tr>
             </thead>
             <tbody>
               {mappings.map((m, index) => (
                 <tr key={m.csvColumn} className="border-b border-border-subtle last:border-0">
-                  <td className="px-3 py-2 text-[12px] font-medium text-ink whitespace-nowrap">{m.csvColumn}</td>
-                  <td className="px-3 py-2 text-[11px] text-ink-muted truncate max-w-[160px]">{m.sample || <span className="text-ink-faint">—</span>}</td>
+                  <td className="px-3 py-2 text-[12px] font-medium text-ink truncate" title={m.csvColumn}>{m.csvColumn}</td>
+                  <td className="px-3 py-2 text-[11px] text-ink-muted truncate" title={m.sample}>{m.sample || <span className="text-ink-faint">—</span>}</td>
                   <td className="px-3 py-2">
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
                       <FieldKind field={m.mappedField} />
                       <select
                         value={m.mappedField}
                         onChange={(e) => setMappings((prev) => prev.map((x, i) => (i === index ? { ...x, mappedField: e.target.value as MappedField, autoMapped: false } : x)))}
-                        className="flex-1 text-[11px] text-ink bg-section border border-border-subtle rounded-lg px-2 py-1.5 focus:outline-none focus:border-border-default"
+                        className="flex-1 min-w-0 text-[11px] text-ink bg-section border border-border-subtle rounded-lg px-2 py-1.5 focus:outline-none focus:border-border-default"
                       >
                         <optgroup label="Lead">{LEAD_FIELDS.map((o) => <option key={o} value={o}>{o.replace("Lead ", "")}{REQUIRED.includes(o) ? " *" : ""}</option>)}</optgroup>
                         <optgroup label="Company">{COMPANY_FIELDS.map((o) => <option key={o} value={o}>{o.replace("Company ", "")}{REQUIRED.includes(o) ? " *" : ""}</option>)}</optgroup>
