@@ -75,6 +75,8 @@ export interface FunnelLead {
    *  "→ Opp" badge on the lead row and the "Open Opportunity" CTA in the
    *  focus view. */
   opportunityId?: string | null;
+  /** Org-defined custom field values (label/value/isLink), from the backend. */
+  customFields?: { key: string; label: string; value: string; isLink: boolean }[];
   events?: FunnelLeadEvent[];
 }
 
@@ -163,5 +165,12 @@ export interface Funnel {
   cockpit: FunnelCockpit;
   analyticsSteps: FunnelAnalyticsStep[];
   members: FunnelMember[];
+  /** Inbound lead-ingestion webhook config. */
+  webhookToken?: string | null;
+  webhookEnabled?: boolean;
+  /** Maps incoming payload key → target ("email", "custom:<key>", …). */
+  webhookFieldMap?: Record<string, string>;
+  /** Full public webhook URL (built server-side from WEBHOOK_BASE_URL). */
+  webhookUrl?: string | null;
   createdAt: Date;
 }

@@ -7,12 +7,14 @@ import { TeamSection } from "./team-section";
 import { ProfileSection } from "./profile-section";
 import { OrganizationSection } from "./organization-section";
 import { LeadStatusesSection } from "./lead-statuses-section";
+import { CustomFieldsSection } from "./custom-fields-section";
 import {
   Bell,
   Briefcase,
   Building2,
   CreditCard,
   Linkedin,
+  ListPlus,
   Phone,
   PhoneCall,
   PlugZap,
@@ -40,6 +42,7 @@ type SettingsTab =
   | "organization"
   | "team"
   | "lead-statuses"
+  | "custom-fields"
   | "phone-lines"
   | "dialer"
   | "pipelines"
@@ -53,6 +56,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "organization", label: "Organization", icon: Building2 },
   { id: "team", label: "Team", icon: Users },
   { id: "lead-statuses", label: "Lead Statuses", icon: Tags },
+  { id: "custom-fields", label: "Custom Fields", icon: ListPlus },
   { id: "phone-lines", label: "Phone Lines", icon: Phone },
   { id: "dialer", label: "Power Dialer", icon: PhoneCall },
   { id: "pipelines", label: "Pipelines", icon: Briefcase },
@@ -167,6 +171,7 @@ const VALID_TABS: SettingsTab[] = [
   "organization",
   "team",
   "lead-statuses",
+  "custom-fields",
   "phone-lines",
   "dialer",
   "pipelines",
@@ -290,6 +295,8 @@ export function SettingsShell() {
           )}
 
           {activeTab === "lead-statuses" && <LeadStatusesSection />}
+
+          {activeTab === "custom-fields" && <CustomFieldsSection />}
 
           {activeTab === "phone-lines" && <PhoneLinesTab />}
 

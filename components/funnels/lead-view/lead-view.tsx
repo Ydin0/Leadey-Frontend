@@ -165,6 +165,12 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
     const l = currentLead;
     if (!l) return [];
     const fields: FunnelLeadCustomField[] = [];
+    // Org-defined custom fields (from Settings → Custom Fields) come first.
+    if (Array.isArray(l.customFields)) {
+      for (const f of l.customFields) {
+        if (f.value) fields.push({ label: f.label, value: f.value, isLink: f.isLink });
+      }
+    }
     if (l.companyLinkedin) fields.push({ label: "Company LinkedIn", value: l.companyLinkedin, isLink: true });
     if (l.companyAnnualRevenue) fields.push({ label: "Annual Revenue", value: l.companyAnnualRevenue });
     if (l.source) fields.push({ label: "Lead Source", value: l.source });

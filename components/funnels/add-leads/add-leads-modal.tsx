@@ -78,7 +78,9 @@ export function AddLeadsModal({ funnelId, onClose, onLeadsImported }: AddLeadsMo
             />
           )}
           {activeSource === "signals" && <SignalsFlow onDone={onClose} />}
-          {activeSource === "webhook" && <WebhookFlow onDone={onClose} />}
+          {activeSource === "webhook" && (
+            <WebhookFlow funnelId={funnelId} onDone={onClose} />
+          )}
           {activeSource === "companies" && <CompaniesFlow onDone={onClose} />}
         </div>
       </div>

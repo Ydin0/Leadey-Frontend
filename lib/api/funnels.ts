@@ -99,6 +99,14 @@ function hydrateLead(raw: ApiFunnelLead): FunnelLead {
     companyHiringRoles: Array.isArray((raw as any).companyHiringRoles) ? (raw as any).companyHiringRoles : undefined,
     doNotCall: !!(raw as any).doNotCall,
     opportunityId: (raw as any).opportunityId || null,
+    customFields: Array.isArray((raw as any).customFields)
+      ? (raw as any).customFields.map((f: any) => ({
+          key: asString(f.key),
+          label: asString(f.label),
+          value: asString(f.value),
+          isLink: !!f.isLink,
+        }))
+      : undefined,
     notes: notes && typeof notes === "object" && !Array.isArray(notes) ? notes : undefined,
     linkedinUrl: (raw as any).linkedinUrl || undefined,
     unipileProviderId: (raw as any).unipileProviderId || null,
@@ -188,6 +196,13 @@ function hydrateFunnel(raw: ApiFunnel): Funnel {
           addedAt: parseDate(m.addedAt),
         }))
       : [],
+    webhookToken: (raw as any).webhookToken ?? null,
+    webhookEnabled: !!(raw as any).webhookEnabled,
+    webhookFieldMap:
+      (raw as any).webhookFieldMap && typeof (raw as any).webhookFieldMap === "object"
+        ? (raw as any).webhookFieldMap
+        : {},
+    webhookUrl: (raw as any).webhookUrl ?? null,
     createdAt: parseDate(raw.createdAt),
   };
 }
@@ -199,6 +214,24 @@ export async function listFunnels(): Promise<Funnel[]> {
 
 export async function getFunnelById(funnelId: string): Promise<Funnel> {
   const data = await apiRequest<ApiFunnel>(`/funnels/${encodeURIComponent(funnelId)}`);
+  return hydrateFunnel(data);
+}
+
+export interface UpdateFunnelWebhookPayload {
+  enabled?: boolean;
+  rotateToken?: boolean;
+  fieldMap?: Record<string, string>;
+}
+
+/** PATCH /funnels/:id/webhook — manage the inbound lead-ingestion webhook. */
+export async function updateFunnelWebhook(
+  funnelId: string,
+  payload: UpdateFunnelWebhookPayload,
+): Promise<Funnel> {
+  const data = await apiRequest<ApiFunnel>(
+    `/funnels/${encodeURIComponent(funnelId)}/webhook`,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
   return hydrateFunnel(data);
 }
 
