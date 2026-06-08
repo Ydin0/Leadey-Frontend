@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2, Lock } from "lucide-react";
 import { useCustomFields } from "@/lib/hooks/use-custom-fields";
 import { saveCustomFields } from "@/lib/api/custom-fields";
 import {
@@ -24,6 +24,20 @@ const EMPTY_DRAFT: DraftField = {
   options: [],
   isRequired: false,
 };
+
+/** Built-in lead fields that always exist and can't be edited or removed.
+ *  These map directly to columns on every lead. */
+const DEFAULT_FIELDS: { label: string; type: string }[] = [
+  { label: "Name", type: "Text" },
+  { label: "Email", type: "Email" },
+  { label: "Phone", type: "Phone" },
+  { label: "Title", type: "Text" },
+  { label: "Company", type: "Text" },
+  { label: "LinkedIn URL", type: "Link" },
+  { label: "Lead Status", type: "Status" },
+  { label: "Score", type: "Number" },
+  { label: "Source", type: "Text" },
+];
 
 export function CustomFieldsSection() {
   const { fields, loading, reload } = useCustomFields();
@@ -99,6 +113,35 @@ export function CustomFieldsSection() {
 
   return (
     <div className="space-y-6">
+      {/* Default fields (read-only) */}
+      <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
+        <div className="flex items-center justify-between mb-1">
+          <h3 className="text-[14px] font-semibold text-ink">Default Fields</h3>
+          <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">
+            {DEFAULT_FIELDS.length} built-in · {draft.length} custom
+          </span>
+        </div>
+        <p className="text-[11px] text-ink-muted mb-4">
+          These fields exist on every lead and can&apos;t be edited or removed.
+          Add your own below.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {DEFAULT_FIELDS.map((f) => (
+            <span
+              key={f.label}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary"
+            >
+              {f.label}
+              <span className="text-[9px] uppercase tracking-wide text-ink-faint">
+                {f.type}
+              </span>
+              <Lock size={9} className="text-ink-faint" />
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Custom fields (editable) */}
       <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-[14px] font-semibold text-ink">Custom Fields</h3>
