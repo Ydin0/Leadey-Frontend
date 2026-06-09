@@ -3,9 +3,9 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ChevronLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { navItems } from "@/lib/mock-data";
+import { navItems, emailNavItems } from "@/lib/mock-data";
 import { useSidebarFunnels } from "@/hooks/use-sidebar-funnels";
 import { LeadeyMark, LeadeyWordmark } from "@/components/brand/leadey-mark";
 
@@ -14,6 +14,14 @@ export function Sidebar() {
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const pathname = usePathname();
   const { items: funnelItems } = useSidebarFunnels();
+
+  // Route-driven "email mode": under /dashboard/email the sidebar swaps to the
+  // cold-email tabs and shows a "Back to Cockpit" link.
+  const emailMode =
+    pathname === "/dashboard/email" || pathname.startsWith("/dashboard/email/");
+  const items = emailMode ? emailNavItems : navItems;
+  // Hrefs that should match exactly (their children are separate tabs).
+  const EXACT_HREFS = new Set(["/dashboard", "/dashboard/email"]);
 
   const toggleGroup = useCallback((id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -63,11 +71,10 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 flex flex-col gap-0.5 px-2 py-2 overflow-y-auto">
-        {navItems.map((item) => {
-          const isActive =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname === item.href || pathname.startsWith(item.href + "/");
+        {items.map((item) => {
+          const isActive = EXACT_HREFS.has(item.href)
+            ? pathname === item.href
+            : pathname === item.href || pathname.startsWith(item.href + "/");
           const Icon = item.icon;
           const hasDynamicChildren = item.dynamicChildren && funnelItems.length > 0;
           const isGroupOpen = expandedGroups.has(item.id);
@@ -170,6 +177,26 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Back to Cockpit — only in email mode */}
+      {emailMode && (
+        <div className="px-2 py-2 border-t border-border-subtle shrink-0">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3 h-9 px-2 rounded-lg transition-colors hover:bg-hover/60"
+          >
+            <ChevronLeft size={17} strokeWidth={1.5} className="shrink-0 text-ink-muted" />
+            <span
+              className={cn(
+                "text-[13px] whitespace-nowrap transition-opacity duration-200 truncate text-ink-secondary",
+                expanded ? "opacity-100" : "opacity-0",
+              )}
+            >
+              Back to Cockpit
+            </span>
+          </Link>
+        </div>
+      )}
     </aside>
   );
 }

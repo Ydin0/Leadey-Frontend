@@ -16,6 +16,9 @@ import {
   Users,
   UsersRound,
   GraduationCap,
+  Flame,
+  AtSign,
+  Globe,
 } from "lucide-react";
 import type {
   NavItem,
@@ -39,6 +42,7 @@ import type {
 export const navItems: NavItem[] = [
   { id: "cockpit", label: "Cockpit", icon: LayoutDashboard, href: "/dashboard" },
   { id: "funnels", label: "Campaigns", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
+  { id: "email", label: "Cold Email", icon: Mail, href: "/dashboard/email" },
   { id: "inbox", label: "Inbox", icon: Inbox, href: "/dashboard/inbox" },
   { id: "opportunities", label: "Opportunities", icon: Briefcase, href: "/dashboard/opportunities" },
   { id: "scrapers", label: "Scrapers", icon: Search, href: "/dashboard/scrapers" },
@@ -48,6 +52,21 @@ export const navItems: NavItem[] = [
   { id: "team", label: "Team", icon: UsersRound, href: "/dashboard/team" },
   { id: "knowledge-base", label: "Knowledge Base", icon: GraduationCap, href: "/dashboard/knowledge-base" },
   { id: "settings", label: "Settings", icon: Settings, href: "/dashboard/settings" },
+];
+
+// ── Cold Email "email mode" navigation ──────────────────────
+// When the route is under /dashboard/email, the sidebar swaps to these tabs
+// (plus a "Back to Cockpit" link). Defined here so the sidebar stays declarative.
+export const emailNavItems: NavItem[] = [
+  { id: "email-overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard/email" },
+  { id: "email-campaigns", label: "Campaigns", icon: Send, href: "/dashboard/email/campaigns" },
+  { id: "email-inbox", label: "Master Inbox", icon: Inbox, href: "/dashboard/email/inbox" },
+  { id: "email-warmup", label: "Warmup", icon: Flame, href: "/dashboard/email/warmup" },
+  { id: "email-mailboxes", label: "Email Accounts", icon: AtSign, href: "/dashboard/email/mailboxes" },
+  { id: "email-domains", label: "Domains", icon: Globe, href: "/dashboard/email/domains" },
+  { id: "email-templates", label: "Templates", icon: FileText, href: "/dashboard/email/templates" },
+  { id: "email-team", label: "Team", icon: UsersRound, href: "/dashboard/email/team" },
+  { id: "email-settings", label: "Settings", icon: Settings, href: "/dashboard/email/settings" },
 ];
 
 // ── Quick Stats ─────────────────────────────────────────────
