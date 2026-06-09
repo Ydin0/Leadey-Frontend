@@ -41,6 +41,9 @@ export interface FunnelLeadActivity {
   detail?: string;
   timestamp: Date;
   userInitials: string;
+  /** The team member who performed this activity (when known). */
+  userId?: string | null;
+  userName?: string | null;
 }
 
 export interface FunnelLeadCustomField {

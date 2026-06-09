@@ -22,8 +22,28 @@ import {
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { AudioPlayer } from "@/components/recordings/audio-player";
 import { summarizeCall } from "@/lib/api/phone-lines";
+import { MemberAvatar } from "@/components/shared/member-avatar";
+import { useTeamMembers } from "@/hooks/use-team-members";
 import type { FunnelLeadActivity } from "@/lib/types/funnel-focus";
 import type { CallRecord } from "@/lib/types/calling";
+
+/** Who performed an activity — resolved to a display name + a stable id for
+ *  the avatar colour. */
+interface Actor {
+  id: string;
+  name: string;
+}
+
+/** Small avatar + first-name chip shown on activity rows. */
+function ActorBadge({ actor }: { actor: Actor | null | undefined }) {
+  if (!actor) return null;
+  return (
+    <span className="flex items-center gap-1.5 shrink-0" title={actor.name}>
+      <MemberAvatar id={actor.id} name={actor.name} />
+      <span className="text-[11px] text-ink-muted">{actor.name.split(" ")[0]}</span>
+    </span>
+  );
+}
 
 interface KindMeta {
   icon: LucideIcon;
@@ -43,8 +63,8 @@ const TYPE_META: Record<string, KindMeta> = {
 };
 
 type FeedItem =
-  | { id: string; kind: "call"; timestamp: Date; record: CallRecord }
-  | { id: string; kind: "activity"; timestamp: Date; activity: FunnelLeadActivity };
+  | { id: string; kind: "call"; timestamp: Date; record: CallRecord; actor: Actor | null }
+  | { id: string; kind: "activity"; timestamp: Date; activity: FunnelLeadActivity; actor: Actor | null };
 
 function fmtDuration(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
@@ -52,7 +72,7 @@ function fmtDuration(sec: number): string {
 }
 
 /* ── Call card — real recording + AI summary ─────────────────────────── */
-function CallCard({ record }: { record: CallRecord }) {
+function CallCard({ record, actor }: { record: CallRecord; actor: Actor | null }) {
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<"summary" | "notes">("summary");
   const [summary, setSummary] = useState<string | null>(record.summary ?? null);
@@ -100,7 +120,10 @@ function CallCard({ record }: { record: CallRecord }) {
             {fmtDuration(record.duration)}
           </span>
         </div>
-        <span className="text-[10.5px] text-ink-faint shrink-0">{formatRelativeTime(record.timestamp)}</span>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <ActorBadge actor={actor} />
+          <span className="text-[10.5px] text-ink-faint">{formatRelativeTime(record.timestamp)}</span>
+        </div>
       </div>
 
       {record.recordingUrl && expanded && (
@@ -151,10 +174,12 @@ function CallCard({ record }: { record: CallRecord }) {
 /* ── Generic activity card (notes are editable / deletable) ──────────── */
 function ActivityCard({
   a,
+  actor,
   onEdit,
   onDelete,
 }: {
   a: FunnelLeadActivity;
+  actor: Actor | null;
   onEdit?: (id: string, text: string) => void;
   onDelete?: (id: string) => void;
 }) {
@@ -206,7 +231,7 @@ function ActivityCard({
           <p className="text-[12.5px] text-ink leading-snug whitespace-pre-wrap">{a.summary}</p>
           {a.detail && <p className="text-[11.5px] text-ink-muted mt-1 leading-relaxed">{a.detail}</p>}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2.5 shrink-0">
           {editable && (
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
@@ -228,6 +253,7 @@ function ActivityCard({
               </button>
             </div>
           )}
+          <ActorBadge actor={actor} />
           <span className="text-[10.5px] text-ink-faint">{formatRelativeTime(a.timestamp)}</span>
         </div>
       </div>
@@ -260,9 +286,9 @@ function TimelineRow({
       </div>
       <div className={cn("flex-1 min-w-0", last ? "pb-0" : "pb-4")}>
         {item.kind === "call" ? (
-          <CallCard record={item.record} />
+          <CallCard record={item.record} actor={item.actor} />
         ) : (
-          <ActivityCard a={item.activity} onEdit={onEditNote} onDelete={onDeleteNote} />
+          <ActivityCard a={item.activity} actor={item.actor} onEdit={onEditNote} onDelete={onDeleteNote} />
         )}
       </div>
     </div>
@@ -316,22 +342,35 @@ type Filter = (typeof FILTERS)[number];
 
 export function LeadTimeline({ activities, callRecords, onAddNote, onEditNote, onDeleteNote }: LeadTimelineProps) {
   const [filter, setFilter] = useState<Filter>("All");
+  const { resolveMember } = useTeamMembers();
 
   const feed = useMemo<FeedItem[]>(() => {
+    // Resolve an actor from a user id + optional stored name. The team list
+    // provides the display name; we fall back to the stored name (e.g. on a
+    // call record) so it works even before the team list loads.
+    const toActor = (id?: string | null, name?: string | null): Actor | null => {
+      const resolved = id ? resolveMember(id)?.name : undefined;
+      const display = resolved || name || "";
+      if (!id && !display) return null;
+      return { id: id || display, name: display || "Unknown" };
+    };
+
     const calls: FeedItem[] = callRecords.map((r) => ({
       id: r.id,
       kind: "call",
       timestamp: new Date(r.timestamp),
       record: r,
+      actor: toActor(r.userId, r.userName),
     }));
     const acts: FeedItem[] = activities.map((a) => ({
       id: a.id,
       kind: "activity",
       timestamp: a.timestamp,
       activity: a,
+      actor: toActor(a.userId, a.userName),
     }));
     return [...calls, ...acts].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [activities, callRecords]);
+  }, [activities, callRecords, resolveMember]);
 
   const items = useMemo(() => {
     const conv = new Set(["call", "email_sent", "email_opened", "linkedin"]);

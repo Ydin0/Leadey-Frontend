@@ -61,7 +61,19 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
         summary = labelize(e.type);
       }
 
-      return { id: e.id, type, summary, detail: detail || undefined, timestamp: e.timestamp, userInitials: "" };
+      const userId = (e.meta?.userId as string) || null;
+      const userName = (e.meta?.userName as string) || null;
+
+      return {
+        id: e.id,
+        type,
+        summary,
+        detail: detail || undefined,
+        timestamp: e.timestamp,
+        userInitials: "",
+        userId,
+        userName,
+      };
     });
 }
 
