@@ -11,6 +11,7 @@ import {
   MicOff,
   X,
   Check,
+  ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDialerContext } from "@/components/dialer/context/dialer-context";
@@ -99,6 +100,24 @@ export function DialerBar() {
 
             {/* Controls */}
             <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={dialer.followMode ? dialer.stopFollow : dialer.openFollow}
+                title={
+                  dialer.followMode
+                    ? "Following — main screen tracks each lead's profile"
+                    : "Open the lead's profile and follow as you dial"
+                }
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] text-[11px] font-medium transition-colors border mr-1",
+                  dialer.followMode
+                    ? "bg-signal-blue text-signal-blue-text border-signal-blue-text/20"
+                    : "bg-section text-ink-secondary border-border-subtle hover:bg-hover",
+                )}
+              >
+                <ExternalLink size={12} strokeWidth={2} />
+                {dialer.followMode ? "Following" : "Open"}
+              </button>
+
               <IconButton title="Previous (B)" onClick={() => void dialer.back()}>
                 <SkipBack size={14} />
               </IconButton>

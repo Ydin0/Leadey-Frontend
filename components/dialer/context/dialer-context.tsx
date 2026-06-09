@@ -8,6 +8,7 @@ import {
   useCallback,
   useRef,
 } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import { useCallContext } from "@/components/calling/call-context";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { confirmDncCall } from "@/lib/utils/dnc";
@@ -44,6 +45,13 @@ interface DialerContextValue {
   mode: DialerMode;
   /** Seconds left before the next auto-dial, or null when not counting. */
   countdown: number | null;
+  /** When true, the main screen follows the current lead's profile page and
+   *  auto-navigates to the next lead as the dialer advances. */
+  followMode: boolean;
+  /** Open the current lead's profile and start following subsequent leads. */
+  openFollow: () => void;
+  /** Stop following (stay on the current page). */
+  stopFollow: () => void;
   /** True while Twilio is connecting or a call is live. */
   isDialing: boolean;
   loading: boolean;
@@ -75,6 +83,8 @@ export function useDialerContext(): DialerContextValue {
 export function DialerProvider({ children }: { children: React.ReactNode }) {
   const call = useCallContext();
   const isAuthReady = useAuthReady();
+  const router = useRouter();
+  const pathname = usePathname();
 
   const [session, setSession] = useState<DialerSession | null>(null);
   const [currentItem, setCurrentItem] = useState<DialerQueueItem | null>(null);
@@ -82,8 +92,13 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   const [voicemails, setVoicemails] = useState<VoicemailDrop[]>([]);
   const [mode, setMode] = useState<DialerMode>("running");
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [followMode, setFollowMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Tracks the lead id we last navigated to in follow mode, so we can tell a
+  // lead change (re-navigate) apart from the user navigating away (stop).
+  const lastNavLeadRef = useRef<string | null>(null);
 
   const subscribedCallSidRef = useRef<string | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -250,6 +265,28 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     setCurrentItem(null);
     setUpcoming([]);
     setCountdown(null);
+    setFollowMode(false);
+  }, []);
+
+  const leadPath = useCallback(
+    (leadId: string) =>
+      session?.funnelId
+        ? `/dashboard/funnels/${session.funnelId}/leads/${leadId}`
+        : null,
+    [session?.funnelId],
+  );
+
+  const openFollow = useCallback(() => {
+    if (!currentItem || !session?.funnelId) return;
+    setFollowMode(true);
+    lastNavLeadRef.current = currentItem.leadId;
+    const p = leadPath(currentItem.leadId);
+    if (p) router.push(p);
+  }, [currentItem, session?.funnelId, leadPath, router]);
+
+  const stopFollow = useCallback(() => {
+    setFollowMode(false);
+    lastNavLeadRef.current = null;
   }, []);
 
   const dropVm = useCallback(
@@ -326,6 +363,27 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     // changes. currentItem?.id drives advancing to the next lead.
   }, [canAutoDial, currentItem?.id, session?.status, mode]);
 
+  // ── Follow mode: keep the main screen on the current lead's profile ──
+  // When the current lead changes, navigate to its profile. If the user
+  // navigates away on their own, stop following.
+  useEffect(() => {
+    if (!followMode) {
+      lastNavLeadRef.current = null;
+      return;
+    }
+    if (!currentItem || !session?.funnelId) return;
+    const leadId = currentItem.leadId;
+    const expected = `/dashboard/funnels/${session.funnelId}/leads/${leadId}`;
+    if (lastNavLeadRef.current !== leadId) {
+      // Lead changed (advance / skip / back) or just opened → go to it.
+      lastNavLeadRef.current = leadId;
+      if (pathname !== expected) router.push(expected);
+    } else if (pathname !== expected) {
+      // Same lead but the user navigated elsewhere → stop following.
+      setFollowMode(false);
+    }
+  }, [followMode, currentItem, session?.funnelId, pathname, router]);
+
   const isDialing =
     call.activeCall?.state === "ringing" || call.activeCall?.state === "connected";
 
@@ -338,6 +396,9 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
         voicemails,
         mode,
         countdown,
+        followMode,
+        openFollow,
+        stopFollow,
         isDialing,
         loading,
         error,
