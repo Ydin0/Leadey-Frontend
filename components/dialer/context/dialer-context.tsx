@@ -9,8 +9,10 @@ import {
   useRef,
 } from "react";
 import { useCallContext } from "@/components/calling/call-context";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import {
+  getActiveSession,
   getCurrent,
   advanceSession,
   skipSession,
@@ -18,7 +20,6 @@ import {
   pauseSession,
   resumeSession,
   endSession,
-  getDispositions,
   getVoicemailDrops,
   dropVoicemail,
   subscribeToCallEvents,
@@ -26,35 +27,40 @@ import {
 import type {
   DialerSession,
   DialerQueueItem,
-  CallDisposition,
   VoicemailDrop,
 } from "@/lib/types/dialer";
+
+/** Seconds the bar counts down before auto-dialing the next lead. */
+const AUTO_ADVANCE_SECONDS = 5;
+
+type DialerMode = "running" | "paused";
 
 interface DialerContextValue {
   session: DialerSession | null;
   currentItem: DialerQueueItem | null;
   upcoming: DialerQueueItem[];
-  dispositions: CallDisposition[];
   voicemails: VoicemailDrop[];
-  /** Set to true after a call disconnects, cleared after the rep picks a
-   *  disposition. Blocks startNext() while true. */
-  awaitingDisposition: boolean;
-  /** True while we're waiting for Twilio to connect or while a call is live. */
+  /** "running" auto-dials between calls; "paused" halts the countdown. */
+  mode: DialerMode;
+  /** Seconds left before the next auto-dial, or null when not counting. */
+  countdown: number | null;
+  /** True while Twilio is connecting or a call is live. */
   isDialing: boolean;
-  /** Slug of the last disposition picked — surfaced for "N = advance with
-   *  last used" keyboard shortcut. */
-  lastDispositionSlug: string | null;
-  /** Most recent AMD result for the current call, if any. */
-  amdResult: string | null;
   loading: boolean;
   error: string | null;
+  /** Start showing a freshly created session (from the launcher) — no nav. */
+  beginSession: (session: DialerSession) => void;
+  /** Dial the current lead now (bypasses the countdown). */
   startNext: () => void;
-  advance: (dispositionSlug: string, notes?: string) => Promise<void>;
-  skip: (reason?: string) => Promise<void>;
+  /** Advance to the next lead, recording the call + ticking the step. */
+  advance: () => Promise<void>;
+  skip: () => Promise<void>;
   back: () => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
   end: () => Promise<void>;
+  /** Clear the finished session from the bar. */
+  dismiss: () => void;
   dropVm: (voicemailId?: string) => Promise<void>;
 }
 
@@ -66,65 +72,78 @@ export function useDialerContext(): DialerContextValue {
   return ctx;
 }
 
-interface DialerProviderProps {
-  sessionId: string;
-  children: React.ReactNode;
-}
-
-export function DialerProvider({ sessionId, children }: DialerProviderProps) {
+export function DialerProvider({ children }: { children: React.ReactNode }) {
   const call = useCallContext();
+  const isAuthReady = useAuthReady();
 
   const [session, setSession] = useState<DialerSession | null>(null);
   const [currentItem, setCurrentItem] = useState<DialerQueueItem | null>(null);
   const [upcoming, setUpcoming] = useState<DialerQueueItem[]>([]);
-  const [dispositions, setDispositions] = useState<CallDisposition[]>([]);
   const [voicemails, setVoicemails] = useState<VoicemailDrop[]>([]);
-  const [awaitingDisposition, setAwaitingDisposition] = useState(false);
-  const [lastDispositionSlug, setLastDispositionSlug] = useState<string | null>(null);
-  const [amdResult, setAmdResult] = useState<string | null>(null);
+  const [mode, setMode] = useState<DialerMode>("running");
+  const [countdown, setCountdown] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Track which call SIDs we've already subscribed to so we don't double-bind.
   const subscribedCallSidRef = useRef<string | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
-  // When auto-disposition fires (e.g. VM drop), we set this so we don't
-  // double-advance if the rep then clicks a disposition.
-  const autoAdvancedRef = useRef(false);
+  const autoVmRef = useRef(false);
 
-  // ── Initial load ─────────────────────────────────────────────────
+  // ── Discover an active session on mount ──────────────────────────
   useEffect(() => {
+    if (!isAuthReady) return;
     let cancelled = false;
-    async function load() {
+    (async () => {
       try {
-        const [snapshot, dispos, vms] = await Promise.all([
-          getCurrent(sessionId),
-          getDispositions(),
-          getVoicemailDrops(),
+        const active = await getActiveSession();
+        if (cancelled || !active) {
+          if (!cancelled) setLoading(false);
+          return;
+        }
+        const [snapshot, vms] = await Promise.all([
+          getCurrent(active.id),
+          getVoicemailDrops().catch(() => [] as VoicemailDrop[]),
         ]);
         if (cancelled) return;
         setSession(snapshot.session);
         setCurrentItem(snapshot.current);
         setUpcoming(snapshot.upcoming);
-        setDispositions(dispos);
         setVoicemails(vms);
-      } catch (err: any) {
-        if (!cancelled) setError(err?.message || "Failed to load dialer session");
+        setMode(snapshot.session.status === "paused" ? "paused" : "running");
+      } catch {
+        // No active session / failed — leave the bar hidden.
       } finally {
         if (!cancelled) setLoading(false);
       }
-    }
-    load();
+    })();
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+  }, [isAuthReady]);
 
-  // ── Subscribe to SSE for the current call ────────────────────────
+  const refresh = useCallback(async (sessionId: string) => {
+    const snapshot = await getCurrent(sessionId);
+    setSession(snapshot.session);
+    setCurrentItem(snapshot.current);
+    setUpcoming(snapshot.upcoming);
+    return snapshot;
+  }, []);
+
+  const beginSession = useCallback(
+    (next: DialerSession) => {
+      setSession(next);
+      setMode("running");
+      setError(null);
+      void refresh(next.id);
+      void getVoicemailDrops().then(setVoicemails).catch(() => {});
+    },
+    [refresh],
+  );
+
+  // ── SSE for the active call (AMD / VM-drop) ──────────────────────
   useEffect(() => {
     const sid = call.activeCall?.callId || null;
     if (!sid) {
-      // No active call — tear down any prior subscription
       if (unsubscribeRef.current) {
         unsubscribeRef.current();
         unsubscribeRef.current = null;
@@ -134,143 +153,104 @@ export function DialerProvider({ sessionId, children }: DialerProviderProps) {
     }
     if (sid === subscribedCallSidRef.current) return;
     subscribedCallSidRef.current = sid;
-    setAmdResult(null);
-    autoAdvancedRef.current = false;
+    autoVmRef.current = false;
 
     const unsub = subscribeToCallEvents(sid, {
-      onAmdDetected: ({ answeredBy }) => setAmdResult(answeredBy),
       onVmDropped: () => {
-        // Backend dropped VM via AMD — auto-disposition as "voicemail".
-        autoAdvancedRef.current = true;
-        // Wait for the call to actually end (Twilio's <Play><Hangup/> will
-        // disconnect shortly), then advance.
-      },
-      onRecordingComplete: () => {
-        // Frontend reads the recording from the call_record via SSR/poll
-        // on the call history page; nothing to do here for v1.
+        autoVmRef.current = true;
       },
     });
     unsubscribeRef.current = unsub;
-    return () => {
-      unsub();
-    };
+    return () => unsub();
   }, [call.activeCall?.callId]);
-
-  // ── Watch for call-end transitions ──────────────────────────────
-  // When activeCall flips to ended, set awaitingDisposition. If the call
-  // was auto-VM-dropped, fire the "voicemail" disposition automatically.
-  const prevStateRef = useRef<string | null>(null);
-  useEffect(() => {
-    const state = call.activeCall?.state || null;
-    if (prevStateRef.current === "connected" && state === "ended") {
-      if (autoAdvancedRef.current) {
-        // AMD-driven auto-advance
-        autoAdvancedRef.current = false;
-        void advance("voicemail");
-      } else {
-        setAwaitingDisposition(true);
-      }
-    }
-    // When the activeCall is cleared (null), reset to idle
-    if (prevStateRef.current && state === null) {
-      // no-op — awaitingDisposition stays true until rep picks one
-    }
-    prevStateRef.current = state;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [call.activeCall?.state]);
 
   // ── Actions ──────────────────────────────────────────────────────
 
   const startNext = useCallback(() => {
     if (!currentItem) return;
-    if (awaitingDisposition) return;
     if (call.activeCall) return;
-    // Confirm before dialing a Do-Not-Contact lead (covers the button + SPACE).
     if (currentItem.lead?.doNotCall && !confirmDncCall(currentItem.lead?.name)) return;
+    setCountdown(null);
     call.startCall(currentItem.leadPhone, {
       contactName: currentItem.lead?.name || null,
       companyName: currentItem.lead?.company || null,
       leadId: currentItem.leadId || null,
     });
-  }, [currentItem, awaitingDisposition, call]);
+  }, [currentItem, call]);
 
-  const advance = useCallback(
-    async (dispositionSlug: string, notes?: string) => {
-      if (!session) return;
-      try {
-        // Resolve the saved callRecordId from CallContext if we have one
-        // for this exact call.
-        const callRecordId = call.lastEndedCall?.callRecordId || undefined;
-        const result = await advanceSession(session.id, {
-          dispositionSlug,
-          notes,
-          callRecordId,
-        });
-        setLastDispositionSlug(dispositionSlug);
-        setAwaitingDisposition(false);
-        // Re-fetch state to get fresh counters + upcoming
-        const snapshot = await getCurrent(session.id);
-        setSession(snapshot.session);
-        setCurrentItem(snapshot.current);
-        setUpcoming(snapshot.upcoming);
-        if (result.sessionComplete) {
-          // Surface complete state — UI handles via session.status
-        }
-      } catch (err: any) {
-        setError(err?.message || "Failed to advance");
-      }
-    },
-    [session, call.lastEndedCall],
-  );
+  const advance = useCallback(async () => {
+    if (!session) return;
+    try {
+      const callRecordId = call.lastEndedCall?.callRecordId || undefined;
+      await advanceSession(session.id, { callRecordId });
+      await refresh(session.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to advance");
+    }
+  }, [session, call.lastEndedCall, refresh]);
 
-  const skip = useCallback(
-    async (reason?: string) => {
-      if (!session) return;
-      try {
-        await skipSession(session.id, reason);
-        setAwaitingDisposition(false);
-        const snapshot = await getCurrent(session.id);
-        setSession(snapshot.session);
-        setCurrentItem(snapshot.current);
-        setUpcoming(snapshot.upcoming);
-      } catch (err: any) {
-        setError(err?.message || "Failed to skip");
-      }
-    },
-    [session],
-  );
+  const skip = useCallback(async () => {
+    if (!session) return;
+    try {
+      await skipSession(session.id);
+      await refresh(session.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to skip");
+    }
+  }, [session, refresh]);
 
   const back = useCallback(async () => {
     if (!session) return;
     try {
       await backSession(session.id);
-      setAwaitingDisposition(false);
-      const snapshot = await getCurrent(session.id);
-      setSession(snapshot.session);
-      setCurrentItem(snapshot.current);
-      setUpcoming(snapshot.upcoming);
-    } catch (err: any) {
-      setError(err?.message || "Failed to go back");
+      await refresh(session.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to go back");
     }
-  }, [session]);
+  }, [session, refresh]);
 
   const pause = useCallback(async () => {
     if (!session) return;
-    const updated = await pauseSession(session.id);
-    setSession(updated);
+    setMode("paused");
+    setCountdown(null);
+    try {
+      const updated = await pauseSession(session.id);
+      setSession(updated);
+    } catch {
+      // local pause still applies
+    }
   }, [session]);
 
   const resume = useCallback(async () => {
     if (!session) return;
-    const updated = await resumeSession(session.id);
-    setSession(updated);
+    setMode("running");
+    try {
+      const updated = await resumeSession(session.id);
+      setSession(updated);
+    } catch {
+      // local resume still applies
+    }
   }, [session]);
 
   const end = useCallback(async () => {
     if (!session) return;
-    const updated = await endSession(session.id);
-    setSession(updated);
+    setCountdown(null);
+    try {
+      await endSession(session.id);
+    } catch {
+      // ignore
+    }
+    setSession(null);
+    setCurrentItem(null);
+    setUpcoming([]);
   }, [session]);
+
+  const dismiss = useCallback(() => {
+    setSession(null);
+    setCurrentItem(null);
+    setUpcoming([]);
+    setCountdown(null);
+  }, []);
 
   const dropVm = useCallback(
     async (voicemailId?: string) => {
@@ -280,28 +260,74 @@ export function DialerProvider({ sessionId, children }: DialerProviderProps) {
         return;
       }
       const vmId =
-        voicemailId ||
-        voicemails.find((v) => v.isDefault)?.id ||
-        voicemails[0]?.id;
+        voicemailId || voicemails.find((v) => v.isDefault)?.id || voicemails[0]?.id;
       if (!vmId) {
         setError("No voicemail recordings available. Record one in settings.");
         return;
       }
       try {
         await dropVoicemail(vmId, callSid);
-        // Twilio will <Play><Hangup/> the call; the SSE event + disconnect
-        // handler will auto-advance as "voicemail".
-        autoAdvancedRef.current = true;
-      } catch (err: any) {
-        setError(err?.message || "Failed to drop voicemail");
+        autoVmRef.current = true;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to drop voicemail");
       }
     },
     [call.activeCall?.callId, voicemails],
   );
 
+  // ── Auto-advance when a call ends ────────────────────────────────
+  // On connected → ended, record the call (no disposition) and move on. The
+  // new currentItem re-triggers the countdown below.
+  const prevStateRef = useRef<string | null>(null);
+  const advanceRef = useRef(advance);
+  advanceRef.current = advance;
+  useEffect(() => {
+    const state = call.activeCall?.state || null;
+    // Advance after any dialed call ends — whether it connected or just rang
+    // out (no answer / busy / failed) — so the queue keeps moving.
+    if (
+      (prevStateRef.current === "connected" || prevStateRef.current === "ringing") &&
+      state === "ended"
+    ) {
+      autoVmRef.current = false;
+      void advanceRef.current();
+    }
+    prevStateRef.current = state;
+  }, [call.activeCall?.state]);
+
+  // ── Countdown engine: auto-dial the current lead ─────────────────
+  const startNextRef = useRef(startNext);
+  startNextRef.current = startNext;
+  const canAutoDial =
+    !!session &&
+    session.status === "active" &&
+    mode === "running" &&
+    !!currentItem &&
+    !call.activeCall;
+  useEffect(() => {
+    if (!canAutoDial) {
+      setCountdown(null);
+      return;
+    }
+    let n = AUTO_ADVANCE_SECONDS;
+    setCountdown(n);
+    const id = setInterval(() => {
+      n -= 1;
+      if (n <= 0) {
+        clearInterval(id);
+        setCountdown(null);
+        startNextRef.current();
+      } else {
+        setCountdown(n);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+    // Re-arm whenever the target lead, mode, session status, or call presence
+    // changes. currentItem?.id drives advancing to the next lead.
+  }, [canAutoDial, currentItem?.id, session?.status, mode]);
+
   const isDialing =
-    call.activeCall?.state === "ringing" ||
-    call.activeCall?.state === "connected";
+    call.activeCall?.state === "ringing" || call.activeCall?.state === "connected";
 
   return (
     <DialerContext.Provider
@@ -309,14 +335,13 @@ export function DialerProvider({ sessionId, children }: DialerProviderProps) {
         session,
         currentItem,
         upcoming,
-        dispositions,
         voicemails,
-        awaitingDisposition,
+        mode,
+        countdown,
         isDialing,
-        lastDispositionSlug,
-        amdResult,
         loading,
         error,
+        beginSession,
         startNext,
         advance,
         skip,
@@ -324,6 +349,7 @@ export function DialerProvider({ sessionId, children }: DialerProviderProps) {
         pause,
         resume,
         end,
+        dismiss,
         dropVm,
       }}
     >

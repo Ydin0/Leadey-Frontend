@@ -237,7 +237,7 @@ export default function FunnelDetailPage() {
             <div className="w-px h-5 bg-border-subtle" />
             {/* Prominent power-dialer launcher — only renders if the
                 campaign has at least one call step. */}
-            <DialerLauncherButton steps={funnel.steps} />
+            <DialerLauncherButton steps={funnel.steps} funnelId={funnel.id} />
             <button
               onClick={() => setShowEdit(true)}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle"

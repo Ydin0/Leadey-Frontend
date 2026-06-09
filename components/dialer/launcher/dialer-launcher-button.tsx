@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import { PhoneCall, ChevronDown, Phone, Play, X, Loader2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { PhoneCall, ChevronDown, Phone, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useAuthReady } from "@/components/providers/auth-token-sync";
-import { getActiveSession, endSession } from "@/lib/api/dialer";
+import { useDialerContext } from "@/components/dialer/context/dialer-context";
 import { DialerConfigModal } from "./dialer-config-modal";
 import type { FunnelStep } from "@/lib/types/funnel";
 
@@ -14,39 +12,23 @@ interface DialerLauncherButtonProps {
    *  steps internally. Pass the whole steps array — that way the
    *  caller doesn't need to know about channel logic. */
   steps: FunnelStep[];
+  /** The campaign id — used to dial the whole campaign when it has no
+   *  call step. */
+  funnelId: string;
   className?: string;
 }
 
-/** Prominent CTA for launching the power dialer on a campaign. Shows
- *  nothing when no call steps exist. Single call step: opens the
- *  config modal directly. Multiple call steps: opens a picker dropdown
- *  so the rep can choose which step's queue to load. */
-export function DialerLauncherButton({ steps, className }: DialerLauncherButtonProps) {
-  const router = useRouter();
-  const isAuthReady = useAuthReady();
+/** Prominent CTA for launching the power dialer on a campaign. Always
+ *  shown. With call steps: single step opens the config modal directly,
+ *  multiple steps open a picker. With no call step: dials every
+ *  phone-having lead in the campaign. */
+export function DialerLauncherButton({ steps, funnelId, className }: DialerLauncherButtonProps) {
+  const dialer = useDialerContext();
   const callSteps = steps.filter((s) => s.channel === "call");
   const [selectedStep, setSelectedStep] = useState<FunnelStep | null>(null);
+  const [campaignModalOpen, setCampaignModalOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
-
-  // Detect an in-progress dialer session so we can offer Resume instead of a
-  // dead-end "you already have a session" error.
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [ending, setEnding] = useState(false);
-
-  const refreshActive = useCallback(async () => {
-    try {
-      const s = await getActiveSession();
-      setActiveSessionId(s?.id ?? null);
-    } catch {
-      setActiveSessionId(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!isAuthReady) return;
-    void refreshActive();
-  }, [isAuthReady, refreshActive]);
 
   // Close picker on outside click
   useEffect(() => {
@@ -60,8 +42,6 @@ export function DialerLauncherButton({ steps, className }: DialerLauncherButtonP
     return () => document.removeEventListener("mousedown", onClick);
   }, [pickerOpen]);
 
-  if (callSteps.length === 0) return null;
-
   const buttonBaseClass = cn(
     "flex items-center gap-2 px-4 py-2 rounded-[20px] text-[12px] font-medium",
     "bg-signal-green text-signal-green-text border border-signal-green-text/20",
@@ -70,43 +50,40 @@ export function DialerLauncherButton({ steps, className }: DialerLauncherButtonP
     className,
   );
 
-  // An active session exists anywhere in the org for this user → Resume + End,
-  // instead of starting a new one (the backend only allows one at a time).
-  if (activeSessionId) {
-    async function handleEnd() {
-      if (!activeSessionId) return;
-      setEnding(true);
-      try {
-        await endSession(activeSessionId);
-        setActiveSessionId(null);
-      } catch {
-        // leave it; user can retry
-      } finally {
-        setEnding(false);
-      }
-    }
+  // A session is already running — the persistent dialer bar handles all
+  // controls, so just show a non-interactive "running" indicator here.
+  if (dialer.session && dialer.session.status !== "completed") {
     return (
-      <div className="flex items-center gap-1.5">
+      <span
+        className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] text-[12px] font-medium bg-signal-green/15 text-signal-green-text border border-signal-green-text/20"
+        title="A power dialer session is in progress — use the bar at the top"
+      >
+        <Radio size={14} strokeWidth={2} />
+        Dialer running
+      </span>
+    );
+  }
+
+  // No call step — dial the whole campaign (all phone-having leads).
+  if (callSteps.length === 0) {
+    return (
+      <>
         <button
           type="button"
-          onClick={() => router.push(`/dashboard/dialer/${activeSessionId}`)}
+          onClick={() => setCampaignModalOpen(true)}
           className={buttonBaseClass}
-          title="A power dialer session is in progress"
+          title="Dial every lead in this campaign that has a phone number"
         >
-          <Play size={14} strokeWidth={2} />
-          Resume Power Dialer
+          <PhoneCall size={14} strokeWidth={2} />
+          Start Power Dialer
         </button>
-        <button
-          type="button"
-          onClick={() => void handleEnd()}
-          disabled={ending}
-          title="End the active session"
-          className="flex items-center gap-1 px-2.5 py-2 rounded-[20px] text-[11px] font-medium bg-section text-ink-secondary border border-border-subtle hover:bg-hover transition-colors disabled:opacity-50"
-        >
-          {ending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} strokeWidth={2} />}
-          End
-        </button>
-      </div>
+        {campaignModalOpen && (
+          <DialerConfigModal
+            funnelId={funnelId}
+            onClose={() => setCampaignModalOpen(false)}
+          />
+        )}
+      </>
     );
   }
 

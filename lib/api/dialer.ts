@@ -111,7 +111,9 @@ export async function setFunnelStepRules(
 // ── Sessions ────────────────────────────────────────────────────────
 
 export async function createSession(params: {
-  funnelStepId: string;
+  /** Target a specific call step, OR a whole campaign via funnelId. */
+  funnelStepId?: string;
+  funnelId?: string;
   filters?: Partial<DialerSessionFilters>;
 }): Promise<{ session: DialerSession; excluded: { dnc: number; recent: number; attempts: number; timezone: number } }> {
   return apiRequest("/dialer/sessions", {
@@ -142,7 +144,7 @@ export async function getCurrent(id: string): Promise<DialerCurrentResponse> {
 
 export async function advanceSession(
   id: string,
-  params: { dispositionSlug: string; notes?: string; callRecordId?: string },
+  params: { dispositionSlug?: string; notes?: string; callRecordId?: string },
 ): Promise<DialerAdvanceResponse> {
   return apiRequest<DialerAdvanceResponse>(`/dialer/sessions/${id}/advance`, {
     method: "POST",

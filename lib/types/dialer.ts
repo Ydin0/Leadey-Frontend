@@ -44,7 +44,9 @@ export interface DialerSessionFilters {
 export interface DialerSession {
   id: string;
   userId: string;
-  funnelStepId: string;
+  /** Null for campaign-mode sessions (campaign has no call step). */
+  funnelStepId: string | null;
+  funnelId: string | null;
   status: DialerSessionStatus;
   totalLeads: number;
   completedLeads: number;

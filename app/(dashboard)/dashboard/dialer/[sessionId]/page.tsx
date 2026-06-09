@@ -1,15 +1,7 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useParams } from "next/navigation";
-import { DialerProvider } from "@/components/dialer/context/dialer-context";
-import { DialerSessionPage } from "@/components/dialer/session/dialer-session-page";
-
+/** The dedicated dialer page was replaced by the persistent dialer bar.
+ *  Keep this route alive for old links — send them to campaigns. */
 export default function DialerSessionRoute() {
-  const params = useParams();
-  const sessionId = params.sessionId as string;
-  return (
-    <DialerProvider sessionId={sessionId}>
-      <DialerSessionPage />
-    </DialerProvider>
-  );
+  redirect("/dashboard/funnels");
 }

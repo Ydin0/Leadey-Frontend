@@ -411,7 +411,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
       />
 
       <div className="px-6 pt-3 shrink-0">
-        <FocusCallControls steps={steps} />
+        <FocusCallControls steps={steps} funnelId={funnelId} />
       </div>
 
       <div className="flex flex-1 min-h-0">

@@ -1,18 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { X, Loader2, ShieldCheck, Clock, Calendar, AlertCircle, Play } from "lucide-react";
 import { createSession, getActiveSession, endSession } from "@/lib/api/dialer";
+import { useDialerContext } from "@/components/dialer/context/dialer-context";
 import type { FunnelStep } from "@/lib/types/funnel";
 
 interface DialerConfigModalProps {
-  step: FunnelStep;
+  /** Step mode: queue leads on this call step. */
+  step?: FunnelStep;
+  /** Campaign mode: queue every phone-having lead in this funnel (used when
+   *  the campaign has no call step). */
+  funnelId?: string;
   onClose: () => void;
 }
 
-export function DialerConfigModal({ step, onClose }: DialerConfigModalProps) {
-  const router = useRouter();
+export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModalProps) {
+  const dialer = useDialerContext();
   const [excludeDoNotCall, setExcludeDoNotCall] = useState(true);
   const [excludeRecentlyCalled, setExcludeRecentlyCalled] = useState(true);
   const [respectTimezone, setRespectTimezone] = useState(false);
@@ -27,10 +31,12 @@ export function DialerConfigModal({ step, onClose }: DialerConfigModalProps) {
     setError(null);
     try {
       const { session } = await createSession({
-        funnelStepId: step.id,
+        ...(step ? { funnelStepId: step.id } : { funnelId }),
         filters: { excludeDoNotCall, excludeRecentlyCalled, respectTimezone, maxAttempts },
       });
-      router.push(`/dashboard/dialer/${session.id}`);
+      // Show the persistent dialer bar in place — no navigation.
+      dialer.beginSession(session);
+      onClose();
     } catch (err: any) {
       const msg = err?.message || "Failed to start dialer";
       if (msg.toLowerCase().includes("active dialer session")) {
@@ -76,7 +82,9 @@ export function DialerConfigModal({ step, onClose }: DialerConfigModalProps) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
           <div>
             <h2 className="text-[14px] font-semibold text-ink">Start Power Dialer</h2>
-            <p className="text-[11px] text-ink-muted mt-0.5">Step: {step.label}</p>
+            <p className="text-[11px] text-ink-muted mt-0.5">
+              {step ? `Step: ${step.label}` : "All leads in this campaign"}
+            </p>
           </div>
           <button
             type="button"
@@ -140,7 +148,7 @@ export function DialerConfigModal({ step, onClose }: DialerConfigModalProps) {
                 <div className="flex items-center gap-2 mt-2.5 pl-5">
                   <button
                     type="button"
-                    onClick={() => router.push(`/dashboard/dialer/${activeSessionId}`)}
+                    onClick={onClose}
                     className="flex items-center gap-1.5 px-3 py-1 rounded-[20px] bg-signal-green text-signal-green-text text-[11px] font-medium hover:opacity-90 transition-opacity"
                   >
                     <Play size={11} /> Resume it

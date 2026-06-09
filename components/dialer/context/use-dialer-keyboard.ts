@@ -12,31 +12,30 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return false;
 }
 
-/** Global keyboard shortcuts for the dialer session. Disabled when the user
- *  is typing in a text input. Mount once at the top of the session page. */
+/** Global keyboard shortcuts for the power-dialer bar. Disabled while typing
+ *  in a text input. Mounted by the bar, so active whenever a session runs. */
 export function useDialerKeyboard(): void {
   const dialer = useDialerContext();
   const call = useCallContext();
 
   useEffect(() => {
+    if (!dialer.session) return;
+
     function onKey(e: KeyboardEvent) {
       if (isEditableTarget(e.target)) return;
-      // Modifier-bearing combos are not ours (let copy/paste etc. flow).
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
       const key = e.key;
 
-      // Space — start next call (only when idle and not awaiting dispo)
+      // Space — pause / resume the auto-dialer.
       if (key === " " || key === "Spacebar") {
-        if (dialer.awaitingDisposition) return;
-        if (call.activeCall) return;
-        if (!dialer.currentItem) return;
         e.preventDefault();
-        dialer.startNext();
+        if (dialer.mode === "paused") void dialer.resume();
+        else void dialer.pause();
         return;
       }
 
-      // Esc / End — hang up
+      // Esc / End — hang up the live call.
       if (key === "Escape" || key === "End") {
         if (call.activeCall) {
           e.preventDefault();
@@ -45,7 +44,7 @@ export function useDialerKeyboard(): void {
         return;
       }
 
-      // V — drop voicemail (only while connected)
+      // V — drop voicemail (while connected).
       if (key === "v" || key === "V") {
         if (call.activeCall?.state === "connected") {
           e.preventDefault();
@@ -54,53 +53,25 @@ export function useDialerKeyboard(): void {
         return;
       }
 
-      // S — skip current (no disposition)
+      // S — skip / forward.
       if (key === "s" || key === "S") {
         e.preventDefault();
         void dialer.skip();
         return;
       }
 
-      // B — back to previous
+      // B — back to previous.
       if (key === "b" || key === "B") {
         e.preventDefault();
         void dialer.back();
         return;
       }
 
-      // N — advance with last-used disposition
-      if (key === "n" || key === "N") {
-        if (dialer.awaitingDisposition && dialer.lastDispositionSlug) {
-          e.preventDefault();
-          void dialer.advance(dialer.lastDispositionSlug);
-        }
-        return;
-      }
-
-      // M — mute toggle
+      // M — mute toggle (while connected).
       if (key === "m" || key === "M") {
         if (call.activeCall?.state === "connected") {
           e.preventDefault();
           call.toggleMute();
-        }
-        return;
-      }
-
-      // H — hold toggle
-      if (key === "h" || key === "H") {
-        if (call.activeCall?.state === "connected") {
-          e.preventDefault();
-          call.toggleHold();
-        }
-        return;
-      }
-
-      // 1-9 — disposition hotkeys (only when awaiting disposition)
-      if (/^[1-9]$/.test(key) && dialer.awaitingDisposition) {
-        const match = dialer.dispositions.find((d) => d.hotkey === key);
-        if (match) {
-          e.preventDefault();
-          void dialer.advance(match.slug);
         }
         return;
       }
