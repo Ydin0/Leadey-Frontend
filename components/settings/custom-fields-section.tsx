@@ -25,19 +25,56 @@ const EMPTY_DRAFT: DraftField = {
   isRequired: false,
 };
 
-/** Built-in lead fields that always exist and can't be edited or removed.
- *  These map directly to columns on every lead. */
-const DEFAULT_FIELDS: { label: string; type: string }[] = [
-  { label: "Name", type: "Text" },
-  { label: "Email", type: "Email" },
-  { label: "Phone", type: "Phone" },
-  { label: "Title", type: "Text" },
-  { label: "Company", type: "Text" },
-  { label: "LinkedIn URL", type: "Link" },
-  { label: "Lead Status", type: "Status" },
-  { label: "Score", type: "Number" },
-  { label: "Source", type: "Text" },
+/** Built-in fields that make up a lead profile (lead + its company + the
+ *  company's contacts). These always exist and can't be edited or removed —
+ *  custom fields are layered on top. Grouped to mirror the lead profile. */
+const DEFAULT_FIELD_GROUPS: { group: string; fields: { label: string; type: string }[] }[] = [
+  {
+    group: "Lead",
+    fields: [
+      { label: "Name", type: "Text" },
+      { label: "Title", type: "Text" },
+      { label: "Email", type: "Email" },
+      { label: "Phone", type: "Phone" },
+      { label: "LinkedIn URL", type: "Link" },
+      { label: "Lead Status", type: "Status" },
+      { label: "Lead Source", type: "Text" },
+      { label: "Score", type: "Number" },
+      { label: "Do Not Call", type: "Toggle" },
+      { label: "Next Action", type: "Text" },
+      { label: "Next Date", type: "Date" },
+      { label: "Campaign Step", type: "Number" },
+    ],
+  },
+  {
+    group: "Company",
+    fields: [
+      { label: "Company Name", type: "Text" },
+      { label: "Domain", type: "Text" },
+      { label: "Website", type: "Link" },
+      { label: "Industry", type: "Text" },
+      { label: "Employees", type: "Number" },
+      { label: "Location", type: "Text" },
+      { label: "Annual Revenue", type: "Text" },
+      { label: "Company LinkedIn", type: "Link" },
+      { label: "Description", type: "Text" },
+      { label: "Hiring Roles", type: "List" },
+    ],
+  },
+  {
+    group: "Contact",
+    fields: [
+      { label: "Contact Name", type: "Text" },
+      { label: "Title", type: "Text" },
+      { label: "Email", type: "Email" },
+      { label: "Phone", type: "Phone" },
+      { label: "LinkedIn URL", type: "Link" },
+      { label: "Primary Contact", type: "Toggle" },
+    ],
+  },
 ];
+
+const DEFAULT_FIELD_COUNT = DEFAULT_FIELD_GROUPS.reduce((s, g) => s + g.fields.length, 0);
 
 export function CustomFieldsSection() {
   const { fields, loading, reload } = useCustomFields();
@@ -118,25 +155,34 @@ export function CustomFieldsSection() {
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-[14px] font-semibold text-ink">Default Fields</h3>
           <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">
-            {DEFAULT_FIELDS.length} built-in · {draft.length} custom
+            {DEFAULT_FIELD_COUNT} built-in · {draft.length} custom
           </span>
         </div>
         <p className="text-[11px] text-ink-muted mb-4">
-          These fields exist on every lead and can&apos;t be edited or removed.
-          Add your own below.
+          The full lead profile — the lead, its company, and the company&apos;s
+          contacts. These can&apos;t be edited or removed. Add your own below.
         </p>
-        <div className="flex flex-wrap gap-2">
-          {DEFAULT_FIELDS.map((f) => (
-            <span
-              key={f.label}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary"
-            >
-              {f.label}
-              <span className="text-[9px] uppercase tracking-wide text-ink-faint">
-                {f.type}
-              </span>
-              <Lock size={9} className="text-ink-faint" />
-            </span>
+        <div className="space-y-4">
+          {DEFAULT_FIELD_GROUPS.map((grp) => (
+            <div key={grp.group}>
+              <div className="text-[10px] uppercase tracking-wider text-ink-faint font-medium mb-2">
+                {grp.group}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {grp.fields.map((f) => (
+                  <span
+                    key={grp.group + f.label}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary"
+                  >
+                    {f.label}
+                    <span className="text-[9px] uppercase tracking-wide text-ink-faint">
+                      {f.type}
+                    </span>
+                    <Lock size={9} className="text-ink-faint" />
+                  </span>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </div>
