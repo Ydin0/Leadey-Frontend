@@ -42,6 +42,7 @@ import type {
 // Funnels are surfaced as "Campaigns" in user-facing copy; the URL
 // stays /dashboard/funnels so we don't churn the route or backend.
 // Cold Email sub-tabs — rendered as a dropdown under the "Cold Email" item.
+// Templates / Team / Settings intentionally live in the main menu, not here.
 const emailChildren: NavSubItem[] = [
   { id: "email-overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard/email" },
   { id: "email-campaigns", label: "Campaigns", icon: Send, href: "/dashboard/email/campaigns" },
@@ -49,9 +50,6 @@ const emailChildren: NavSubItem[] = [
   { id: "email-warmup", label: "Warmup", icon: Flame, href: "/dashboard/email/warmup" },
   { id: "email-mailboxes", label: "Email Accounts", icon: AtSign, href: "/dashboard/email/mailboxes" },
   { id: "email-domains", label: "Domains", icon: Globe, href: "/dashboard/email/domains" },
-  { id: "email-templates", label: "Templates", icon: FileText, href: "/dashboard/email/templates" },
-  { id: "email-team", label: "Team", icon: UsersRound, href: "/dashboard/email/team" },
-  { id: "email-settings", label: "Settings", icon: Settings, href: "/dashboard/email/settings" },
 ];
 
 // Sidebar is organized into labeled sections. "Cold Email" is an expandable
@@ -67,7 +65,6 @@ export const navGroups: NavGroup[] = [
     items: [
       { id: "funnels", label: "Campaigns", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
       { id: "email", label: "Cold Email", icon: Mail, href: "/dashboard/email", children: emailChildren },
-      { id: "inbox", label: "Inbox", icon: Inbox, href: "/dashboard/inbox" },
     ],
   },
   {
