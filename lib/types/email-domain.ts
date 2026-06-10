@@ -23,6 +23,8 @@ export interface EmailDomain {
   mx: DnsState;
   tracking: DnsState;
   dnsRecords: DnsRecord[];
+  /** Number of connected mailboxes on this domain (from Smartlead). */
+  mailboxes?: number;
   createdAt: string;
   updatedAt: string;
 }

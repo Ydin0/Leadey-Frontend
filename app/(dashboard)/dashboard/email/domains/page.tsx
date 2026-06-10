@@ -75,7 +75,7 @@ export default function EmailDomainsPage() {
   }, [isAuthReady]);
 
   const healthy = domains.filter((d) => d.status === "healthy").length;
-  const totalMailboxes = 0; // populated once mailboxes link to domains
+  const totalMailboxes = domains.reduce((s, d) => s + (d.mailboxes ?? 0), 0);
   const avgHealth = domains.length
     ? Math.round(domains.reduce((s, d) => s + d.health, 0) / domains.length)
     : 0;
@@ -147,7 +147,8 @@ export default function EmailDomainsPage() {
                   <div className="min-w-0">
                     <span className="truncate font-mono text-[13px] font-semibold text-ink block">{d.name}</span>
                     <div className="text-[10px] text-ink-faint">
-                      {d.client || "—"} · {d.age}
+                      {(d.mailboxes ?? 0)} mailbox{(d.mailboxes ?? 0) === 1 ? "" : "es"}
+                      {d.registrar ? ` · ${d.registrar}` : ""}
                     </div>
                   </div>
                 </div>
