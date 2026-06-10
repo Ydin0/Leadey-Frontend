@@ -100,6 +100,7 @@ export interface NavSubItem {
   label: string;
   href: string;
   status?: "active" | "paused" | "draft";
+  icon?: LucideIcon;
 }
 
 export interface NavItem {
@@ -108,6 +109,15 @@ export interface NavItem {
   icon: LucideIcon;
   href: string;
   badge?: number;
+  /** Funnels load their children dynamically from the API. */
   dynamicChildren?: boolean;
+  /** Static dropdown children (e.g. the Cold Email sub-tabs). */
+  children?: NavSubItem[];
   comingSoon?: boolean;
+}
+
+/** A labeled section of the sidebar. */
+export interface NavGroup {
+  label: string;
+  items: NavItem[];
 }

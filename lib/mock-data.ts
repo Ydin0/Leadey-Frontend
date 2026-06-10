@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import type {
   NavItem,
+  NavGroup,
+  NavSubItem,
   QuickStat,
   Reply,
   LinkedInQueueItem,
@@ -39,25 +41,8 @@ import type {
 //
 // Funnels are surfaced as "Campaigns" in user-facing copy; the URL
 // stays /dashboard/funnels so we don't churn the route or backend.
-export const navItems: NavItem[] = [
-  { id: "cockpit", label: "Cockpit", icon: LayoutDashboard, href: "/dashboard" },
-  { id: "funnels", label: "Campaigns", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
-  { id: "email", label: "Cold Email", icon: Mail, href: "/dashboard/email" },
-  { id: "inbox", label: "Inbox", icon: Inbox, href: "/dashboard/inbox" },
-  { id: "opportunities", label: "Opportunities", icon: Briefcase, href: "/dashboard/opportunities" },
-  { id: "scrapers", label: "Scrapers", icon: Search, href: "/dashboard/scrapers" },
-  { id: "recordings", label: "Recordings", icon: Headphones, href: "/dashboard/recordings" },
-  { id: "templates", label: "Templates", icon: FileText, href: "/dashboard/templates" },
-  { id: "leads", label: "Leads", icon: Users, href: "/dashboard/leads" },
-  { id: "team", label: "Team", icon: UsersRound, href: "/dashboard/team" },
-  { id: "knowledge-base", label: "Knowledge Base", icon: GraduationCap, href: "/dashboard/knowledge-base" },
-  { id: "settings", label: "Settings", icon: Settings, href: "/dashboard/settings" },
-];
-
-// ── Cold Email "email mode" navigation ──────────────────────
-// When the route is under /dashboard/email, the sidebar swaps to these tabs
-// (plus a "Back to Cockpit" link). Defined here so the sidebar stays declarative.
-export const emailNavItems: NavItem[] = [
+// Cold Email sub-tabs — rendered as a dropdown under the "Cold Email" item.
+const emailChildren: NavSubItem[] = [
   { id: "email-overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard/email" },
   { id: "email-campaigns", label: "Campaigns", icon: Send, href: "/dashboard/email/campaigns" },
   { id: "email-inbox", label: "Master Inbox", icon: Inbox, href: "/dashboard/email/inbox" },
@@ -68,6 +53,50 @@ export const emailNavItems: NavItem[] = [
   { id: "email-team", label: "Team", icon: UsersRound, href: "/dashboard/email/team" },
   { id: "email-settings", label: "Settings", icon: Settings, href: "/dashboard/email/settings" },
 ];
+
+// Sidebar is organized into labeled sections. "Cold Email" is an expandable
+// dropdown (its sub-tabs are children) and "Campaigns" expands to the org's
+// funnels (loaded dynamically).
+export const navGroups: NavGroup[] = [
+  {
+    label: "Overview",
+    items: [{ id: "cockpit", label: "Cockpit", icon: LayoutDashboard, href: "/dashboard" }],
+  },
+  {
+    label: "Outreach",
+    items: [
+      { id: "funnels", label: "Campaigns", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
+      { id: "email", label: "Cold Email", icon: Mail, href: "/dashboard/email", children: emailChildren },
+      { id: "inbox", label: "Inbox", icon: Inbox, href: "/dashboard/inbox" },
+    ],
+  },
+  {
+    label: "Pipeline",
+    items: [
+      { id: "opportunities", label: "Opportunities", icon: Briefcase, href: "/dashboard/opportunities" },
+      { id: "leads", label: "Leads", icon: Users, href: "/dashboard/leads" },
+      { id: "scrapers", label: "Scrapers", icon: Search, href: "/dashboard/scrapers" },
+      { id: "recordings", label: "Recordings", icon: Headphones, href: "/dashboard/recordings" },
+    ],
+  },
+  {
+    label: "Library",
+    items: [
+      { id: "templates", label: "Templates", icon: FileText, href: "/dashboard/templates" },
+      { id: "knowledge-base", label: "Knowledge Base", icon: GraduationCap, href: "/dashboard/knowledge-base" },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      { id: "team", label: "Team", icon: UsersRound, href: "/dashboard/team" },
+      { id: "settings", label: "Settings", icon: Settings, href: "/dashboard/settings" },
+    ],
+  },
+];
+
+/** Flattened list of all nav items (kept for any consumer that needs it). */
+export const navItems: NavItem[] = navGroups.flatMap((g) => g.items);
 
 // ── Quick Stats ─────────────────────────────────────────────
 export const quickStats: QuickStat[] = [
