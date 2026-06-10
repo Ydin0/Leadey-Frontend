@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Mail, Loader2, X, ChevronDown, UserPlus, Clock, Trash2 } from "lucide-react";
+import { Users, Mail, Loader2, X, ChevronDown, UserPlus, Clock, Trash2, AlertTriangle } from "lucide-react";
+import { useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Modal, ModalHeader } from "@/components/email/modal";
 import {
   getTeamMembers,
   inviteTeamMember,
@@ -33,6 +35,7 @@ function memberName(m: TeamMember): string {
 
 export function TeamSection() {
   const isAuthReady = useAuthReady();
+  const { user } = useUser();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [seatUsage, setSeatUsage] = useState<SeatUsage>({ used: 0, included: 1 });
@@ -53,6 +56,8 @@ export function TeamSection() {
 
   // Remove
   const [removing, setRemoving] = useState<string | null>(null);
+  const [confirmRemove, setConfirmRemove] = useState<TeamMember | null>(null);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -124,12 +129,14 @@ export function TeamSection() {
 
   async function handleRemove(userId: string) {
     setRemoving(userId);
+    setRemoveError(null);
     try {
       await removeMember(userId);
       setMembers((prev) => prev.filter((m) => m.id !== userId));
-      setSeatUsage((prev) => ({ ...prev, used: prev.used - 1 }));
+      setSeatUsage((prev) => ({ ...prev, used: Math.max(0, prev.used - 1) }));
+      setConfirmRemove(null);
     } catch (err) {
-      console.error("Failed to remove:", err);
+      setRemoveError(err instanceof Error ? err.message : "Failed to remove member");
     } finally {
       setRemoving(null);
     }
@@ -310,19 +317,74 @@ export function TeamSection() {
                 </div>
 
                 {/* Remove */}
-                <button
-                  onClick={() => handleRemove(member.id)}
-                  disabled={removing === member.id}
-                  className="p-1.5 rounded-md text-ink-faint hover:text-signal-red-text hover:bg-signal-red/10 transition-colors disabled:opacity-50"
-                  title="Remove member"
-                >
-                  {removing === member.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                </button>
+                {member.id === user?.id ? (
+                  <span
+                    className="p-1.5 rounded-md text-ink-faint/40 cursor-not-allowed"
+                    title="You can't remove yourself"
+                  >
+                    <Trash2 size={12} />
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setRemoveError(null);
+                      setConfirmRemove(member);
+                    }}
+                    className="p-1.5 rounded-md text-ink-faint hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
+                    title="Remove member"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* Confirm remove modal */}
+      {confirmRemove && (
+        <Modal onClose={() => (removing ? null : setConfirmRemove(null))} maxWidth={440}>
+          <ModalHeader
+            title="Remove member?"
+            onClose={() => (removing ? null : setConfirmRemove(null))}
+          />
+          <div className="p-[18px]">
+            <div className="flex items-start gap-3">
+              <span className="flex items-center justify-center w-9 h-9 rounded-full bg-signal-red/10 text-signal-red-text shrink-0">
+                <AlertTriangle size={16} />
+              </span>
+              <p className="text-[12.5px] text-ink-secondary leading-relaxed">
+                <span className="font-medium text-ink">{memberName(confirmRemove)}</span>{" "}
+                ({confirmRemove.email}) will be removed from the organization and lose
+                access immediately. This can&apos;t be undone.
+              </p>
+            </div>
+
+            {removeError && (
+              <p className="text-[11.5px] text-signal-red-text mt-3">{removeError}</p>
+            )}
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                onClick={() => setConfirmRemove(null)}
+                disabled={!!removing}
+                className="px-4 py-2 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleRemove(confirmRemove.id)}
+                disabled={!!removing}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-signal-red text-signal-red-text text-[11px] font-medium hover:bg-signal-red/80 transition-colors disabled:opacity-50"
+              >
+                {removing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                Remove member
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
