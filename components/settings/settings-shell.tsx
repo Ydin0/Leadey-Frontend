@@ -26,7 +26,6 @@ import {
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { mockSettings } from "@/lib/mock-data/settings";
-import { SmartleadIntegration } from "./smartlead-integration";
 import { UnipileIntegration } from "./unipile-integration";
 import { PhoneLinesTab } from "@/components/calling/settings/phone-lines-tab";
 import { DialerSettingsTab } from "@/components/dialer/settings/dialer-settings-tab";
@@ -398,10 +397,12 @@ export function SettingsShell() {
               description="Manage provider connections and sync health."
             >
               <div className="space-y-2">
-                {draft.integrations.map((integration) =>
-                  integration.id === "int_smartlead" ? (
-                    <SmartleadIntegration key={integration.id} />
-                  ) : integration.id === "int_unipile" ? (
+                {draft.integrations
+                  // Smartlead is our white-label backbone — managed centrally,
+                  // never exposed to customers as a connectable integration.
+                  .filter((integration) => integration.id !== "int_smartlead")
+                  .map((integration) =>
+                  integration.id === "int_unipile" ? (
                     <UnipileIntegration key={integration.id} />
                   ) : (
                     <div
