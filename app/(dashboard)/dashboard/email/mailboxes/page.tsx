@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/table";
 import {
   listEmailMailboxes,
-  createEmailMailbox,
+  connectSmtpMailbox,
   syncEmailMailboxes,
 } from "@/lib/api/email-mailboxes";
 import { listEmailDomains } from "@/lib/api/email-domains";
@@ -237,7 +237,6 @@ export default function EmailMailboxesPage() {
 
       {modal === "connect" && (
         <ConnectModal
-          domains={domains}
           onClose={() => setModal(null)}
           onConnected={() => {
             setModal(null);
@@ -256,36 +255,53 @@ function domainOf(m: EmailMailbox, domains: EmailDomain[]): string {
 }
 
 function ConnectModal({
-  domains,
   onClose,
   onConnected,
 }: {
-  domains: EmailDomain[];
   onClose: () => void;
   onConnected: () => void;
 }) {
   const providers = [
-    { id: "Google", name: "Google Workspace / Gmail", desc: "Connect a Google mailbox", icon: Mail },
-    { id: "Outlook", name: "Microsoft 365 / Outlook", desc: "Connect a Microsoft mailbox", icon: Mail },
     { id: "SMTP", name: "Any SMTP / IMAP", desc: "Host, port & credentials", icon: Server },
+    { id: "Google", name: "Google Workspace", desc: "OAuth — connect in Smartlead", icon: Mail },
+    { id: "Outlook", name: "Microsoft 365", desc: "OAuth — connect in Smartlead", icon: Mail },
   ];
-  const [provider, setProvider] = useState("Google");
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [domainId, setDomainId] = useState("");
+  const [provider, setProvider] = useState("SMTP");
+  const [fromEmail, setFromEmail] = useState("");
+  const [fromName, setFromName] = useState("");
+  const [userName, setUserName] = useState("");
+  const [password, setPassword] = useState("");
+  const [smtpHost, setSmtpHost] = useState("");
+  const [smtpPort, setSmtpPort] = useState("587");
+  const [imapHost, setImapHost] = useState("");
+  const [imapPort, setImapPort] = useState("993");
+  const [maxPerDay, setMaxPerDay] = useState("50");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const inputClass =
+    "w-full mt-1.5 px-3 py-2 rounded-lg bg-section border border-border-subtle text-[13px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default";
+
   async function connect() {
-    const e = email.trim().toLowerCase();
-    if (!e) {
-      setError("Enter the mailbox email");
+    const e = fromEmail.trim().toLowerCase();
+    if (!e || !password || !smtpHost.trim()) {
+      setError("Email, password and SMTP host are required");
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      await createEmailMailbox({ email: e, name: name.trim(), provider, domainId: domainId || null });
+      await connectSmtpMailbox({
+        fromEmail: e,
+        fromName: fromName.trim() || e,
+        userName: userName.trim() || e,
+        password,
+        smtpHost: smtpHost.trim(),
+        smtpPort: Number(smtpPort) || 587,
+        imapHost: imapHost.trim() || smtpHost.trim(),
+        imapPort: Number(imapPort) || 993,
+        maxPerDay: Number(maxPerDay) || 50,
+      });
       onConnected();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to connect mailbox");
@@ -295,7 +311,7 @@ function ConnectModal({
 
   return (
     <Modal onClose={onClose}>
-      <ModalHeader title="Connect an existing mailbox" onClose={onClose} />
+      <ModalHeader title="Connect a mailbox" onClose={onClose} />
       <div className="p-[18px] flex flex-col gap-3">
         <div className="grid grid-cols-3 gap-2">
           {providers.map((o) => {
@@ -320,55 +336,78 @@ function ConnectModal({
           })}
         </div>
 
-        <div>
-          <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">Mailbox email</label>
-          <input
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="ben@getyourcompany.com"
-            className="w-full mt-1.5 px-3 py-2 rounded-lg bg-section border border-border-subtle text-[13px] text-ink font-mono placeholder:text-ink-faint focus:outline-none focus:border-border-default"
-          />
-        </div>
-        <div className="flex gap-3">
-          <div className="grow">
-            <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">Sender name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ben Carter"
-              className="w-full mt-1.5 px-3 py-2 rounded-lg bg-section border border-border-subtle text-[13px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
-            />
+        {provider !== "SMTP" ? (
+          <div className="rounded-xl bg-section border border-border-subtle p-4 text-[12px] text-ink-secondary leading-relaxed">
+            {provider} mailboxes connect via OAuth inside Smartlead. Once
+            connected there, hit <span className="font-medium text-ink">Sync</span> and
+            they&apos;ll appear here automatically. To add one right now, use{" "}
+            <span className="font-medium text-ink">Any SMTP / IMAP</span>.
           </div>
-          <div className="grow">
-            <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">Domain</label>
-            <select
-              value={domainId}
-              onChange={(e) => setDomainId(e.target.value)}
-              className="w-full mt-1.5 px-3 py-2 rounded-lg bg-section border border-border-subtle text-[13px] text-ink focus:outline-none focus:border-border-default"
+        ) : (
+          <>
+            <div className="flex gap-3">
+              <div className="grow">
+                <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">Sender name</label>
+                <input value={fromName} onChange={(e) => setFromName(e.target.value)} placeholder="Ben Carter" className={inputClass} />
+              </div>
+              <div className="grow">
+                <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">From email</label>
+                <input value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder="ben@getyourcompany.com" className={cn(inputClass, "font-mono")} />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="grow">
+                <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">Username</label>
+                <input value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="(defaults to email)" className={cn(inputClass, "font-mono")} />
+              </div>
+              <div className="grow">
+                <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">Password</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="SMTP password / app password" className={inputClass} />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="grow">
+                <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">SMTP host</label>
+                <input value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} placeholder="smtp.yourhost.com" className={cn(inputClass, "font-mono")} />
+              </div>
+              <div className="w-[90px]">
+                <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">Port</label>
+                <input value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} className={cn(inputClass, "font-mono")} />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="grow">
+                <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">IMAP host</label>
+                <input value={imapHost} onChange={(e) => setImapHost(e.target.value)} placeholder="(defaults to SMTP host)" className={cn(inputClass, "font-mono")} />
+              </div>
+              <div className="w-[90px]">
+                <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">Port</label>
+                <input value={imapPort} onChange={(e) => setImapPort(e.target.value)} className={cn(inputClass, "font-mono")} />
+              </div>
+              <div className="w-[110px]">
+                <label className="text-[10px] uppercase tracking-[0.12em] text-ink-muted font-medium">Daily limit</label>
+                <input value={maxPerDay} onChange={(e) => setMaxPerDay(e.target.value)} className={cn(inputClass, "font-mono")} />
+              </div>
+            </div>
+
+            {error && <p className="text-[11px] text-signal-red-text">{error}</p>}
+
+            <button
+              onClick={connect}
+              disabled={saving}
+              className="flex items-center justify-center gap-1.5 py-3 rounded-full bg-ink text-on-ink text-[13px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-60"
             >
-              <option value="">Auto (from email)</option>
-              {domains.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {error && <p className="text-[11px] text-signal-red-text">{error}</p>}
-
-        <button
-          onClick={connect}
-          disabled={saving}
-          className="flex items-center justify-center gap-1.5 py-3 rounded-full bg-ink text-on-ink text-[13px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-60"
-        >
-          {saving && <Loader2 size={14} className="animate-spin" />}
-          Connect mailbox
-        </button>
-        <p className="text-[11px] text-ink-faint">
-          New mailboxes start a 2–3 week warmup automatically before sending campaigns.
-        </p>
+              {saving && <Loader2 size={14} className="animate-spin" />}
+              Connect & start warmup
+            </button>
+            <p className="text-[11px] text-ink-faint">
+              The mailbox is provisioned on Smartlead and starts warmup automatically.
+            </p>
+          </>
+        )}
       </div>
     </Modal>
   );

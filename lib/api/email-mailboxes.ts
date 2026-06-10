@@ -32,6 +32,26 @@ export async function deleteEmailMailbox(id: string): Promise<{ id: string; dele
   return apiRequest(`/email/mailboxes/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
+export interface SmtpMailboxPayload {
+  fromEmail: string;
+  fromName: string;
+  userName?: string;
+  password: string;
+  smtpHost: string;
+  smtpPort: number;
+  imapHost?: string;
+  imapPort?: number;
+  maxPerDay?: number;
+}
+
+/** Provision an SMTP/IMAP mailbox on Smartlead (under this org's client). */
+export async function connectSmtpMailbox(payload: SmtpMailboxPayload): Promise<EmailMailbox> {
+  return apiRequest<EmailMailbox>("/email/mailboxes/smtp", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 /** Pull email accounts from Smartlead into our DB. */
 export async function syncEmailMailboxes(): Promise<{
   created: number;
