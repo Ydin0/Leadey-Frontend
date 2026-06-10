@@ -182,8 +182,6 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
     return fields;
   }, [currentLead]);
 
-  const hiringRoles = currentLead?.companyHiringRoles ?? companyFirstLead?.companyHiringRoles ?? [];
-
   const primaryPhone = currentLead?.phone || companyContacts.find((c) => c.phone)?.phone || "";
 
   function logActivity(id: string, activity: FunnelLeadActivity) {
@@ -422,7 +420,6 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
             company={realCompany}
             contacts={companyContacts}
             customFields={realCustomFields}
-            hiringRoles={hiringRoles}
             opportunityId={currentLead.opportunityId ?? null}
             onConvert={() => setShowConvert(true)}
             onOpportunityChanged={() => onLeadsChanged?.()}

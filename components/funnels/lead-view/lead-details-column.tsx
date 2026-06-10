@@ -5,7 +5,6 @@ import {
   Info,
   Users,
   List,
-  Briefcase,
   MapPin,
   Link as LinkIcon,
   AlignLeft,
@@ -28,6 +27,7 @@ import { Section, MiniBtn } from "./lead-section";
 import { LeadTasksSection } from "./lead-tasks-section";
 import { LeadOpportunitySection } from "./lead-opportunity-section";
 import { LeadLeadsList } from "./lead-leads-list";
+import { LeadHiringRolesSection } from "./lead-hiring-roles-section";
 
 interface LeadDetailsColumnProps {
   funnelId: string;
@@ -35,7 +35,6 @@ interface LeadDetailsColumnProps {
   company: FunnelLeadCompany | null;
   contacts: FunnelLeadContact[];
   customFields: FunnelLeadCustomField[];
-  hiringRoles: string[];
   opportunityId: string | null;
   onConvert: () => void;
   onOpportunityChanged: () => void;
@@ -176,7 +175,6 @@ export function LeadDetailsColumn({
   company,
   contacts,
   customFields,
-  hiringRoles,
   opportunityId,
   onConvert,
   onOpportunityChanged,
@@ -282,21 +280,8 @@ export function LeadDetailsColumn({
             </div>
           </Section>
 
-          {/* Hiring (job-scraper signal) */}
-          {hiringRoles.length > 0 && (
-            <Section icon={Briefcase} title="Hiring for" count={hiringRoles.length}>
-              <div className="flex flex-wrap gap-1.5 pl-1">
-                {hiringRoles.map((role, i) => (
-                  <span
-                    key={i}
-                    className="text-[11px] rounded-full px-2.5 py-1 bg-signal-slate text-signal-slate-text"
-                  >
-                    {role}
-                  </span>
-                ))}
-              </div>
-            </Section>
-          )}
+          {/* Hiring roles — full CRUD (title, salary, location, seniority, …) */}
+          <LeadHiringRolesSection funnelId={funnelId} leadId={leadId} />
 
           {/* Custom fields */}
           {customFields.length > 0 && (
