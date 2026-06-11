@@ -72,7 +72,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
 
   const goToLead = useCallback(
     (lead: FunnelLead | null) => {
-      if (lead) router.push(`/dashboard/funnels/${funnelId}/leads/${lead.id}`);
+      // scroll:false keeps the viewport steady so prev/next feels instant.
+      if (lead) router.push(`/dashboard/funnels/${funnelId}/leads/${lead.id}`, { scroll: false });
     },
     [router, funnelId],
   );

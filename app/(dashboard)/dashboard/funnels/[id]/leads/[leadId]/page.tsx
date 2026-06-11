@@ -12,14 +12,20 @@ import type { Funnel, FunnelLead } from "@/lib/types/funnel";
 
 const SORT_STORAGE_KEY = "leadey:campaign-lead-sort";
 
+/** Session-lived cache of loaded funnels (with all their leads). Navigating
+ *  prev/next between leads in the same campaign remounts this page; serving the
+ *  already-loaded funnel from cache makes that switch instant (no "Loading lead…"
+ *  flash) while we refresh it in the background. */
+const funnelCache = new Map<string, Funnel>();
+
 export default function LeadViewPage() {
   const params = useParams();
   const funnelId = params.id as string;
   const leadId = params.leadId as string;
   const isAuthReady = useAuthReady();
 
-  const [funnel, setFunnel] = useState<Funnel | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [funnel, setFunnel] = useState<Funnel | null>(() => funnelCache.get(funnelId) ?? null);
+  const [loading, setLoading] = useState(() => !funnelCache.has(funnelId));
   const [error, setError] = useState<string | null>(null);
   const [authTimedOut, setAuthTimedOut] = useState(false);
   const [sortBy, setSortBy] = useState<LeadSortKey>(DEFAULT_LEAD_SORT);
@@ -41,13 +47,20 @@ export default function LeadViewPage() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    // Only block the screen on a true cold load. If we already have this
+    // funnel cached, keep showing it and refresh silently in the background.
+    if (!funnelCache.has(funnelId)) setLoading(true);
     setError(null);
     try {
       const data = await getFunnelById(funnelId);
+      funnelCache.set(funnelId, data);
       setFunnel(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load campaign");
+      // A failed background refresh shouldn't blow away cached data we're
+      // already showing — only surface an error when we have nothing.
+      if (!funnelCache.has(funnelId)) {
+        setError(err instanceof Error ? err.message : "Failed to load campaign");
+      }
     } finally {
       setLoading(false);
     }
@@ -115,11 +128,16 @@ export default function LeadViewPage() {
       leads={sortedLeads}
       leadId={leadId}
       onLeadPatch={(id, patch) =>
-        setFunnel((prev) =>
-          prev
-            ? { ...prev, leads: prev.leads.map((l: FunnelLead) => (l.id === id ? { ...l, ...patch } : l)) }
-            : prev,
-        )
+        setFunnel((prev) => {
+          if (!prev) return prev;
+          const next = {
+            ...prev,
+            leads: prev.leads.map((l: FunnelLead) => (l.id === id ? { ...l, ...patch } : l)),
+          };
+          // Keep the cache in sync so navigating away and back shows the edit.
+          funnelCache.set(funnelId, next);
+          return next;
+        })
       }
       onLeadsChanged={() => void loadFunnel()}
     />
