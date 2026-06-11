@@ -13,10 +13,10 @@ import { MemberAvatar } from "@/components/shared/member-avatar";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { listEmailAccounts } from "@/lib/api/email-accounts";
-import { listFunnels, createFunnel, type CreateFunnelPayload } from "@/lib/api/funnels";
+import { listFunnels, createFunnel, updateFunnel, type CreateFunnelPayload } from "@/lib/api/funnels";
 import { cn } from "@/lib/utils";
 import type { EmailAccount } from "@/lib/types/email-accounts";
-import type { FunnelChannel, CampaignAudienceCondition } from "@/lib/types/funnel";
+import type { Funnel, FunnelChannel, CampaignAudienceCondition } from "@/lib/types/funnel";
 
 // ── Static config ────────────────────────────────────────────────────────────
 type StepId = "details" | "audience" | "sequence" | "email" | "review";
@@ -101,21 +101,17 @@ interface WizState {
   menu: string | null;
 }
 
-export function CreateCampaignWizard() {
-  const router = useRouter();
-  const isAuthReady = useAuthReady();
-  const { userId } = useAuth();
-  const { members: team, resolveMember } = useTeamMembers();
+interface CreateCampaignWizardProps {
+  /** "create" (default) builds a new campaign; "edit" pre-fills from `funnel`
+   *  and saves via PATCH. */
+  mode?: "create" | "edit";
+  funnel?: Funnel;
+}
 
-  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
-  const [leadBase, setLeadBase] = useState(0);
-  const [launching, setLaunching] = useState(false);
-  const [launched, setLaunched] = useState(false);
-  const [createdId, setCreatedId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
-
-  const [s, setS] = useState<WizState>({
+/** Build the wizard's starting state — defaults for create, or pre-filled from
+ *  an existing campaign for edit so the whole flow is identical either way. */
+function initialStateFor(funnel?: Funnel): WizState {
+  const base: WizState = {
     step: "details",
     visited: { details: true },
     name: "",
@@ -143,7 +139,62 @@ export function CreateCampaignWizard() {
     track: { opens: true, clicks: true, unsub: true },
     launchMode: "launch",
     menu: null,
-  });
+  };
+  if (!funnel) return base;
+
+  const cfg = funnel.config ?? {};
+  const aud = cfg.audience;
+  const ex = cfg.exit;
+  const em = cfg.emailAutomation;
+  const mailboxSel: Record<string, boolean> = {};
+  const mailboxLimit: Record<string, number> = {};
+  if (em?.mailboxIds) for (const id of em.mailboxIds) mailboxSel[id] = true;
+  if (em?.perMailboxLimits) for (const [id, v] of Object.entries(em.perMailboxLimits)) mailboxLimit[id] = v;
+
+  return {
+    ...base,
+    visited: { details: true, audience: true, sequence: true, email: true, review: true },
+    name: funnel.name,
+    desc: funnel.description,
+    visibility: funnel.visibility ?? "private",
+    members: funnel.members.filter((m) => m.role !== "owner").map((m) => m.teamMemberId),
+    audMode: aud?.mode ?? "dynamic",
+    matchAll: aud?.matchAll ?? true,
+    conditions: aud?.conditions?.length ? aud.conditions : base.conditions,
+    autoEnroll: aud?.autoEnroll ?? true,
+    steps: funnel.steps.length
+      ? funnel.steps.map((st, i) => ({ id: st.id || `s${i + 1}`, ch: st.channel, day: st.dayOffset, body: st.subject || st.action || "" }))
+      : base.steps,
+    exit: ex ?? base.exit,
+    emailAuto: em?.enabled ?? true,
+    mailboxSel,
+    mailboxLimit,
+    dailyCap: em?.dailyCap ?? 80,
+    ramp: em?.ramp ?? true,
+    days: em?.days ?? base.days,
+    sendStart: em?.sendStart ?? "09:00",
+    sendEnd: em?.sendEnd ?? "17:00",
+    track: em?.tracking ?? base.track,
+  };
+}
+
+export function CreateCampaignWizard({ mode = "create", funnel }: CreateCampaignWizardProps = {}) {
+  const router = useRouter();
+  const isAuthReady = useAuthReady();
+  const { userId } = useAuth();
+  const { members: team, resolveMember } = useTeamMembers();
+  const isEdit = mode === "edit";
+  const funnelId = funnel?.id;
+
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [leadBase, setLeadBase] = useState(0);
+  const [launching, setLaunching] = useState(false);
+  const [launched, setLaunched] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  const [s, setS] = useState<WizState>(() => initialStateFor(funnel));
   const patch = (u: Partial<WizState>) => setS((p) => ({ ...p, ...u }));
 
   // Load real mailboxes + a real lead-count base for the live estimate.
@@ -160,7 +211,9 @@ export function CreateCampaignWizard() {
           const sel: Record<string, boolean> = { ...p.mailboxSel };
           const lim: Record<string, number> = { ...p.mailboxLimit };
           for (const a of accts) {
-            if (!(a.id in sel)) sel[a.id] = a.status === "active";
+            // In create mode default-select connected mailboxes; in edit mode
+            // leave unknown accounts unselected (the saved selection wins).
+            if (!(a.id in sel)) sel[a.id] = isEdit ? false : a.status === "active";
             if (!(a.id in lim)) lim[a.id] = 50;
           }
           return { ...p, mailboxSel: sel, mailboxLimit: lim };
@@ -171,7 +224,7 @@ export function CreateCampaignWizard() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isAuthReady]);
+  }, [isAuthReady, isEdit]);
 
   // Close any open menu on outside click.
   useEffect(() => {
@@ -225,58 +278,76 @@ export function CreateCampaignWizard() {
   const emailStepN = s.steps.filter((x) => x.ch === "email").length;
   const nameOk = s.name.trim().length > 0;
 
-  // ── Launch → create the real campaign ───────────────────────────────────────
+  // ── Submit → create the campaign, or save edits to an existing one ───────────
   const launch = useCallback(async () => {
     if (launching) return;
     setLaunching(true);
     setError(null);
     try {
-      const payload: CreateFunnelPayload = {
-        name: s.name.trim(),
-        description: s.desc.trim(),
-        status: s.launchMode === "launch" ? "active" : "draft",
-        visibility: s.visibility,
-        steps: s.steps.map((st) => ({
-          channel: st.ch,
-          label: CH[st.ch].label,
-          dayOffset: st.day,
-          ...(st.ch === "email" && st.body.trim() ? { subject: st.body.trim() } : {}),
-          ...(st.ch !== "email" && st.body.trim() ? { action: st.body.trim() } : {}),
-        })),
-        members: s.members,
-        audience: {
-          mode: s.audMode,
-          matchAll: s.matchAll,
-          conditions: s.conditions,
-          autoEnroll: s.autoEnroll,
-          matchEstimate,
-        },
-        exit: s.exit,
-        ...(hasEmailStep
-          ? {
-              emailAutomation: {
-                enabled: s.emailAuto,
-                mailboxIds: selectedMailboxes.map((m) => m.id),
-                perMailboxLimits: Object.fromEntries(selectedMailboxes.map((m) => [m.id, s.mailboxLimit[m.id] ?? 50])),
-                dailyCap: s.dailyCap,
-                ramp: s.ramp,
-                days: s.days,
-                sendStart: s.sendStart,
-                sendEnd: s.sendEnd,
-                tracking: s.track,
-              },
-            }
-          : {}),
+      const steps = s.steps.map((st) => ({
+        channel: st.ch,
+        label: CH[st.ch].label,
+        dayOffset: st.day,
+        ...(st.ch === "email" && st.body.trim() ? { subject: st.body.trim() } : {}),
+        ...(st.ch !== "email" && st.body.trim() ? { action: st.body.trim() } : {}),
+      }));
+      const audience = {
+        mode: s.audMode,
+        matchAll: s.matchAll,
+        conditions: s.conditions,
+        autoEnroll: s.autoEnroll,
+        matchEstimate,
       };
-      const funnel = await createFunnel(payload);
-      setCreatedId(funnel.id);
+      const emailAutomation = hasEmailStep
+        ? {
+            enabled: s.emailAuto,
+            mailboxIds: selectedMailboxes.map((m) => m.id),
+            perMailboxLimits: Object.fromEntries(selectedMailboxes.map((m) => [m.id, s.mailboxLimit[m.id] ?? 50])),
+            dailyCap: s.dailyCap,
+            ramp: s.ramp,
+            days: s.days,
+            sendStart: s.sendStart,
+            sendEnd: s.sendEnd,
+            tracking: s.track,
+          }
+        : undefined;
+
+      if (isEdit && funnelId) {
+        // Edit preserves the current status — status is changed from the
+        // campaign header (Activate/Pause), not the wizard.
+        await updateFunnel(funnelId, {
+          name: s.name.trim(),
+          description: s.desc.trim(),
+          visibility: s.visibility,
+          steps,
+          members: s.members,
+          audience,
+          exit: s.exit,
+          ...(emailAutomation ? { emailAutomation } : {}),
+        });
+        setCreatedId(funnelId);
+      } else {
+        const payload: CreateFunnelPayload = {
+          name: s.name.trim(),
+          description: s.desc.trim(),
+          status: s.launchMode === "launch" ? "active" : "draft",
+          visibility: s.visibility,
+          steps,
+          members: s.members,
+          audience,
+          exit: s.exit,
+          ...(emailAutomation ? { emailAutomation } : {}),
+        };
+        const created = await createFunnel(payload);
+        setCreatedId(created.id);
+      }
       setLaunched(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create campaign");
+      setError(err instanceof Error ? err.message : isEdit ? "Failed to save changes" : "Failed to create campaign");
     } finally {
       setLaunching(false);
     }
-  }, [launching, s, matchEstimate, hasEmailStep, selectedMailboxes]);
+  }, [launching, s, matchEstimate, hasEmailStep, selectedMailboxes, isEdit, funnelId]);
 
   // Toggle helpers
   const toggleMember = (id: string) =>
@@ -289,6 +360,7 @@ export function CreateCampaignWizard() {
   const addableFields = FIELD_ORDER.filter((f) => !usedFields.includes(f));
 
   const titleDisplay = s.name.trim() || "Untitled campaign";
+  const cancelHref = isEdit && funnelId ? `/dashboard/funnels/${funnelId}` : "/dashboard/funnels";
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
@@ -307,14 +379,24 @@ export function CreateCampaignWizard() {
           <span className="text-[13px] font-semibold truncate max-w-[280px]">{titleDisplay}</span>
         </div>
         <div className="grow" />
-        <button
-          onClick={() => { patch({ launchMode: "draft" }); void launch(); }}
-          disabled={!nameOk || launching}
-          className="inline-flex items-center gap-1.5 rounded-full bg-section text-ink-secondary px-3.5 py-2 text-[12px] hover:bg-hover transition-colors disabled:opacity-40"
-        >
-          <Save size={13} /> Save draft
-        </button>
-        <button onClick={() => router.push("/dashboard/funnels")} title="Cancel" className="flex items-center justify-center w-[34px] h-[34px] rounded-lg text-ink-muted hover:bg-section transition-colors">
+        {isEdit ? (
+          <button
+            onClick={() => void launch()}
+            disabled={!nameOk || launching}
+            className="inline-flex items-center gap-1.5 rounded-full bg-ink text-on-ink px-4 py-2 text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+          >
+            {launching ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Save changes
+          </button>
+        ) : (
+          <button
+            onClick={() => { patch({ launchMode: "draft" }); void launch(); }}
+            disabled={!nameOk || launching}
+            className="inline-flex items-center gap-1.5 rounded-full bg-section text-ink-secondary px-3.5 py-2 text-[12px] hover:bg-hover transition-colors disabled:opacity-40"
+          >
+            <Save size={13} /> Save draft
+          </button>
+        )}
+        <button onClick={() => router.push(cancelHref)} title="Cancel" className="flex items-center justify-center w-[34px] h-[34px] rounded-lg text-ink-muted hover:bg-section transition-colors">
           <X size={17} />
         </button>
       </header>
@@ -322,7 +404,7 @@ export function CreateCampaignWizard() {
       <div className="flex flex-1 min-h-0 items-stretch">
         {/* Step rail */}
         <aside className="flex flex-col w-[312px] shrink-0 border-r border-border-subtle px-5 py-6 bg-section/30">
-          <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-4">New campaign</span>
+          <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-4">{isEdit ? "Edit campaign" : "New campaign"}</span>
           <div className="flex flex-col gap-1">
             {order.map((id, i) => {
               const done = i < curIdx;
@@ -847,8 +929,8 @@ export function CreateCampaignWizard() {
               {/* ===== REVIEW ===== */}
               {s.step === "review" && (
                 <section>
-                  <h2 className="text-[20px] font-semibold tracking-[-0.01em]">Review & launch</h2>
-                  <p className="text-[13px] text-ink-muted mt-1">Confirm the setup. You can edit any section before going live.</p>
+                  <h2 className="text-[20px] font-semibold tracking-[-0.01em]">{isEdit ? "Review changes" : "Review & launch"}</h2>
+                  <p className="text-[13px] text-ink-muted mt-1">{isEdit ? "Confirm the setup. Changes apply to the live campaign on save." : "Confirm the setup. You can edit any section before going live."}</p>
 
                   <div className="flex flex-col gap-3.5 mt-6">
                     <ReviewCard title="Details" onEdit={() => go("details")}>
@@ -925,17 +1007,33 @@ export function CreateCampaignWizard() {
                       <div className="flex items-center gap-3">
                         <Rocket size={18} className="text-accent" />
                         <div className="flex flex-col">
-                          <span className="text-[13.5px] font-semibold">Ready to launch</span>
-                          <span className="text-[12px] text-ink-muted mt-px">{s.launchMode === "launch" ? "Outreach starts immediately for matching leads." : "Saved as a draft — activate it whenever you're ready."}</span>
+                          <span className="text-[13.5px] font-semibold">{isEdit ? "Save your changes" : "Ready to launch"}</span>
+                          <span className="text-[12px] text-ink-muted mt-px">
+                            {isEdit
+                              ? "Updates take effect immediately. Status is managed from the campaign page."
+                              : s.launchMode === "launch"
+                                ? "Outreach starts immediately for matching leads."
+                                : "Saved as a draft — activate it whenever you're ready."}
+                          </span>
                         </div>
                       </div>
-                      <div className="flex items-center bg-section rounded-full p-[3px]">
-                        {(["launch", "draft"] as const).map((m) => (
-                          <button key={m} onClick={() => patch({ launchMode: m })} className={cn("rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all", s.launchMode === m ? "bg-surface text-ink shadow-sm" : "text-ink-muted")}>
-                            {m === "launch" ? "Launch now" : "Save as draft"}
-                          </button>
-                        ))}
-                      </div>
+                      {isEdit ? (
+                        <button
+                          onClick={() => void launch()}
+                          disabled={launching}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-ink text-on-ink px-[18px] py-2.5 text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                        >
+                          {launching ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save changes
+                        </button>
+                      ) : (
+                        <div className="flex items-center bg-section rounded-full p-[3px]">
+                          {(["launch", "draft"] as const).map((m) => (
+                            <button key={m} onClick={() => patch({ launchMode: m })} className={cn("rounded-full px-3.5 py-1.5 text-[12px] font-semibold transition-all", s.launchMode === m ? "bg-surface text-ink shadow-sm" : "text-ink-muted")}>
+                              {m === "launch" ? "Launch now" : "Save as draft"}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </section>
@@ -957,8 +1055,12 @@ export function CreateCampaignWizard() {
                 className="inline-flex items-center gap-1.5 rounded-full bg-ink text-on-ink px-[18px] py-2.5 text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
               >
                 {launching ? <Loader2 size={14} className="animate-spin" /> : null}
-                {s.step === "review" ? (s.launchMode === "launch" ? "Launch campaign" : "Save draft") : "Continue"}
-                {!launching && (s.step === "review" ? (s.launchMode === "launch" ? <Rocket size={14} /> : <Save size={14} />) : <ArrowRight size={14} />)}
+                {s.step === "review"
+                  ? isEdit ? "Save changes" : s.launchMode === "launch" ? "Launch campaign" : "Save draft"
+                  : "Continue"}
+                {!launching && (s.step === "review"
+                  ? isEdit ? <Save size={14} /> : s.launchMode === "launch" ? <Rocket size={14} /> : <Save size={14} />
+                  : <ArrowRight size={14} />)}
               </button>
             </div>
           </footer>
@@ -970,11 +1072,13 @@ export function CreateCampaignWizard() {
         <div className="absolute inset-0 z-[80] flex items-center justify-center bg-page/80 backdrop-blur-sm">
           <div className="w-[420px] rounded-[14px] border border-border-subtle bg-surface p-9 text-center flex flex-col items-center">
             <span className="flex items-center justify-center w-16 h-16 rounded-[18px] bg-signal-green"><Check size={30} className="text-signal-green-text" /></span>
-            <h2 className="text-[19px] font-semibold mt-4">{s.launchMode === "launch" ? "Campaign launched" : "Draft saved"}</h2>
+            <h2 className="text-[19px] font-semibold mt-4">{isEdit ? "Changes saved" : s.launchMode === "launch" ? "Campaign launched" : "Draft saved"}</h2>
             <p className="text-[13px] text-ink-muted mt-2 leading-relaxed">
-              “{titleDisplay}” {s.launchMode === "launch"
-                ? `is live. ${s.audMode === "dynamic" ? "Matching leads are entering the sequence now." : "Your imported leads are entering the sequence now."}`
-                : "was saved as a draft. Activate it anytime from Campaigns."}
+              “{titleDisplay}” {isEdit
+                ? "has been updated. Your changes are now live."
+                : s.launchMode === "launch"
+                  ? `is live. ${s.audMode === "dynamic" ? "Matching leads are entering the sequence now." : "Your imported leads are entering the sequence now."}`
+                  : "was saved as a draft. Activate it anytime from Campaigns."}
             </p>
             <div className="flex items-center gap-2.5 mt-5">
               <button onClick={() => createdId && router.push(`/dashboard/funnels/${createdId}`)} className="rounded-full bg-ink text-on-ink px-[18px] py-2.5 text-[12px] font-medium hover:opacity-90 transition-opacity">

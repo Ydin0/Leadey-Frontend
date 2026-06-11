@@ -503,6 +503,7 @@ export async function updateFunnelStatus(
 export interface UpdateFunnelPayload {
   name?: string;
   description?: string;
+  status?: FunnelStatus;
   steps?: Array<
     Pick<FunnelStep, "channel" | "label" | "dayOffset"> & {
       subject?: string;
@@ -510,6 +511,12 @@ export interface UpdateFunnelPayload {
       action?: string;
     }
   >;
+  visibility?: CampaignVisibility;
+  audience?: CampaignAudience;
+  exit?: CampaignExitConditions;
+  emailAutomation?: CampaignEmailAutomation;
+  /** Full set of assigned member ids (besides the owner) — synced on the backend. */
+  members?: string[];
 }
 
 /** Edit a campaign's name / description / steps. Replacing steps clamps each

@@ -18,7 +18,6 @@ import { CockpitView } from "@/components/funnels/cockpit/cockpit-view";
 import { AnalyticsView } from "@/components/funnels/analytics/analytics-view";
 import { EmailPerformancePanel } from "@/components/funnels/email-performance-panel";
 import { AddLeadsModal } from "@/components/funnels/add-leads/add-leads-modal";
-import { EditCampaignModal } from "@/components/funnels/edit-campaign-modal";
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
 import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
 import { getFunnelById, updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
@@ -42,7 +41,6 @@ export default function FunnelDetailPage() {
 
   const [activeTab, setActiveTab] = useState<FunnelTab>("leads");
   const [showAddLeads, setShowAddLeads] = useState(false);
-  const [showEdit, setShowEdit] = useState(false);
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -239,7 +237,7 @@ export default function FunnelDetailPage() {
                 campaign has at least one call step. */}
             <DialerLauncherButton steps={funnel.steps} funnelId={funnel.id} />
             <button
-              onClick={() => setShowEdit(true)}
+              onClick={() => router.push(`/dashboard/funnels/${funnel.id}/edit`)}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle"
             >
               <Pencil size={12} strokeWidth={2} />
@@ -325,15 +323,6 @@ export default function FunnelDetailPage() {
           funnelId={funnel.id}
           onClose={() => setShowAddLeads(false)}
           onLeadsImported={() => void loadFunnel()}
-        />
-      )}
-
-      {/* Edit Campaign Modal */}
-      {showEdit && (
-        <EditCampaignModal
-          funnel={funnel}
-          onClose={() => setShowEdit(false)}
-          onSaved={(updated) => setFunnel(updated)}
         />
       )}
 
