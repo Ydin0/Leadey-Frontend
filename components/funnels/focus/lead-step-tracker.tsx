@@ -1,6 +1,6 @@
 "use client";
 
-import { Mail, Phone, Linkedin, MessageCircle, Check, Loader2 } from "lucide-react";
+import { Mail, Phone, Linkedin, MessageCircle, CheckSquare, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isTerminalStatus, getStatusLabel } from "@/lib/utils/lead-status";
 import type { FunnelStep, FunnelChannel, FunnelLeadEvent } from "@/lib/types/funnel";
@@ -11,6 +11,7 @@ const CHANNEL_ICON: Record<FunnelChannel, typeof Mail> = {
   linkedin: Linkedin,
   whatsapp: MessageCircle,
   sms: MessageCircle,
+  task: CheckSquare,
 };
 
 const CHANNEL_CTA: Record<FunnelChannel, string> = {
@@ -19,6 +20,7 @@ const CHANNEL_CTA: Record<FunnelChannel, string> = {
   linkedin: "Send message",
   whatsapp: "Send message",
   sms: "Send text",
+  task: "Complete task",
 };
 
 interface LeadStepTrackerProps {

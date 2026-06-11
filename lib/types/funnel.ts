@@ -4,7 +4,50 @@ export type { LeadStatus };
 
 export type FunnelStatus = "active" | "paused" | "draft";
 
-export type FunnelChannel = "email" | "linkedin" | "call" | "whatsapp" | "sms";
+export type FunnelChannel = "email" | "linkedin" | "call" | "whatsapp" | "sms" | "task";
+
+export type CampaignVisibility = "public" | "private";
+
+/** A single dynamic-audience filter row (e.g. Lead owner is Alex). */
+export interface CampaignAudienceCondition {
+  id: string;
+  field: string;
+  value: string;
+}
+
+export interface CampaignAudience {
+  mode: "dynamic" | "static";
+  matchAll: boolean;
+  conditions: CampaignAudienceCondition[];
+  autoEnroll: boolean;
+  /** Estimated leads matching the filters at create time. */
+  matchEstimate?: number;
+}
+
+export interface CampaignExitConditions {
+  reply: boolean;
+  meeting: boolean;
+  opp: boolean;
+}
+
+export interface CampaignEmailAutomation {
+  enabled: boolean;
+  mailboxIds: string[];
+  perMailboxLimits?: Record<string, number>;
+  dailyCap: number;
+  ramp: boolean;
+  days: Record<string, boolean>;
+  sendStart: string;
+  sendEnd: string;
+  tracking: { opens: boolean; clicks: boolean; unsub: boolean };
+}
+
+/** Builder config persisted in `funnels.config` (round-trips the wizard). */
+export interface CampaignConfig {
+  audience?: CampaignAudience;
+  exit?: CampaignExitConditions;
+  emailAutomation?: CampaignEmailAutomation;
+}
 
 export interface FunnelStep {
   id: string;
@@ -158,6 +201,8 @@ export interface Funnel {
   name: string;
   description: string;
   status: FunnelStatus;
+  visibility?: CampaignVisibility;
+  config?: CampaignConfig;
   steps: FunnelStep[];
   metrics: FunnelMetrics;
   sources: FunnelSource[];

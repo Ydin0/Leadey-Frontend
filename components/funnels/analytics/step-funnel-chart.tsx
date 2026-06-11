@@ -1,4 +1,4 @@
-import { Mail, Linkedin, Phone, MessageSquare } from "lucide-react";
+import { Mail, Linkedin, Phone, MessageSquare, CheckSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FunnelAnalyticsStep, FunnelChannel } from "@/lib/types/funnel";
 
@@ -8,6 +8,7 @@ const channelIcon: Record<FunnelChannel, typeof Mail> = {
   call: Phone,
   whatsapp: MessageSquare,
   sms: MessageSquare,
+  task: CheckSquare,
 };
 
 const channelColor: Record<FunnelChannel, string> = {
@@ -16,6 +17,7 @@ const channelColor: Record<FunnelChannel, string> = {
   call: "text-signal-green-text",
   whatsapp: "text-signal-green-text",
   sms: "text-signal-green-text",
+  task: "text-ink-secondary",
 };
 
 const barBg: Record<FunnelChannel, string> = {
@@ -24,6 +26,7 @@ const barBg: Record<FunnelChannel, string> = {
   call: "bg-signal-green-text",
   whatsapp: "bg-signal-green-text",
   sms: "bg-signal-green-text",
+  task: "bg-ink-secondary",
 };
 
 export function StepFunnelChart({ steps }: { steps: FunnelAnalyticsStep[] }) {

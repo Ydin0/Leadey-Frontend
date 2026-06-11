@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Plus, Search, ArrowUpDown, ChevronDown, Check, List, LayoutGrid,
-  GitFork, Phone, Mail, Linkedin, MessageSquare, ArrowRight, X, SearchX,
+  GitFork, Phone, Mail, Linkedin, MessageSquare, ArrowRight, X, SearchX, CheckSquare,
 } from "lucide-react";
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { listFunnels } from "@/lib/api/funnels";
@@ -20,6 +20,7 @@ const STEP_META: Record<FunnelChannel, { icon: typeof Mail; color: string }> = {
   linkedin: { icon: Linkedin, color: "text-linkedin" },
   whatsapp: { icon: MessageSquare, color: "text-signal-green-text" },
   sms: { icon: MessageSquare, color: "text-signal-green-text" },
+  task: { icon: CheckSquare, color: "text-ink-secondary" },
 };
 
 const CHANNEL_DEFS: { id: FunnelChannel; label: string; icon: typeof Mail }[] = [
@@ -124,7 +125,7 @@ export default function FunnelsPage() {
   const [funnels, setFunnels] = useState<Funnel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { resolveMember } = useTeamMembers();
+  const { members: allMembers, resolveMember } = useTeamMembers();
 
   // Filter state
   const [search, setSearch] = useState("");
@@ -172,18 +173,25 @@ export default function FunnelsPage() {
     return map;
   }, [funnels, resolveMember]);
 
-  // The rep universe = everyone assigned to at least one campaign.
+  // The rep universe = the whole team roster (so you can filter by any rep to
+  // see their campaigns), each annotated with how many campaigns they own.
+  // Falls back to anyone assigned to a campaign but not in the roster.
   const repUniverse = useMemo(() => {
-    const counts = new Map<string, { id: string; name: string; count: number }>();
+    const counts = new Map<string, number>();
     for (const f of funnels) {
-      for (const m of f.members) {
-        const existing = counts.get(m.teamMemberId);
-        if (existing) existing.count += 1;
-        else counts.set(m.teamMemberId, { id: m.teamMemberId, name: resolveMember(m.teamMemberId)?.name ?? "Unknown", count: 1 });
-      }
+      for (const m of f.members) counts.set(m.teamMemberId, (counts.get(m.teamMemberId) ?? 0) + 1);
     }
-    return [...counts.values()].sort((a, b) => a.name.localeCompare(b.name));
-  }, [funnels, resolveMember]);
+    const seen = new Set<string>();
+    const list: { id: string; name: string; count: number }[] = [];
+    for (const m of allMembers) {
+      seen.add(m.id);
+      list.push({ id: m.id, name: m.name, count: counts.get(m.id) ?? 0 });
+    }
+    for (const [id, count] of counts) {
+      if (!seen.has(id)) list.push({ id, name: resolveMember(id)?.name ?? "Unknown", count });
+    }
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }, [funnels, allMembers, resolveMember]);
 
   // Apply search / channel / rep filters (status applied after, so tab counts reflect the rest).
   const baseFiltered = useMemo(() => {

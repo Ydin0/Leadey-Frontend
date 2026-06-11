@@ -1,4 +1,4 @@
-import { Mail, Linkedin, Phone, MessageSquare } from "lucide-react";
+import { Mail, Linkedin, Phone, MessageSquare, CheckSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { FunnelStep, FunnelChannel } from "@/lib/types/funnel";
 
@@ -8,6 +8,7 @@ const channelConfig: Record<FunnelChannel, { icon: typeof Mail; color: string; l
   call: { icon: Phone, color: "text-signal-green-text", label: "Call" },
   whatsapp: { icon: MessageSquare, color: "text-signal-green-text", label: "WhatsApp" },
   sms: { icon: MessageSquare, color: "text-signal-green-text", label: "SMS" },
+  task: { icon: CheckSquare, color: "text-ink-secondary", label: "Task" },
 };
 
 interface FunnelStepPipelineProps {

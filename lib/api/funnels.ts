@@ -7,6 +7,10 @@ import type {
   LeadStatus,
   FunnelStatus,
   FunnelStep,
+  CampaignVisibility,
+  CampaignAudience,
+  CampaignExitConditions,
+  CampaignEmailAutomation,
 } from "@/lib/types/funnel";
 import { apiRequest } from "./client";
 
@@ -47,7 +51,13 @@ function asFunnelStatus(value: unknown): FunnelStatus {
 
 function asChannel(value: unknown): FunnelChannel {
   const normalized = asString(value).toLowerCase();
-  if (normalized === "linkedin" || normalized === "call" || normalized === "whatsapp") {
+  if (
+    normalized === "linkedin" ||
+    normalized === "call" ||
+    normalized === "whatsapp" ||
+    normalized === "sms" ||
+    normalized === "task"
+  ) {
     return normalized;
   }
   return "email";
@@ -137,6 +147,8 @@ function hydrateFunnel(raw: ApiFunnel): Funnel {
     name: asString(raw.name),
     description: asString(raw.description),
     status: asFunnelStatus(raw.status),
+    visibility: (raw as any).visibility === "public" ? "public" : "private",
+    config: (raw as any).config && typeof (raw as any).config === "object" ? (raw as any).config : {},
     steps,
     metrics: {
       total: asNumber(raw.metrics?.total),
@@ -241,6 +253,12 @@ export interface CreateFunnelPayload {
   status?: FunnelStatus;
   steps: Array<Pick<FunnelStep, "channel" | "label" | "dayOffset"> & { subject?: string; emailBody?: string; action?: string }>;
   sourceTypes?: Array<"csv" | "signals" | "webhook" | "companies">;
+  visibility?: CampaignVisibility;
+  audience?: CampaignAudience;
+  exit?: CampaignExitConditions;
+  emailAutomation?: CampaignEmailAutomation;
+  /** Assigned team-member ids (besides the creator, who becomes owner). */
+  members?: string[];
 }
 
 export async function createFunnel(payload: CreateFunnelPayload): Promise<Funnel> {

@@ -1,7 +1,7 @@
 "use client";
 
-import { FunnelWizardShell } from "@/components/funnels/wizard/funnel-wizard-shell";
+import { CreateCampaignWizard } from "@/components/funnels/create/create-campaign-wizard";
 
 export default function NewFunnelPage() {
-  return <FunnelWizardShell />;
+  return <CreateCampaignWizard />;
 }
