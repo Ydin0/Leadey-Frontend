@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { TrialBanner } from "@/components/layout/trial-banner";
 import { CallProvider } from "@/components/calling/call-context";
+import { IncomingCallPrompt } from "@/components/calling/incoming-call-prompt";
 import { DialerProvider } from "@/components/dialer/context/dialer-context";
 import { DialerBar } from "@/components/dialer/bar/dialer-bar";
 import { AuthTokenSync } from "@/components/providers/auth-token-sync";
@@ -31,6 +32,8 @@ export default function DashboardLayout({
                 <div className="p-6">{children}</div>
               </main>
               <ScraperRunsWidget />
+              {/* Global ringing prompt for inbound calls (accept/reject). */}
+              <IncomingCallPrompt />
             </div>
           </ScraperRunsProvider>
         </DialerProvider>

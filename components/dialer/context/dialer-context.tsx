@@ -424,21 +424,26 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   // On connected → ended, record the call (no disposition) and move on. The
   // new currentItem re-triggers the countdown below.
   const prevStateRef = useRef<string | null>(null);
+  const prevDirectionRef = useRef<string | null>(null);
   const advanceRef = useRef(advance);
   advanceRef.current = advance;
   useEffect(() => {
     const state = call.activeCall?.state || null;
-    // Advance after any dialed call ends — whether it connected or just rang
-    // out (no answer / busy / failed) — so the queue keeps moving.
+    const direction = call.activeCall?.direction || null;
+    // Advance after any OUTBOUND dialed call ends — whether it connected or
+    // just rang out (no answer / busy / failed) — so the queue keeps moving.
+    // Inbound calls must never advance the dialer queue.
     if (
       (prevStateRef.current === "connected" || prevStateRef.current === "ringing") &&
-      state === "ended"
+      state === "ended" &&
+      prevDirectionRef.current === "outbound"
     ) {
       autoVmRef.current = false;
       void advanceRef.current();
     }
     prevStateRef.current = state;
-  }, [call.activeCall?.state]);
+    prevDirectionRef.current = direction;
+  }, [call.activeCall?.state, call.activeCall?.direction]);
 
   // ── Countdown engine: auto-dial the current lead ─────────────────
   const startNextRef = useRef(startNext);
@@ -449,6 +454,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     mode === "running" &&
     !!currentItem &&
     !call.activeCall &&
+    !call.incomingCall &&
     autoAdvanceSeconds > 0;
   useEffect(() => {
     if (!canAutoDial) {

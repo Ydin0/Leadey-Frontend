@@ -18,6 +18,7 @@ import type {
   CallRecord,
   EndedCallInfo,
   AudioDeviceOption,
+  IncomingCallInfo,
 } from "@/lib/types/calling";
 import { getPhoneLines, getCallRecords, saveCallRecord } from "@/lib/api/phone-lines";
 import { logLeadCall } from "@/lib/api/funnels";
@@ -83,9 +84,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [selectedInputDeviceId, setSelectedInputDeviceId] = useState<string | null>(null);
   const [selectedOutputDeviceId, setSelectedOutputDeviceId] = useState<string | null>(null);
   const [outputSelectionSupported, setOutputSelectionSupported] = useState(false);
+  const [incomingCall, setIncomingCall] = useState<IncomingCallInfo | null>(null);
 
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
+  const incomingCallRef = useRef<Call | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const callStartRef = useRef<number>(0);
 
@@ -199,11 +202,28 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           console.error("[Twilio Device Error]", err);
         });
 
-        // Handle incoming calls
-        device.on("incoming", (incomingCall: Call) => {
-          callRef.current = incomingCall;
-          bindCallEvents(incomingCall, "inbound");
-          incomingCall.accept();
+        // Handle incoming calls — DON'T auto-answer. Surface a ringing prompt
+        // (Twilio plays its built-in ringtone while the call is pending) and
+        // let the rep accept/reject via acceptIncoming()/rejectIncoming().
+        device.on("incoming", (call: Call) => {
+          incomingCallRef.current = call;
+          setIncomingCall({
+            callId: call.parameters?.CallSid || `in_${Date.now()}`,
+            fromNumber: call.parameters?.From || "",
+            lineNumber: call.parameters?.To || "",
+            lineName: null,
+          });
+          // If the caller hangs up (or it errors) before we answer, clear it.
+          const clearPending = () => {
+            if (incomingCallRef.current === call) {
+              incomingCallRef.current = null;
+              setIncomingCall(null);
+            }
+          };
+          call.on("cancel", clearPending);
+          call.on("disconnect", clearPending);
+          call.on("reject", clearPending);
+          call.on("error", clearPending);
         });
 
         // Token refresh — re-register before expiry (45 min)
@@ -489,6 +509,28 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     [activeCall, deviceReady, phoneLines, selectedLineId, bindCallEvents]
   );
 
+  // ── Accept / reject a ringing inbound call ────
+  const acceptIncoming = useCallback(() => {
+    const call = incomingCallRef.current;
+    if (!call) return;
+    // Clear the pending state first so the ring prompt's clear handlers no-op;
+    // the call now flows through the normal active-call lifecycle.
+    incomingCallRef.current = null;
+    setIncomingCall(null);
+    callRef.current = call;
+    bindCallEvents(call, "inbound");
+    call.accept();
+  }, [bindCallEvents]);
+
+  const rejectIncoming = useCallback(() => {
+    const call = incomingCallRef.current;
+    incomingCallRef.current = null;
+    setIncomingCall(null);
+    if (call) {
+      try { call.reject(); } catch { /* already gone */ }
+    }
+  }, []);
+
   // ── End the current call ──────────────────────
   const endCall = useCallback(() => {
     if (callRef.current) {
@@ -562,6 +604,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         setInputDevice,
         setOutputDevice,
         refreshAudioDevices,
+        incomingCall,
+        acceptIncoming,
+        rejectIncoming,
       }}
     >
       {children}

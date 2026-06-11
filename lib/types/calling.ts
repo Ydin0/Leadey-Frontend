@@ -241,9 +241,28 @@ export interface CallContextValue {
   setOutputDevice: (deviceId: string) => Promise<void>;
   /** Re-enumerate devices and request mic permission so labels appear. */
   refreshAudioDevices: () => Promise<void>;
+
+  // ── Incoming call (ringing, awaiting accept/reject) ────────────────
+  /** A ringing inbound call the rep hasn't answered yet, or null. */
+  incomingCall: IncomingCallInfo | null;
+  /** Answer the ringing inbound call. */
+  acceptIncoming: () => void;
+  /** Decline the ringing inbound call. */
+  rejectIncoming: () => void;
 }
 
 export interface AudioDeviceOption {
   deviceId: string;
   label: string;
+}
+
+/** A pending inbound call shown in the ringing prompt before it's answered. */
+export interface IncomingCallInfo {
+  callId: string;
+  /** The external caller's number. */
+  fromNumber: string;
+  /** The Leadey line the call came in on (E.164). */
+  lineNumber: string;
+  /** Friendly name of that line, if known. */
+  lineName: string | null;
 }
