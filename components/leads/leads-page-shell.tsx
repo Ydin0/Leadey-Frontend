@@ -14,6 +14,7 @@ import {
 } from "@/components/scrapers/leads/leads-filter-bar";
 import { useCrossPageSelection } from "@/lib/hooks/use-cross-page-selection";
 import { CompaniesTable } from "./companies-table";
+import { ImportsView } from "./imports-view";
 import {
   getContacts, getContactCompanyCounts, enrichContacts, pollEnrichmentAll,
   bulkUpdateContactStatus, sendContactsToFunnel, resetEnrichment,
@@ -31,7 +32,7 @@ interface CompanyOption {
 
 export function LeadsPageShell() {
   const isAuthReady = useAuthReady();
-  const [view, setView] = useState<"leads" | "companies">("leads");
+  const [view, setView] = useState<"leads" | "companies" | "imports">("leads");
   const [contacts, setContacts] = useState<ScraperContactRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -250,7 +251,7 @@ export function LeadsPageShell() {
   async function handleExport() {
     setExporting(true);
     try {
-      let rows: ScraperContactRow[] = [];
+      const rows: ScraperContactRow[] = [];
       let p = 1;
       while (true) {
         const batch = await getContacts({ page: p, pageSize: 500, ...filterPayload() });
@@ -306,17 +307,21 @@ export function LeadsPageShell() {
 
       {/* View toggle */}
       <div className="flex items-center gap-1 mb-3">
-        {(["leads", "companies"] as const).map((v) => (
+        {([
+          { id: "leads", icon: Users },
+          { id: "companies", icon: Building2 },
+          { id: "imports", icon: FolderInput },
+        ] as const).map(({ id, icon: Icon }) => (
           <button
-            key={v}
-            onClick={() => setView(v)}
+            key={id}
+            onClick={() => setView(id)}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors capitalize",
-              view === v ? "bg-ink text-on-ink" : "bg-section text-ink-secondary hover:bg-hover",
+              view === id ? "bg-ink text-on-ink" : "bg-section text-ink-secondary hover:bg-hover",
             )}
           >
-            {v === "leads" ? <Users size={12} /> : <Building2 size={12} />}
-            {v}
+            <Icon size={12} />
+            {id}
           </button>
         ))}
       </div>
@@ -333,7 +338,9 @@ export function LeadsPageShell() {
         </div>
       )}
 
-      {loading ? (
+      {view === "imports" ? (
+        <ImportsView showStatus={showStatus} />
+      ) : loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 size={20} className="animate-spin text-ink-muted" />
         </div>

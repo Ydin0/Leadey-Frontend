@@ -17,6 +17,7 @@ import type {
   PhoneLine,
   CallRecord,
   EndedCallInfo,
+  AudioDeviceOption,
 } from "@/lib/types/calling";
 import { getPhoneLines, getCallRecords, saveCallRecord } from "@/lib/api/phone-lines";
 import { logLeadCall } from "@/lib/api/funnels";
@@ -33,6 +34,20 @@ export function useCallContext() {
 const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "http://localhost:3001";
+
+const AUDIO_INPUT_KEY = "leadey:audioInputDevice";
+const AUDIO_OUTPUT_KEY = "leadey:audioOutputDevice";
+
+/** Twilio's audio helper exposes devices as a Map<deviceId, MediaDeviceInfo>. */
+function deviceMapToOptions(
+  map: Map<string, MediaDeviceInfo> | undefined | null,
+): AudioDeviceOption[] {
+  if (!map) return [];
+  return Array.from(map.values()).map((d, i) => ({
+    deviceId: d.deviceId,
+    label: d.label || (d.deviceId === "default" ? "System default" : `Device ${i + 1}`),
+  }));
+}
 
 async function fetchTwilioToken(clerkToken: string | null): Promise<string> {
   const headers: Record<string, string> = {};
@@ -62,6 +77,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [lastLoggedCall, setLastLoggedCall] = useState<
     { leadId: string; funnelId: string; at: number } | null
   >(null);
+
+  const [audioInputDevices, setAudioInputDevices] = useState<AudioDeviceOption[]>([]);
+  const [audioOutputDevices, setAudioOutputDevices] = useState<AudioDeviceOption[]>([]);
+  const [selectedInputDeviceId, setSelectedInputDeviceId] = useState<string | null>(null);
+  const [selectedOutputDeviceId, setSelectedOutputDeviceId] = useState<string | null>(null);
+  const [outputSelectionSupported, setOutputSelectionSupported] = useState(false);
 
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -101,6 +122,56 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       setPhoneLines(lines);
     } catch (err) {
       console.error("[CallProvider] Failed to refresh lines:", err);
+    }
+  }, []);
+
+  // ── Audio device (mic / speaker) selection ────────────────────────
+  // Reads the current device lists from Twilio's AudioHelper into state.
+  const syncAudioDeviceLists = useCallback(() => {
+    const audio = deviceRef.current?.audio;
+    if (!audio) return;
+    setAudioInputDevices(deviceMapToOptions(audio.availableInputDevices));
+    setAudioOutputDevices(deviceMapToOptions(audio.availableOutputDevices));
+    setOutputSelectionSupported(!!audio.isOutputSelectionSupported);
+  }, []);
+
+  // Device labels are blank until mic permission is granted — request it once,
+  // then re-enumerate so the dropdowns show real names ("MacBook Mic", etc.).
+  const refreshAudioDevices = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach((t) => t.stop());
+    } catch {
+      // Permission denied — labels stay generic but ids still work.
+    }
+    syncAudioDeviceLists();
+  }, [syncAudioDeviceLists]);
+
+  const setInputDevice = useCallback(async (deviceId: string) => {
+    const audio = deviceRef.current?.audio;
+    if (!audio) return;
+    try {
+      if (!deviceId || deviceId === "default") {
+        await audio.unsetInputDevice();
+      } else {
+        await audio.setInputDevice(deviceId);
+      }
+      setSelectedInputDeviceId(deviceId || "default");
+      try { window.localStorage.setItem(AUDIO_INPUT_KEY, deviceId || "default"); } catch {}
+    } catch (err) {
+      console.error("[Twilio] Failed to set microphone:", err);
+    }
+  }, []);
+
+  const setOutputDevice = useCallback(async (deviceId: string) => {
+    const audio = deviceRef.current?.audio;
+    if (!audio?.isOutputSelectionSupported) return;
+    try {
+      await audio.speakerDevices.set(deviceId || "default");
+      setSelectedOutputDeviceId(deviceId || "default");
+      try { window.localStorage.setItem(AUDIO_OUTPUT_KEY, deviceId || "default"); } catch {}
+    } catch (err) {
+      console.error("[Twilio] Failed to set speaker:", err);
     }
   }, []);
 
@@ -146,8 +217,29 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           }
         });
 
+        // Keep the mic/speaker dropdowns live as headsets are plugged/unplugged.
+        device.audio?.on("deviceChange", () => syncAudioDeviceLists());
+
         await device.register();
         deviceRef.current = device;
+
+        // Restore the user's saved mic / speaker choice and populate the lists.
+        try {
+          const savedIn = window.localStorage.getItem(AUDIO_INPUT_KEY);
+          if (savedIn) {
+            setSelectedInputDeviceId(savedIn);
+            if (savedIn === "default") await device.audio?.unsetInputDevice();
+            else await device.audio?.setInputDevice(savedIn);
+          }
+          const savedOut = window.localStorage.getItem(AUDIO_OUTPUT_KEY);
+          if (savedOut && device.audio?.isOutputSelectionSupported) {
+            setSelectedOutputDeviceId(savedOut);
+            await device.audio.speakerDevices.set(savedOut);
+          }
+        } catch (err) {
+          console.warn("[Twilio] Could not restore saved audio devices:", err);
+        }
+        syncAudioDeviceLists();
       } catch (err) {
         console.error("[Twilio] Device init failed:", err);
       }
@@ -462,6 +554,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         refreshPhoneLines,
         lastEndedCall,
         lastLoggedCall,
+        audioInputDevices,
+        audioOutputDevices,
+        selectedInputDeviceId,
+        selectedOutputDeviceId,
+        outputSelectionSupported,
+        setInputDevice,
+        setOutputDevice,
+        refreshAudioDevices,
       }}
     >
       {children}

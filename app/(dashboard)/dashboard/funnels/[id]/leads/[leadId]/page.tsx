@@ -21,6 +21,7 @@ export default function LeadViewPage() {
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authTimedOut, setAuthTimedOut] = useState(false);
   const [sortBy, setSortBy] = useState<LeadSortKey>(DEFAULT_LEAD_SORT);
 
   useEffect(() => {
@@ -35,7 +36,12 @@ export default function LeadViewPage() {
   );
 
   const loadFunnel = useCallback(async () => {
-    if (!funnelId) return;
+    if (!funnelId) {
+      setError("Missing campaign id.");
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     setError(null);
     try {
       const data = await getFunnelById(funnelId);
@@ -49,10 +55,26 @@ export default function LeadViewPage() {
 
   useEffect(() => {
     if (!isAuthReady) return;
+    setAuthTimedOut(false);
     void loadFunnel();
   }, [isAuthReady, loadFunnel]);
 
-  if (loading) {
+  // Safety net: never spin forever waiting on auth. If it hasn't become ready
+  // within a few seconds, surface a recoverable state instead of an endless
+  // "Loading lead…". The auth provider keeps retrying in the background, so a
+  // Retry click typically succeeds without a full browser refresh.
+  useEffect(() => {
+    if (isAuthReady) return;
+    const id = setTimeout(() => setAuthTimedOut(true), 6000);
+    return () => clearTimeout(id);
+  }, [isAuthReady]);
+
+  const retry = useCallback(() => {
+    setAuthTimedOut(false);
+    void loadFunnel();
+  }, [loadFunnel]);
+
+  if (loading && !authTimedOut) {
     return (
       <div className="rounded-[14px] border border-border-subtle bg-surface p-6">
         <p className="text-[12px] text-ink-muted">Loading lead…</p>
@@ -60,16 +82,29 @@ export default function LeadViewPage() {
     );
   }
 
-  if (error || !funnel) {
+  if (error || authTimedOut || !funnel) {
     return (
-      <div className="rounded-[14px] border border-border-subtle bg-surface p-6">
-        <p className="text-[12px] text-ink-muted mb-3">{error || "Campaign not found."}</p>
-        <Link
-          href="/dashboard/funnels"
-          className="text-[11px] text-signal-blue-text hover:underline"
-        >
-          Back to Campaigns
-        </Link>
+      <div className="rounded-[14px] border border-signal-red-text/25 bg-signal-red/10 p-5">
+        <p className="text-[12px] font-medium text-signal-red-text mb-2">
+          Could not load lead
+        </p>
+        <p className="text-[11px] text-ink-secondary mb-3">
+          {error || "Taking longer than expected — please try again."}
+        </p>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={retry}
+            className="px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
+          >
+            Retry
+          </button>
+          <Link
+            href="/dashboard/funnels"
+            className="text-[11px] text-signal-blue-text hover:underline"
+          >
+            Back to Campaigns
+          </Link>
+        </div>
       </div>
     );
   }

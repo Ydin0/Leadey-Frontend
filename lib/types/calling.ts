@@ -227,4 +227,23 @@ export interface CallContextValue {
   /** Fires after a call has been logged against a campaign lead (step ticked +
    *  call counter incremented), so list views can refresh the right campaign. */
   lastLoggedCall: { leadId: string; funnelId: string; at: number } | null;
+
+  // ── Audio device selection (mic / speaker) ─────────────────────────
+  /** Available microphones / speakers (labels populate after mic permission). */
+  audioInputDevices: AudioDeviceOption[];
+  audioOutputDevices: AudioDeviceOption[];
+  /** Currently selected device ids ("default" when unset). */
+  selectedInputDeviceId: string | null;
+  selectedOutputDeviceId: string | null;
+  /** Whether the browser supports choosing the speaker (Chrome: yes). */
+  outputSelectionSupported: boolean;
+  setInputDevice: (deviceId: string) => Promise<void>;
+  setOutputDevice: (deviceId: string) => Promise<void>;
+  /** Re-enumerate devices and request mic permission so labels appear. */
+  refreshAudioDevices: () => Promise<void>;
+}
+
+export interface AudioDeviceOption {
+  deviceId: string;
+  label: string;
 }

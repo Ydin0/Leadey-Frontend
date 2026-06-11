@@ -182,8 +182,25 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     setSession(snapshot.session);
     setCurrentItem(snapshot.current);
     setUpcoming(snapshot.upcoming);
+    // A successful read means we're reconnected — drop any stale error banner.
+    setError(null);
     return snapshot;
   }, []);
+
+  // After a mutation (advance/skip/back) fails on a network blip, re-read the
+  // session to reconcile true state. The read is retried by the API client, so
+  // if the backend recovered (and the mutation may well have applied), this
+  // clears the banner. Only a failed reconcile surfaces a soft error.
+  const reconcile = useCallback(
+    async (sessionId: string) => {
+      try {
+        await refresh(sessionId);
+      } catch {
+        setError("Reconnecting…");
+      }
+    },
+    [refresh],
+  );
 
   const beginSession = useCallback(
     (next: DialerSession) => {
@@ -249,20 +266,22 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       const callRecordId = call.lastEndedCall?.callRecordId || undefined;
       await advanceSession(session.id, { callRecordId });
       await refresh(session.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to advance");
+    } catch {
+      // Network blip on the POST — re-read to reconcile rather than stick a
+      // raw "Failed to fetch" banner (the advance may have applied).
+      await reconcile(session.id);
     }
-  }, [session, call.lastEndedCall, refresh]);
+  }, [session, call.lastEndedCall, refresh, reconcile]);
 
   const skip = useCallback(async () => {
     if (!session) return;
     try {
       await skipSession(session.id);
       await refresh(session.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to skip");
+    } catch {
+      await reconcile(session.id);
     }
-  }, [session, refresh]);
+  }, [session, refresh, reconcile]);
 
   // The "Next" button / S key: go straight to the next lead and dial it. If a
   // call is live, hang up first and let the auto-advance handler move on (the
@@ -278,20 +297,20 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       await skipSession(session.id);
       const snapshot = await refresh(session.id);
       dialItem(snapshot.current);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to advance");
+    } catch {
+      await reconcile(session.id);
     }
-  }, [session, call, refresh, dialItem]);
+  }, [session, call, refresh, dialItem, reconcile]);
 
   const back = useCallback(async () => {
     if (!session) return;
     try {
       await backSession(session.id);
       await refresh(session.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to go back");
+    } catch {
+      await reconcile(session.id);
     }
-  }, [session, refresh]);
+  }, [session, refresh, reconcile]);
 
   const pause = useCallback(async () => {
     if (!session) return;

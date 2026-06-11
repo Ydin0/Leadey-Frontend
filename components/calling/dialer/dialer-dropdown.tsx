@@ -7,8 +7,9 @@ import { useCallContext } from "@/components/calling/call-context";
 import { DialPad } from "./dial-pad";
 import { RecentCallsList } from "./recent-calls-list";
 import { InCallControls } from "./in-call-controls";
+import { PhoneSettingsPanel } from "./phone-settings-panel";
 
-type DialerView = "dialpad" | "recents";
+type DialerView = "dialpad" | "recents" | "settings";
 
 export function DialerDropdown() {
   const [open, setOpen] = useState(false);
@@ -51,7 +52,7 @@ export function DialerDropdown() {
           ) : (
             <>
               {/* Tab toggle */}
-              {hasActiveLines && (
+              {hasActiveLines && view !== "settings" && (
                 <div className="flex border-b border-border-subtle">
                   <button
                     type="button"
@@ -78,7 +79,9 @@ export function DialerDropdown() {
 
               {/* Content */}
               <div className="px-4 py-3">
-                {!hasActiveLines ? (
+                {view === "settings" ? (
+                  <PhoneSettingsPanel onBack={() => setView("dialpad")} />
+                ) : !hasActiveLines ? (
                   <div className="py-6 text-center">
                     <p className="text-[12px] text-ink-muted mb-1">No phone lines configured</p>
                     <p className="text-[11px] text-ink-faint">
@@ -101,15 +104,15 @@ export function DialerDropdown() {
               </div>
 
               {/* Footer */}
-              {hasActiveLines && (
+              {hasActiveLines && view !== "settings" && (
                 <div className="px-4 py-2.5 border-t border-border-subtle">
                   <button
                     type="button"
-                    onClick={() => setOpen(false)}
+                    onClick={() => setView("settings")}
                     className="flex items-center gap-1.5 text-[11px] text-ink-muted hover:text-ink-secondary transition-colors"
                   >
                     <Settings size={12} strokeWidth={1.5} />
-                    Phone Settings
+                    Audio settings (mic / speaker)
                   </button>
                 </div>
               )}
