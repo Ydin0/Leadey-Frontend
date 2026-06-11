@@ -7,6 +7,7 @@ const channelConfig: Record<FunnelChannel, { icon: typeof Mail; color: string; l
   linkedin: { icon: Linkedin, color: "text-linkedin", label: "LinkedIn" },
   call: { icon: Phone, color: "text-signal-green-text", label: "Call" },
   whatsapp: { icon: MessageSquare, color: "text-signal-green-text", label: "WhatsApp" },
+  sms: { icon: MessageSquare, color: "text-signal-green-text", label: "SMS" },
 };
 
 interface FunnelStepPipelineProps {

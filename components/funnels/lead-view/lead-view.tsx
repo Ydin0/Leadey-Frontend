@@ -9,6 +9,7 @@ import { LeadTimeline } from "./lead-timeline";
 import { LeadStepTracker } from "@/components/funnels/focus/lead-step-tracker";
 import { FocusCallControls } from "@/components/funnels/focus/focus-call-controls";
 import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
+import { SmsThreadDrawer } from "@/components/sms/sms-thread-drawer";
 import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
 import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc } from "@/lib/api/funnels";
@@ -56,6 +57,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
   const [deletedNotes, setDeletedNotes] = useState<Set<string>>(new Set());
   const [advancing, setAdvancing] = useState(false);
   const [showComposer, setShowComposer] = useState(false);
+  const [showSms, setShowSms] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [showConvert, setShowConvert] = useState(false);
@@ -405,6 +407,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
         onStatusChange={handleStatusChange}
         onNote={() => setNoteOpen(true)}
         onEmail={() => setShowComposer(true)}
+        onSms={() => setShowSms(true)}
         onCall={dialPrimary}
       />
 
@@ -478,6 +481,17 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
           </button>
         </div>
       )}
+
+      {/* SMS thread */}
+      <SmsThreadDrawer
+        open={showSms}
+        onClose={() => setShowSms(false)}
+        funnelId={funnelId}
+        leadId={currentLead.id}
+        leadName={currentLead.name}
+        leadPhone={primaryPhone || null}
+        onSent={() => onLeadsChanged?.()}
+      />
 
       {/* Email composer */}
       <EmailComposerDrawer

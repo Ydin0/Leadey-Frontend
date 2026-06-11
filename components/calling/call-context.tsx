@@ -20,7 +20,7 @@ import type {
   AudioDeviceOption,
   IncomingCallInfo,
 } from "@/lib/types/calling";
-import { getPhoneLines, getCallRecords, saveCallRecord } from "@/lib/api/phone-lines";
+import { getPhoneLines, getCallRecords, saveCallRecord, resolveCaller } from "@/lib/api/phone-lines";
 import { logLeadCall } from "@/lib/api/funnels";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 
@@ -352,6 +352,27 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         setActiveCall((prev) =>
           prev ? { ...prev, state: "connected" } : prev
         );
+        // Identify the caller against the org's leads/contacts when we don't
+        // already have a name (inbound calls, or ad-hoc dial-pad outbound), so
+        // the live-call UI shows who it is + a link to their profile.
+        if (!contactName && to) {
+          resolveCaller(to)
+            .then((r) => {
+              if (!r.name && !r.company && !r.leadId) return;
+              setActiveCall((prev) =>
+                prev && prev.callId === callId
+                  ? {
+                      ...prev,
+                      contactName: prev.contactName || r.name,
+                      companyName: r.company,
+                      leadId: r.leadId,
+                      funnelId: r.funnelId,
+                    }
+                  : prev,
+              );
+            })
+            .catch(() => {});
+        }
       });
 
       call.on("disconnect", () => {

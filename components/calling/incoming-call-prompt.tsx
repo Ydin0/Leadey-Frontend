@@ -1,6 +1,7 @@
 "use client";
 
-import { PhoneIncoming, Phone, PhoneOff, Mic, MicOff } from "lucide-react";
+import Link from "next/link";
+import { PhoneIncoming, Phone, PhoneOff, Mic, MicOff, Pause, Play, ExternalLink } from "lucide-react";
 import { cn, formatPhoneIntl, formatCallDuration } from "@/lib/utils";
 import { useCallContext } from "@/components/calling/call-context";
 
@@ -18,6 +19,7 @@ export function IncomingCallPrompt() {
     activeCall,
     endCall,
     toggleMute,
+    toggleHold,
     phoneLines,
   } = useCallContext();
 
@@ -73,8 +75,16 @@ export function IncomingCallPrompt() {
     );
   }
 
-  // ── Connected inbound: mute + hang up ────────────────────────────
-  const connected = activeCall!.state === "connected";
+  // ── Connected inbound: live info + controls ──────────────────────
+  const call = activeCall!;
+  const connected = call.state === "connected";
+  const hasName = !!call.contactName;
+  const numberLabel = formatPhoneIntl(call.to) || call.to;
+  const leadHref =
+    call.leadId && call.funnelId
+      ? `/dashboard/funnels/${call.funnelId}/leads/${call.leadId}`
+      : null;
+
   return (
     <Shell>
       <div className="flex items-center gap-3">
@@ -83,33 +93,61 @@ export function IncomingCallPrompt() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-[14px] font-semibold text-ink truncate">
-            {activeCall!.contactName || formatPhoneIntl(activeCall!.to) || "Inbound call"}
+            {hasName ? call.contactName : numberLabel || "Inbound call"}
           </p>
-          <p className="text-[11px] text-ink-muted tabular-nums">
-            {connected ? formatCallDuration(activeCall!.duration) : "Connecting…"}
+          <p className="text-[11px] text-ink-muted truncate">
+            {[call.companyName, hasName ? numberLabel : null].filter(Boolean).join(" · ") || " "}
+          </p>
+          <p className="text-[11px] text-signal-green-text font-medium tabular-nums mt-0.5">
+            {connected ? formatCallDuration(call.duration) : "Connecting…"}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={toggleMute}
-          title={activeCall!.isMuted ? "Unmute" : "Mute"}
-          className={cn(
-            "w-9 h-9 rounded-full flex items-center justify-center transition-colors shrink-0",
-            activeCall!.isMuted
-              ? "bg-signal-red text-signal-red-text"
-              : "bg-section hover:bg-hover text-ink-secondary",
+      </div>
+
+      <div className="flex items-center justify-between gap-2 mt-3">
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleMute}
+            title={call.isMuted ? "Unmute" : "Mute"}
+            className={cn(
+              "w-9 h-9 rounded-full flex items-center justify-center transition-colors",
+              call.isMuted ? "bg-signal-red text-signal-red-text" : "bg-section hover:bg-hover text-ink-secondary",
+            )}
+          >
+            {call.isMuted ? <MicOff size={15} strokeWidth={1.5} /> : <Mic size={15} strokeWidth={1.5} />}
+          </button>
+          <button
+            type="button"
+            onClick={toggleHold}
+            title={call.isOnHold ? "Resume" : "Hold"}
+            className={cn(
+              "w-9 h-9 rounded-full flex items-center justify-center transition-colors",
+              call.isOnHold ? "bg-signal-blue text-signal-blue-text" : "bg-section hover:bg-hover text-ink-secondary",
+            )}
+          >
+            {call.isOnHold ? <Play size={15} strokeWidth={1.5} /> : <Pause size={15} strokeWidth={1.5} />}
+          </button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {leadHref && (
+            <Link
+              href={leadHref}
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle"
+            >
+              <ExternalLink size={11} /> Open lead
+            </Link>
           )}
-        >
-          {activeCall!.isMuted ? <MicOff size={15} strokeWidth={1.5} /> : <Mic size={15} strokeWidth={1.5} />}
-        </button>
-        <button
-          type="button"
-          onClick={endCall}
-          title="Hang up"
-          className="w-9 h-9 rounded-full flex items-center justify-center bg-signal-red-text text-on-ink hover:bg-signal-red-text/90 transition-colors shrink-0"
-        >
-          <PhoneOff size={15} strokeWidth={1.5} />
-        </button>
+          <button
+            type="button"
+            onClick={endCall}
+            title="Hang up"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-signal-red-text text-on-ink text-[11px] font-medium hover:bg-signal-red-text/90 transition-colors"
+          >
+            <PhoneOff size={13} strokeWidth={2} /> End
+          </button>
+        </div>
       </div>
     </Shell>
   );

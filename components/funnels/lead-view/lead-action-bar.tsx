@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, GitFork, FileText, Mail, Phone } from "lucide-react";
+import { ArrowLeft, ChevronDown, GitFork, FileText, Mail, Phone, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { FunnelStatusBadge } from "@/components/funnels/funnel-status-badge";
@@ -21,6 +21,7 @@ interface LeadActionBarProps {
   onStatusChange: (status: string) => void;
   onNote: () => void;
   onEmail: () => void;
+  onSms: () => void;
   onCall: () => void;
 }
 
@@ -36,6 +37,7 @@ export function LeadActionBar({
   onStatusChange,
   onNote,
   onEmail,
+  onSms,
   onCall,
 }: LeadActionBarProps) {
   const [open, setOpen] = useState(false);
@@ -134,6 +136,13 @@ export function LeadActionBar({
           >
             <Mail size={13} strokeWidth={1.5} />
             Email
+          </button>
+          <button
+            onClick={onSms}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors"
+          >
+            <MessageSquare size={13} strokeWidth={1.5} />
+            Text
           </button>
           <button
             onClick={onCall}

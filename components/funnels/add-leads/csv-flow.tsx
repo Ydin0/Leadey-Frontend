@@ -18,6 +18,12 @@ const ALL_FIELDS = [...LEAD_FIELDS, ...COMPANY_FIELDS, ...OTHER_FIELDS];
 type MappedField = (typeof ALL_FIELDS)[number];
 const REQUIRED: MappedField[] = ["Lead Name", "Company Name"];
 
+/** Fields that may map from more than one CSV column. Everything else is a
+ *  single-value field and must map from at most ONE column (no duplicates).
+ *  Notes aggregates multiple columns; Skip is the absence of a mapping. */
+const MULTI_USE: ReadonlySet<MappedField> = new Set<MappedField>(["Notes", "--- Skip ---"]);
+const isUniqueField = (f: MappedField) => !MULTI_USE.has(f);
+
 interface ColumnMapping {
   csvColumn: string;
   mappedField: MappedField;
@@ -112,8 +118,16 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
         const text = typeof reader.result === "string" ? reader.result : "";
         const parsed = parseCsvText(text);
         if (parsed.rows.length === 0) throw new Error("No lead rows found in this CSV file");
+        // Auto-map each column, but never assign the same single-value field
+        // twice — the first column to claim it wins, later matches fall back to
+        // "Skip" so the user starts with a clean, duplicate-free mapping.
+        const claimed = new Set<MappedField>();
         const mapped: ColumnMapping[] = parsed.headers.map((header) => {
-          const mappedField = autoMapField(header);
+          let mappedField = autoMapField(header);
+          if (isUniqueField(mappedField)) {
+            if (claimed.has(mappedField)) mappedField = "--- Skip ---";
+            else claimed.add(mappedField);
+          }
           return { csvColumn: header, mappedField, autoMapped: mappedField !== "--- Skip ---", sample: parsed.rows[0]?.[header] || "" };
         });
         setFileName(file.name);
@@ -241,7 +255,18 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
                       <FieldKind field={m.mappedField} />
                       <select
                         value={m.mappedField}
-                        onChange={(e) => setMappings((prev) => prev.map((x, i) => (i === index ? { ...x, mappedField: e.target.value as MappedField, autoMapped: false } : x)))}
+                        onChange={(e) => {
+                          const next = e.target.value as MappedField;
+                          setMappings((prev) => prev.map((x, i) => {
+                            if (i === index) return { ...x, mappedField: next, autoMapped: false };
+                            // A single-value field can only live on one column —
+                            // moving it here clears whichever column held it.
+                            if (isUniqueField(next) && x.mappedField === next) {
+                              return { ...x, mappedField: "--- Skip ---" as MappedField, autoMapped: false };
+                            }
+                            return x;
+                          }));
+                        }}
                         className="flex-1 min-w-0 text-[11px] text-ink bg-section border border-border-subtle rounded-lg px-2 py-1.5 focus:outline-none focus:border-border-default"
                       >
                         <optgroup label="Lead">{LEAD_FIELDS.map((o) => <option key={o} value={o}>{o.replace("Lead ", "")}{REQUIRED.includes(o) ? " *" : ""}</option>)}</optgroup>

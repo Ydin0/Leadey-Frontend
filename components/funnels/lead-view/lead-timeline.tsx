@@ -17,6 +17,7 @@ import {
   Pencil,
   Trash2,
   Trophy,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -60,6 +61,8 @@ const TYPE_META: Record<string, KindMeta> = {
   note: { icon: FileText, tint: "bg-section", fg: "text-ink-muted" },
   import: { icon: Download, tint: "bg-signal-slate", fg: "text-signal-slate-text" },
   opportunity: { icon: Trophy, tint: "bg-signal-green", fg: "text-signal-green-text" },
+  sms_sent: { icon: MessageSquare, tint: "bg-signal-green", fg: "text-signal-green-text" },
+  sms_received: { icon: MessageSquare, tint: "bg-signal-green", fg: "text-signal-green-text" },
 };
 
 type FeedItem =
@@ -373,7 +376,7 @@ export function LeadTimeline({ activities, callRecords, onAddNote, onEditNote, o
   }, [activities, callRecords, resolveMember]);
 
   const items = useMemo(() => {
-    const conv = new Set(["call", "email_sent", "email_opened", "linkedin"]);
+    const conv = new Set(["call", "email_sent", "email_opened", "linkedin", "sms_sent", "sms_received"]);
     return feed.filter((item) => {
       const type = item.kind === "call" ? "call" : item.activity.type;
       if (filter === "All") return true;

@@ -40,6 +40,12 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
         if (channel === "call") { type = "call"; summary = outcome === "sent" ? "Call logged" : `Call — ${labelize(outcome)}`; }
         else if (channel === "linkedin") { type = "linkedin"; summary = outcome === "sent" ? "LinkedIn message sent" : `LinkedIn — ${labelize(outcome)}`; }
         else if (channel === "email") { type = outcome === "opened" ? "email_opened" : "email_sent"; summary = outcome === "sent" ? "Email sent" : `Email — ${labelize(outcome)}`; }
+        else if (channel === "sms") {
+          const inbound = (e.meta?.direction as string) === "inbound";
+          type = inbound ? "sms_received" : "sms_sent";
+          summary = inbound ? "SMS received" : "SMS sent";
+          detail = (e.meta?.body as string) || "";
+        }
         else { type = "status_change"; summary = labelize(outcome) || "Step completed"; }
       } else if (e.type === "linkedin_action") {
         type = "linkedin";

@@ -4,7 +4,7 @@ export type { LeadStatus };
 
 export type FunnelStatus = "active" | "paused" | "draft";
 
-export type FunnelChannel = "email" | "linkedin" | "call" | "whatsapp";
+export type FunnelChannel = "email" | "linkedin" | "call" | "whatsapp" | "sms";
 
 export interface FunnelStep {
   id: string;

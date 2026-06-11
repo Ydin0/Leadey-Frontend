@@ -36,7 +36,7 @@ export interface FunnelLeadContact {
 
 export interface FunnelLeadActivity {
   id: string;
-  type: "call" | "email_sent" | "email_opened" | "linkedin" | "note" | "status_change" | "import" | "opportunity";
+  type: "call" | "email_sent" | "email_opened" | "linkedin" | "note" | "status_change" | "import" | "opportunity" | "sms_sent" | "sms_received";
   summary: string;
   detail?: string;
   timestamp: Date;

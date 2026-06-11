@@ -7,6 +7,7 @@ const channelIcon: Record<FunnelChannel, typeof Mail> = {
   linkedin: Linkedin,
   call: Phone,
   whatsapp: MessageSquare,
+  sms: MessageSquare,
 };
 
 const channelColor: Record<FunnelChannel, string> = {
@@ -14,6 +15,7 @@ const channelColor: Record<FunnelChannel, string> = {
   linkedin: "text-linkedin",
   call: "text-signal-green-text",
   whatsapp: "text-signal-green-text",
+  sms: "text-signal-green-text",
 };
 
 const barBg: Record<FunnelChannel, string> = {
@@ -21,6 +23,7 @@ const barBg: Record<FunnelChannel, string> = {
   linkedin: "bg-linkedin",
   call: "bg-signal-green-text",
   whatsapp: "bg-signal-green-text",
+  sms: "bg-signal-green-text",
 };
 
 export function StepFunnelChart({ steps }: { steps: FunnelAnalyticsStep[] }) {

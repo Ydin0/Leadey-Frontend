@@ -7,6 +7,18 @@ export async function getPhoneLines(): Promise<PhoneLine[]> {
   return apiRequest<PhoneLine[]>("/phone-lines");
 }
 
+export interface ResolvedCaller {
+  name: string | null;
+  company: string | null;
+  leadId: string | null;
+  funnelId: string | null;
+}
+
+/** Identify a caller by phone number within the org (for live-call UI). */
+export async function resolveCaller(number: string): Promise<ResolvedCaller> {
+  return apiRequest<ResolvedCaller>(`/calls/resolve?number=${encodeURIComponent(number)}`);
+}
+
 export async function getPhoneLine(id: string): Promise<PhoneLine> {
   return apiRequest<PhoneLine>(`/phone-lines/${id}`);
 }

@@ -3,6 +3,7 @@ import { Header } from "@/components/layout/header";
 import { TrialBanner } from "@/components/layout/trial-banner";
 import { CallProvider } from "@/components/calling/call-context";
 import { IncomingCallPrompt } from "@/components/calling/incoming-call-prompt";
+import { VersionGate } from "@/components/providers/version-gate";
 import { DialerProvider } from "@/components/dialer/context/dialer-context";
 import { DialerBar } from "@/components/dialer/bar/dialer-bar";
 import { AuthTokenSync } from "@/components/providers/auth-token-sync";
@@ -34,6 +35,8 @@ export default function DashboardLayout({
               <ScraperRunsWidget />
               {/* Global ringing prompt for inbound calls (accept/reject). */}
               <IncomingCallPrompt />
+              {/* Auto-reloads stale tabs so reps never run outdated call code. */}
+              <VersionGate />
             </div>
           </ScraperRunsProvider>
         </DialerProvider>

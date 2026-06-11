@@ -10,6 +10,7 @@ const CHANNEL_ICON: Record<FunnelChannel, typeof Mail> = {
   call: Phone,
   linkedin: Linkedin,
   whatsapp: MessageCircle,
+  sms: MessageCircle,
 };
 
 const CHANNEL_CTA: Record<FunnelChannel, string> = {
@@ -17,6 +18,7 @@ const CHANNEL_CTA: Record<FunnelChannel, string> = {
   call: "Log call",
   linkedin: "Send message",
   whatsapp: "Send message",
+  sms: "Send text",
 };
 
 interface LeadStepTrackerProps {

@@ -146,6 +146,10 @@ export interface ActiveCall {
   from: string;
   to: string;
   contactName: string | null;
+  /** Resolved on connect for callers that match a known lead/contact. */
+  companyName?: string | null;
+  leadId?: string | null;
+  funnelId?: string | null;
   lineId: string;
   isMuted: boolean;
   isOnHold: boolean;

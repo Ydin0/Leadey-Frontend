@@ -2,6 +2,11 @@ import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Bake the deploy's git SHA into the client bundle so a stale tab can detect
+  // it's running outdated code (see components/providers/version-gate.tsx).
+  env: {
+    NEXT_PUBLIC_BUILD_ID: process.env.VERCEL_GIT_COMMIT_SHA || "dev",
+  },
   images: {
     remotePatterns: [
       {
