@@ -109,6 +109,7 @@ export function PhoneLinesTab() {
           filters={filters}
           onSelectLine={handleSelectLine}
           onProvision={() => setView("provision")}
+          onChanged={fetchLines}
         />
       )}
 

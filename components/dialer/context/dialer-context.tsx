@@ -456,6 +456,12 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     !call.activeCall &&
     !call.incomingCall &&
     autoAdvanceSeconds > 0;
+  // Live mirror of the gating condition. The interval below re-checks this on
+  // every tick so a Pause (or an incoming/active call) that lands mid-countdown
+  // stops the auto-dial immediately — instead of a stale captured callback
+  // firing a call after the dialer was paused (the "dials while paused" race).
+  const canAutoDialRef = useRef(canAutoDial);
+  canAutoDialRef.current = canAutoDial;
   useEffect(() => {
     if (!canAutoDial) {
       setCountdown(null);
@@ -464,11 +470,17 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     let n = autoAdvanceSeconds;
     setCountdown(n);
     const id = setInterval(() => {
+      // Re-validate against live state — never auto-dial once paused / busy.
+      if (!canAutoDialRef.current) {
+        clearInterval(id);
+        setCountdown(null);
+        return;
+      }
       n -= 1;
       if (n <= 0) {
         clearInterval(id);
         setCountdown(null);
-        startNextRef.current();
+        if (canAutoDialRef.current) startNextRef.current();
       } else {
         setCountdown(n);
       }
