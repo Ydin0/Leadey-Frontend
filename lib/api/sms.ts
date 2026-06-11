@@ -11,15 +11,17 @@ export interface SmsMessage {
   createdAt: string;
 }
 
-/** Send a text to a lead. Returns the persisted outbound message. */
+/** Send a text to a lead. Optionally choose which line to send from (admins can
+ *  text from any active number). Returns the persisted outbound message. */
 export async function sendSms(
   funnelId: string,
   leadId: string,
   body: string,
+  lineId?: string | null,
 ): Promise<SmsMessage> {
   return apiRequest<SmsMessage>(
     `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/sms`,
-    { method: "POST", body: JSON.stringify({ body }) },
+    { method: "POST", body: JSON.stringify({ body, lineId: lineId || undefined }) },
   );
 }
 

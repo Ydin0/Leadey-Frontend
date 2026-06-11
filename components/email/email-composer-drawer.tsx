@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { X, Mail, Loader2, Send, ChevronDown, FileText, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { RichEmailEditor } from "./rich-email-editor";
+import { SlideOver } from "@/components/shared/slide-over";
 import { listSendingAccounts, sendEmail } from "@/lib/api/email";
 import { listTemplates } from "@/lib/api/templates";
 import { renderPersonalized, type PersonalizationLead } from "@/lib/utils/personalize";
@@ -54,8 +54,6 @@ export function EmailComposerDrawer({
     listTemplates("email").then(setTemplates).catch(() => setTemplates([]));
   }, [open]);
 
-  if (!open) return null;
-
   function applyTemplate(t: Template) {
     setSubject(t.subject || "");
     // Templates store plain text; wrap lines into paragraphs for the editor.
@@ -105,22 +103,23 @@ export function EmailComposerDrawer({
   const fromAccount = accounts.find((a) => a.id === fromId);
 
   return (
-    <div className="fixed inset-0 z-[60] flex justify-end">
-      <div className="absolute inset-0 bg-ink/30 backdrop-blur-[1px]" onClick={onClose} />
-      <div className="relative w-full max-w-[560px] h-full bg-page border-l border-border-subtle shadow-2xl flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 h-14 border-b border-border-subtle shrink-0">
-          <div className="flex items-center gap-2">
-            <Mail size={15} className="text-signal-blue-text" />
-            <span className="text-[13px] font-semibold text-ink">New Email</span>
-          </div>
-          <button onClick={onClose} className="p-1.5 rounded-md text-ink-muted hover:bg-hover transition-colors">
-            <X size={15} />
-          </button>
+    <SlideOver open={open} onClose={onClose} width="max-w-[560px]" panelClassName="bg-page">
+      {/* Header */}
+      <div className="relative flex items-center justify-between px-5 h-14 border-b border-border-subtle shrink-0">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-signal-blue-text/40 to-transparent" />
+        <div className="flex items-center gap-2.5">
+          <span className="flex items-center justify-center w-8 h-8 rounded-full bg-signal-blue/15 text-signal-blue-text">
+            <Mail size={15} />
+          </span>
+          <span className="text-[13px] font-semibold text-ink">New Email</span>
         </div>
+        <button onClick={onClose} className="p-1.5 -mr-1 rounded-lg text-ink-muted hover:bg-hover hover:text-ink transition-colors">
+          <X size={16} />
+        </button>
+      </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
           {/* From */}
           <Field label="From">
             <div className="relative">
@@ -233,8 +232,7 @@ export function EmailComposerDrawer({
             Send email
           </button>
         </div>
-      </div>
-    </div>
+    </SlideOver>
   );
 }
 

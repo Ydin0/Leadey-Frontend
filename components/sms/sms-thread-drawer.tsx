@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { X, MessageSquare, Loader2, Send } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { X, MessageSquare, Loader2, Send, ChevronDown, Check, CheckCheck } from "lucide-react";
 import { cn, formatRelativeTime, formatPhoneIntl } from "@/lib/utils";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { getSmsThread, sendSms, type SmsMessage } from "@/lib/api/sms";
+import { getPhoneLines } from "@/lib/api/phone-lines";
+import type { PhoneLine } from "@/lib/types/calling";
+import { SlideOver } from "@/components/shared/slide-over";
 
 interface SmsThreadDrawerProps {
   open: boolean;
@@ -29,6 +32,8 @@ export function SmsThreadDrawer({
   const { resolveMember } = useTeamMembers();
   const [messages, setMessages] = useState<SmsMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lines, setLines] = useState<PhoneLine[]>([]);
+  const [fromLineId, setFromLineId] = useState<string>("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -39,16 +44,27 @@ export function SmsThreadDrawer({
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setBody("");
     getSmsThread(funnelId, leadId)
       .then((m) => !cancelled && setMessages(m))
       .catch(() => !cancelled && setError("Couldn't load the conversation."))
       .finally(() => !cancelled && setLoading(false));
+    getPhoneLines()
+      .then((ls) => {
+        if (cancelled) return;
+        const active = ls.filter((l) => l.status === "active");
+        setLines(active);
+        setFromLineId((prev) => prev || active[0]?.id || "");
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [open, funnelId, leadId]);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
+    endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
   }, [messages, loading]);
+
+  const fromLine = useMemo(() => lines.find((l) => l.id === fromLineId), [lines, fromLineId]);
 
   async function handleSend() {
     const text = body.trim();
@@ -56,7 +72,7 @@ export function SmsThreadDrawer({
     setSending(true);
     setError(null);
     try {
-      const msg = await sendSms(funnelId, leadId, text);
+      const msg = await sendSms(funnelId, leadId, text, fromLineId || undefined);
       setMessages((prev) => [...prev, msg]);
       setBody("");
       onSent?.();
@@ -67,101 +83,142 @@ export function SmsThreadDrawer({
     }
   }
 
-  if (!open) return null;
-
   const segments = Math.max(1, Math.ceil(body.length / 160));
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-ink/30" onClick={onClose} />
-      <div className="relative w-full max-w-md bg-surface border-l border-border-subtle shadow-2xl flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-signal-green/15 text-signal-green-text shrink-0">
-              <MessageSquare size={15} strokeWidth={2} />
+    <SlideOver open={open} onClose={onClose} width="max-w-[440px]">
+      {/* Header */}
+      <div className="relative shrink-0 px-5 py-4 border-b border-border-subtle">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-signal-green-text/40 to-transparent" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="flex items-center justify-center w-9 h-9 rounded-full bg-signal-green/15 text-signal-green-text shrink-0">
+              <MessageSquare size={16} strokeWidth={2} />
             </span>
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold text-ink truncate">{leadName}</p>
+              <p className="text-[14px] font-semibold text-ink truncate leading-tight">{leadName}</p>
               <p className="text-[11px] text-ink-muted truncate">
                 {leadPhone ? formatPhoneIntl(leadPhone) : "No phone number"}
               </p>
             </div>
           </div>
-          <button onClick={onClose} className="text-ink-muted hover:text-ink transition-colors">
+          <button
+            onClick={onClose}
+            className="p-1.5 -mr-1 rounded-lg text-ink-muted hover:bg-hover hover:text-ink transition-colors"
+          >
             <X size={18} />
           </button>
         </div>
 
-        {/* Thread */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 size={18} className="animate-spin text-ink-muted" />
-            </div>
-          ) : messages.length === 0 ? (
-            <p className="text-[12px] text-ink-muted text-center py-16">
-              No messages yet. Send the first text below.
-            </p>
-          ) : (
-            messages.map((m) => {
-              const outbound = m.direction === "outbound";
-              const sender = outbound ? (m.userId ? resolveMember(m.userId)?.name || "You" : "You") : null;
-              return (
-                <div key={m.id} className={cn("flex flex-col", outbound ? "items-end" : "items-start")}>
-                  <div
-                    className={cn(
-                      "max-w-[80%] rounded-[14px] px-3 py-2 text-[12.5px] leading-snug whitespace-pre-wrap break-words",
-                      outbound
-                        ? "bg-signal-green/15 text-ink rounded-br-sm"
-                        : "bg-section text-ink rounded-bl-sm",
-                    )}
-                  >
-                    {m.body}
-                  </div>
-                  <p className="text-[10px] text-ink-faint mt-1 px-1">
-                    {sender ? `${sender} · ` : ""}
-                    {formatRelativeTime(m.createdAt)}
-                    {outbound && m.status && m.status !== "received" ? ` · ${m.status}` : ""}
-                  </p>
-                </div>
-              );
-            })
-          )}
-          <div ref={endRef} />
-        </div>
-
-        {/* Composer */}
-        <div className="border-t border-border-subtle p-3">
-          {error && <p className="text-[11px] text-signal-red-text mb-2 px-1">{error}</p>}
-          <div className="flex items-end gap-2">
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  e.preventDefault();
-                  void handleSend();
-                }
-              }}
-              rows={2}
-              placeholder={leadPhone ? "Type a message…" : "This lead has no phone number"}
-              disabled={!leadPhone || sending}
-              className="flex-1 resize-none px-3 py-2 rounded-[12px] bg-section text-[12.5px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30 disabled:opacity-50"
-            />
-            <button
-              onClick={() => void handleSend()}
-              disabled={!body.trim() || !leadPhone || sending}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-ink text-on-ink hover:bg-ink/90 transition-colors disabled:opacity-40 shrink-0"
+        {/* Send-from selector — admins can text from any active number. */}
+        <div className="mt-3 flex items-center gap-2">
+          <span className="text-[10px] uppercase tracking-wider text-ink-faint font-medium">From</span>
+          <div className="relative flex-1 min-w-0">
+            <select
+              value={fromLineId}
+              onChange={(e) => setFromLineId(e.target.value)}
+              disabled={lines.length === 0}
+              className="w-full appearance-none bg-section border border-border-subtle rounded-full pl-3 pr-7 py-1.5 text-[11px] font-medium text-ink-secondary focus:outline-none focus:border-signal-blue-text/40 transition-colors disabled:opacity-50 truncate"
             >
-              {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-            </button>
+              {lines.length === 0 && <option value="">No active numbers</option>}
+              {lines.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.number}{l.friendlyName ? ` · ${l.friendlyName}` : ""}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
           </div>
-          <p className="text-[10px] text-ink-faint mt-1.5 px-1">
-            {body.length} chars · {segments} SMS segment{segments === 1 ? "" : "s"} · ⌘/Ctrl+Enter to send
-          </p>
         </div>
       </div>
-    </div>
+
+      {/* Thread */}
+      <div className="flex-1 overflow-y-auto px-5 py-5 space-y-3 bg-page/40">
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 size={18} className="animate-spin text-ink-muted" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <span className="flex items-center justify-center w-12 h-12 rounded-full bg-signal-green/10 text-signal-green-text mb-3">
+              <MessageSquare size={20} strokeWidth={1.5} />
+            </span>
+            <p className="text-[12px] text-ink-muted">No messages yet.</p>
+            <p className="text-[11px] text-ink-faint mt-0.5">Send the first text below.</p>
+          </div>
+        ) : (
+          messages.map((m, i) => {
+            const outbound = m.direction === "outbound";
+            const sender = outbound ? (m.userId ? resolveMember(m.userId)?.name || "You" : "You") : null;
+            const prev = messages[i - 1];
+            const grouped = prev && prev.direction === m.direction;
+            return (
+              <div key={m.id} className={cn("flex flex-col", outbound ? "items-end" : "items-start", grouped ? "mt-1" : "mt-3 first:mt-0")}>
+                <div
+                  className={cn(
+                    "max-w-[82%] rounded-[16px] px-3.5 py-2 text-[12.5px] leading-relaxed whitespace-pre-wrap break-words shadow-sm",
+                    outbound
+                      ? "bg-signal-green text-signal-green-text rounded-br-md"
+                      : "bg-surface border border-border-subtle text-ink rounded-bl-md",
+                  )}
+                >
+                  {m.body}
+                </div>
+                <div className={cn("flex items-center gap-1 mt-1 px-1", outbound ? "flex-row-reverse" : "")}>
+                  {sender && <span className="text-[10px] text-ink-muted">{sender}</span>}
+                  <span className="text-[10px] text-ink-faint">{formatRelativeTime(m.createdAt)}</span>
+                  {outbound && <DeliveryTick status={m.status} />}
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={endRef} />
+      </div>
+
+      {/* Composer */}
+      <div className="shrink-0 border-t border-border-subtle p-3 bg-surface">
+        {error && <p className="text-[11px] text-signal-red-text mb-2 px-1">{error}</p>}
+        <div className="flex items-end gap-2 rounded-[18px] bg-section border border-border-subtle focus-within:border-signal-blue-text/40 transition-colors px-2 py-1.5">
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                void handleSend();
+              }
+            }}
+            rows={1}
+            placeholder={leadPhone ? "Type a message…" : "This lead has no phone number"}
+            disabled={!leadPhone || sending}
+            className="flex-1 resize-none bg-transparent px-2 py-1.5 text-[12.5px] text-ink placeholder:text-ink-faint outline-none max-h-32 disabled:opacity-50"
+          />
+          <button
+            onClick={() => void handleSend()}
+            disabled={!body.trim() || !leadPhone || sending}
+            className="flex items-center justify-center w-9 h-9 rounded-full bg-signal-green text-signal-green-text hover:opacity-90 transition-opacity disabled:opacity-40 shrink-0"
+          >
+            {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+          </button>
+        </div>
+        <div className="flex items-center justify-between mt-1.5 px-1.5">
+          <span className="text-[10px] text-ink-faint truncate">
+            {fromLine ? `From ${fromLine.number}` : ""}
+          </span>
+          <span className="text-[10px] text-ink-faint shrink-0">
+            {body.length} · {segments} segment{segments === 1 ? "" : "s"} · ⌘↵
+          </span>
+        </div>
+      </div>
+    </SlideOver>
   );
+}
+
+/** Small delivery indicator for outbound texts. */
+function DeliveryTick({ status }: { status: string }) {
+  if (status === "delivered") return <CheckCheck size={11} className="text-signal-green-text" />;
+  if (status === "failed") return <span className="text-[10px] text-signal-red-text">failed</span>;
+  if (status === "sent" || status === "queued") return <Check size={11} className="text-ink-faint" />;
+  return null;
 }
