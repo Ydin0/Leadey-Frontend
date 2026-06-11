@@ -817,7 +817,7 @@ export function CreateCampaignWizard({ mode = "create", funnel }: CreateCampaign
                         {accounts.length === 0 ? (
                           <div className="px-4 py-6 text-center">
                             <p className="text-[12px] text-ink-muted">No connected mailboxes yet.</p>
-                            <button onClick={() => router.push("/dashboard/email/mailboxes")} className="mt-2 text-[12px] text-accent font-medium">Connect a mailbox →</button>
+                            <button onClick={() => router.push("/dashboard/settings?tab=email-accounts")} className="mt-2 text-[12px] text-accent font-medium">Connect a mailbox →</button>
                           </div>
                         ) : (
                           accounts.map((m) => {

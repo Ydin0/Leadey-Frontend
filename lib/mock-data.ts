@@ -12,18 +12,13 @@ import {
   Headphones,
   FileText,
   Briefcase,
-  Inbox,
   Users,
   UsersRound,
   GraduationCap,
-  Flame,
-  AtSign,
-  Globe,
 } from "lucide-react";
 import type {
   NavItem,
   NavGroup,
-  NavSubItem,
   QuickStat,
   Reply,
   LinkedInQueueItem,
@@ -41,19 +36,9 @@ import type {
 //
 // Funnels are surfaced as "Campaigns" in user-facing copy; the URL
 // stays /dashboard/funnels so we don't churn the route or backend.
-// Cold Email sub-tabs — rendered as a dropdown under the "Cold Email" item.
-// Templates / Team / Settings intentionally live in the main menu, not here.
-const emailChildren: NavSubItem[] = [
-  { id: "email-overview", label: "Overview", icon: LayoutDashboard, href: "/dashboard/email" },
-  { id: "email-campaigns", label: "Campaigns", icon: Send, href: "/dashboard/email/campaigns" },
-  { id: "email-inbox", label: "Master Inbox", icon: Inbox, href: "/dashboard/email/inbox" },
-  { id: "email-warmup", label: "Warmup", icon: Flame, href: "/dashboard/email/warmup" },
-  { id: "email-mailboxes", label: "Email Accounts", icon: AtSign, href: "/dashboard/email/mailboxes" },
-  { id: "email-domains", label: "Domains", icon: Globe, href: "/dashboard/email/domains" },
-];
+// Templates / Team / Settings intentionally live in the main menu.
 
-// Sidebar is organized into labeled sections. "Cold Email" is an expandable
-// dropdown (its sub-tabs are children) and "Campaigns" expands to the org's
+// Sidebar is organized into labeled sections. "Campaigns" expands to the org's
 // funnels (loaded dynamically).
 export const navGroups: NavGroup[] = [
   {
@@ -64,7 +49,6 @@ export const navGroups: NavGroup[] = [
     label: "Outreach",
     items: [
       { id: "funnels", label: "Campaigns", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
-      { id: "email", label: "Cold Email", icon: Mail, href: "/dashboard/email", children: emailChildren },
     ],
   },
   {
