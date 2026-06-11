@@ -1,4 +1,4 @@
-export type TemplateChannel = "email" | "linkedin";
+export type TemplateChannel = "email" | "linkedin" | "sms";
 export type TemplateCategory = "outreach" | "follow_up" | "breakup" | "referral" | "custom";
 
 export interface Template {

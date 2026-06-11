@@ -104,7 +104,7 @@ function FilterSection({
                   className={cn(
                     "px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors border",
                     isSelected
-                      ? "bg-signal-blue text-signal-blue-text border-signal-blue-text/20"
+                      ? "bg-accent text-on-ink border-accent font-semibold shadow-sm"
                       : "bg-surface text-ink-secondary border-border-subtle hover:bg-hover"
                   )}
                 >
@@ -146,7 +146,7 @@ function FilterSection({
                 className={cn(
                   "px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors border",
                   currentValue === opt
-                    ? "bg-signal-blue text-signal-blue-text border-signal-blue-text/20"
+                    ? "bg-accent text-on-ink border-accent font-semibold shadow-sm"
                     : "bg-surface text-ink-secondary border-border-subtle hover:bg-hover"
                 )}
               >
@@ -331,7 +331,7 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
                   className={cn(
                     "flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-medium transition-colors border",
                     selected
-                      ? "bg-signal-blue text-signal-blue-text border-signal-blue-text/20"
+                      ? "bg-accent text-on-ink border-accent font-semibold shadow-sm"
                       : "bg-surface text-ink-secondary border-border-subtle hover:bg-hover"
                   )}
                 >
@@ -356,7 +356,7 @@ export function FilterBuilder({ filters, onChange }: FilterBuilderProps) {
                   className={cn(
                     "px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors border",
                     selected
-                      ? "bg-signal-blue text-signal-blue-text border-signal-blue-text/20"
+                      ? "bg-accent text-on-ink border-accent font-semibold shadow-sm"
                       : "bg-surface text-ink-secondary border-border-subtle hover:bg-hover"
                   )}
                 >

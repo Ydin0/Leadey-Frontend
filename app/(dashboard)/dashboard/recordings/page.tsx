@@ -39,8 +39,23 @@ export default function RecordingsPage() {
   const [hasRecording, setHasRecording] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [dateRange, setDateRange] = useState<"all" | "today" | "7d" | "30d" | "90d">("all");
+  const [durMode, setDurMode] = useState<"any" | "more" | "less">("any");
+  const [durMinutes, setDurMinutes] = useState("2");
 
   const fetchRecords = useCallback(async (p: number) => {
+    // Date range → an ISO startDate.
+    let startDate: string | undefined;
+    if (dateRange !== "all") {
+      if (dateRange === "today") {
+        const d = new Date(); d.setHours(0, 0, 0, 0); startDate = d.toISOString();
+      } else {
+        const days = dateRange === "7d" ? 7 : dateRange === "30d" ? 30 : 90;
+        startDate = new Date(Date.now() - days * 86400000).toISOString();
+      }
+    }
+    // Duration (minutes) → seconds, mapped to min/max.
+    const secs = (Number(durMinutes) || 0) * 60;
     try {
       const result = await getCallRecords({
         page: p,
@@ -50,6 +65,9 @@ export default function RecordingsPage() {
         hasRecording: hasRecording || undefined,
         userId: memberId || undefined,
         search: search || undefined,
+        startDate,
+        minDuration: durMode === "more" ? secs : undefined,
+        maxDuration: durMode === "less" ? secs : undefined,
       });
       setRecords(result.data);
       setTotalCount(result.meta.totalCount);
@@ -59,7 +77,7 @@ export default function RecordingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [direction, disposition, hasRecording, memberId, search]);
+  }, [direction, disposition, hasRecording, memberId, search, dateRange, durMode, durMinutes]);
 
   useEffect(() => {
     if (!isAuthReady) return;
@@ -79,9 +97,10 @@ export default function RecordingsPage() {
 
   useEffect(() => {
     handleFilterChange();
-  }, [direction, disposition, hasRecording, memberId]);
+  }, [direction, disposition, hasRecording, memberId, dateRange, durMode, durMinutes]);
 
-  const hasFilters = !!direction || !!disposition || !!hasRecording || !!memberId;
+  const moreFiltersCount = (dateRange !== "all" ? 1 : 0) + (durMode !== "any" ? 1 : 0);
+  const hasFilters = !!direction || !!disposition || !!hasRecording || !!memberId || moreFiltersCount > 0;
   const selectedMember = members.find((m) => m.id === memberId);
 
   if (loading && records.length === 0) {
@@ -211,10 +230,67 @@ export default function RecordingsPage() {
           </div>
         </FilterPopover>
 
+        {/* More filters — date range + duration */}
+        <FilterPopover label="More filters" isActive={moreFiltersCount > 0} activeCount={moreFiltersCount}>
+          <div className="w-[260px] space-y-4">
+            {/* Date range */}
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Date range</p>
+              <div className="flex flex-wrap gap-1.5">
+                {([
+                  { v: "all", l: "All time" }, { v: "today", l: "Today" }, { v: "7d", l: "7 days" },
+                  { v: "30d", l: "30 days" }, { v: "90d", l: "90 days" },
+                ] as const).map((o) => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => setDateRange(o.v)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors",
+                      dateRange === o.v
+                        ? "bg-accent text-on-ink border-accent font-semibold"
+                        : "bg-section text-ink-secondary border-border-subtle hover:bg-hover",
+                    )}
+                  >
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Duration */}
+            <div>
+              <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Call duration</p>
+              <div className="flex items-center gap-2">
+                <select
+                  value={durMode}
+                  onChange={(e) => setDurMode(e.target.value as typeof durMode)}
+                  className="bg-section border border-border-subtle rounded-[8px] px-2 py-1.5 text-[11px] text-ink focus:outline-none focus:border-border-default"
+                >
+                  <option value="any">Any length</option>
+                  <option value="more">More than</option>
+                  <option value="less">Less than</option>
+                </select>
+                {durMode !== "any" && (
+                  <div className="flex items-center gap-1.5 flex-1">
+                    <input
+                      type="number"
+                      min={0}
+                      value={durMinutes}
+                      onChange={(e) => setDurMinutes(e.target.value)}
+                      className="w-16 bg-section border border-border-subtle rounded-[8px] px-2 py-1.5 text-[11px] text-ink focus:outline-none focus:border-border-default"
+                    />
+                    <span className="text-[11px] text-ink-muted">min</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </FilterPopover>
+
         {hasFilters && (
           <button
             type="button"
-            onClick={() => { setDirection(null); setDisposition(null); setHasRecording(null); setMemberId(null); }}
+            onClick={() => { setDirection(null); setDisposition(null); setHasRecording(null); setMemberId(null); setDateRange("all"); setDurMode("any"); }}
             className="text-[11px] font-medium text-ink-muted hover:text-ink-secondary transition-colors ml-1"
           >
             Clear all

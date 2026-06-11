@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Calendar, Building2 } from "lucide-react";
+import { MemberAvatar } from "@/components/shared/member-avatar";
 import { cn, formatCurrency, formatRelativeTime } from "@/lib/utils";
 import type { Opportunity, PipelineStage } from "@/lib/types/opportunity";
 
@@ -69,9 +70,11 @@ export function OpportunityCard({
             {opp.name}
           </p>
           {ownerInitials && (
-            <div className="w-6 h-6 rounded-full bg-section text-[10px] font-medium text-ink-secondary flex items-center justify-center shrink-0">
-              {ownerInitials}
-            </div>
+            <MemberAvatar
+              id={opp.ownerId ?? ownerInitials}
+              initials={ownerInitials}
+              className="w-6 h-6 text-[9px]"
+            />
           )}
         </div>
 

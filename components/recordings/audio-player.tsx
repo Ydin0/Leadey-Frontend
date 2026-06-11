@@ -10,6 +10,9 @@ interface AudioPlayerProps {
    *  proxy (Twilio media URLs need Basic Auth and can't load in a bare tag). */
   recordId: string;
   compact?: boolean;
+  /** Known length (seconds) shown immediately, before the media loads, so the
+   *  duration isn't blank until the user presses play. */
+  initialDuration?: number;
 }
 
 function formatTime(seconds: number): string {
@@ -19,12 +22,12 @@ function formatTime(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function AudioPlayer({ recordId, compact = false }: AudioPlayerProps) {
+export function AudioPlayer({ recordId, compact = false, initialDuration = 0 }: AudioPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const blobUrlRef = useRef<string | null>(null);
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
+  const [duration, setDuration] = useState(initialDuration);
   const [speed, setSpeed] = useState(1);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -35,7 +38,10 @@ export function AudioPlayer({ recordId, compact = false }: AudioPlayerProps) {
     if (!audio) return;
 
     const onTime = () => setCurrentTime(audio.currentTime);
-    const onMeta = () => setDuration(audio.duration || 0);
+    // Prefer the media's real duration once known; keep the supplied length
+    // when the stream doesn't report a finite duration.
+    const onMeta = () =>
+      setDuration(audio.duration && Number.isFinite(audio.duration) ? audio.duration : initialDuration);
     const onEnded = () => setPlaying(false);
 
     audio.addEventListener("timeupdate", onTime);
@@ -46,7 +52,7 @@ export function AudioPlayer({ recordId, compact = false }: AudioPlayerProps) {
       audio.removeEventListener("loadedmetadata", onMeta);
       audio.removeEventListener("ended", onEnded);
     };
-  }, []);
+  }, [initialDuration]);
 
   // Revoke the object URL on unmount to avoid leaking memory.
   useEffect(() => {

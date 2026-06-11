@@ -150,6 +150,8 @@ export async function sendEmail(
       method: "POST",
       body: JSON.stringify({
         fromAccountId: payload.fromAccountId,
+        toEmail: payload.toEmail,
+        cc: payload.cc,
         subject: payload.subject,
         bodyHtml: payload.bodyHtml,
       }),

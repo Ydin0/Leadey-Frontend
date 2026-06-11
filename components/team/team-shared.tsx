@@ -20,11 +20,36 @@ export const STATUS_META: Record<string, [string, string]> = {
   pending: ["var(--signal-blue-text)", "Invited"],
 };
 
-export function Avatar({ name, size = 32, pod }: { name: string; size?: number; pod?: string }) {
-  const col = (pod && POD_COLOR[pod]) || "var(--fg-muted)";
+// Shared design-system avatar palette — sophisticated two-tone gradients in
+// varied hues, picked deterministically per member. Mirrors MemberAvatar so
+// every avatar across the app reads as the same family.
+const AVATAR_GRADIENTS = [
+  "linear-gradient(135deg, #8C9AE0 0%, #6E7CC4 100%)",
+  "linear-gradient(135deg, #6FBEA8 0%, #4E9C88 100%)",
+  "linear-gradient(135deg, #C58FD6 0%, #9D6CC0 100%)",
+  "linear-gradient(135deg, #E0A878 0%, #C08850 100%)",
+  "linear-gradient(135deg, #E08FA8 0%, #C06A88 100%)",
+  "linear-gradient(135deg, #7FA8D6 0%, #5E86C4 100%)",
+  "linear-gradient(135deg, #9B8FE0 0%, #6E5EC4 100%)",
+  "linear-gradient(135deg, #6FBE9A 0%, #4E9C70 100%)",
+];
+function gradientFor(key: string): string {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
+}
+
+export function Avatar({ name, size = 32 }: { name: string; size?: number; pod?: string }) {
   return (
-    <div className="avatar" style={{ width: size, height: size, fontSize: size * 0.36,
-      background: "var(--section)", color: "var(--fg1)", border: `1.5px solid ${col}55`, position: "relative" }}>
+    <div
+      className="avatar"
+      style={{
+        width: size, height: size, borderRadius: "50%", overflow: "hidden",
+        backgroundImage: gradientFor(name), display: "flex",
+        alignItems: "center", justifyContent: "center", position: "relative",
+        color: "#fff", fontSize: size * 0.36, fontWeight: 600, letterSpacing: "0.01em",
+      }}
+    >
       {initialsOf(name)}
     </div>
   );

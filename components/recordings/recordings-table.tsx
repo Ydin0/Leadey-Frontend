@@ -56,9 +56,11 @@ export function RecordingsTable({
 }: RecordingsTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
+  const [genError, setGenError] = useState<Record<string, string>>({});
 
   async function generateTranscript(record: CallRecord) {
     setGenerating(record.id);
+    setGenError((prev) => { const next = { ...prev }; delete next[record.id]; return next; });
     try {
       const result = await summarizeCall(record.id);
       onRecordUpdated?.(record.id, {
@@ -66,7 +68,7 @@ export function RecordingsTable({
         summary: result.summary,
       });
     } catch (err) {
-      console.error("Failed to transcribe:", err);
+      setGenError((prev) => ({ ...prev, [record.id]: err instanceof Error ? err.message : "Transcription failed" }));
     } finally {
       setGenerating(null);
     }
@@ -188,7 +190,7 @@ export function RecordingsTable({
                   {/* Player */}
                   <TableCell>
                     {hasRecording ? (
-                      <AudioPlayer recordId={record.id} compact />
+                      <AudioPlayer recordId={record.id} compact initialDuration={record.recordingDuration || record.duration} />
                     ) : (
                       <span className="text-[10px] text-ink-faint">No recording</span>
                     )}
@@ -211,7 +213,7 @@ export function RecordingsTable({
                         className="inline-flex items-center gap-1 mx-auto px-2 py-0.5 rounded-full text-[10px] font-medium bg-signal-blue/10 text-signal-blue-text hover:bg-signal-blue/20 transition-colors disabled:opacity-50"
                       >
                         {isGenerating ? <Loader2 size={9} className="animate-spin" /> : <Sparkles size={9} />}
-                        {isGenerating ? "Working" : "Generate"}
+                        {isGenerating ? "Transcribing…" : "Generate"}
                       </button>
                     ) : (
                       <span className="text-[10px] text-ink-faint">&mdash;</span>
@@ -250,12 +252,14 @@ export function RecordingsTable({
                           </>
                         ) : hasRecording ? (
                           <div className="flex items-center justify-between gap-3">
-                            <span className="text-[12px] text-ink-muted">No transcript yet for this call.</span>
+                            <span className={cn("text-[12px]", genError[record.id] ? "text-signal-red-text" : "text-ink-muted")}>
+                              {genError[record.id] || "No transcript yet for this call."}
+                            </span>
                             <button
                               onClick={(e) => { e.stopPropagation(); void generateTranscript(record); }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors shrink-0"
                             >
-                              <Sparkles size={11} /> Generate transcript
+                              <Sparkles size={11} /> {genError[record.id] ? "Retry" : "Generate transcript"}
                             </button>
                           </div>
                         ) : (

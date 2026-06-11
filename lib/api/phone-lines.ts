@@ -89,6 +89,10 @@ export async function getCallRecords(params?: {
   hasRecording?: string;
   search?: string;
   leadId?: string;
+  minDuration?: number;
+  maxDuration?: number;
+  startDate?: string;
+  endDate?: string;
   page?: number;
   limit?: number;
   offset?: number;
@@ -101,6 +105,10 @@ export async function getCallRecords(params?: {
   if (params?.hasRecording) searchParams.set("hasRecording", params.hasRecording);
   if (params?.search) searchParams.set("search", params.search);
   if (params?.leadId) searchParams.set("leadId", params.leadId);
+  if (params?.minDuration !== undefined) searchParams.set("minDuration", String(params.minDuration));
+  if (params?.maxDuration !== undefined) searchParams.set("maxDuration", String(params.maxDuration));
+  if (params?.startDate) searchParams.set("startDate", params.startDate);
+  if (params?.endDate) searchParams.set("endDate", params.endDate);
   if (params?.page) searchParams.set("page", String(params.page));
   if (params?.limit) searchParams.set("limit", String(params.limit));
   if (params?.offset) searchParams.set("offset", String(params.offset));

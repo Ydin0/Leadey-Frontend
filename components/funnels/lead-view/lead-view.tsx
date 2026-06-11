@@ -65,7 +65,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
   const [showConvert, setShowConvert] = useState(false);
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
   const [emailMessages, setEmailMessages] = useState<LeadEmailMessage[]>([]);
-  const [replyPrefill, setReplyPrefill] = useState<{ subject: string; body: string } | null>(null);
+  const [replyPrefill, setReplyPrefill] = useState<{ to: string; subject: string; body: string } | null>(null);
 
   const currentLead = useMemo(() => leads.find((l) => l.id === leadId) || null, [leads, leadId]);
 
@@ -315,8 +315,12 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
   const handleReplyEmail = useCallback((message: LeadEmailMessage, mode: EmailReplyMode) => {
     const base = message.subject.replace(/^(re|fwd):\s*/i, "");
     const subject = mode === "forward" ? `Fwd: ${base}` : `Re: ${base}`;
+    // Forward → blank recipient (type a new address). Reply → the other party:
+    // the sender for an inbound reply, else the address we sent to.
+    const to =
+      mode === "forward" ? "" : message.direction === "inbound" ? message.fromEmail : message.toEmail;
     const quoted = `<br/><br/><blockquote>On ${new Date(message.createdAt).toLocaleString()}, ${message.fromName || message.fromEmail} wrote:<br/>${message.bodyHtml || message.bodyText}</blockquote>`;
-    setReplyPrefill({ subject, body: quoted });
+    setReplyPrefill({ to, subject, body: quoted });
     setShowComposer(true);
   }, []);
 
@@ -516,6 +520,13 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
         leadId={currentLead.id}
         leadName={currentLead.name}
         leadPhone={primaryPhone || null}
+        lead={{
+          name: currentLead.name,
+          company: currentLead.company,
+          title: currentLead.title,
+          email: currentLead.email,
+          companyDomain: currentLead.companyDomain,
+        }}
         onSent={() => onLeadsChanged?.()}
       />
 
@@ -525,6 +536,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
         onClose={() => { setShowComposer(false); setReplyPrefill(null); }}
         initialSubject={replyPrefill?.subject}
         initialBody={replyPrefill?.body}
+        initialTo={replyPrefill?.to}
         lead={{
           id: currentLead.id,
           name: currentLead.name,

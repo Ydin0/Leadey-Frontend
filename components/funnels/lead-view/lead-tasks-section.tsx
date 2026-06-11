@@ -16,6 +16,7 @@ import {
   type LeadTask,
 } from "@/lib/api/lead-tasks";
 import { Section, MiniBtn } from "./lead-section";
+import { MemberAvatar } from "@/components/shared/member-avatar";
 
 /** Short, human due label. Returns "Today" (urgent) for tasks due today. */
 function dueLabel(dueAt: string | null): { text: string; urgent: boolean } | null {
@@ -37,10 +38,6 @@ function dueLabel(dueAt: string | null): { text: string; urgent: boolean } | nul
 
 function memberName(m: TeamMember): string {
   return [m.firstName, m.lastName].filter(Boolean).join(" ").trim() || m.email;
-}
-
-function initials(name: string): string {
-  return name.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
 }
 
 /** Compact member picker (admins only) used in the add-task form. */
@@ -95,9 +92,7 @@ function AssigneePicker({
                 m.id === value ? "text-ink font-medium" : "text-ink-secondary",
               )}
             >
-              <span className="flex items-center justify-center w-5 h-5 rounded-full bg-section text-[8px] font-medium text-ink-secondary shrink-0">
-                {initials(memberName(m))}
-              </span>
+              <MemberAvatar id={m.id} name={memberName(m)} className="w-5 h-5 text-[8px]" />
               <span className="truncate">
                 {memberName(m)}
                 {m.id === currentUserId ? " (me)" : ""}

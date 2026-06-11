@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useMemo } from "react";
-import { Mail, Linkedin, ChevronDown, X } from "lucide-react";
+import { Mail, Linkedin, MessageSquare, ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VariableInserter } from "./variable-inserter";
 import { TEMPLATE_CATEGORIES, TEMPLATE_VARIABLES } from "@/lib/types/template";
@@ -125,6 +125,19 @@ export function TemplateEditor({
             >
               <Linkedin size={12} />
               LinkedIn
+            </button>
+            <button
+              type="button"
+              onClick={() => onChannelChange("sms")}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] text-[11px] font-medium border transition-colors",
+                channel === "sms"
+                  ? "bg-signal-green/15 text-signal-green-text border-signal-green-text/20"
+                  : "bg-surface text-ink-muted border-border-subtle hover:bg-hover"
+              )}
+            >
+              <MessageSquare size={12} />
+              SMS
             </button>
           </div>
         </div>

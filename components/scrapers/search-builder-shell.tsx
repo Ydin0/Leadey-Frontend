@@ -119,7 +119,7 @@ export function SearchBuilderShell({ mode, initialData }: SearchBuilderShellProp
                     className={cn(
                       "px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors border",
                       frequency === f
-                        ? "bg-signal-blue text-signal-blue-text border-signal-blue-text/20"
+                        ? "bg-accent text-on-ink border-accent font-semibold shadow-sm"
                         : "bg-surface text-ink-secondary border-border-subtle hover:bg-hover"
                     )}
                   >

@@ -25,6 +25,9 @@ interface EmailComposerDrawerProps {
   /** Prefill for replies/forwards (Re:/Fwd: subject + quoted body). */
   initialSubject?: string;
   initialBody?: string;
+  /** Prefill recipient — empty for Forward (type a new address), the reply
+   *  target for Reply, or defaults to the lead's email. */
+  initialTo?: string;
   onSent: (info: { subject: string; bodyHtml: string }) => void;
 }
 
@@ -36,12 +39,16 @@ export function EmailComposerDrawer({
   stepIndex,
   initialSubject,
   initialBody,
+  initialTo,
   onSent,
 }: EmailComposerDrawerProps) {
   const [accounts, setAccounts] = useState<SendingAccount[]>([]);
   const [fromId, setFromId] = useState<string>("");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [toEmail, setToEmail] = useState("");
+  const [cc, setCc] = useState("");
+  const [showCc, setShowCc] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
@@ -59,9 +66,14 @@ export function EmailComposerDrawer({
     listTemplates("email").then(setTemplates).catch(() => setTemplates([]));
   }, [open]);
 
-  // Seed Re:/Fwd: subject + quoted body when opened as a reply/forward.
+  // Seed recipient + Re:/Fwd: subject + quoted body when opened. For a forward
+  // the To starts empty so you can type a new address; otherwise default to the
+  // reply target (or the lead).
   useEffect(() => {
     if (!open) return;
+    setToEmail(initialTo !== undefined ? initialTo : lead.email || "");
+    setCc("");
+    setShowCc(false);
     if (initialSubject !== undefined) setSubject(initialSubject);
     if (initialBody !== undefined) setBody(initialBody);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -79,8 +91,9 @@ export function EmailComposerDrawer({
   }
 
   async function handleSend() {
-    if (!lead.email) {
-      setError("This lead has no email address.");
+    const recipient = toEmail.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(recipient)) {
+      setError("Enter a valid recipient email address.");
       return;
     }
     if (!subject.trim() && !body.trim()) {
@@ -90,8 +103,8 @@ export function EmailComposerDrawer({
     setSending(true);
     setError(null);
     try {
-      // 1:1 send → resolve personalization tokens to the lead's real values
-      // (and the sending rep's name for {{sender_name}}).
+      // Resolve personalization tokens to the lead's real values (and the
+      // sending rep's name for {{sender_name}}).
       const ctx = { senderName: accounts.find((a) => a.id === fromId)?.fromName };
       const resolvedSubject = renderPersonalized(subject, lead, ctx);
       const resolvedBody = renderPersonalized(body, lead, ctx);
@@ -99,7 +112,8 @@ export function EmailComposerDrawer({
         leadId: lead.id,
         funnelId,
         fromAccountId: fromId,
-        toEmail: lead.email,
+        toEmail: recipient,
+        cc: cc.trim() || undefined,
         subject: resolvedSubject,
         bodyHtml: resolvedBody,
         stepIndex: stepIndex ?? null,
@@ -163,15 +177,38 @@ export function EmailComposerDrawer({
 
           {/* To */}
           <Field label="To">
-            <div className="bg-section border border-border-subtle rounded-[8px] px-3 py-2 text-[12px] text-ink">
-              {lead.name ? <span className="font-medium">{lead.name}</span> : null}
-              {lead.email ? (
-                <span className="text-ink-muted">{lead.name ? ` · ${lead.email}` : lead.email}</span>
-              ) : (
-                <span className="text-signal-red-text">No email address</span>
+            <div className="relative">
+              <input
+                type="email"
+                value={toEmail}
+                onChange={(e) => setToEmail(e.target.value)}
+                placeholder="name@company.com"
+                className="w-full bg-section border border-border-subtle rounded-[8px] px-3 py-2 text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+              />
+              {!showCc && (
+                <button
+                  type="button"
+                  onClick={() => setShowCc(true)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-ink-muted hover:text-ink-secondary transition-colors"
+                >
+                  + Cc
+                </button>
               )}
             </div>
           </Field>
+
+          {/* Cc (optional) */}
+          {showCc && (
+            <Field label="Cc">
+              <input
+                type="text"
+                value={cc}
+                onChange={(e) => setCc(e.target.value)}
+                placeholder="cc1@company.com, cc2@company.com"
+                className="w-full bg-section border border-border-subtle rounded-[8px] px-3 py-2 text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+              />
+            </Field>
+          )}
 
           {/* Template picker */}
           <div className="relative">
@@ -248,7 +285,7 @@ export function EmailComposerDrawer({
           <button
             type="button"
             onClick={handleSend}
-            disabled={sending || !lead.email}
+            disabled={sending || !toEmail.trim() || accounts.length === 0}
             className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-50"
           >
             {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}

@@ -102,6 +102,8 @@ export interface SendEmailPayload {
   funnelId?: string | null;
   fromAccountId: string;
   toEmail: string;
+  /** Optional comma-separated Cc recipients. */
+  cc?: string;
   subject: string;
   bodyHtml: string;
   /** Set when this send completes a campaign step. */

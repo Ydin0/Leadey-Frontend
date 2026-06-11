@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { X, MessageSquare, Loader2, Send, ChevronDown, Check, CheckCheck } from "lucide-react";
+import { X, MessageSquare, Loader2, Send, ChevronDown, Check, CheckCheck, FileText } from "lucide-react";
 import { cn, formatRelativeTime, formatPhoneIntl } from "@/lib/utils";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { getSmsThread, sendSms, type SmsMessage } from "@/lib/api/sms";
 import { getPhoneLines } from "@/lib/api/phone-lines";
+import { listTemplates } from "@/lib/api/templates";
+import { renderPersonalized, type PersonalizationLead } from "@/lib/utils/personalize";
 import type { PhoneLine } from "@/lib/types/calling";
+import type { Template } from "@/lib/types/template";
 import { SlideOver } from "@/components/shared/slide-over";
 
 interface SmsThreadDrawerProps {
@@ -16,6 +19,8 @@ interface SmsThreadDrawerProps {
   leadId: string;
   leadName: string;
   leadPhone: string | null;
+  /** Lead fields for personalizing template variables ({{first_name}}, etc.). */
+  lead?: PersonalizationLead;
   /** Called after a message is sent so the parent can refresh the timeline. */
   onSent?: () => void;
 }
@@ -27,6 +32,7 @@ export function SmsThreadDrawer({
   leadId,
   leadName,
   leadPhone,
+  lead,
   onSent,
 }: SmsThreadDrawerProps) {
   const { resolveMember } = useTeamMembers();
@@ -34,10 +40,14 @@ export function SmsThreadDrawer({
   const [loading, setLoading] = useState(true);
   const [lines, setLines] = useState<PhoneLine[]>([]);
   const [fromLineId, setFromLineId] = useState<string>("");
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+
+  const personalize = (text: string) => renderPersonalized(text, lead || { name: leadName });
 
   useEffect(() => {
     if (!open) return;
@@ -49,6 +59,7 @@ export function SmsThreadDrawer({
       .then((m) => !cancelled && setMessages(m))
       .catch(() => !cancelled && setError("Couldn't load the conversation."))
       .finally(() => !cancelled && setLoading(false));
+    setShowTemplates(false);
     getPhoneLines()
       .then((ls) => {
         if (cancelled) return;
@@ -57,6 +68,7 @@ export function SmsThreadDrawer({
         setFromLineId((prev) => prev || active[0]?.id || "");
       })
       .catch(() => {});
+    listTemplates("sms").then((t) => !cancelled && setTemplates(t)).catch(() => {});
     return () => { cancelled = true; };
   }, [open, funnelId, leadId]);
 
@@ -72,7 +84,7 @@ export function SmsThreadDrawer({
     setSending(true);
     setError(null);
     try {
-      const msg = await sendSms(funnelId, leadId, text, fromLineId || undefined);
+      const msg = await sendSms(funnelId, leadId, personalize(text), fromLineId || undefined);
       setMessages((prev) => [...prev, msg]);
       setBody("");
       onSent?.();
@@ -123,7 +135,7 @@ export function SmsThreadDrawer({
               {lines.length === 0 && <option value="">No active numbers</option>}
               {lines.map((l) => (
                 <option key={l.id} value={l.id}>
-                  {l.number}{l.friendlyName ? ` · ${l.friendlyName}` : ""}
+                  {l.number}{l.assignedToName ? ` · ${l.assignedToName}` : l.friendlyName ? ` · ${l.friendlyName}` : ""}
                 </option>
               ))}
             </select>
@@ -179,6 +191,39 @@ export function SmsThreadDrawer({
       {/* Composer */}
       <div className="shrink-0 border-t border-border-subtle p-3 bg-surface">
         {error && <p className="text-[11px] text-signal-red-text mb-2 px-1">{error}</p>}
+
+        {/* Template picker — links to your SMS templates */}
+        <div className="relative mb-2">
+          <button
+            type="button"
+            onClick={() => setShowTemplates((v) => !v)}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+          >
+            <FileText size={12} /> Use template <ChevronDown size={11} />
+          </button>
+          {showTemplates && (
+            <div className="absolute left-0 bottom-full mb-1 z-20 w-72 max-h-56 overflow-y-auto bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+              {templates.length === 0 ? (
+                <div className="px-3 py-2 text-[11px] text-ink-muted">
+                  No SMS templates yet — create them in Templates.
+                </div>
+              ) : (
+                templates.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => { setBody(personalize(t.body)); setShowTemplates(false); }}
+                    className="w-full text-left px-3 py-2 hover:bg-hover transition-colors"
+                  >
+                    <p className="text-[11px] font-medium text-ink truncate">{t.name}</p>
+                    <p className="text-[10px] text-ink-muted truncate">{t.body}</p>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="flex items-end gap-2 rounded-[18px] bg-section border border-border-subtle focus-within:border-signal-blue-text/40 transition-colors px-2 py-1.5">
           <textarea
             value={body}

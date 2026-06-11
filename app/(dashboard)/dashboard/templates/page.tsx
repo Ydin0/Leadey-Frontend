@@ -2,20 +2,21 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, Loader2, Mail, Linkedin } from "lucide-react";
+import { FileText, Plus, Loader2, Mail, Linkedin, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TemplateCard } from "@/components/templates/template-card";
 import { listTemplates } from "@/lib/api/templates";
-import type { Template, TemplateChannel } from "@/lib/types/template";
+import type { Template } from "@/lib/types/template";
 
-type TabKey = "all" | "email" | "linkedin";
+type TabKey = "all" | "email" | "linkedin" | "sms";
 
 const tabs: { key: TabKey; label: string; icon?: typeof Mail }[] = [
   { key: "all", label: "All" },
   { key: "email", label: "Email", icon: Mail },
   { key: "linkedin", label: "LinkedIn", icon: Linkedin },
+  { key: "sms", label: "SMS", icon: MessageSquare },
 ];
 
 export default function TemplatesPage() {
