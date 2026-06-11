@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { NativeSelect } from "@/components/ui/native-select";
+import { MemberAvatar } from "@/components/shared/member-avatar";
 
 const TIMEZONES = [
   "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Amsterdam", "Europe/Madrid",
@@ -67,6 +68,13 @@ export function ProfileSection() {
   return (
     <div className="space-y-6">
       <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
+        <div className="flex items-center gap-3.5 mb-5">
+          <MemberAvatar id={user.id} name={fullName || primaryEmail} size="xl" />
+          <div className="min-w-0">
+            <h3 className="text-[15px] font-semibold text-ink truncate">{fullName || "Your profile"}</h3>
+            <p className="text-[12px] text-ink-muted truncate">{primaryEmail}</p>
+          </div>
+        </div>
         <h3 className="text-[14px] font-semibold text-ink mb-1">Profile Settings</h3>
         <p className="text-[11px] text-ink-muted mb-4">Your personal account details and security controls.</p>
 

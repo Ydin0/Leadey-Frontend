@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Modal, ModalHeader } from "@/components/email/modal";
+import { MemberAvatar } from "@/components/shared/member-avatar";
 import {
   getTeamMembers,
   inviteTeamMember,
@@ -272,15 +273,7 @@ export function TeamSection() {
           {members.map((member) => (
             <div key={member.id} className="flex items-center justify-between py-2.5 px-3 rounded-[8px] hover:bg-hover/30 transition-colors">
               <div className="flex items-center gap-3">
-                {member.imageUrl ? (
-                  <img src={member.imageUrl} alt="" className="w-8 h-8 rounded-full object-cover" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-signal-blue/10 flex items-center justify-center">
-                    <span className="text-[11px] font-semibold text-signal-blue-text">
-                      {(member.firstName?.[0] || member.email[0]).toUpperCase()}
-                    </span>
-                  </div>
-                )}
+                <MemberAvatar id={member.id} name={memberName(member)} size="md" />
                 <div>
                   <p className="text-[12px] font-medium text-ink">{memberName(member)}</p>
                   <p className="text-[11px] text-ink-muted">{member.email}</p>

@@ -1,10 +1,10 @@
 "use client";
 
-import { UserButton } from "@clerk/nextjs";
 import { NotificationDropdown } from "@/components/dashboard/notification-dropdown";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { DialerDropdown } from "@/components/calling/dialer/dialer-dropdown";
 import { GlobalSearch } from "@/components/layout/global-search";
+import { UserMenu } from "@/components/layout/user-menu";
 
 export function Header() {
   return (
@@ -24,8 +24,8 @@ export function Header() {
       {/* Notifications */}
       <NotificationDropdown />
 
-      {/* User Menu */}
-      <UserButton afterSignOutUrl="/sign-in" />
+      {/* User Menu — custom Leadey account menu with the gradient avatar */}
+      <UserMenu />
     </header>
   );
 }
