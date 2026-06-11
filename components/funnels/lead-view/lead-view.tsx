@@ -14,6 +14,8 @@ import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
 import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc } from "@/lib/api/funnels";
 import { getCallRecords } from "@/lib/api/phone-lines";
+import { getLeadEmailThread, type LeadEmailMessage } from "@/lib/api/email";
+import type { EmailReplyMode } from "./email-activity-card";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { useCallContext } from "@/components/calling/call-context";
@@ -62,6 +64,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
   const [noteText, setNoteText] = useState("");
   const [showConvert, setShowConvert] = useState(false);
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
+  const [emailMessages, setEmailMessages] = useState<LeadEmailMessage[]>([]);
+  const [replyPrefill, setReplyPrefill] = useState<{ subject: string; body: string } | null>(null);
 
   const currentLead = useMemo(() => leads.find((l) => l.id === leadId) || null, [leads, leadId]);
 
@@ -91,6 +95,19 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
   useEffect(() => {
     void reloadCalls();
   }, [reloadCalls]);
+
+  // ── Real per-lead email thread (rich, expandable cards in the timeline) ──
+  const reloadEmails = useCallback(async () => {
+    try {
+      setEmailMessages(await getLeadEmailThread(funnelId, leadId));
+    } catch {
+      // no thread / not emailable yet — leave empty
+    }
+  }, [funnelId, leadId]);
+
+  useEffect(() => {
+    void reloadEmails();
+  }, [reloadEmails]);
 
   // Refetch shortly after a call against this lead ends + is saved.
   useEffect(() => {
@@ -285,17 +302,23 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
     completeStep("sent");
   }
 
-  function handleEmailSent(info: { subject: string }) {
+  function handleEmailSent() {
     if (!currentLead) return;
-    logActivity(currentLead.id, {
-      id: `act_${Date.now()}`,
-      type: "email_sent",
-      summary: `Email sent: ${info.subject || "(no subject)"}`,
-      timestamp: new Date(),
-      userInitials: "You",
-    });
+    // Pull the freshly-sent email into the timeline as a rich card.
+    void reloadEmails();
+    setReplyPrefill(null);
     if (currentStepDef?.channel === "email") completeStep("sent");
   }
+
+  // Reply / reply-all / forward from an email card → open the composer prefilled
+  // (lead-scoped, so all three compose back to this lead's address).
+  const handleReplyEmail = useCallback((message: LeadEmailMessage, mode: EmailReplyMode) => {
+    const base = message.subject.replace(/^(re|fwd):\s*/i, "");
+    const subject = mode === "forward" ? `Fwd: ${base}` : `Re: ${base}`;
+    const quoted = `<br/><br/><blockquote>On ${new Date(message.createdAt).toLocaleString()}, ${message.fromName || message.fromEmail} wrote:<br/>${message.bodyHtml || message.bodyText}</blockquote>`;
+    setReplyPrefill({ subject, body: quoted });
+    setShowComposer(true);
+  }, []);
 
   function addNote(text: string) {
     if (!currentLead || !text.trim()) return;
@@ -451,9 +474,11 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
           <LeadTimeline
             activities={timelineActivities}
             callRecords={callRecords}
+            emailMessages={emailMessages}
             onAddNote={addNote}
             onEditNote={editNote}
             onDeleteNote={deleteNote}
+            onReplyEmail={handleReplyEmail}
           />
         </section>
       </div>
@@ -497,7 +522,9 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
       {/* Email composer */}
       <EmailComposerDrawer
         open={showComposer}
-        onClose={() => setShowComposer(false)}
+        onClose={() => { setShowComposer(false); setReplyPrefill(null); }}
+        initialSubject={replyPrefill?.subject}
+        initialBody={replyPrefill?.body}
         lead={{
           id: currentLead.id,
           name: currentLead.name,

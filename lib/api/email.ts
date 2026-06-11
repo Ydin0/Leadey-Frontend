@@ -102,6 +102,32 @@ export async function getThreadByLead(leadId: string): Promise<EmailThread | nul
   return delay(t ? { ...t, messages: [...(t.messages || [])] } : null);
 }
 
+export interface LeadEmailMessage {
+  id: string;
+  direction: "outbound" | "inbound";
+  fromEmail: string;
+  fromName: string;
+  toEmail: string;
+  subject: string;
+  bodyHtml: string;
+  bodyText: string;
+  status: string;
+  openedAt: string | null;
+  openCount: number;
+  userId: string | null;
+  createdAt: string;
+}
+
+/** The full 1:1 email conversation with a lead (sent + received), oldest first. */
+export async function getLeadEmailThread(
+  funnelId: string,
+  leadId: string,
+): Promise<LeadEmailMessage[]> {
+  return apiRequest<LeadEmailMessage[]>(
+    `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/email`,
+  );
+}
+
 /** Send a 1:1 email from the rep's connected account, via the real backend.
  *  POST /api/funnels/:funnelId/leads/:leadId/email */
 export async function sendEmail(

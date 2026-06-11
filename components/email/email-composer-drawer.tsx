@@ -22,6 +22,9 @@ interface EmailComposerDrawerProps {
   funnelId?: string | null;
   /** Current campaign step index (0-based), tagged on the sent message. */
   stepIndex?: number | null;
+  /** Prefill for replies/forwards (Re:/Fwd: subject + quoted body). */
+  initialSubject?: string;
+  initialBody?: string;
   onSent: (info: { subject: string; bodyHtml: string }) => void;
 }
 
@@ -31,6 +34,8 @@ export function EmailComposerDrawer({
   lead,
   funnelId,
   stepIndex,
+  initialSubject,
+  initialBody,
   onSent,
 }: EmailComposerDrawerProps) {
   const [accounts, setAccounts] = useState<SendingAccount[]>([]);
@@ -52,6 +57,14 @@ export function EmailComposerDrawer({
       })
       .catch(() => {});
     listTemplates("email").then(setTemplates).catch(() => setTemplates([]));
+  }, [open]);
+
+  // Seed Re:/Fwd: subject + quoted body when opened as a reply/forward.
+  useEffect(() => {
+    if (!open) return;
+    if (initialSubject !== undefined) setSubject(initialSubject);
+    if (initialBody !== undefined) setBody(initialBody);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   function applyTemplate(t: Template) {

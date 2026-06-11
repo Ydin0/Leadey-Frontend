@@ -27,6 +27,8 @@ import { MemberAvatar } from "@/components/shared/member-avatar";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import type { FunnelLeadActivity } from "@/lib/types/funnel-focus";
 import type { CallRecord } from "@/lib/types/calling";
+import type { LeadEmailMessage } from "@/lib/api/email";
+import { EmailActivityCard, type EmailReplyMode } from "./email-activity-card";
 
 /** Who performed an activity — resolved to a display name + a stable id for
  *  the avatar colour. */
@@ -67,6 +69,7 @@ const TYPE_META: Record<string, KindMeta> = {
 
 type FeedItem =
   | { id: string; kind: "call"; timestamp: Date; record: CallRecord; actor: Actor | null }
+  | { id: string; kind: "email"; timestamp: Date; message: LeadEmailMessage; actor: Actor | null }
   | { id: string; kind: "activity"; timestamp: Date; activity: FunnelLeadActivity; actor: Actor | null };
 
 function fmtDuration(sec: number): string {
@@ -270,14 +273,18 @@ function TimelineRow({
   last,
   onEditNote,
   onDeleteNote,
+  onReplyEmail,
 }: {
   item: FeedItem;
   last: boolean;
   onEditNote?: (id: string, text: string) => void;
   onDeleteNote?: (id: string) => void;
+  onReplyEmail?: (message: LeadEmailMessage, mode: EmailReplyMode) => void;
 }) {
-  const type = item.kind === "call" ? "call" : item.activity.type;
-  const meta = TYPE_META[type] ?? TYPE_META.note;
+  const meta =
+    item.kind === "email"
+      ? { icon: Mail, tint: "bg-signal-blue", fg: "text-signal-blue-text" }
+      : TYPE_META[item.kind === "call" ? "call" : item.activity.type] ?? TYPE_META.note;
   const Icon = meta.icon;
   return (
     <div className="flex gap-3.5 items-stretch">
@@ -290,6 +297,8 @@ function TimelineRow({
       <div className={cn("flex-1 min-w-0", last ? "pb-0" : "pb-4")}>
         {item.kind === "call" ? (
           <CallCard record={item.record} actor={item.actor} />
+        ) : item.kind === "email" ? (
+          <EmailActivityCard message={item.message} onReply={onReplyEmail} />
         ) : (
           <ActivityCard a={item.activity} actor={item.actor} onEdit={onEditNote} onDelete={onDeleteNote} />
         )}
@@ -335,15 +344,17 @@ function Composer({ onAdd }: { onAdd: (text: string) => void }) {
 interface LeadTimelineProps {
   activities: FunnelLeadActivity[];
   callRecords: CallRecord[];
+  emailMessages?: LeadEmailMessage[];
   onAddNote: (text: string) => void;
   onEditNote?: (id: string, text: string) => void;
   onDeleteNote?: (id: string) => void;
+  onReplyEmail?: (message: LeadEmailMessage, mode: EmailReplyMode) => void;
 }
 
 const FILTERS = ["All", "Important", "Conversations", "Notes"] as const;
 type Filter = (typeof FILTERS)[number];
 
-export function LeadTimeline({ activities, callRecords, onAddNote, onEditNote, onDeleteNote }: LeadTimelineProps) {
+export function LeadTimeline({ activities, callRecords, emailMessages, onAddNote, onEditNote, onDeleteNote, onReplyEmail }: LeadTimelineProps) {
   const [filter, setFilter] = useState<Filter>("All");
   const { resolveMember } = useTeamMembers();
 
@@ -365,20 +376,31 @@ export function LeadTimeline({ activities, callRecords, onAddNote, onEditNote, o
       record: r,
       actor: toActor(r.userId, r.userName),
     }));
-    const acts: FeedItem[] = activities.map((a) => ({
-      id: a.id,
-      kind: "activity",
-      timestamp: a.timestamp,
-      activity: a,
-      actor: toActor(a.userId, a.userName),
+    // Email events are rendered as rich cards from the real message thread, so
+    // drop the flattened "Email sent/opened" activities to avoid duplicates.
+    const acts: FeedItem[] = activities
+      .filter((a) => a.type !== "email_sent" && a.type !== "email_opened")
+      .map((a) => ({
+        id: a.id,
+        kind: "activity" as const,
+        timestamp: a.timestamp,
+        activity: a,
+        actor: toActor(a.userId, a.userName),
+      }));
+    const emails: FeedItem[] = (emailMessages || []).map((m) => ({
+      id: `em_${m.id}`,
+      kind: "email" as const,
+      timestamp: new Date(m.createdAt),
+      message: m,
+      actor: toActor(m.userId, null),
     }));
-    return [...calls, ...acts].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [activities, callRecords, resolveMember]);
+    return [...calls, ...acts, ...emails].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }, [activities, callRecords, emailMessages, resolveMember]);
 
   const items = useMemo(() => {
-    const conv = new Set(["call", "email_sent", "email_opened", "linkedin", "sms_sent", "sms_received"]);
+    const conv = new Set(["call", "email", "linkedin", "sms_sent", "sms_received"]);
     return feed.filter((item) => {
-      const type = item.kind === "call" ? "call" : item.activity.type;
+      const type = item.kind === "call" ? "call" : item.kind === "email" ? "email" : item.activity.type;
       if (filter === "All") return true;
       if (filter === "Important") return type === "call" || type === "status_change" || type === "opportunity";
       if (filter === "Conversations") return conv.has(type);
@@ -424,6 +446,7 @@ export function LeadTimeline({ activities, callRecords, onAddNote, onEditNote, o
                 last={i === items.length - 1}
                 onEditNote={onEditNote}
                 onDeleteNote={onDeleteNote}
+                onReplyEmail={onReplyEmail}
               />
             ))}
           </div>
