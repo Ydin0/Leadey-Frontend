@@ -77,9 +77,11 @@ export function EmailComposerDrawer({
     setSending(true);
     setError(null);
     try {
-      // 1:1 send → resolve personalization tokens to the lead's real values.
-      const resolvedSubject = renderPersonalized(subject, lead);
-      const resolvedBody = renderPersonalized(body, lead);
+      // 1:1 send → resolve personalization tokens to the lead's real values
+      // (and the sending rep's name for {{sender_name}}).
+      const ctx = { senderName: accounts.find((a) => a.id === fromId)?.fromName };
+      const resolvedSubject = renderPersonalized(subject, lead, ctx);
+      const resolvedBody = renderPersonalized(body, lead, ctx);
       await sendEmail({
         leadId: lead.id,
         funnelId,
@@ -93,8 +95,10 @@ export function EmailComposerDrawer({
       onClose();
       setSubject("");
       setBody("");
-    } catch {
-      setError("Failed to send email. Please try again.");
+    } catch (err) {
+      // Surface the real reason (provider error, scope/permission, etc.) so it
+      // can actually be fixed — not a generic "try again".
+      setError(err instanceof Error ? err.message : "Failed to send email. Please try again.");
     } finally {
       setSending(false);
     }
