@@ -31,8 +31,12 @@ import type {
   VoicemailDrop,
 } from "@/lib/types/dialer";
 
-/** Seconds the bar counts down before auto-dialing the next lead. */
-const AUTO_ADVANCE_SECONDS = 5;
+/** Default seconds the bar counts down before auto-dialing the next lead.
+ *  Reps can change this (or set it to 0 for manual) via the bar; the choice is
+ *  persisted in localStorage. */
+const DEFAULT_AUTO_ADVANCE_SECONDS = 5;
+const FOLLOW_KEY = "dialer:followMode";
+const AUTO_ADVANCE_KEY = "dialer:autoAdvanceSeconds";
 
 type DialerMode = "running" | "paused";
 
@@ -46,12 +50,16 @@ interface DialerContextValue {
   /** Seconds left before the next auto-dial, or null when not counting. */
   countdown: number | null;
   /** When true, the main screen follows the current lead's profile page and
-   *  auto-navigates to the next lead as the dialer advances. */
+   *  auto-navigates to the next lead as the dialer advances. On by default. */
   followMode: boolean;
   /** Open the current lead's profile and start following subsequent leads. */
   openFollow: () => void;
   /** Stop following (stay on the current page). */
   stopFollow: () => void;
+  /** Seconds to wait before auto-dialing the next lead; 0 = manual only. */
+  autoAdvanceSeconds: number;
+  /** Update the auto-dial wait (persisted to localStorage). */
+  setAutoAdvanceSeconds: (seconds: number) => void;
   /** True while Twilio is connecting or a call is live. */
   isDialing: boolean;
   loading: boolean;
@@ -63,6 +71,9 @@ interface DialerContextValue {
   /** Advance to the next lead, recording the call + ticking the step. */
   advance: () => Promise<void>;
   skip: () => Promise<void>;
+  /** Skip to the next lead and start dialing it immediately (the "Next"
+   *  button) — bypasses the countdown instead of resetting it. */
+  nextNow: () => Promise<void>;
   back: () => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
@@ -92,9 +103,39 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   const [voicemails, setVoicemails] = useState<VoicemailDrop[]>([]);
   const [mode, setMode] = useState<DialerMode>("running");
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [followMode, setFollowMode] = useState(false);
+  // Follow mode is ON by default so the rep always lands on the lead being
+  // dialed without clicking "Open". The stored preference is loaded in an
+  // effect below to avoid an SSR/hydration mismatch on the button label.
+  const [followMode, setFollowMode] = useState(true);
+  const [autoAdvanceSeconds, setAutoAdvanceSecondsState] = useState(
+    DEFAULT_AUTO_ADVANCE_SECONDS,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Load persisted preferences once on the client.
+  useEffect(() => {
+    try {
+      const f = window.localStorage.getItem(FOLLOW_KEY);
+      if (f !== null) setFollowMode(f === "true");
+      const a = window.localStorage.getItem(AUTO_ADVANCE_KEY);
+      if (a !== null) {
+        const n = Number(a);
+        if (Number.isFinite(n) && n >= 0) setAutoAdvanceSecondsState(n);
+      }
+    } catch {
+      // localStorage unavailable — keep defaults.
+    }
+  }, []);
+
+  const setAutoAdvanceSeconds = useCallback((seconds: number) => {
+    setAutoAdvanceSecondsState(seconds);
+    try {
+      window.localStorage.setItem(AUTO_ADVANCE_KEY, String(seconds));
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Tracks the lead id we last navigated to in follow mode, so we can tell a
   // lead change (re-navigate) apart from the user navigating away (stop).
@@ -181,17 +222,26 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
 
   // ── Actions ──────────────────────────────────────────────────────
 
+  // Dial a specific queue item now. Shared by the countdown engine, the
+  // "Call now" button, and nextNow so they all honour the DNC guard.
+  const dialItem = useCallback(
+    (item: DialerQueueItem | null) => {
+      if (!item) return;
+      if (call.activeCall) return;
+      if (item.lead?.doNotCall && !confirmDncCall(item.lead?.name)) return;
+      setCountdown(null);
+      call.startCall(item.leadPhone, {
+        contactName: item.lead?.name || null,
+        companyName: item.lead?.company || null,
+        leadId: item.leadId || null,
+      });
+    },
+    [call],
+  );
+
   const startNext = useCallback(() => {
-    if (!currentItem) return;
-    if (call.activeCall) return;
-    if (currentItem.lead?.doNotCall && !confirmDncCall(currentItem.lead?.name)) return;
-    setCountdown(null);
-    call.startCall(currentItem.leadPhone, {
-      contactName: currentItem.lead?.name || null,
-      companyName: currentItem.lead?.company || null,
-      leadId: currentItem.leadId || null,
-    });
-  }, [currentItem, call]);
+    dialItem(currentItem);
+  }, [dialItem, currentItem]);
 
   const advance = useCallback(async () => {
     if (!session) return;
@@ -213,6 +263,25 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       setError(err instanceof Error ? err.message : "Failed to skip");
     }
   }, [session, refresh]);
+
+  // The "Next" button / S key: go straight to the next lead and dial it. If a
+  // call is live, hang up first and let the auto-advance handler move on (the
+  // countdown there is bypassed below). Otherwise skip the current lead and
+  // immediately dial the new one — no 5s wait, no timer reset.
+  const nextNow = useCallback(async () => {
+    if (!session) return;
+    if (call.activeCall) {
+      call.endCall();
+      return;
+    }
+    try {
+      await skipSession(session.id);
+      const snapshot = await refresh(session.id);
+      dialItem(snapshot.current);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to advance");
+    }
+  }, [session, call, refresh, dialItem]);
 
   const back = useCallback(async () => {
     if (!session) return;
@@ -276,18 +345,38 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     [session?.funnelId],
   );
 
+  // Navigate the main screen to a lead's profile (no-op if already there).
+  const navigateToLead = useCallback(
+    (leadId: string) => {
+      const p = leadPath(leadId);
+      if (p && pathname !== p) router.push(p);
+    },
+    [leadPath, pathname, router],
+  );
+
+  const persistFollow = useCallback((on: boolean) => {
+    try {
+      window.localStorage.setItem(FOLLOW_KEY, String(on));
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const openFollow = useCallback(() => {
-    if (!currentItem || !session?.funnelId) return;
     setFollowMode(true);
-    lastNavLeadRef.current = currentItem.leadId;
-    const p = leadPath(currentItem.leadId);
-    if (p) router.push(p);
-  }, [currentItem, session?.funnelId, leadPath, router]);
+    persistFollow(true);
+    if (currentItem) {
+      lastNavLeadRef.current = currentItem.leadId;
+      navigateToLead(currentItem.leadId);
+    }
+  }, [currentItem, navigateToLead, persistFollow]);
 
   const stopFollow = useCallback(() => {
     setFollowMode(false);
+    persistFollow(false);
+    // Reset so re-enabling navigates to the current lead again.
     lastNavLeadRef.current = null;
-  }, []);
+  }, [persistFollow]);
 
   const dropVm = useCallback(
     async (voicemailId?: string) => {
@@ -340,13 +429,14 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     session.status === "active" &&
     mode === "running" &&
     !!currentItem &&
-    !call.activeCall;
+    !call.activeCall &&
+    autoAdvanceSeconds > 0;
   useEffect(() => {
     if (!canAutoDial) {
       setCountdown(null);
       return;
     }
-    let n = AUTO_ADVANCE_SECONDS;
+    let n = autoAdvanceSeconds;
     setCountdown(n);
     const id = setInterval(() => {
       n -= 1;
@@ -359,30 +449,24 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       }
     }, 1000);
     return () => clearInterval(id);
-    // Re-arm whenever the target lead, mode, session status, or call presence
-    // changes. currentItem?.id drives advancing to the next lead.
-  }, [canAutoDial, currentItem?.id, session?.status, mode]);
+    // Re-arm whenever the target lead, mode, session status, call presence, or
+    // configured wait changes. currentItem?.id drives advancing to the next lead.
+  }, [canAutoDial, currentItem?.id, session?.status, mode, autoAdvanceSeconds]);
 
   // ── Follow mode: keep the main screen on the current lead's profile ──
-  // When the current lead changes, navigate to its profile. If the user
-  // navigates away on their own, stop following.
+  // Auto-navigate whenever the dialer moves to a NEW lead (advance / skip /
+  // back / session start). We key off the lead id only — navigating to the
+  // same lead twice is a no-op, and a rep who clicks elsewhere mid-lead is
+  // left alone (no yank) until the next lead, at which point follow resumes.
+  // Follow mode is never auto-disabled; the rep controls it via the toggle.
   useEffect(() => {
-    if (!followMode) {
-      lastNavLeadRef.current = null;
-      return;
-    }
+    if (!followMode) return;
     if (!currentItem || !session?.funnelId) return;
     const leadId = currentItem.leadId;
-    const expected = `/dashboard/funnels/${session.funnelId}/leads/${leadId}`;
-    if (lastNavLeadRef.current !== leadId) {
-      // Lead changed (advance / skip / back) or just opened → go to it.
-      lastNavLeadRef.current = leadId;
-      if (pathname !== expected) router.push(expected);
-    } else if (pathname !== expected) {
-      // Same lead but the user navigated elsewhere → stop following.
-      setFollowMode(false);
-    }
-  }, [followMode, currentItem, session?.funnelId, pathname, router]);
+    if (lastNavLeadRef.current === leadId) return;
+    lastNavLeadRef.current = leadId;
+    navigateToLead(leadId);
+  }, [followMode, currentItem, session?.funnelId, navigateToLead]);
 
   const isDialing =
     call.activeCall?.state === "ringing" || call.activeCall?.state === "connected";
@@ -399,6 +483,8 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
         followMode,
         openFollow,
         stopFollow,
+        autoAdvanceSeconds,
+        setAutoAdvanceSeconds,
         isDialing,
         loading,
         error,
@@ -406,6 +492,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
         startNext,
         advance,
         skip,
+        nextNow,
         back,
         pause,
         resume,

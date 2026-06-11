@@ -53,10 +53,10 @@ export function useDialerKeyboard(): void {
         return;
       }
 
-      // S — skip / forward.
+      // S — next call: go to the next lead and dial it now.
       if (key === "s" || key === "S") {
         e.preventDefault();
-        void dialer.skip();
+        void dialer.nextNow();
         return;
       }
 

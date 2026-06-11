@@ -12,6 +12,7 @@ import {
   X,
   Check,
   ExternalLink,
+  Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDialerContext } from "@/components/dialer/context/dialer-context";
@@ -23,7 +24,7 @@ export function DialerBar() {
   const call = useCallContext();
   useDialerKeyboard();
 
-  const { session, currentItem, mode, countdown } = dialer;
+  const { session, currentItem, mode, countdown, autoAdvanceSeconds } = dialer;
 
   // Nothing to show until a session exists.
   if (!session) return null;
@@ -89,13 +90,14 @@ export function DialerBar() {
               )}
             </div>
 
-            {/* Status pill */}
+            {/* Status pill — click during the countdown to dial now. */}
             <StatusPill
               connected={connected}
               ringing={activeCall?.state === "ringing"}
               duration={activeCall?.duration ?? 0}
               countdown={countdown}
               paused={mode === "paused"}
+              onDialNow={() => dialer.startNext()}
             />
 
             {/* Controls */}
@@ -136,7 +138,10 @@ export function DialerBar() {
                 </IconButton>
               )}
 
-              <IconButton title="Skip (S)" onClick={() => void dialer.skip()}>
+              <IconButton
+                title="Next call — dial the next lead now (S)"
+                onClick={() => void dialer.nextNow()}
+              >
                 <SkipForward size={14} />
               </IconButton>
 
@@ -169,6 +174,11 @@ export function DialerBar() {
                 </IconButton>
               )}
 
+              <WaitSelector
+                seconds={autoAdvanceSeconds}
+                onChange={dialer.setAutoAdvanceSeconds}
+              />
+
               <div className="w-px h-5 bg-border-subtle mx-0.5" />
 
               <button
@@ -199,15 +209,18 @@ function StatusPill({
   duration,
   countdown,
   paused,
+  onDialNow,
 }: {
   connected: boolean;
   ringing: boolean;
   duration: number;
   countdown: number | null;
   paused: boolean;
+  onDialNow?: () => void;
 }) {
   let label: string;
   let tone: "green" | "blue" | "slate" | "amber";
+  const counting = !connected && !ringing && !paused && countdown !== null;
 
   if (connected) {
     label = `Connected · ${formatDuration(duration)}`;
@@ -219,7 +232,7 @@ function StatusPill({
     label = "Paused";
     tone = "amber";
   } else if (countdown !== null) {
-    label = `Next in ${countdown}s`;
+    label = `Next in ${countdown}s · dial now`;
     tone = "blue";
   } else {
     label = "Ready";
@@ -233,15 +246,51 @@ function StatusPill({
     amber: "bg-amber-500/15 text-amber-600",
   }[tone];
 
+  const className = cn(
+    "shrink-0 text-[11px] font-medium rounded-full px-2.5 py-1 tabular-nums",
+    toneClass,
+    counting && "cursor-pointer hover:brightness-95",
+  );
+
+  if (counting && onDialNow) {
+    return (
+      <button
+        type="button"
+        title="Dial the current lead now (skip the wait)"
+        onClick={onDialNow}
+        className={className}
+      >
+        {label}
+      </button>
+    );
+  }
+
+  return <span className={className}>{label}</span>;
+}
+
+/** Compact cycle button for the auto-dial wait: Off → 3s → 5s → 10s. */
+function WaitSelector({
+  seconds,
+  onChange,
+}: {
+  seconds: number;
+  onChange: (seconds: number) => void;
+}) {
+  const STEPS = [0, 3, 5, 10];
+  const next = () => {
+    const i = STEPS.indexOf(seconds);
+    onChange(STEPS[(i + 1) % STEPS.length] ?? 5);
+  };
   return (
-    <span
-      className={cn(
-        "shrink-0 text-[11px] font-medium rounded-full px-2.5 py-1 tabular-nums",
-        toneClass,
-      )}
+    <button
+      type="button"
+      onClick={next}
+      title="Wait between calls before auto-dialing (click to change). Off = manual."
+      className="flex items-center gap-1 px-2.5 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle tabular-nums"
     >
-      {label}
-    </span>
+      <Timer size={12} strokeWidth={2} />
+      {seconds === 0 ? "Off" : `${seconds}s`}
+    </button>
   );
 }
 
