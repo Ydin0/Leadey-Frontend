@@ -15,6 +15,7 @@ import {
   CreditCard,
   Linkedin,
   ListPlus,
+  Mail,
   Phone,
   PhoneCall,
   PlugZap,
@@ -31,6 +32,7 @@ import { PhoneLinesTab } from "@/components/calling/settings/phone-lines-tab";
 import { DialerSettingsTab } from "@/components/dialer/settings/dialer-settings-tab";
 import { PipelineSettings } from "@/components/opportunities/settings/pipeline-settings";
 import { LinkedInTeamTab } from "./linkedin-team-tab";
+import { EmailAccountsSection } from "./email-accounts-section";
 import type {
   AppSettingsSnapshot,
   IntegrationSettings,
@@ -46,6 +48,7 @@ type SettingsTab =
   | "dialer"
   | "pipelines"
   | "linkedin"
+  | "email-accounts"
   | "billing"
   | "notifications"
   | "integrations";
@@ -60,6 +63,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "dialer", label: "Power Dialer", icon: PhoneCall },
   { id: "pipelines", label: "Pipelines", icon: Briefcase },
   { id: "linkedin", label: "LinkedIn", icon: Linkedin },
+  { id: "email-accounts", label: "Email Accounts", icon: Mail },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "integrations", label: "Integrations", icon: PlugZap },
@@ -175,6 +179,7 @@ const VALID_TABS: SettingsTab[] = [
   "dialer",
   "pipelines",
   "linkedin",
+  "email-accounts",
   "billing",
   "notifications",
   "integrations",
@@ -298,6 +303,7 @@ export function SettingsShell() {
           {activeTab === "custom-fields" && <CustomFieldsSection />}
 
           {activeTab === "phone-lines" && <PhoneLinesTab />}
+          {activeTab === "email-accounts" && <EmailAccountsSection />}
 
           {activeTab === "dialer" && <DialerSettingsTab />}
 

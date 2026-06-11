@@ -22,13 +22,15 @@ import {
   mockEmailStats,
   mockCampaignEmailAnalytics,
 } from "@/lib/mock-data/email";
+import { apiRequest } from "./client";
+import { listEmailAccounts } from "./email-accounts";
 
 /** Simulate network latency so loading states are exercised in the UI. */
 const delay = <T>(value: T, ms = 250): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), ms));
 
 // In-memory thread store so sends/replies/sentiment persist within a session.
-let threadStore: EmailThread[] = mockEmailThreads.map((t) => ({
+const threadStore: EmailThread[] = mockEmailThreads.map((t) => ({
   ...t,
   messages: t.messages ? [...t.messages] : [],
 }));
@@ -40,10 +42,20 @@ export async function getEmailStats(): Promise<EmailStats> {
   return delay(mockEmailStats);
 }
 
-/** GET /api/email/sending-accounts — connected Smartlead mailboxes. */
+/** The rep's real connected inboxes (Gmail/Outlook/SMTP), shaped for the
+ *  composer's "From" selector. */
 export async function listSendingAccounts(): Promise<SendingAccount[]> {
-  // TODO(backend): return apiRequest<SendingAccount[]>("/email/sending-accounts");
-  return delay(mockSendingAccounts);
+  const accounts = await listEmailAccounts();
+  return accounts.map((a) => ({
+    id: a.id,
+    email: a.email,
+    fromName: a.fromName || a.email,
+    isActive: a.status === "active",
+    warmupStatus: "active",
+    dailyLimit: 0,
+    sentToday: 0,
+    healthScore: 100,
+  }));
 }
 
 /** GET /api/email/threads — inbox list, filtered. */
@@ -90,40 +102,46 @@ export async function getThreadByLead(leadId: string): Promise<EmailThread | nul
   return delay(t ? { ...t, messages: [...(t.messages || [])] } : null);
 }
 
-/** POST /api/email/send — send a new email / first touch from a lead. */
+/** Send a 1:1 email from the rep's connected account, via the real backend.
+ *  POST /api/funnels/:funnelId/leads/:leadId/email */
 export async function sendEmail(
   payload: SendEmailPayload,
 ): Promise<EmailMessage> {
-  // TODO(backend): return apiRequest<EmailMessage>("/email/send", { method: "POST", body: JSON.stringify(payload) });
-  const account = mockSendingAccounts.find((a) => a.id === payload.fromAccountId) ?? mockSendingAccounts[0];
-  const msg: EmailMessage = {
-    id: `m_${Date.now()}`,
+  if (!payload.funnelId) {
+    throw new Error("This lead isn't tied to a campaign, so it can't be emailed yet.");
+  }
+  const sent = await apiRequest<{
+    id: string;
+    fromEmail: string;
+    fromName: string;
+    toEmail: string;
+    subject: string;
+    bodyHtml: string;
+    createdAt: string;
+  }>(
+    `/funnels/${encodeURIComponent(payload.funnelId)}/leads/${encodeURIComponent(payload.leadId)}/email`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        fromAccountId: payload.fromAccountId,
+        subject: payload.subject,
+        bodyHtml: payload.bodyHtml,
+      }),
+    },
+  );
+  return {
+    id: sent.id,
     threadId: `th_${payload.leadId}`,
     direction: "outbound",
-    fromName: account.fromName,
-    fromEmail: account.email,
-    toEmail: payload.toEmail,
-    subject: payload.subject,
-    bodyHtml: payload.bodyHtml,
-    sentAt: new Date().toISOString(),
+    fromName: sent.fromName,
+    fromEmail: sent.fromEmail,
+    toEmail: sent.toEmail,
+    subject: sent.subject,
+    bodyHtml: sent.bodyHtml,
+    sentAt: sent.createdAt,
     openedAt: null,
     stepIndex: payload.stepIndex ?? null,
   };
-  let t = threadStore.find((x) => x.leadId === payload.leadId);
-  if (!t) {
-    t = {
-      id: msg.threadId, leadId: payload.leadId, leadName: payload.toEmail, leadTitle: "",
-      company: "", contactEmail: payload.toEmail, funnelId: payload.funnelId ?? null, funnelName: null,
-      subject: payload.subject, lastMessageAt: msg.sentAt, lastMessagePreview: "", unread: false,
-      sentiment: null, status: "active", messageCount: 0, messages: [],
-    };
-    threadStore = [t, ...threadStore];
-  }
-  t.messages = [...(t.messages || []), msg];
-  t.messageCount = t.messages.length;
-  t.lastMessageAt = msg.sentAt;
-  t.lastMessagePreview = msg.bodyHtml.replace(/<[^>]+>/g, " ").trim().slice(0, 120);
-  return delay(msg, 400);
 }
 
 /** POST /api/email/threads/:id/reply — reply within an existing thread. */

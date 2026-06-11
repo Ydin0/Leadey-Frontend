@@ -19,6 +19,21 @@ export async function resolveCaller(number: string): Promise<ResolvedCaller> {
   return apiRequest<ResolvedCaller>(`/calls/resolve?number=${encodeURIComponent(number)}`);
 }
 
+export interface RecentCall {
+  leadId: string;
+  funnelId: string;
+  name: string;
+  company: string;
+  domain: string | null;
+  calledAt: string;
+}
+
+/** The current rep's recently-called leads (deduped, newest first) — for the
+ *  search-bar quick-jump. */
+export async function getRecentCalls(limit = 8): Promise<RecentCall[]> {
+  return apiRequest<RecentCall[]>(`/phone-lines/recent-calls?limit=${limit}`);
+}
+
 export async function getPhoneLine(id: string): Promise<PhoneLine> {
   return apiRequest<PhoneLine>(`/phone-lines/${id}`);
 }

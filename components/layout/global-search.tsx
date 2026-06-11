@@ -9,10 +9,12 @@ import {
   Contact,
   Users,
   Loader2,
+  PhoneCall,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { globalSearch } from "@/lib/api/search";
+import { getRecentCalls, type RecentCall } from "@/lib/api/phone-lines";
 import type { SearchResult, SearchResultType } from "@/lib/types/search";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { cn } from "@/lib/utils";
@@ -79,6 +81,7 @@ export function GlobalSearch() {
 
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [recent, setRecent] = useState<RecentCall[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -115,6 +118,18 @@ export function GlobalSearch() {
     };
   }, [query, isAuthReady]);
 
+  // Load the rep's recently-called leads each time the panel opens — shown
+  // while the query is empty so you can jump back to a lead the dialer skipped
+  // past before you dispositioned it.
+  useEffect(() => {
+    if (!open || !isAuthReady) return;
+    let cancelled = false;
+    getRecentCalls(8)
+      .then((r) => { if (!cancelled) setRecent(r); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [open, isAuthReady]);
+
   // Close on outside click.
   useEffect(() => {
     function onClick(e: MouseEvent) {
@@ -144,6 +159,12 @@ export function GlobalSearch() {
     router.push(result.href);
   }
 
+  function goLead(c: RecentCall) {
+    setOpen(false);
+    setQuery("");
+    router.push(`/dashboard/funnels/${c.funnelId}/leads/${c.leadId}`);
+  }
+
   function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Escape") {
       setOpen(false);
@@ -165,6 +186,7 @@ export function GlobalSearch() {
   }
 
   const showDropdown = open && query.trim().length >= 2;
+  const showRecent = open && query.trim().length < 2 && recent.length > 0;
 
   // Group results while preserving a flat index for keyboard nav.
   let flatIndex = -1;
@@ -195,9 +217,34 @@ export function GlobalSearch() {
         )}
       </div>
 
-      {showDropdown && (
+      {(showDropdown || showRecent) && (
         <div className="absolute left-0 top-[calc(100%+6px)] w-[420px] max-w-[80vw] bg-surface border border-border-subtle rounded-[14px] shadow-xl overflow-hidden z-50">
-          {results.length === 0 ? (
+          {!showDropdown ? (
+            <div className="max-h-[60vh] overflow-y-auto py-1.5">
+              <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-ink-muted font-medium flex items-center gap-1.5">
+                <PhoneCall size={11} /> Recent calls
+              </div>
+              {recent.map((c) => (
+                <button
+                  key={c.leadId}
+                  type="button"
+                  onClick={() => goLead(c)}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-hover"
+                >
+                  <ResultAvatar
+                    result={{ imageUrl: null, domain: c.domain ?? undefined } as unknown as SearchResult}
+                    Icon={PhoneCall}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] text-ink truncate">{c.name}</span>
+                    {c.company && (
+                      <span className="block text-[11px] text-ink-muted truncate">{c.company}</span>
+                    )}
+                  </span>
+                </button>
+              ))}
+            </div>
+          ) : results.length === 0 ? (
             <div className="px-4 py-6 text-center text-[12px] text-ink-muted">
               {loading ? "Searching…" : `No results for “${query.trim()}”`}
             </div>
