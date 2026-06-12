@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,6 +42,10 @@ export default function FunnelDetailPage() {
   const [activeTab, setActiveTab] = useState<FunnelTab>("leads");
   const [showAddLeads, setShowAddLeads] = useState(false);
   const [funnel, setFunnel] = useState<Funnel | null>(null);
+  // Full funnel (with per-lead events) — lazily loaded only when the Cockpit or
+  // Analytics tab needs it, so the default Leads view stays fast.
+  const [fullFunnel, setFullFunnel] = useState<Funnel | null>(null);
+  const fullLoadStartedRef = useRef(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusChanging, setStatusChanging] = useState(false);
@@ -82,7 +86,10 @@ export default function FunnelDetailPage() {
     setError(null);
 
     try {
-      const data = await getFunnelById(funnelId);
+      // Lite load — the leads table doesn't need per-lead events / long company
+      // descriptions, so skip them. The Cockpit/Analytics tabs lazily load the
+      // full funnel (with events) when opened.
+      const data = await getFunnelById(funnelId, { lite: true });
       funnelCache.set(funnelId, data);
       setFunnel(data);
       setLoading(false);
@@ -96,7 +103,7 @@ export default function FunnelDetailPage() {
         void backfillCompanyData()
           .then(async (result) => {
             if (result.updated > 0) {
-              const refreshed = await getFunnelById(funnelId);
+              const refreshed = await getFunnelById(funnelId, { lite: true });
               funnelCache.set(funnelId, refreshed);
               setFunnel(refreshed);
             }
@@ -144,6 +151,19 @@ export default function FunnelDetailPage() {
     if (!isAuthReady) return;
     void loadFunnel();
   }, [isAuthReady, loadFunnel]);
+
+  // Cockpit + Analytics need per-lead events, which the lite load omits — fetch
+  // the full funnel once, the first time either tab is opened.
+  useEffect(() => {
+    if (activeTab !== "cockpit" && activeTab !== "analytics") return;
+    if (!isAuthReady || !funnelId || fullFunnel || fullLoadStartedRef.current) return;
+    fullLoadStartedRef.current = true;
+    let cancelled = false;
+    void getFunnelById(funnelId)
+      .then((data) => { if (!cancelled) setFullFunnel(data); })
+      .catch(() => { fullLoadStartedRef.current = false; });
+    return () => { cancelled = true; };
+  }, [activeTab, isAuthReady, funnelId, fullFunnel]);
 
   // Keep the session cache in sync with any local mutation (status change,
   // edit, lead patch) so navigating away and back shows the latest state.
@@ -296,19 +316,25 @@ export default function FunnelDetailPage() {
       )}
 
       {activeTab === "cockpit" && (
-        <CockpitView
-          cockpit={funnel.cockpit}
-          funnelId={funnel.id}
-          onActionExecuted={() => void loadFunnel()}
-        />
+        fullFunnel ? (
+          <CockpitView
+            cockpit={fullFunnel.cockpit}
+            funnelId={funnel.id}
+            onActionExecuted={() => { setFullFunnel(null); fullLoadStartedRef.current = false; void loadFunnel(); }}
+          />
+        ) : (
+          <div className="rounded-[14px] border border-border-subtle bg-surface p-6">
+            <p className="text-[12px] text-ink-muted">Loading cockpit…</p>
+          </div>
+        )
       )}
 
       {activeTab === "analytics" && (
         <div className="space-y-6">
           <AnalyticsView
-            metrics={funnel.metrics}
-            analyticsSteps={funnel.analyticsSteps}
-            sources={funnel.sources}
+            metrics={(fullFunnel ?? funnel).metrics}
+            analyticsSteps={(fullFunnel ?? funnel).analyticsSteps}
+            sources={(fullFunnel ?? funnel).sources}
           />
           <div>
             <h3 className="text-[13px] font-semibold text-ink mb-3">Email performance</h3>

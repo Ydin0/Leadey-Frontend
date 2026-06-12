@@ -52,7 +52,10 @@ export default function LeadViewPage() {
     if (!funnelCache.has(funnelId)) setLoading(true);
     setError(null);
     try {
-      const data = await getFunnelById(funnelId);
+      // Lite load — only the lead being viewed comes back with its full events /
+      // description / custom fields; the rest are light (for nav + contacts).
+      // This keeps even a 5k-lead campaign fast to open.
+      const data = await getFunnelById(funnelId, { lite: true, fullLeadId: leadId });
       funnelCache.set(funnelId, data);
       setFunnel(data);
     } catch (err) {
@@ -64,7 +67,7 @@ export default function LeadViewPage() {
     } finally {
       setLoading(false);
     }
-  }, [funnelId]);
+  }, [funnelId, leadId]);
 
   useEffect(() => {
     if (!isAuthReady) return;

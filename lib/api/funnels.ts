@@ -224,8 +224,20 @@ export async function listFunnels(): Promise<Funnel[]> {
   return data.map(hydrateFunnel);
 }
 
-export async function getFunnelById(funnelId: string): Promise<Funnel> {
-  const data = await apiRequest<ApiFunnel>(`/funnels/${encodeURIComponent(funnelId)}`);
+/** Fetch a campaign. Pass `{ lite: true, fullLeadId }` to skip the heavy
+ *  per-lead events/description/custom-fields for every lead except the one being
+ *  viewed — a big speed-up for campaigns with thousands of leads. */
+export async function getFunnelById(
+  funnelId: string,
+  opts?: { lite?: boolean; fullLeadId?: string | null },
+): Promise<Funnel> {
+  const params = new URLSearchParams();
+  if (opts?.lite) params.set("lite", "1");
+  if (opts?.fullLeadId) params.set("fullLeadId", opts.fullLeadId);
+  const qs = params.toString();
+  const data = await apiRequest<ApiFunnel>(
+    `/funnels/${encodeURIComponent(funnelId)}${qs ? `?${qs}` : ""}`,
+  );
   return hydrateFunnel(data);
 }
 

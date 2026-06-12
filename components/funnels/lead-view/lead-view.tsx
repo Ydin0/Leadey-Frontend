@@ -69,24 +69,30 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
 
   const currentLead = useMemo(() => leads.find((l) => l.id === leadId) || null, [leads, leadId]);
 
-  // ── Prev / next lead navigation (buttons + arrow keys) ──
-  // Build a deduped, stable ordering and an O(1) index lookup so position can't
-  // jump around on a huge list (duplicate ids / unstable findIndex were the
-  // source of the "skips to a random number" bug).
-  const orderedIds = useMemo(() => {
-    const seen = new Set<string>();
-    const ids: string[] = [];
-    for (const l of leads) if (!seen.has(l.id)) { seen.add(l.id); ids.push(l.id); }
-    return ids;
+  // ── Prev / next navigation — by COMPANY, not by individual contact ──
+  // The lead view shows a company with all its contacts, so several leads map
+  // to one card. Navigation walks distinct companies (landing on each one's
+  // first lead in sorted order) instead of cycling through every contact of the
+  // same company. Built once over a stable, deduped ordering.
+  const companyNav = useMemo(() => {
+    const reps: string[] = []; // representative leadId per company, in order
+    const keyToGroup = new Map<string, number>();
+    const groupByLeadId = new Map<string, number>();
+    for (const l of leads) {
+      const key = (l.company || "").trim().toLowerCase() || `__lead_${l.id}`;
+      let gi = keyToGroup.get(key);
+      if (gi === undefined) {
+        gi = reps.length;
+        reps.push(l.id);
+        keyToGroup.set(key, gi);
+      }
+      groupByLeadId.set(l.id, gi);
+    }
+    return { reps, groupByLeadId };
   }, [leads]);
-  const indexById = useMemo(() => {
-    const m = new Map<string, number>();
-    orderedIds.forEach((id, i) => m.set(id, i));
-    return m;
-  }, [orderedIds]);
-  const currentIndex = indexById.get(leadId) ?? -1;
-  const prevId = currentIndex > 0 ? orderedIds[currentIndex - 1] : null;
-  const nextId = currentIndex >= 0 && currentIndex < orderedIds.length - 1 ? orderedIds[currentIndex + 1] : null;
+  const currentIndex = companyNav.groupByLeadId.get(leadId) ?? -1;
+  const prevId = currentIndex > 0 ? companyNav.reps[currentIndex - 1] : null;
+  const nextId = currentIndex >= 0 && currentIndex < companyNav.reps.length - 1 ? companyNav.reps[currentIndex + 1] : null;
 
   // One navigation per intent: a lock blocks key auto-repeat / rapid clicks
   // from skipping several leads at once. It releases when the new lead mounts.
@@ -193,7 +199,9 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
   }, [leads, currentLead]);
 
   const realCompany = useMemo<FunnelLeadCompany | null>(() => {
-    const l = companyFirstLead || currentLead;
+    // Prefer the current lead — in a lite load it's the only one with the full
+    // company description / fields; the other contacts come back light.
+    const l = currentLead || companyFirstLead;
     if (!l) return null;
     const domain = l.companyDomain || (l.email?.includes("@") ? l.email.split("@")[1] : "") || "";
     return {
@@ -516,7 +524,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
       </div>
 
       {/* Prev / next lead navigation — bottom right (also ← / → keys) */}
-      {orderedIds.length > 1 && currentIndex >= 0 && (
+      {companyNav.reps.length > 1 && currentIndex >= 0 && (
         <div className="fixed bottom-6 right-6 z-30 flex items-center gap-1 rounded-full bg-surface border border-border-default shadow-xl px-1.5 py-1.5">
           <button
             onClick={() => goToLeadId(prevId)}
@@ -527,7 +535,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
             <ChevronLeft size={16} strokeWidth={2} />
           </button>
           <span className="text-[11px] text-ink-muted tabular-nums px-1.5 select-none">
-            {currentIndex + 1} / {orderedIds.length}
+            {currentIndex + 1} / {companyNav.reps.length}
           </span>
           <button
             onClick={() => goToLeadId(nextId)}
