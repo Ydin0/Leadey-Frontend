@@ -52,7 +52,9 @@ export default function DashboardPage() {
       const [repData, dashData, oppData, pipelineData] = await Promise.all([
         getRepDashboard(),
         getDashboard(),
-        listOpportunities({ summary: true }),
+        // The cockpit is the rep's command-center — show THEIR pipeline, not the
+        // whole team's.
+        listOpportunities({ summary: true, ownerId: user?.id }),
         listPipelines(),
       ]);
       setRep(repData);
@@ -66,7 +68,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     if (!isAuthReady) return;

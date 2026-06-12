@@ -8,6 +8,7 @@ import { PipelineBoard } from "@/components/opportunities/pipeline-board";
 import { PipelineTabs } from "@/components/opportunities/pipeline-tabs";
 import { PipelineStatsBar } from "@/components/opportunities/pipeline-stats-bar";
 import { OpportunityFilters } from "@/components/opportunities/opportunity-filters";
+import { useTeamMembers } from "@/hooks/use-team-members";
 import { listPipelines, listOpportunities, updateOpportunity } from "@/lib/api/opportunities";
 import type {
   Pipeline,
@@ -27,6 +28,19 @@ export default function OpportunitiesPage() {
 
   const [ownerFilter, setOwnerFilter] = useState<string | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Resolve each deal's owner to their initials so the card shows a colour-coded
+  // rep avatar (gradient keyed by ownerId).
+  const { resolveMember } = useTeamMembers();
+  const resolveOwnerInitials = useCallback(
+    (opp: Opportunity): string | null => {
+      if (!opp.ownerId) return null;
+      const name = resolveMember(opp.ownerId)?.name;
+      if (!name) return null;
+      return name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("") || null;
+    },
+    [resolveMember],
+  );
 
   // ── Load pipelines once auth is ready ──
   useEffect(() => {
@@ -167,6 +181,7 @@ export default function OpportunitiesPage() {
           pipeline={activePipeline}
           opportunities={opportunities}
           onMove={handleMove}
+          resolveOwnerInitials={resolveOwnerInitials}
         />
       )}
     </div>
