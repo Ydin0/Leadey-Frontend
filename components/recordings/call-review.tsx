@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Play, Pause, Loader2, AlertCircle, Sparkles, ListTree, ArrowRight } from "lucide-react";
+import { Play, Pause, Loader2, AlertCircle, Sparkles, ListTree, ArrowRight, Wand2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchCallRecordingBlobUrl } from "@/lib/api/phone-lines";
 import type { CallRecord } from "@/lib/types/calling";
@@ -16,10 +16,23 @@ function fmt(s: number): string {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
-export function CallReview({ record, initialDuration }: { record: CallRecord; initialDuration?: number }) {
+export function CallReview({
+  record,
+  initialDuration,
+  onRegenerate,
+  regenerating,
+}: {
+  record: CallRecord;
+  initialDuration?: number;
+  /** Re-run the (new) diarized pipeline — shown for legacy plain transcripts. */
+  onRegenerate?: () => void;
+  regenerating?: boolean;
+}) {
   const segments = useMemo(() => record.transcriptSegments ?? [], [record.transcriptSegments]);
   const speakers = useMemo(() => record.speakers ?? [], [record.speakers]);
   const summary = record.summaryStructured;
+  // A legacy record: has plain text but no diarized segments / structured summary.
+  const isLegacy = segments.length === 0 && !summary;
 
   const audioRef = useRef<HTMLAudioElement>(null);
   const blobUrlRef = useRef<string | null>(null);
@@ -137,6 +150,26 @@ export function CallReview({ record, initialDuration }: { record: CallRecord; in
   return (
     <div className="flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
       <audio ref={audioRef} preload="none" />
+
+      {/* Legacy transcript — offer an upgrade to the diarized/structured view. */}
+      {isLegacy && onRegenerate && (
+        <div className="flex items-center justify-between gap-3 rounded-[12px] border border-accent/25 bg-accent/[0.05] px-4 py-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Wand2 size={15} className="text-accent shrink-0" />
+            <span className="text-[12px] text-ink-secondary">
+              This is an older transcript. Re-transcribe to get colour-coded speakers, a structured AI summary & click-to-jump.
+            </span>
+          </div>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRegenerate(); }}
+            disabled={regenerating}
+            className="inline-flex items-center gap-1.5 rounded-full bg-ink text-on-ink px-3.5 py-1.5 text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 shrink-0"
+          >
+            {regenerating ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+            {regenerating ? "Re-transcribing…" : "Re-transcribe with speakers"}
+          </button>
+        </div>
+      )}
 
       {/* Player + talk-time */}
       <div className="rounded-[12px] border border-border-subtle bg-surface p-3">

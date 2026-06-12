@@ -239,6 +239,8 @@ export function RecordingsTable({
                           <CallReview
                             record={record}
                             initialDuration={record.recordingDuration || record.duration}
+                            onRegenerate={() => void generateTranscript(record)}
+                            regenerating={isGenerating}
                           />
                         ) : hasRecording ? (
                           <div className="flex items-center justify-between gap-3">
