@@ -104,6 +104,25 @@ export interface BundleDocument {
 export type CallDirection = "inbound" | "outbound" | "missed";
 export type CallDisposition = "completed" | "no-answer" | "busy" | "voicemail" | "failed";
 
+/** One diarized, timestamped line of the call transcript. */
+export interface TranscriptSegment {
+  speaker: string; // stable id ("A" / "B")
+  start: number; // seconds
+  end: number;
+  text: string;
+}
+export interface TranscriptSpeaker {
+  id: string;
+  name: string;
+  role: "rep" | "prospect" | "other";
+  talkPct: number; // 0-100
+}
+export interface CallSummaryStructured {
+  tldr: string[];
+  sections: { title: string; points: string[] }[];
+  nextSteps?: string[];
+}
+
 export interface CallRecord {
   id: string;
   direction: CallDirection;
@@ -119,6 +138,9 @@ export interface CallRecord {
   recordingDuration?: number;
   transcript?: string | null;
   summary?: string | null;
+  transcriptSegments?: TranscriptSegment[] | null;
+  speakers?: TranscriptSpeaker[] | null;
+  summaryStructured?: CallSummaryStructured | null;
   userId?: string | null;
   userName?: string | null;
   timestamp: string;

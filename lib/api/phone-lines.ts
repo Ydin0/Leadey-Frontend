@@ -161,8 +161,8 @@ export async function fetchCallRecordingBlobUrl(callRecordId: string): Promise<s
 
 export async function summarizeCall(
   callRecordId: string,
-): Promise<{ transcript: string | null; summary: string | null }> {
-  return apiRequest<{ transcript: string | null; summary: string | null }>(
+): Promise<Pick<CallRecord, "transcript" | "summary" | "transcriptSegments" | "speakers" | "summaryStructured">> {
+  return apiRequest(
     `/phone-lines/call-records/${callRecordId}/summarize`,
     { method: "POST" },
   );

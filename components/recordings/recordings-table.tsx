@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { AudioPlayer } from "./audio-player";
+import { CallReview } from "./call-review";
 import { summarizeCall } from "@/lib/api/phone-lines";
 import type { CallRecord } from "@/lib/types/calling";
 
@@ -66,6 +67,9 @@ export function RecordingsTable({
       onRecordUpdated?.(record.id, {
         transcript: result.transcript,
         summary: result.summary,
+        transcriptSegments: result.transcriptSegments,
+        speakers: result.speakers,
+        summaryStructured: result.summaryStructured,
       });
     } catch (err) {
       setGenError((prev) => ({ ...prev, [record.id]: err instanceof Error ? err.message : "Transcription failed" }));
@@ -231,25 +235,11 @@ export function RecordingsTable({
                             <Loader2 size={14} className="animate-spin" />
                             Transcribing &amp; summarizing this call…
                           </div>
-                        ) : record.transcript || record.summary ? (
-                          <>
-                            {record.summary && (
-                              <div className="mb-4">
-                                <h4 className="text-[11px] font-semibold text-ink uppercase tracking-wider mb-2">AI Summary</h4>
-                                <div className="text-[12px] text-ink-secondary leading-relaxed whitespace-pre-wrap">
-                                  {record.summary}
-                                </div>
-                              </div>
-                            )}
-                            {record.transcript && (
-                              <div>
-                                <h4 className="text-[11px] font-semibold text-ink uppercase tracking-wider mb-2">Transcript</h4>
-                                <div className="text-[11px] text-ink-muted leading-relaxed whitespace-pre-wrap max-h-72 overflow-y-auto">
-                                  {record.transcript}
-                                </div>
-                              </div>
-                            )}
-                          </>
+                        ) : record.transcriptSegments?.length || record.summaryStructured || record.transcript || record.summary ? (
+                          <CallReview
+                            record={record}
+                            initialDuration={record.recordingDuration || record.duration}
+                          />
                         ) : hasRecording ? (
                           <div className="flex items-center justify-between gap-3">
                             <span className={cn("text-[12px]", genError[record.id] ? "text-signal-red-text" : "text-ink-muted")}>

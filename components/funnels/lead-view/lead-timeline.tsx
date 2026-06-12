@@ -90,8 +90,8 @@ function CallCard({ record, actor }: { record: CallRecord; actor: Actor | null }
     setGenerating(true);
     try {
       const res = await summarizeCall(record.id);
-      setSummary(res.summary);
-      setTranscript(res.transcript);
+      setSummary(res.summary ?? null);
+      setTranscript(res.transcript ?? null);
     } catch (err) {
       console.error("Failed to summarize call:", err);
     } finally {
