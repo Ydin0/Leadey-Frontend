@@ -77,6 +77,9 @@ interface DialerContextValue {
   back: () => Promise<void>;
   pause: () => Promise<void>;
   resume: () => Promise<void>;
+  /** Auto-pause the countdown when the rep starts working the lead (clicks
+   *  email/text/note etc.) — Close-style. No-ops unless a countdown is live. */
+  pauseForEngagement: () => void;
   end: () => Promise<void>;
   /** Clear the finished session from the bar. */
   dismiss: () => void;
@@ -350,6 +353,13 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session, refresh]);
 
+  // Pause the auto-dial countdown the moment the rep starts working the lead.
+  // Only fires while a countdown is actually ticking, so it never interferes
+  // outside the wait window.
+  const pauseForEngagement = useCallback(() => {
+    if (mode === "running" && countdown !== null) void pause();
+  }, [mode, countdown, pause]);
+
   const end = useCallback(async () => {
     if (!session) return;
     setCountdown(null);
@@ -552,6 +562,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
         back,
         pause,
         resume,
+        pauseForEngagement,
         end,
         dismiss,
         dropVm,

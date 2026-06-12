@@ -19,6 +19,7 @@ import type { EmailReplyMode } from "./email-activity-card";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { useCallContext } from "@/components/calling/call-context";
+import { useDialerContext } from "@/components/dialer/context/dialer-context";
 import type { Funnel, FunnelLead, FunnelStep, FunnelLeadEvent } from "@/lib/types/funnel";
 import type {
   FunnelLeadActivity,
@@ -49,6 +50,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
   const router = useRouter();
   const { statuses } = useLeadStatuses();
   const { startCall, lastEndedCall } = useCallContext();
+  const { pauseForEngagement } = useDialerContext();
 
   const [statusOverride, setStatusOverride] = useState<Record<string, string>>({});
   const [progress, setProgress] = useState<Record<string, ProgressOverride>>({});
@@ -468,9 +470,9 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
         statuses={statuses}
         doNotCall={currentLead.doNotCall}
         onStatusChange={handleStatusChange}
-        onNote={() => setNoteOpen(true)}
-        onEmail={() => setShowComposer(true)}
-        onSms={() => setShowSms(true)}
+        onNote={() => { pauseForEngagement(); setNoteOpen(true); }}
+        onEmail={() => { pauseForEngagement(); setShowComposer(true); }}
+        onSms={() => { pauseForEngagement(); setShowSms(true); }}
         onCall={dialPrimary}
       />
 
@@ -487,10 +489,10 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
             contacts={companyContacts}
             customFields={realCustomFields}
             opportunityId={currentLead.opportunityId ?? null}
-            onConvert={() => setShowConvert(true)}
+            onConvert={() => { pauseForEngagement(); setShowConvert(true); }}
             onOpportunityChanged={() => onLeadsChanged?.()}
             onCall={(phone, name) => dial(phone, name)}
-            onEmail={(email) => { setReplyPrefill({ to: email, subject: "", body: "" }); setShowComposer(true); }}
+            onEmail={(email) => { pauseForEngagement(); setReplyPrefill({ to: email, subject: "", body: "" }); setShowComposer(true); }}
             onDnc={handleDnc}
             leads={leads}
             statuses={statuses}

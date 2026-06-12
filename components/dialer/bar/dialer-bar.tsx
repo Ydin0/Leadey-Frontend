@@ -1,11 +1,11 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import {
   PhoneCall,
   PhoneOff,
   Pause,
   Play,
-  SkipForward,
   SkipBack,
   Mic,
   MicOff,
@@ -13,6 +13,8 @@ import {
   Check,
   ExternalLink,
   Timer,
+  ArrowRight,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useDialerContext } from "@/components/dialer/context/dialer-context";
@@ -111,14 +113,21 @@ export function DialerBar() {
               )}
             </div>
 
-            {/* Status pill — click during the countdown to dial now. */}
+            {/* Call-state pill (connected / calling / paused). */}
             <StatusPill
               connected={connected}
               ringing={activeCall?.state === "ringing"}
               duration={activeCall?.duration ?? 0}
-              countdown={countdown}
               paused={mode === "paused"}
-              onDialNow={() => dialer.startNext()}
+            />
+
+            {/* Animated "Next Call" button — fills as the countdown runs down. */}
+            <NextCallButton
+              counting={mode === "running" && !inCall && countdown !== null && autoAdvanceSeconds > 0}
+              countdown={countdown}
+              total={autoAdvanceSeconds}
+              inCall={inCall}
+              onClick={() => (inCall ? void dialer.nextNow() : dialer.startNext())}
             />
 
             {/* Controls */}
@@ -159,13 +168,6 @@ export function DialerBar() {
                 </IconButton>
               )}
 
-              <IconButton
-                title="Next call — dial the next lead now (S)"
-                onClick={() => void dialer.nextNow()}
-              >
-                <SkipForward size={14} />
-              </IconButton>
-
               {inCall ? (
                 <>
                   {connected && (
@@ -195,7 +197,7 @@ export function DialerBar() {
                 </IconButton>
               )}
 
-              <WaitSelector
+              <WaitDropdown
                 seconds={autoAdvanceSeconds}
                 onChange={dialer.setAutoAdvanceSeconds}
               />
@@ -228,90 +230,124 @@ function StatusPill({
   connected,
   ringing,
   duration,
-  countdown,
   paused,
-  onDialNow,
 }: {
   connected: boolean;
   ringing: boolean;
   duration: number;
-  countdown: number | null;
   paused: boolean;
-  onDialNow?: () => void;
 }) {
+  // Only shown for active call / paused states — the countdown lives in the
+  // animated Next Call button now.
   let label: string;
-  let tone: "green" | "blue" | "slate" | "amber";
-  const counting = !connected && !ringing && !paused && countdown !== null;
-
-  if (connected) {
-    label = `Connected · ${formatDuration(duration)}`;
-    tone = "green";
-  } else if (ringing) {
-    label = "Calling…";
-    tone = "blue";
-  } else if (paused) {
-    label = "Paused";
-    tone = "amber";
-  } else if (countdown !== null) {
-    label = `Next in ${countdown}s · dial now`;
-    tone = "blue";
-  } else {
-    label = "Ready";
-    tone = "slate";
-  }
+  let tone: "green" | "blue" | "amber" | null = null;
+  if (connected) { label = `Connected · ${formatDuration(duration)}`; tone = "green"; }
+  else if (ringing) { label = "Calling…"; tone = "blue"; }
+  else if (paused) { label = "Paused"; tone = "amber"; }
+  else return null;
 
   const toneClass = {
     green: "bg-signal-green/15 text-signal-green-text",
     blue: "bg-signal-blue/15 text-signal-blue-text",
-    slate: "bg-section text-ink-muted",
     amber: "bg-amber-500/15 text-amber-600",
   }[tone];
 
-  const className = cn(
-    "shrink-0 text-[11px] font-medium rounded-full px-2.5 py-1 tabular-nums",
-    toneClass,
-    counting && "cursor-pointer hover:brightness-95",
+  return (
+    <span className={cn("shrink-0 text-[11px] font-medium rounded-full px-2.5 py-1 tabular-nums", toneClass)}>
+      {label}
+    </span>
   );
-
-  if (counting && onDialNow) {
-    return (
-      <button
-        type="button"
-        title="Dial the current lead now (skip the wait)"
-        onClick={onDialNow}
-        className={className}
-      >
-        {label}
-      </button>
-    );
-  }
-
-  return <span className={className}>{label}</span>;
 }
 
-/** Compact cycle button for the auto-dial wait: Off → 3s → 5s → 10s. */
-function WaitSelector({
+/** Pill that visually fills as the auto-dial countdown runs down. Click to dial
+ *  now (or, mid-call, to hang up and move to the next lead). */
+function NextCallButton({
+  counting,
+  countdown,
+  total,
+  inCall,
+  onClick,
+}: {
+  counting: boolean;
+  countdown: number | null;
+  total: number;
+  inCall: boolean;
+  onClick: () => void;
+}) {
+  const progress =
+    counting && total > 0 ? Math.max(0, Math.min(100, ((total - (countdown ?? 0)) / total) * 100)) : 0;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={counting ? "Dial now — skip the wait" : inCall ? "Hang up & go to the next lead" : "Dial the next lead"}
+      className="relative shrink-0 overflow-hidden inline-flex items-center rounded-full bg-signal-blue/15 text-signal-blue-text px-4 py-1.5 text-[12px] font-semibold hover:brightness-95 transition-[filter]"
+    >
+      {/* Fill — animates smoothly between the 1s countdown ticks. */}
+      <span
+        aria-hidden
+        className="absolute inset-y-0 left-0 bg-signal-blue/35"
+        style={{ width: `${progress}%`, transition: counting ? "width 1s linear" : "none" }}
+      />
+      <span className="relative z-10 inline-flex items-center gap-1.5">
+        {inCall ? "Next" : "Next Call"}
+        {counting && countdown !== null && <span className="tabular-nums opacity-80">· {countdown}s</span>}
+        <ArrowRight size={13} strokeWidth={2.5} />
+      </span>
+    </button>
+  );
+}
+
+/** Dropdown to choose the auto-dial wait between calls (default 5s). */
+function WaitDropdown({
   seconds,
   onChange,
 }: {
   seconds: number;
   onChange: (seconds: number) => void;
 }) {
-  const STEPS = [0, 3, 5, 10];
-  const next = () => {
-    const i = STEPS.indexOf(seconds);
-    onChange(STEPS[(i + 1) % STEPS.length] ?? 5);
-  };
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const OPTIONS = [0, 3, 5, 8, 10, 15];
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
   return (
-    <button
-      type="button"
-      onClick={next}
-      title="Wait between calls before auto-dialing (click to change). Off = manual."
-      className="flex items-center gap-1 px-2.5 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle tabular-nums"
-    >
-      <Timer size={12} strokeWidth={2} />
-      {seconds === 0 ? "Off" : `${seconds}s`}
-    </button>
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        title="Wait between calls before auto-dialing"
+        className="flex items-center gap-1 px-2.5 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle tabular-nums"
+      >
+        <Timer size={12} strokeWidth={2} />
+        {seconds === 0 ? "Off" : `${seconds}s`}
+        <ChevronDown size={11} className={cn("transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1.5 z-50 min-w-[140px] bg-surface border border-border-default rounded-[10px] shadow-lg shadow-black/20 p-1.5">
+          <p className="px-2 py-1 text-[10px] uppercase tracking-wider text-ink-muted font-medium">Wait between calls</p>
+          {OPTIONS.map((s) => (
+            <button
+              key={s}
+              onClick={() => { onChange(s); setOpen(false); }}
+              className={cn(
+                "flex items-center justify-between w-full rounded-md px-2.5 py-1.5 text-[12px] transition-colors",
+                s === seconds ? "bg-section text-ink" : "text-ink-secondary hover:bg-hover",
+              )}
+            >
+              {s === 0 ? "Manual (off)" : `${s} seconds`}
+              {s === seconds && <Check size={13} />}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
