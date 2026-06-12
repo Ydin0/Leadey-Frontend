@@ -155,6 +155,21 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
   const mappingPayload = (): CsvColumnMapping[] =>
     mappings.map((m) => ({ csvColumn: m.csvColumn, mappedField: m.mappedField, autoMapped: m.autoMapped }));
 
+  // Send only the columns that are actually mapped (and only non-empty values).
+  // Skipped columns are dead weight — trimming them keeps large imports (5k+
+  // rows) well under the request-body limit.
+  const payloadRows = (): Record<string, string>[] => {
+    const cols = mappings.filter((m) => m.mappedField !== "--- Skip ---").map((m) => m.csvColumn);
+    return csvRows.map((r) => {
+      const o: Record<string, string> = {};
+      for (const c of cols) {
+        const v = r[c];
+        if (v) o[c] = v;
+      }
+      return o;
+    });
+  };
+
   const mappedSet = new Set(mappings.map((m) => m.mappedField));
   const missingRequired = REQUIRED.filter((f) => !mappedSet.has(f));
   const canProceed = missingRequired.length === 0;
@@ -163,7 +178,7 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
     setLoadingReview(true);
     setError(null);
     try {
-      const r = await importCsvLeads(funnelId, { fileName, mappings: mappingPayload(), rows: csvRows, groupBy: gb, dryRun: true });
+      const r = await importCsvLeads(funnelId, { fileName, mappings: mappingPayload(), rows: payloadRows(), groupBy: gb, dryRun: true });
       setReview(r);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not preview import");
@@ -188,7 +203,7 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
     setError(null);
     setIsImporting(true);
     try {
-      const r = await importCsvLeads(funnelId, { fileName, mappings: mappingPayload(), rows: csvRows, groupBy });
+      const r = await importCsvLeads(funnelId, { fileName, mappings: mappingPayload(), rows: payloadRows(), groupBy });
       setResult(r);
       setStep("done");
       onImported?.();
