@@ -34,6 +34,22 @@ export function DialerBar() {
   const connected = activeCall?.state === "connected";
   const completed = session.status === "completed" || (!currentItem && !inCall);
 
+  // During a LIVE call show who's actually on the line — resolved from the call
+  // itself (incl. inbound callers / dial-pad calls), not the outbound queue
+  // item. Between calls, show the next queued lead. This is why a connected call
+  // used to render blank: the bar was always reading `currentItem`.
+  const isInbound = inCall && activeCall?.direction === "inbound";
+  const callPhone = activeCall
+    ? activeCall.direction === "inbound"
+      ? activeCall.from
+      : activeCall.to
+    : null;
+  const displayName = inCall
+    ? activeCall?.contactName || callPhone || "Unknown caller"
+    : currentItem?.lead?.name || "—";
+  const displayCompany = inCall ? activeCall?.companyName || null : currentItem?.lead?.company || null;
+  const displayPhone = inCall ? callPhone : currentItem?.leadPhone || null;
+
   return (
     <div className="sticky top-14 z-30 mx-0">
       <div className="flex items-center gap-3 px-4 py-2 bg-surface border-b border-border-default shadow-sm">
@@ -68,22 +84,27 @@ export function DialerBar() {
           </>
         ) : (
           <>
-            {/* Current lead */}
+            {/* Who's on the line (live call) or the next queued lead */}
             <div className="flex items-center gap-2 flex-1 min-w-0">
+              {isInbound && (
+                <span className="text-[9px] uppercase tracking-wide font-semibold text-signal-blue-text bg-signal-blue/10 px-1.5 py-0.5 rounded-full shrink-0">
+                  Incoming
+                </span>
+              )}
               <span className="text-[12px] font-semibold text-ink truncate">
-                {currentItem?.lead?.name || "—"}
+                {displayName}
               </span>
-              {currentItem?.lead?.company && (
+              {displayCompany && (
                 <span className="text-[11px] text-ink-muted truncate">
-                  · {currentItem.lead.company}
+                  · {displayCompany}
                 </span>
               )}
-              {currentItem?.leadPhone && (
+              {displayPhone && (
                 <span className="text-[11px] text-ink-muted font-mono tabular-nums truncate">
-                  · {currentItem.leadPhone}
+                  · {displayPhone}
                 </span>
               )}
-              {currentItem?.lead?.doNotCall && (
+              {!inCall && currentItem?.lead?.doNotCall && (
                 <span className="text-[9px] uppercase tracking-wide font-semibold text-signal-red-text bg-signal-red/10 px-1.5 py-0.5 rounded-full shrink-0">
                   DNC
                 </span>
