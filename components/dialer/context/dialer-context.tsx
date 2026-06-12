@@ -112,6 +112,10 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // True while advance() is mid-flight (recording the call + fetching the next
+  // contact). Auto-dial is blocked until it settles so the countdown can never
+  // re-arm on the just-called contact and dial them again.
+  const [advancing, setAdvancing] = useState(false);
 
   // Load persisted preferences once on the client.
   useEffect(() => {
@@ -140,6 +144,10 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   // Tracks the lead id we last navigated to in follow mode, so we can tell a
   // lead change (re-navigate) apart from the user navigating away (stop).
   const lastNavLeadRef = useRef<string | null>(null);
+  // The queue item the dialer last placed a call to. The auto-dialer refuses to
+  // dial the same item twice in a row, so a stale countdown can never re-call a
+  // contact whose call already ended.
+  const lastDialedItemIdRef = useRef<string | null>(null);
 
   const subscribedCallSidRef = useRef<string | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
@@ -247,6 +255,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       if (call.activeCall) return;
       if (item.lead?.doNotCall && !confirmDncCall(item.lead?.name)) return;
       setCountdown(null);
+      lastDialedItemIdRef.current = item.id;
       call.startCall(item.leadPhone, {
         contactName: item.lead?.name || null,
         companyName: item.lead?.company || null,
@@ -262,6 +271,8 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
 
   const advance = useCallback(async () => {
     if (!session) return;
+    // Hold off auto-dial until the next contact is actually loaded.
+    setAdvancing(true);
     try {
       const callRecordId = call.lastEndedCall?.callRecordId || undefined;
       await advanceSession(session.id, { callRecordId });
@@ -270,6 +281,8 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       // Network blip on the POST — re-read to reconcile rather than stick a
       // raw "Failed to fetch" banner (the advance may have applied).
       await reconcile(session.id);
+    } finally {
+      setAdvancing(false);
     }
   }, [session, call.lastEndedCall, refresh, reconcile]);
 
@@ -455,6 +468,10 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     !!currentItem &&
     !call.activeCall &&
     !call.incomingCall &&
+    !advancing &&
+    // Never auto-dial the contact we just called — if the queue hasn't moved on
+    // yet (advance still settling, or it failed), wait rather than re-dial them.
+    currentItem?.id !== lastDialedItemIdRef.current &&
     autoAdvanceSeconds > 0;
   // Live mirror of the gating condition. The interval below re-checks this on
   // every tick so a Pause (or an incoming/active call) that lands mid-countdown
