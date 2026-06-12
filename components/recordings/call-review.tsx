@@ -6,8 +6,9 @@ import { cn } from "@/lib/utils";
 import { fetchCallRecordingBlobUrl } from "@/lib/api/phone-lines";
 import type { CallRecord } from "@/lib/types/calling";
 
-// Per-speaker accent palette (id order). First = rep-ish violet, second = blue.
-const SPEAKER_COLORS = ["#8B5CF6", "#3B82F6", "#10B981", "#F59E0B", "#EC4899", "#06B6D4"];
+// Soft, on-brand pastels (the Leadey avatar palette) so the two speakers read as
+// part of the design rather than loud violet/blue.
+const SPEAKER_COLORS = ["#8C9AE0", "#E0A878", "#6FBEA8", "#E08FA8", "#9B8FE0", "#7FA8D6"];
 
 function fmt(s: number): string {
   if (!Number.isFinite(s) || s < 0) s = 0;
