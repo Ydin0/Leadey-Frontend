@@ -1,5 +1,5 @@
-import { LeadsPageShell } from "@/components/leads/leads-page-shell";
+import { GlobalLeadsShell } from "@/components/leads/global-leads-shell";
 
 export default function LeadsPage() {
-  return <LeadsPageShell />;
+  return <GlobalLeadsShell />;
 }
