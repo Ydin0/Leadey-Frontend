@@ -39,6 +39,8 @@ interface LeadDetailsColumnProps {
   onConvert: () => void;
   onOpportunityChanged: () => void;
   onCall: (phone: string, name: string) => void;
+  /** Opens the in-app email composer addressed to this contact. */
+  onEmail: (email: string, name: string) => void;
   onDnc: (contactId: string, value: boolean) => void | Promise<void>;
   leads: FunnelLead[];
   statuses: LeadStatusOption[];
@@ -58,10 +60,12 @@ function initials(name: string): string {
 function ContactRow({
   c,
   onCall,
+  onEmail,
   onDnc,
 }: {
   c: FunnelLeadContact;
   onCall: (phone: string, name: string) => void;
+  onEmail: (email: string, name: string) => void;
   onDnc?: (contactId: string, value: boolean) => void | Promise<void>;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -110,13 +114,11 @@ function ContactRow({
         </div>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
           {c.email && (
-            <a
-              href={`mailto:${c.email}`}
-              className="flex items-center justify-center w-[22px] h-[22px] rounded-md text-ink-muted hover:bg-hover hover:text-ink-secondary transition-colors"
-              title={c.email}
-            >
-              <Mail size={13} />
-            </a>
+            <MiniBtn
+              icon={Mail}
+              title={`Email ${c.email}`}
+              onClick={() => onEmail(c.email as string, c.name)}
+            />
           )}
           {c.phone && <MiniBtn icon={Phone} title={`Call ${c.phone}`} onClick={call} />}
           {onDnc && (
@@ -179,6 +181,7 @@ export function LeadDetailsColumn({
   onConvert,
   onOpportunityChanged,
   onCall,
+  onEmail,
   onDnc,
   leads,
   statuses,
@@ -273,7 +276,7 @@ export function LeadDetailsColumn({
           <Section icon={Users} title="Contacts" count={contacts.length}>
             <div className="flex flex-col">
               {contacts.length ? (
-                contacts.map((c) => <ContactRow key={c.id} c={c} onCall={onCall} onDnc={onDnc} />)
+                contacts.map((c) => <ContactRow key={c.id} c={c} onCall={onCall} onEmail={onEmail} onDnc={onDnc} />)
               ) : (
                 <p className="text-[12px] text-ink-faint px-1">No other contacts at this company.</p>
               )}

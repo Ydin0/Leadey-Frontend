@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LeadActionBar } from "./lead-action-bar";
@@ -70,16 +70,36 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
   const currentLead = useMemo(() => leads.find((l) => l.id === leadId) || null, [leads, leadId]);
 
   // ── Prev / next lead navigation (buttons + arrow keys) ──
-  const currentIndex = useMemo(() => leads.findIndex((l) => l.id === leadId), [leads, leadId]);
-  const prevLead = currentIndex > 0 ? leads[currentIndex - 1] : null;
-  const nextLead = currentIndex >= 0 && currentIndex < leads.length - 1 ? leads[currentIndex + 1] : null;
+  // Build a deduped, stable ordering and an O(1) index lookup so position can't
+  // jump around on a huge list (duplicate ids / unstable findIndex were the
+  // source of the "skips to a random number" bug).
+  const orderedIds = useMemo(() => {
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const l of leads) if (!seen.has(l.id)) { seen.add(l.id); ids.push(l.id); }
+    return ids;
+  }, [leads]);
+  const indexById = useMemo(() => {
+    const m = new Map<string, number>();
+    orderedIds.forEach((id, i) => m.set(id, i));
+    return m;
+  }, [orderedIds]);
+  const currentIndex = indexById.get(leadId) ?? -1;
+  const prevId = currentIndex > 0 ? orderedIds[currentIndex - 1] : null;
+  const nextId = currentIndex >= 0 && currentIndex < orderedIds.length - 1 ? orderedIds[currentIndex + 1] : null;
 
-  const goToLead = useCallback(
-    (lead: FunnelLead | null) => {
+  // One navigation per intent: a lock blocks key auto-repeat / rapid clicks
+  // from skipping several leads at once. It releases when the new lead mounts.
+  const navLockRef = useRef(false);
+  useEffect(() => { navLockRef.current = false; }, [leadId]);
+  const goToLeadId = useCallback(
+    (id: string | null) => {
+      if (!id || id === leadId || navLockRef.current) return;
+      navLockRef.current = true;
       // scroll:false keeps the viewport steady so prev/next feels instant.
-      if (lead) router.push(`/dashboard/funnels/${funnelId}/leads/${lead.id}`, { scroll: false });
+      router.push(`/dashboard/funnels/${funnelId}/leads/${id}`, { scroll: false });
     },
-    [router, funnelId],
+    [router, funnelId, leadId],
   );
 
   // ── Real per-lead call records (audio + AI summary in the timeline) ──
@@ -117,20 +137,27 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
   }, [lastEndedCall, leadId, reloadCalls]);
 
   // ← / → arrow keys jump between leads — ignored while typing or with a
-  // modal/composer open.
+  // modal/composer open. The handler reads the latest prev/next from a ref
+  // (never a stale closure) and ignores key auto-repeat so holding a key can't
+  // fly through the list.
+  const navRef = useRef<{ prevId: string | null; nextId: string | null; blocked: boolean }>({ prevId, nextId, blocked: false });
+  navRef.current = { prevId, nextId, blocked: showComposer || showSms || noteOpen || showConvert };
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (showComposer || noteOpen || showConvert) return;
+      if (e.repeat) return;
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      const { prevId, nextId, blocked } = navRef.current;
+      if (blocked) return;
       const el = document.activeElement as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable)) {
         return;
       }
-      if (e.key === "ArrowLeft") goToLead(prevLead);
-      else if (e.key === "ArrowRight") goToLead(nextLead);
+      e.preventDefault();
+      goToLeadId(e.key === "ArrowLeft" ? prevId : nextId);
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [goToLead, prevLead, nextLead, showComposer, noteOpen, showConvert]);
+  }, [goToLeadId]);
 
   const leadProgress = currentLead ? progress[currentLead.id] : undefined;
   const currentStatus = currentLead
@@ -455,6 +482,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
             onConvert={() => setShowConvert(true)}
             onOpportunityChanged={() => onLeadsChanged?.()}
             onCall={(phone, name) => dial(phone, name)}
+            onEmail={(email) => { setReplyPrefill({ to: email, subject: "", body: "" }); setShowComposer(true); }}
             onDnc={handleDnc}
             leads={leads}
             statuses={statuses}
@@ -488,22 +516,22 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
       </div>
 
       {/* Prev / next lead navigation — bottom right (also ← / → keys) */}
-      {leads.length > 1 && currentIndex >= 0 && (
+      {orderedIds.length > 1 && currentIndex >= 0 && (
         <div className="fixed bottom-6 right-6 z-30 flex items-center gap-1 rounded-full bg-surface border border-border-default shadow-xl px-1.5 py-1.5">
           <button
-            onClick={() => goToLead(prevLead)}
-            disabled={!prevLead}
+            onClick={() => goToLeadId(prevId)}
+            disabled={!prevId}
             title="Previous lead (←)"
             className="flex items-center justify-center w-8 h-8 rounded-full text-ink-secondary hover:bg-hover transition-colors disabled:opacity-30 disabled:pointer-events-none"
           >
             <ChevronLeft size={16} strokeWidth={2} />
           </button>
           <span className="text-[11px] text-ink-muted tabular-nums px-1.5 select-none">
-            {currentIndex + 1} / {leads.length}
+            {currentIndex + 1} / {orderedIds.length}
           </span>
           <button
-            onClick={() => goToLead(nextLead)}
-            disabled={!nextLead}
+            onClick={() => goToLeadId(nextId)}
+            disabled={!nextId}
             title="Next lead (→)"
             className="flex items-center justify-center w-8 h-8 rounded-full text-ink-secondary hover:bg-hover transition-colors disabled:opacity-30 disabled:pointer-events-none"
           >
