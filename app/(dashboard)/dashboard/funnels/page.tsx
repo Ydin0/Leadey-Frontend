@@ -10,6 +10,7 @@ import {
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { listFunnels } from "@/lib/api/funnels";
 import { useTeamMembers } from "@/hooks/use-team-members";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { cn } from "@/lib/utils";
 import type { Funnel, FunnelChannel, FunnelStatus } from "@/lib/types/funnel";
 
@@ -126,6 +127,7 @@ export default function FunnelsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { members: allMembers, resolveMember } = useTeamMembers();
+  const isAuthReady = useAuthReady();
 
   // Filter state
   const [search, setSearch] = useState("");
@@ -149,7 +151,12 @@ export default function FunnelsPage() {
     }
   }, []);
 
-  useEffect(() => { void loadFunnels(); }, [loadFunnels]);
+  // Wait for the org-scoped auth token before fetching — firing too early
+  // (e.g. on a hard browser refresh) makes the request 404 "Not Found".
+  useEffect(() => {
+    if (!isAuthReady) return;
+    void loadFunnels();
+  }, [isAuthReady, loadFunnels]);
 
   // Close the sort menu on outside click.
   useEffect(() => {
