@@ -341,12 +341,14 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     if (!session) return;
     setMode("running");
     try {
-      const updated = await resumeSession(session.id);
-      setSession(updated);
+      await resumeSession(session.id);
+      // Re-sync the current item so we continue from exactly where we paused
+      // (and pick up anything advanced from another tab) — never from the top.
+      await refresh(session.id);
     } catch {
       // local resume still applies
     }
-  }, [session]);
+  }, [session, refresh]);
 
   const end = useCallback(async () => {
     if (!session) return;
