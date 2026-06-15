@@ -291,4 +291,10 @@ export interface IncomingCallInfo {
   lineNumber: string;
   /** Friendly name of that line, if known. */
   lineName: string | null;
+  /** Resolved caller identity (matched to a lead/contact by number), filled in
+   *  shortly after the call starts ringing so the rep can see WHO is calling. */
+  contactName?: string | null;
+  companyName?: string | null;
+  leadId?: string | null;
+  funnelId?: string | null;
 }

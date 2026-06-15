@@ -47,13 +47,26 @@ export function IncomingCallPrompt() {
               Incoming call
             </p>
             <p className="text-[14px] font-semibold text-ink truncate">
-              {formatPhoneIntl(incomingCall.fromNumber) || "Unknown caller"}
+              {incomingCall.contactName || formatPhoneIntl(incomingCall.fromNumber) || "Unknown caller"}
             </p>
-            {lineLabel && (
-              <p className="text-[11px] text-ink-muted truncate">to {lineLabel}</p>
-            )}
+            <p className="text-[11px] text-ink-muted truncate">
+              {[
+                incomingCall.companyName,
+                incomingCall.contactName ? formatPhoneIntl(incomingCall.fromNumber) : null,
+                lineLabel ? `to ${lineLabel}` : null,
+              ].filter(Boolean).join(" · ") || formatPhoneIntl(incomingCall.fromNumber)}
+            </p>
           </div>
         </div>
+
+        {incomingCall.leadId && incomingCall.funnelId && (
+          <Link
+            href={`/dashboard/funnels/${incomingCall.funnelId}/leads/${incomingCall.leadId}`}
+            className="mt-2.5 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle"
+          >
+            <ExternalLink size={11} /> Open lead
+          </Link>
+        )}
 
         <div className="flex items-center gap-2 mt-4">
           <button

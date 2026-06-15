@@ -207,12 +207,29 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         // let the rep accept/reject via acceptIncoming()/rejectIncoming().
         device.on("incoming", (call: Call) => {
           incomingCallRef.current = call;
+          const fromNumber = call.parameters?.From || "";
+          const callId = call.parameters?.CallSid || `in_${Date.now()}`;
           setIncomingCall({
-            callId: call.parameters?.CallSid || `in_${Date.now()}`,
-            fromNumber: call.parameters?.From || "",
+            callId,
+            fromNumber,
             lineNumber: call.parameters?.To || "",
             lineName: null,
           });
+          // Resolve WHO is calling (match the number to a lead/contact) and show
+          // it on the ringing prompt — the rep should never have to answer blind.
+          if (fromNumber) {
+            resolveCaller(fromNumber)
+              .then((r) => {
+                if (incomingCallRef.current !== call) return; // already ended/answered
+                if (!r.name && !r.company && !r.leadId) return;
+                setIncomingCall((prev) =>
+                  prev && prev.callId === callId
+                    ? { ...prev, contactName: r.name, companyName: r.company, leadId: r.leadId, funnelId: r.funnelId }
+                    : prev,
+                );
+              })
+              .catch(() => {});
+          }
           // If the caller hangs up (or it errors) before we answer, clear it.
           const clearPending = () => {
             if (incomingCallRef.current === call) {
