@@ -34,6 +34,7 @@ export function DialerBar() {
   const activeCall = call.activeCall;
   const inCall = activeCall?.state === "ringing" || activeCall?.state === "connected";
   const connected = activeCall?.state === "connected";
+  const countingDown = mode === "running" && !inCall && countdown !== null && autoAdvanceSeconds > 0;
   const completed = session.status === "completed" || (!currentItem && !inCall);
 
   // During a LIVE call show who's actually on the line — resolved from the call
@@ -121,13 +122,17 @@ export function DialerBar() {
               paused={mode === "paused"}
             />
 
-            {/* Animated "Next Call" button — fills as the countdown runs down. */}
+            {/* Animated "Next Call" button — fills as the countdown runs down.
+                During a live countdown it means "dial the current lead now"
+                (skip the wait → startNext). Otherwise — in a call, or stuck
+                between leads with no countdown — it means "move to the NEXT
+                lead" (nextNow: hangs up if needed, then dials the next). */}
             <NextCallButton
-              counting={mode === "running" && !inCall && countdown !== null && autoAdvanceSeconds > 0}
+              counting={countingDown}
               countdown={countdown}
               total={autoAdvanceSeconds}
               inCall={inCall}
-              onClick={() => (inCall ? void dialer.nextNow() : dialer.startNext())}
+              onClick={() => (countingDown ? dialer.startNext() : void dialer.nextNow())}
             />
 
             {/* Controls */}
