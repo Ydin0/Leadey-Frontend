@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Loader2, ShieldCheck, Clock, Calendar, AlertCircle, Play } from "lucide-react";
+import { X, Loader2, ShieldCheck, UserCheck, Clock, Calendar, AlertCircle, Play } from "lucide-react";
 import { createSession, getActiveSession, endSession } from "@/lib/api/dialer";
 import { useDialerContext } from "@/components/dialer/context/dialer-context";
 import type { FunnelStep } from "@/lib/types/funnel";
@@ -18,7 +18,9 @@ interface DialerConfigModalProps {
 export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModalProps) {
   const dialer = useDialerContext();
   const [excludeDoNotCall, setExcludeDoNotCall] = useState(true);
+  const [excludeClosed, setExcludeClosed] = useState(true);
   const [excludeRecentlyCalled, setExcludeRecentlyCalled] = useState(true);
+  const [recentlyCalledDays, setRecentlyCalledDays] = useState(2);
   const [respectTimezone, setRespectTimezone] = useState(false);
   const [maxAttempts, setMaxAttempts] = useState<number | null>(3);
   const [starting, setStarting] = useState(false);
@@ -32,7 +34,14 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
     try {
       const { session } = await createSession({
         ...(step ? { funnelStepId: step.id } : { funnelId }),
-        filters: { excludeDoNotCall, excludeRecentlyCalled, respectTimezone, maxAttempts },
+        filters: {
+          excludeDoNotCall,
+          excludeClosed,
+          excludeRecentlyCalled,
+          recentlyCalledDays,
+          respectTimezone,
+          maxAttempts,
+        },
       });
       // Show the persistent dialer bar in place — no navigation.
       dialer.beginSession(session);
@@ -121,12 +130,34 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
             onChange={setExcludeDoNotCall}
           />
           <FilterRow
+            icon={<UserCheck size={13} className="text-signal-green-text" />}
+            label="Only new & follow-up leads"
+            description="Skip Not Interested, DNC, Qualified and other closed leads"
+            value={excludeClosed}
+            onChange={setExcludeClosed}
+          />
+          <FilterRow
             icon={<Clock size={13} className="text-signal-blue-text" />}
             label="Exclude recently called"
-            description="Skip anyone called in the last 24h"
+            description="Skip anyone called within the window below"
             value={excludeRecentlyCalled}
             onChange={setExcludeRecentlyCalled}
           />
+          {excludeRecentlyCalled && (
+            <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-[8px] bg-section ml-7">
+              <p className="text-[12px] font-medium text-ink">Recently-called window</p>
+              <select
+                value={recentlyCalledDays}
+                onChange={(e) => setRecentlyCalledDays(Number(e.target.value))}
+                className="px-2 py-1 rounded-[6px] bg-surface text-[12px] text-ink border border-border-subtle outline-none focus:border-border-default"
+              >
+                <option value={1}>1 day</option>
+                <option value={2}>2 days</option>
+                <option value={3}>3 days</option>
+                <option value={7}>7 days</option>
+              </select>
+            </div>
+          )}
           <FilterRow
             icon={<Calendar size={13} className="text-ink-muted" />}
             label="Respect timezone"
