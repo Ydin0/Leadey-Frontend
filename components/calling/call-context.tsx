@@ -90,7 +90,16 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const callRef = useRef<Call | null>(null);
   const incomingCallRef = useRef<Call | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 0 until the call actually CONNECTS (accept fires). A call that never
+  // connects must log duration 0 — not (now - 0) ≈ epoch seconds, which is what
+  // corrupted durations into the billions and broke cost reporting.
   const callStartRef = useRef<number>(0);
+  // The real Twilio CallSid, captured the moment it's available. For OUTBOUND
+  // calls the SDK doesn't populate call.parameters.CallSid until the call
+  // connects (and it can be gone by disconnect), so we grab it on accept — this
+  // is what the recording webhook matches on, so a missing SID = lost recording.
+  const callSidRef = useRef<string | null>(null);
+  const callSidPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ── Fetch phone lines + call records once auth is ready ──
   useEffect(() => {
@@ -319,6 +328,15 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       meta?: CallMeta,
       known?: { to?: string; from?: string },
     ) => {
+      // Fresh call — clear any carry-over from the previous one so a
+      // non-connected call can't inherit a stale start time or SID.
+      callStartRef.current = 0;
+      callSidRef.current = call.parameters?.CallSid || null;
+      if (callSidPollRef.current) {
+        clearInterval(callSidPollRef.current);
+        callSidPollRef.current = null;
+      }
+
       const lineId = selectedLineId || "unknown";
       const contactName = meta?.contactName || null;
       const companyName = meta?.companyName || null;
@@ -366,6 +384,22 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
       call.on("accept", () => {
         callStartRef.current = Date.now();
+        // Capture the CallSid now that the call is live. For outbound it may
+        // arrive a beat after accept, so poll briefly until it appears — this
+        // SID is what the recording webhook matches on.
+        if (call.parameters?.CallSid) callSidRef.current = call.parameters.CallSid;
+        if (!callSidRef.current) {
+          let tries = 0;
+          callSidPollRef.current = setInterval(() => {
+            tries += 1;
+            const sid = call.parameters?.CallSid;
+            if (sid) callSidRef.current = sid;
+            if (callSidRef.current || tries >= 20) {
+              if (callSidPollRef.current) clearInterval(callSidPollRef.current);
+              callSidPollRef.current = null;
+            }
+          }, 250);
+        }
         setActiveCall((prev) =>
           prev ? { ...prev, state: "connected" } : prev
         );
@@ -393,10 +427,18 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
 
       call.on("disconnect", () => {
-        const duration = Math.round(
-          (Date.now() - callStartRef.current) / 1000
-        );
-        const callSid = call.parameters?.CallSid || null;
+        if (callSidPollRef.current) {
+          clearInterval(callSidPollRef.current);
+          callSidPollRef.current = null;
+        }
+        // A call that never connected (no accept → callStartRef still 0) logged
+        // a duration of (now - 0)/1000 ≈ epoch seconds. Treat it as 0.
+        const duration = callStartRef.current
+          ? Math.round((Date.now() - callStartRef.current) / 1000)
+          : 0;
+        // Prefer the SID we captured while the call was live; fall back to the
+        // (often-empty for outbound) parameters at disconnect.
+        const callSid = callSidRef.current || call.parameters?.CallSid || null;
 
         setActiveCall((prev) =>
           prev ? { ...prev, state: "ended" } : prev
