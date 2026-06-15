@@ -55,6 +55,18 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
     }
   }
 
+  async function handleResume() {
+    // Load the existing session into the persistent dialer bar (beginSession
+    // pulls the current item) and close — actually resuming, not just dismissing.
+    try {
+      const active = await getActiveSession();
+      if (active) dialer.beginSession(active);
+    } catch {
+      /* fall through to close */
+    }
+    onClose();
+  }
+
   async function handleEndAndStart() {
     if (!activeSessionId) return;
     setEnding(true);
@@ -148,7 +160,7 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
                 <div className="flex items-center gap-2 mt-2.5 pl-5">
                   <button
                     type="button"
-                    onClick={onClose}
+                    onClick={() => void handleResume()}
                     className="flex items-center gap-1.5 px-3 py-1 rounded-[20px] bg-signal-green text-signal-green-text text-[11px] font-medium hover:opacity-90 transition-opacity"
                   >
                     <Play size={11} /> Resume it
