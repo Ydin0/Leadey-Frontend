@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Users, Building2, Mail, Phone, Search, ChevronDown, X, Check, Loader2,
-  Rocket, FolderInput, ArrowRight, Linkedin, Ban,
+  Rocket, FolderInput, Linkedin, Ban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { ImportsView } from "@/components/leads/imports-view";
 import {
   getOrgLeads, getOrgLeadCompanies, getLeadsFacets, createCampaignFromLeads,
@@ -252,32 +253,65 @@ export function GlobalLeadsShell() {
   );
 }
 
+/** Favicon-based round company logo with an initials fallback — identical to
+ *  the campaign Companies table so both lists look exactly the same. */
+function CompanyLogo({ domain, name }: { domain: string | null; name: string }) {
+  const [imgError, setImgError] = useState(false);
+  const initials = (name || "?").slice(0, 2).toUpperCase();
+  if (!domain || imgError) {
+    return (
+      <div className="w-6 h-6 rounded-full bg-signal-blue flex items-center justify-center flex-shrink-0">
+        <span className="text-[9px] font-bold text-signal-blue-text">{initials}</span>
+      </div>
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`https://www.google.com/s2/favicons?sz=128&domain=${domain}`}
+      alt={name}
+      width={24}
+      height={24}
+      className="w-6 h-6 rounded-full flex-shrink-0 object-contain"
+      onError={() => setImgError(true)}
+    />
+  );
+}
+
 function CompaniesTable({ rows, onPick }: { rows: LeadCompanyRow[]; onPick: (company: string) => void }) {
   if (rows.length === 0) return <Empty />;
   return (
-    <div className="rounded-[14px] border border-border-subtle bg-surface overflow-hidden">
-      <div className="grid items-center gap-4 px-5 py-3 border-b border-border-subtle text-[10px] font-semibold uppercase tracking-[0.08em] text-ink-muted" style={{ gridTemplateColumns: "minmax(220px,1.6fr) 90px 110px 110px 130px 1fr" }}>
-        <span>Company</span><span className="text-right">Leads</span><span className="text-right">Campaigns</span><span className="text-right">With phone</span><span>Industry</span><span>Location</span>
-      </div>
-      {rows.map((r) => (
-        <button key={r.company} onClick={() => onPick(r.company)} className="group grid items-center gap-4 px-5 py-3.5 border-b border-border-subtle last:border-b-0 w-full text-left hover:bg-accent/[0.05] transition-colors" style={{ gridTemplateColumns: "minmax(220px,1.6fr) 90px 110px 110px 130px 1fr" }}>
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-section shrink-0"><Building2 size={16} className="text-ink-muted" /></span>
-          <div className="min-w-0">
-            <div className="text-[13.5px] font-semibold text-ink truncate">{r.company || "—"}</div>
-            {r.domain && <div className="text-[11px] text-ink-faint truncate">{r.domain}</div>}
-          </div>
-        </div>
-        <span className="text-[13px] font-semibold text-ink text-right tabular-nums">{r.leadCount}</span>
-        <span className="text-[13px] text-ink-secondary text-right tabular-nums">{r.campaigns}</span>
-        <span className="text-[13px] text-ink-secondary text-right tabular-nums">{r.withPhone}</span>
-        <span className="text-[12px] text-ink-secondary truncate">{r.industry || "—"}</span>
-        <span className="flex items-center justify-between gap-2 min-w-0">
-          <span className="text-[12px] text-ink-muted truncate">{r.location || "—"}</span>
-          <ArrowRight size={14} className="text-ink-muted opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-        </span>
-        </button>
-      ))}
+    <div className="bg-surface rounded-[14px] border border-border-subtle overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
+            <TableHead className="text-left w-[260px]">Company</TableHead>
+            <TableHead className="text-right w-[90px]">Leads</TableHead>
+            <TableHead className="text-right w-[110px]">Campaigns</TableHead>
+            <TableHead className="text-right w-[110px]">With phone</TableHead>
+            <TableHead className="text-left w-[150px]">Industry</TableHead>
+            <TableHead className="text-left">Location</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r) => (
+            <TableRow key={r.company} className="cursor-pointer" onClick={() => onPick(r.company)}>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <CompanyLogo domain={r.domain} name={r.company} />
+                  <span className="text-[12px] font-medium text-ink">{r.company || "—"}</span>
+                  {r.domain && <span className="text-[10px] text-ink-faint">{r.domain}</span>}
+                </div>
+              </TableCell>
+              <TableCell className="text-right text-ink-secondary tabular-nums">{r.leadCount}</TableCell>
+              <TableCell className="text-right text-ink-secondary tabular-nums">{r.campaigns}</TableCell>
+              <TableCell className="text-right text-ink-secondary tabular-nums">{r.withPhone}</TableCell>
+              <TableCell className="text-ink-secondary">{r.industry || <span className="text-ink-faint">—</span>}</TableCell>
+              <TableCell className="text-ink-muted">{r.location || <span className="text-ink-faint">—</span>}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 }
