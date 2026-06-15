@@ -155,6 +155,14 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   const subscribedCallSidRef = useRef<string | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const autoVmRef = useRef(false);
+  // The live auto-dial countdown interval — held in a ref so end()/pause() can
+  // kill it SYNCHRONOUSLY. The interval keeps its own local counter, so merely
+  // clearing the `countdown` state doesn't stop it: it would tick to zero during
+  // an in-flight endSession() await and place a call after the rep hit End.
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Hard stop flag set the instant the rep ends a session — blocks any auto-dial
+  // even before the session-null re-render lands. Reset when a new session begins.
+  const stoppedRef = useRef(false);
 
   // ── Discover an active session on mount ──────────────────────────
   useEffect(() => {
@@ -176,7 +184,10 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
         setCurrentItem(snapshot.current);
         setUpcoming(snapshot.upcoming);
         setVoicemails(vms);
-        setMode(snapshot.session.status === "paused" ? "paused" : "running");
+        // A restored session ALWAYS comes back paused — never start auto-dialing
+        // the instant the app loads. The rep resumes explicitly from the bar.
+        // (Fixes "it starts dialing immediately when I first log in".)
+        setMode("paused");
       } catch {
         // No active session / failed — leave the bar hidden.
       } finally {
@@ -213,8 +224,19 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     [refresh],
   );
 
+  // Synchronously kill the auto-dial countdown — clears the live interval (not
+  // just the displayed number) so it can't tick to zero and place a call.
+  const stopCountdown = useCallback(() => {
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
+    setCountdown(null);
+  }, []);
+
   const beginSession = useCallback(
     (next: DialerSession) => {
+      stoppedRef.current = false;
       setSession(next);
       setMode("running");
       setError(null);
@@ -255,7 +277,8 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   const dialItem = useCallback(
     (item: DialerQueueItem | null) => {
       if (!item) return;
-      if (call.activeCall) return;
+      if (stoppedRef.current) return; // session ended — never place a call
+      if (call.activeCall || call.incomingCall) return; // busy or a call is ringing in
       if (item.lead?.doNotCall && !confirmDncCall(item.lead?.name)) return;
       setCountdown(null);
       lastDialedItemIdRef.current = item.id;
@@ -331,14 +354,14 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   const pause = useCallback(async () => {
     if (!session) return;
     setMode("paused");
-    setCountdown(null);
+    stopCountdown(); // kill the live interval now, not just the displayed number
     try {
       const updated = await pauseSession(session.id);
       setSession(updated);
     } catch {
       // local pause still applies
     }
-  }, [session]);
+  }, [session, stopCountdown]);
 
   const resume = useCallback(async () => {
     if (!session) return;
@@ -362,24 +385,34 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
 
   const end = useCallback(async () => {
     if (!session) return;
-    setCountdown(null);
+    // Tear everything down SYNCHRONOUSLY first, before the network call:
+    //  • stoppedRef blocks any auto-dial that races the re-render
+    //  • stopCountdown kills the live interval so it can't fire startNext()
+    //  • hang up any live call so the dialer can't keep a call connected with
+    //    no bar showing ("I ended it and someone started speaking")
+    //  • clear session state so the bar disappears and canAutoDial goes false
+    stoppedRef.current = true;
+    stopCountdown();
+    if (call.activeCall) call.endCall();
+    setSession(null);
+    setCurrentItem(null);
+    setUpcoming([]);
+    setMode("paused");
     try {
       await endSession(session.id);
     } catch {
-      // ignore
+      // UI already torn down — ignore a failed end POST.
     }
-    setSession(null);
-    setCurrentItem(null);
-    setUpcoming([]);
-  }, [session]);
+  }, [session, call, stopCountdown]);
 
   const dismiss = useCallback(() => {
+    stoppedRef.current = true;
+    stopCountdown();
     setSession(null);
     setCurrentItem(null);
     setUpcoming([]);
-    setCountdown(null);
     setFollowMode(false);
-  }, []);
+  }, [stopCountdown]);
 
   const leadPath = useCallback(
     (leadId: string) =>
@@ -474,6 +507,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   const startNextRef = useRef(startNext);
   startNextRef.current = startNext;
   const canAutoDial =
+    !stoppedRef.current &&
     !!session &&
     session.status === "active" &&
     mode === "running" &&
@@ -499,22 +533,29 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     let n = autoAdvanceSeconds;
     setCountdown(n);
     const id = setInterval(() => {
-      // Re-validate against live state — never auto-dial once paused / busy.
-      if (!canAutoDialRef.current) {
+      // Re-validate against live state — never auto-dial once paused / busy /
+      // ended (stoppedRef flips the instant the rep hits End).
+      if (!canAutoDialRef.current || stoppedRef.current) {
         clearInterval(id);
+        if (countdownIntervalRef.current === id) countdownIntervalRef.current = null;
         setCountdown(null);
         return;
       }
       n -= 1;
       if (n <= 0) {
         clearInterval(id);
+        if (countdownIntervalRef.current === id) countdownIntervalRef.current = null;
         setCountdown(null);
-        if (canAutoDialRef.current) startNextRef.current();
+        if (canAutoDialRef.current && !stoppedRef.current) startNextRef.current();
       } else {
         setCountdown(n);
       }
     }, 1000);
-    return () => clearInterval(id);
+    countdownIntervalRef.current = id;
+    return () => {
+      clearInterval(id);
+      if (countdownIntervalRef.current === id) countdownIntervalRef.current = null;
+    };
     // Re-arm whenever the target lead, mode, session status, call presence, or
     // configured wait changes. currentItem?.id drives advancing to the next lead.
   }, [canAutoDial, currentItem?.id, session?.status, mode, autoAdvanceSeconds]);
