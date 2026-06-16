@@ -1,16 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Users, Building2, Mail, Phone, Search, ChevronDown, X, Check, Loader2,
+  Users, Building2, Mail, Phone, Search, ChevronDown, ChevronRight, X, Check, Loader2,
   Rocket, FolderInput, Linkedin, Ban,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
+import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
+import { getStatusDotClass, getStatusLabel } from "@/lib/utils/lead-status";
 import { ImportsView } from "@/components/leads/imports-view";
 import {
   getOrgLeads, getOrgLeadCompanies, getLeadsFacets, createCampaignFromLeads,
@@ -222,7 +224,7 @@ export function GlobalLeadsShell() {
           {loading ? (
             <div className="rounded-[14px] border border-border-subtle bg-surface p-6"><p className="text-[12px] text-ink-muted">Loading…</p></div>
           ) : tab === "companies" ? (
-            <CompaniesTable rows={companies} onPick={(company) => { setTab("leads"); setFilter({ company }); }} />
+            <CompaniesTable rows={companies} />
           ) : (
             <LeadsTable rows={leads} />
           )}
@@ -253,63 +255,141 @@ export function GlobalLeadsShell() {
   );
 }
 
-/** Favicon-based round company logo with an initials fallback — identical to
- *  the campaign Companies table so both lists look exactly the same. */
-function CompanyLogo({ domain, name }: { domain: string | null; name: string }) {
-  const [imgError, setImgError] = useState(false);
-  const initials = (name || "?").slice(0, 2).toUpperCase();
-  if (!domain || imgError) {
-    return (
-      <div className="w-6 h-6 rounded-full bg-signal-blue flex items-center justify-center flex-shrink-0">
-        <span className="text-[9px] font-bold text-signal-blue-text">{initials}</span>
-      </div>
-    );
-  }
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`https://www.google.com/s2/favicons?sz=128&domain=${domain}`}
-      alt={name}
-      width={24}
-      height={24}
-      className="w-6 h-6 rounded-full flex-shrink-0 object-contain"
-      onError={() => setImgError(true)}
-    />
-  );
-}
+/** Org-wide Companies table — identical layout to the campaign "Group by
+ *  company" view (CompanyAvatar, status dot, Contacts + Activity cells, chevron
+ *  expand into contact sub-rows). */
+function CompaniesTable({ rows }: { rows: LeadCompanyRow[] }) {
+  const router = useRouter();
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [contacts, setContacts] = useState<Map<string, OrgLead[]>>(new Map());
+  const [loadingCompany, setLoadingCompany] = useState<Set<string>>(new Set());
 
-function CompaniesTable({ rows, onPick }: { rows: LeadCompanyRow[]; onPick: (company: string) => void }) {
+  const toggle = useCallback(
+    (company: string) => {
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        if (next.has(company)) {
+          next.delete(company);
+          return next;
+        }
+        next.add(company);
+        if (!contacts.has(company)) {
+          setLoadingCompany((l) => new Set(l).add(company));
+          getOrgLeads({ company, pageSize: 100 })
+            .then((res) => setContacts((m) => new Map(m).set(company, res.data)))
+            .catch(() => setContacts((m) => new Map(m).set(company, [])))
+            .finally(() => setLoadingCompany((l) => { const n = new Set(l); n.delete(company); return n; }));
+        }
+        return next;
+      });
+    },
+    [contacts],
+  );
+
   if (rows.length === 0) return <Empty />;
   return (
     <div className="bg-surface rounded-[14px] border border-border-subtle overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
-            <TableHead className="text-left w-[260px]">Company</TableHead>
-            <TableHead className="text-right w-[90px]">Leads</TableHead>
-            <TableHead className="text-right w-[110px]">Campaigns</TableHead>
-            <TableHead className="text-right w-[110px]">With phone</TableHead>
+            <TableHead className="w-8" />
+            <TableHead className="text-left w-[220px]">Company</TableHead>
+            <TableHead className="text-left w-[130px]">Status</TableHead>
             <TableHead className="text-left w-[150px]">Industry</TableHead>
-            <TableHead className="text-left">Location</TableHead>
+            <TableHead className="text-center w-[90px]">Employees</TableHead>
+            <TableHead className="text-left w-[150px]">Location</TableHead>
+            <TableHead className="text-center w-[80px]">Contacts</TableHead>
+            <TableHead className="text-center w-[100px]">Activity</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => (
-            <TableRow key={r.company} className="cursor-pointer" onClick={() => onPick(r.company)}>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <CompanyLogo domain={r.domain} name={r.company} />
-                  <span className="text-[12px] font-medium text-ink">{r.company || "—"}</span>
-                  {r.domain && <span className="text-[10px] text-ink-faint">{r.domain}</span>}
-                </div>
-              </TableCell>
-              <TableCell className="text-right text-ink-secondary tabular-nums">{r.leadCount}</TableCell>
-              <TableCell className="text-right text-ink-secondary tabular-nums">{r.campaigns}</TableCell>
-              <TableCell className="text-right text-ink-secondary tabular-nums">{r.withPhone}</TableCell>
-              <TableCell className="text-ink-secondary">{r.industry || <span className="text-ink-faint">—</span>}</TableCell>
-              <TableCell className="text-ink-muted">{r.location || <span className="text-ink-faint">—</span>}</TableCell>
-            </TableRow>
-          ))}
+          {rows.map((r) => {
+            const isExpanded = expanded.has(r.company);
+            const companyContacts = contacts.get(r.company) ?? [];
+            return (
+              <Fragment key={r.company}>
+                <TableRow className="cursor-pointer hover:bg-hover/50" onClick={() => toggle(r.company)}>
+                  <TableCell className="w-8 px-3">
+                    <ChevronRight size={14} className={cn("text-ink-muted transition-transform", isExpanded && "rotate-90")} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2.5">
+                      <CompanyAvatar name={r.company} size="md" domain={r.domain ?? undefined} />
+                      <div>
+                        <span className="text-[12px] font-medium text-ink">{r.company || "—"}</span>
+                        {r.domain && <div className="text-[10px] text-ink-faint">{r.domain}</div>}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", getStatusDotClass(r.status))} />
+                      <span className="text-[11px] text-ink-secondary truncate">{getStatusLabel(r.status)}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell><span className="text-[11px] text-ink-secondary">{r.industry || "–"}</span></TableCell>
+                  <TableCell className="text-center"><span className="text-[11px] text-ink-secondary">{r.employees ? r.employees.toLocaleString() : "–"}</span></TableCell>
+                  <TableCell><span className="text-[11px] text-ink-muted">{r.location || "–"}</span></TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Users size={11} className="text-ink-faint" />
+                      <span className="text-[11px] text-ink-secondary">{r.leadCount}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="flex items-center gap-0.5">
+                        <Phone size={10} strokeWidth={1.5} className={cn(r.callCount > 0 ? "text-ink-secondary" : "text-ink-faint")} />
+                        <span className={cn("text-[10px]", r.callCount > 0 ? "text-ink-secondary" : "text-ink-faint")}>{r.callCount}</span>
+                      </div>
+                      <div className="flex items-center gap-0.5">
+                        <Mail size={10} strokeWidth={1.5} className={cn(r.emailCount > 0 ? "text-ink-secondary" : "text-ink-faint")} />
+                        <span className={cn("text-[10px]", r.emailCount > 0 ? "text-ink-secondary" : "text-ink-faint")}>{r.emailCount}</span>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {isExpanded && loadingCompany.has(r.company) && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={8} className="py-3 text-center text-[11px] text-ink-muted">Loading contacts…</TableCell>
+                  </TableRow>
+                )}
+                {isExpanded && companyContacts.map((l) => (
+                  <TableRow key={l.id} className="bg-section/20 cursor-pointer hover:bg-hover/50" onClick={() => router.push(`/dashboard/leads/${l.id}?c=${l.funnelId}`)}>
+                    <TableCell colSpan={8} className="py-2">
+                      <div className="flex items-center gap-3 pl-[60px] pr-2">
+                        <div className="flex-1 min-w-0">
+                          <span className={cn("text-[12px] font-medium inline-flex items-center gap-1.5", l.doNotCall ? "text-signal-red-text" : "text-ink")}>
+                            {l.name}
+                            {l.doNotCall && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-signal-red/10 text-signal-red-text text-[9px] font-semibold uppercase tracking-wide">
+                                <Ban size={9} strokeWidth={2} /> DNC
+                              </span>
+                            )}
+                          </span>
+                          <div className="text-[10px] text-ink-muted truncate">{l.title || "–"}</div>
+                        </div>
+                        <div className="w-[160px] shrink-0 flex items-center gap-1.5">
+                          <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", getStatusDotClass(l.status))} />
+                          <span className="text-[11px] text-ink-secondary truncate">{getStatusLabel(l.status)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          {l.phone && <Phone size={12} strokeWidth={1.5} className="text-signal-green-text" />}
+                          {l.email && <Mail size={12} strokeWidth={1.5} className="text-signal-blue-text" />}
+                          {l.linkedinUrl && <Linkedin size={12} strokeWidth={1.5} className="text-[#0A66C2]" />}
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {isExpanded && !loadingCompany.has(r.company) && companyContacts.length === 0 && (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell colSpan={8} className="py-3 text-center text-[11px] text-ink-muted">No contacts.</TableCell>
+                  </TableRow>
+                )}
+              </Fragment>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -326,7 +406,7 @@ function LeadsTable({ rows }: { rows: OrgLead[] }) {
       {rows.map((l) => (
         <Link
           key={l.id}
-          href={`/dashboard/funnels/${l.funnelId}/leads/${l.id}`}
+          href={`/dashboard/leads/${l.id}?c=${l.funnelId}`}
           className="grid items-center gap-4 px-5 py-3 border-b border-border-subtle last:border-b-0 hover:bg-accent/[0.05] transition-colors"
           style={{ gridTemplateColumns: "minmax(200px,1.4fr) minmax(160px,1.2fr) minmax(160px,1.2fr) 90px 130px" }}
         >

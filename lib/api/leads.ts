@@ -33,6 +33,9 @@ export interface LeadCompanyRow {
   industry: string | null;
   location: string | null;
   employees: number | null;
+  status: string;
+  callCount: number;
+  emailCount: number;
 }
 
 export interface LeadsFacets {
@@ -91,6 +94,12 @@ export async function getOrgLeadCompanies(
 
 export async function getLeadsFacets(): Promise<LeadsFacets> {
   return apiRequest<LeadsFacets>(`/leads/facets`);
+}
+
+/** Resolve which campaign owns a lead — used to open its standalone profile
+ *  when the funnel id isn't already known from the row. */
+export async function getOrgLeadFunnel(id: string): Promise<{ funnelId: string }> {
+  return apiRequest<{ funnelId: string }>(`/leads/${id}/funnel`);
 }
 
 export async function createCampaignFromLeads(payload: {
