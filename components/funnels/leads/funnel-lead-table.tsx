@@ -8,6 +8,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { useRowLimit } from "@/lib/hooks/use-row-limit";
 import { advanceLead, enrichJobPosts, saveLeadFilters } from "@/lib/api/funnels";
+import { useCredits } from "@/components/providers/credits-provider";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { FunnelLeadsFilterBar, DEFAULT_FUNNEL_LEADS_FILTERS, normalizeFunnelLeadsFilters, type FunnelLeadsFilters } from "./funnel-leads-filter-bar";
 import {
@@ -187,6 +188,7 @@ function MagicEnrichBar({
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const { refresh: refreshCredits } = useCredits();
 
   useEffect(() => {
     if (!open) return;
@@ -202,6 +204,7 @@ function MagicEnrichBar({
     setBusy(true);
     try {
       const res = await enrichJobPosts(funnelId, companies);
+      refreshCredits(); // job scraping spent credits — update the header pill
       const summary =
         res.rolesCreated > 0
           ? `Added ${res.rolesCreated} hiring role${res.rolesCreated === 1 ? "" : "s"} across ${res.leadsEnriched} lead${res.leadsEnriched === 1 ? "" : "s"} · ${res.jobsFound} jobs found in ${res.companiesSearched} companies`

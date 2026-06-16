@@ -2,6 +2,7 @@
 
 import { NotificationDropdown } from "@/components/dashboard/notification-dropdown";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { CreditBalancePill } from "@/components/layout/credit-balance-pill";
 import { DialerDropdown } from "@/components/calling/dialer/dialer-dropdown";
 import { GlobalSearch } from "@/components/layout/global-search";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -14,6 +15,9 @@ export function Header() {
 
       {/* Spacer pushes the action cluster to the right. */}
       <div className="flex-1" />
+
+      {/* Credit balance — click to view breakdown & top up */}
+      <CreditBalancePill />
 
       {/* Theme Toggle */}
       <ThemeToggle />

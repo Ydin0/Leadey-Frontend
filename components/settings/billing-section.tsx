@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { CreditCard, ExternalLink, Loader2, Check, Sparkles, Minus, Plus, Download } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -144,7 +145,6 @@ export function BillingSection() {
   const status = planStatusLabel[billing.planStatus] || planStatusLabel.active;
   const isTrial = billing.plan === "trial";
   const hasSubscription = !!billing.stripeSubscriptionId;
-  const creditsPercent = billing.creditsIncluded > 0 ? Math.round((billing.creditsUsed / billing.creditsIncluded) * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -175,21 +175,17 @@ export function BillingSection() {
 
         {/* Usage + Seats */}
         <div className="space-y-4">
-          {/* Credits bar */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
-              <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">Scraper Credits</p>
-              <span className="text-[10px] text-ink-muted">
-                {billing.creditsUsed.toLocaleString()} / {billing.creditsIncluded.toLocaleString()}
-              </span>
+          {/* Credits now live in their own tab (unified prepaid wallet). */}
+          <Link
+            href="/dashboard/settings?tab=credits"
+            className="flex items-center justify-between rounded-[10px] border border-border-subtle bg-section/40 px-3 py-2.5 hover:bg-hover transition-colors"
+          >
+            <div>
+              <p className="text-[12px] font-medium text-ink">Credits</p>
+              <p className="text-[10px] text-ink-muted">View balance, top up & usage reports</p>
             </div>
-            <div className="h-1.5 rounded-full bg-section overflow-hidden">
-              <div
-                className={cn("h-full rounded-full", creditsPercent > 90 ? "bg-signal-red-text" : "bg-signal-blue-text")}
-                style={{ width: `${Math.min(100, creditsPercent)}%` }}
-              />
-            </div>
-          </div>
+            <span className="text-[11px] font-medium text-accent">Open Credits →</span>
+          </Link>
 
           {/* Seats */}
           <div className="flex items-center justify-between py-3 border-t border-border-subtle">

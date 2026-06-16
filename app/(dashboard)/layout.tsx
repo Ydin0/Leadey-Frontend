@@ -8,6 +8,7 @@ import { DialerProvider } from "@/components/dialer/context/dialer-context";
 import { DialerBar } from "@/components/dialer/bar/dialer-bar";
 import { AuthTokenSync } from "@/components/providers/auth-token-sync";
 import { ScraperRunsProvider } from "@/components/providers/scraper-runs-provider";
+import { CreditsProvider } from "@/components/providers/credits-provider";
 import { ScraperRunsWidget } from "@/components/scrapers/scraper-runs-widget";
 
 export default function DashboardLayout({
@@ -17,6 +18,7 @@ export default function DashboardLayout({
 }) {
   return (
     <AuthTokenSync>
+      <CreditsProvider>
       <CallProvider>
         <DialerProvider>
           <ScraperRunsProvider>
@@ -41,6 +43,7 @@ export default function DashboardLayout({
           </ScraperRunsProvider>
         </DialerProvider>
       </CallProvider>
+      </CreditsProvider>
     </AuthTokenSync>
   );
 }

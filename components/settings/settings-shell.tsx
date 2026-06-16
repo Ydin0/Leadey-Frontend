@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BillingSection } from "./billing-section";
+import { CreditsSection } from "./credits-section";
 import { TeamSection } from "./team-section";
 import { ProfileSection } from "./profile-section";
 import { OrganizationSection } from "./organization-section";
@@ -12,6 +13,7 @@ import {
   Bell,
   Briefcase,
   Building2,
+  Coins,
   CreditCard,
   Linkedin,
   ListPlus,
@@ -50,6 +52,7 @@ type SettingsTab =
   | "linkedin"
   | "email-accounts"
   | "billing"
+  | "credits"
   | "notifications"
   | "integrations";
 
@@ -65,6 +68,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "linkedin", label: "LinkedIn", icon: Linkedin },
   { id: "email-accounts", label: "Email Accounts", icon: Mail },
   { id: "billing", label: "Billing", icon: CreditCard },
+  { id: "credits", label: "Credits", icon: Coins },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "integrations", label: "Integrations", icon: PlugZap },
 ];
@@ -181,6 +185,7 @@ const VALID_TABS: SettingsTab[] = [
   "linkedin",
   "email-accounts",
   "billing",
+  "credits",
   "notifications",
   "integrations",
 ];
@@ -315,6 +320,10 @@ export function SettingsShell() {
 
           {activeTab === "billing" && (
             <BillingSection />
+          )}
+
+          {activeTab === "credits" && (
+            <CreditsSection />
           )}
 
           {activeTab === "notifications" && (
