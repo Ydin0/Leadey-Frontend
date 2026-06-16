@@ -11,6 +11,12 @@ export interface FunnelLeadsFilters {
   statuses: LeadStatus[];
   companies: string[];
   sources: string[];
+  industries: string[];
+  locations: string[];
+  sizeMin: number | null;
+  sizeMax: number | null;
+  hasJobs: "true" | "false" | null;
+  leadsInCompanyMin: number | null;
   scoreMin: number | null;
   hasPhone: "true" | "false" | null;
   hasEmail: "true" | "false" | null;
@@ -24,6 +30,12 @@ export const DEFAULT_FUNNEL_LEADS_FILTERS: FunnelLeadsFilters = {
   statuses: [],
   companies: [],
   sources: [],
+  industries: [],
+  locations: [],
+  sizeMin: null,
+  sizeMax: null,
+  hasJobs: null,
+  leadsInCompanyMin: null,
   scoreMin: null,
   hasPhone: null,
   hasEmail: null,
@@ -32,6 +44,13 @@ export const DEFAULT_FUNNEL_LEADS_FILTERS: FunnelLeadsFilters = {
   emailCountMin: null,
   search: "",
 };
+
+/** Normalises a possibly-partial filter object (e.g. from older persisted
+ *  config) so newly-added keys always have a defined default. */
+export function normalizeFunnelLeadsFilters(raw: unknown): FunnelLeadsFilters {
+  if (!raw || typeof raw !== "object") return { ...DEFAULT_FUNNEL_LEADS_FILTERS };
+  return { ...DEFAULT_FUNNEL_LEADS_FILTERS, ...(raw as Partial<FunnelLeadsFilters>) };
+}
 
 const ALL_STATUSES: LeadStatus[] = [
   "new", "contacted", "no_answer", "callback", "interested",
@@ -56,16 +75,51 @@ const CONTACT_DATA_OPTIONS = [
   { value: "false", label: "Missing" },
 ];
 
+const HAS_JOBS_OPTIONS = [
+  { value: "true", label: "Hiring" },
+  { value: "false", label: "Not hiring" },
+];
+
+// Company-size (headcount) presets — min/max pairs, à la Close / Apollo.
+const SIZE_PRESETS: { label: string; min: number | null; max: number | null }[] = [
+  { label: "1–10", min: 1, max: 10 },
+  { label: "11–50", min: 11, max: 50 },
+  { label: "51–200", min: 51, max: 200 },
+  { label: "201–500", min: 201, max: 500 },
+  { label: "501–1k", min: 501, max: 1000 },
+  { label: "1k–5k", min: 1001, max: 5000 },
+  { label: "5k+", min: 5001, max: null },
+];
+
 interface FunnelLeadsFilterBarProps {
   filters: FunnelLeadsFilters;
   onChange: (filters: FunnelLeadsFilters) => void;
   companyOptions: string[];
   sourceOptions: string[];
+  industryOptions: string[];
+  locationOptions: string[];
 }
 
-type AdditionalFilterKey = "sources" | "scoreMin" | "hasPhone" | "hasEmail" | "isOverdue" | "callCountMin" | "emailCountMin";
+type AdditionalFilterKey =
+  | "industries"
+  | "locations"
+  | "companySize"
+  | "hasJobs"
+  | "leadsInCompanyMin"
+  | "sources"
+  | "scoreMin"
+  | "hasPhone"
+  | "hasEmail"
+  | "isOverdue"
+  | "callCountMin"
+  | "emailCountMin";
 
 const ADDITIONAL_FILTER_DEFS: { key: AdditionalFilterKey; label: string }[] = [
+  { key: "industries", label: "Industry" },
+  { key: "locations", label: "Location" },
+  { key: "companySize", label: "Company size" },
+  { key: "hasJobs", label: "Hiring" },
+  { key: "leadsInCompanyMin", label: "Leads in company" },
   { key: "sources", label: "Source" },
   { key: "scoreMin", label: "Score" },
   { key: "hasPhone", label: "Has Phone" },
@@ -74,6 +128,13 @@ const ADDITIONAL_FILTER_DEFS: { key: AdditionalFilterKey; label: string }[] = [
   { key: "callCountMin", label: "Calls Made" },
   { key: "emailCountMin", label: "Emails Sent" },
 ];
+
+function sizeLabel(min: number | null, max: number | null): string {
+  if (min !== null && max !== null) return `${min}–${max}`;
+  if (min !== null) return `${min}+`;
+  if (max !== null) return `≤${max}`;
+  return "";
+}
 
 function SearchableMultiSelect({
   options,
@@ -131,9 +192,14 @@ function toggleInArray(arr: string[], value: string): string[] {
   return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
 }
 
-export function FunnelLeadsFilterBar({ filters, onChange, companyOptions, sourceOptions }: FunnelLeadsFilterBarProps) {
+export function FunnelLeadsFilterBar({ filters, onChange, companyOptions, sourceOptions, industryOptions, locationOptions }: FunnelLeadsFilterBarProps) {
   const [activeAdditional, setActiveAdditional] = useState<AdditionalFilterKey[]>(() => {
     const active: AdditionalFilterKey[] = [];
+    if (filters.industries.length > 0) active.push("industries");
+    if (filters.locations.length > 0) active.push("locations");
+    if (filters.sizeMin !== null || filters.sizeMax !== null) active.push("companySize");
+    if (filters.hasJobs) active.push("hasJobs");
+    if (filters.leadsInCompanyMin !== null) active.push("leadsInCompanyMin");
     if (filters.sources.length > 0) active.push("sources");
     if (filters.scoreMin !== null) active.push("scoreMin");
     if (filters.hasPhone) active.push("hasPhone");
@@ -143,6 +209,29 @@ export function FunnelLeadsFilterBar({ filters, onChange, companyOptions, source
     if (filters.emailCountMin !== null) active.push("emailCountMin");
     return active;
   });
+
+  // Keep pickable filters visible after a refresh when their value was restored
+  // from the shared (persisted) config — without this they'd only appear once
+  // re-added. Runs whenever the persisted filter set changes identity.
+  useEffect(() => {
+    setActiveAdditional((prev) => {
+      const next = new Set(prev);
+      if (filters.industries.length > 0) next.add("industries");
+      if (filters.locations.length > 0) next.add("locations");
+      if (filters.sizeMin !== null || filters.sizeMax !== null) next.add("companySize");
+      if (filters.hasJobs) next.add("hasJobs");
+      if (filters.leadsInCompanyMin !== null) next.add("leadsInCompanyMin");
+      if (filters.sources.length > 0) next.add("sources");
+      if (filters.scoreMin !== null) next.add("scoreMin");
+      if (filters.hasPhone) next.add("hasPhone");
+      if (filters.hasEmail) next.add("hasEmail");
+      if (filters.isOverdue) next.add("isOverdue");
+      if (filters.callCountMin !== null) next.add("callCountMin");
+      if (filters.emailCountMin !== null) next.add("emailCountMin");
+      return Array.from(next);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
   const [addDropdownOpen, setAddDropdownOpen] = useState(false);
   const addRef = useRef<HTMLDivElement>(null);
 
@@ -164,6 +253,21 @@ export function FunnelLeadsFilterBar({ filters, onChange, companyOptions, source
   }
   if (filters.companies.length > 0) {
     pills.push({ key: "companies", label: `Company: ${filters.companies.join(", ")}` });
+  }
+  if (filters.industries.length > 0) {
+    pills.push({ key: "industries", label: `Industry: ${filters.industries.join(", ")}` });
+  }
+  if (filters.locations.length > 0) {
+    pills.push({ key: "locations", label: `Location: ${filters.locations.join(", ")}` });
+  }
+  if (filters.sizeMin !== null || filters.sizeMax !== null) {
+    pills.push({ key: "companySize", label: `Size: ${sizeLabel(filters.sizeMin, filters.sizeMax)}` });
+  }
+  if (filters.hasJobs) {
+    pills.push({ key: "hasJobs", label: filters.hasJobs === "true" ? "Hiring" : "Not hiring" });
+  }
+  if (filters.leadsInCompanyMin !== null) {
+    pills.push({ key: "leadsInCompanyMin", label: `Leads in company: ${filters.leadsInCompanyMin}+` });
   }
   if (filters.sources.length > 0) {
     pills.push({ key: "sources", label: `Source: ${filters.sources.join(", ")}` });
@@ -202,6 +306,11 @@ export function FunnelLeadsFilterBar({ filters, onChange, companyOptions, source
     switch (key) {
       case "statuses": updated.statuses = []; break;
       case "companies": updated.companies = []; break;
+      case "industries": updated.industries = []; break;
+      case "locations": updated.locations = []; break;
+      case "companySize": updated.sizeMin = null; updated.sizeMax = null; break;
+      case "hasJobs": updated.hasJobs = null; break;
+      case "leadsInCompanyMin": updated.leadsInCompanyMin = null; break;
       case "sources": updated.sources = []; break;
       case "scoreMin": updated.scoreMin = null; break;
       case "hasEmail": updated.hasEmail = null; break;
@@ -258,6 +367,134 @@ export function FunnelLeadsFilterBar({ filters, onChange, companyOptions, source
         {/* Additional filters */}
         {activeAdditional.map((key) => {
           const def = ADDITIONAL_FILTER_DEFS.find((d) => d.key === key)!;
+
+          if (key === "industries") {
+            return (
+              <FilterPopover key={key} label="Industry" isActive={filters.industries.length > 0} activeCount={filters.industries.length}>
+                <div className="space-y-2">
+                  <SearchableMultiSelect
+                    options={industryOptions}
+                    selected={filters.industries}
+                    onToggle={(v) => onChange({ ...filters, industries: toggleInArray(filters.industries, v) })}
+                    placeholder="Search industries..."
+                  />
+                  <div className="pt-1.5 border-t border-border-subtle">
+                    <button type="button" onClick={() => removeAdditional(key)} className="text-[11px] text-ink-muted hover:text-signal-red-text transition-colors">Remove filter</button>
+                  </div>
+                </div>
+              </FilterPopover>
+            );
+          }
+
+          if (key === "locations") {
+            return (
+              <FilterPopover key={key} label="Location" isActive={filters.locations.length > 0} activeCount={filters.locations.length}>
+                <div className="space-y-2">
+                  <SearchableMultiSelect
+                    options={locationOptions}
+                    selected={filters.locations}
+                    onToggle={(v) => onChange({ ...filters, locations: toggleInArray(filters.locations, v) })}
+                    placeholder="Search locations..."
+                  />
+                  <div className="pt-1.5 border-t border-border-subtle">
+                    <button type="button" onClick={() => removeAdditional(key)} className="text-[11px] text-ink-muted hover:text-signal-red-text transition-colors">Remove filter</button>
+                  </div>
+                </div>
+              </FilterPopover>
+            );
+          }
+
+          if (key === "companySize") {
+            const sizeActive = filters.sizeMin !== null || filters.sizeMax !== null;
+            return (
+              <FilterPopover key={key} label="Company size" isActive={sizeActive} activeCount={sizeActive ? 1 : 0}>
+                <div className="space-y-2.5 w-[230px]">
+                  <div className="flex flex-wrap gap-1.5">
+                    {SIZE_PRESETS.map((p) => {
+                      const on = filters.sizeMin === p.min && filters.sizeMax === p.max;
+                      return (
+                        <button key={p.label} type="button"
+                          onClick={() => onChange({ ...filters, sizeMin: on ? null : p.min, sizeMax: on ? null : p.max })}
+                          className={cn("px-2.5 py-1 rounded-[6px] text-[11px] font-medium transition-colors border",
+                            on ? "bg-signal-blue/15 text-signal-blue-text border-signal-blue-text/20" : "bg-section text-ink-secondary border-transparent hover:bg-hover"
+                          )}>{p.label}</button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      inputMode="numeric"
+                      value={filters.sizeMin ?? ""}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/[^0-9]/g, "");
+                        onChange({ ...filters, sizeMin: digits ? Number(digits) : null });
+                      }}
+                      placeholder="Min"
+                      className="w-full bg-section border border-border-subtle rounded-md px-2 py-1.5 text-[11.5px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+                    />
+                    <span className="text-ink-faint text-[11px]">–</span>
+                    <input
+                      inputMode="numeric"
+                      value={filters.sizeMax ?? ""}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/[^0-9]/g, "");
+                        onChange({ ...filters, sizeMax: digits ? Number(digits) : null });
+                      }}
+                      placeholder="Max"
+                      className="w-full bg-section border border-border-subtle rounded-md px-2 py-1.5 text-[11.5px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+                    />
+                  </div>
+                  <div className="pt-1.5 border-t border-border-subtle">
+                    <button type="button" onClick={() => removeAdditional(key)} className="text-[11px] text-ink-muted hover:text-signal-red-text transition-colors">Remove filter</button>
+                  </div>
+                </div>
+              </FilterPopover>
+            );
+          }
+
+          if (key === "hasJobs") {
+            return (
+              <FilterPopover key={key} label="Hiring" isActive={!!filters.hasJobs} activeCount={filters.hasJobs ? 1 : 0}>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {HAS_JOBS_OPTIONS.map((opt) => (
+                      <button key={opt.value} type="button"
+                        onClick={() => onChange({ ...filters, hasJobs: filters.hasJobs === opt.value ? null : opt.value as "true" | "false" })}
+                        className={cn("px-2.5 py-1 rounded-[6px] text-[11px] font-medium transition-colors border",
+                          filters.hasJobs === opt.value ? "bg-signal-blue/15 text-signal-blue-text border-signal-blue-text/20" : "bg-section text-ink-secondary border-transparent hover:bg-hover"
+                        )}>{opt.label}</button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-ink-faint">Based on open roles found for the company.</p>
+                  <div className="pt-1.5 border-t border-border-subtle">
+                    <button type="button" onClick={() => removeAdditional(key)} className="text-[11px] text-ink-muted hover:text-signal-red-text transition-colors">Remove filter</button>
+                  </div>
+                </div>
+              </FilterPopover>
+            );
+          }
+
+          if (key === "leadsInCompanyMin") {
+            return (
+              <FilterPopover key={key} label="Leads in company" isActive={filters.leadsInCompanyMin !== null} activeCount={filters.leadsInCompanyMin !== null ? 1 : 0}>
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {COUNT_PRESETS.map((p) => (
+                      <button key={p.value} type="button"
+                        onClick={() => onChange({ ...filters, leadsInCompanyMin: filters.leadsInCompanyMin === p.value ? null : p.value })}
+                        className={cn("px-2.5 py-1 rounded-[6px] text-[11px] font-medium transition-colors border",
+                          filters.leadsInCompanyMin === p.value ? "bg-signal-blue/15 text-signal-blue-text border-signal-blue-text/20" : "bg-section text-ink-secondary border-transparent hover:bg-hover"
+                        )}>{p.label}</button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-ink-faint">Companies with at least this many contacts in the campaign.</p>
+                  <div className="pt-1.5 border-t border-border-subtle">
+                    <button type="button" onClick={() => removeAdditional(key)} className="text-[11px] text-ink-muted hover:text-signal-red-text transition-colors">Remove filter</button>
+                  </div>
+                </div>
+              </FilterPopover>
+            );
+          }
 
           if (key === "sources") {
             return (

@@ -47,6 +47,9 @@ export interface CampaignConfig {
   audience?: CampaignAudience;
   exit?: CampaignExitConditions;
   emailAutomation?: CampaignEmailAutomation;
+  /** Shared per-campaign lead filters (the Leads tab filter bar). Persisted so
+   *  the filtered view is the same for every rep and survives a refresh. */
+  leadFilters?: Record<string, unknown>;
 }
 
 export interface FunnelStep {

@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { useRowLimit } from "@/lib/hooks/use-row-limit";
-import { advanceLead, enrichJobPosts } from "@/lib/api/funnels";
+import { advanceLead, enrichJobPosts, saveLeadFilters } from "@/lib/api/funnels";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
-import { FunnelLeadsFilterBar, DEFAULT_FUNNEL_LEADS_FILTERS, type FunnelLeadsFilters } from "./funnel-leads-filter-bar";
+import { FunnelLeadsFilterBar, DEFAULT_FUNNEL_LEADS_FILTERS, normalizeFunnelLeadsFilters, type FunnelLeadsFilters } from "./funnel-leads-filter-bar";
 import {
   getStatusDotClass,
   getStatusLabel,
@@ -31,6 +31,8 @@ interface FunnelLeadTableProps {
   funnelId: string;
   /** Campaign sequence steps — powers the "Step" filter. */
   steps?: FunnelStep[];
+  /** Shared filters restored from the campaign config (persisted server-side). */
+  initialFilters?: FunnelLeadsFilters;
   sortBy?: LeadSortKey;
   onSortChange?: (key: LeadSortKey) => void;
   onLeadAdvanced?: () => void;
@@ -271,8 +273,26 @@ function MagicEnrichBar({
   );
 }
 
-export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortChange, onLeadAdvanced, onLeadClick }: FunnelLeadTableProps) {
-  const [filters, setFilters] = useState<FunnelLeadsFilters>(DEFAULT_FUNNEL_LEADS_FILTERS);
+export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, sortBy, onSortChange, onLeadAdvanced, onLeadClick }: FunnelLeadTableProps) {
+  const [filters, setFilters] = useState<FunnelLeadsFilters>(
+    initialFilters ? normalizeFunnelLeadsFilters(initialFilters) : DEFAULT_FUNNEL_LEADS_FILTERS,
+  );
+
+  // Persist filter changes to the shared campaign config (debounced) so the
+  // filtered view is the same for every rep and survives a refresh. The first
+  // render (hydrating from the server value) must not trigger a save-back.
+  const hydratedRef = useRef(false);
+  useEffect(() => {
+    if (!hydratedRef.current) { hydratedRef.current = true; return; }
+    const t = setTimeout(() => {
+      // Persist everything except the free-text search — that stays per-rep.
+      const { search: _omit, ...shared } = filters;
+      void saveLeadFilters(funnelId, shared as unknown as Record<string, unknown>).catch((err) =>
+        console.error("Failed to save lead filters:", err),
+      );
+    }, 600);
+    return () => clearTimeout(t);
+  }, [filters, funnelId]);
   const [stepFilter, setStepFilter] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
@@ -312,6 +332,18 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
   // Extract unique companies and sources for filter dropdowns
   const companyOptions = useMemo(() => [...new Set(leads.map((l) => l.company).filter(Boolean))].sort(), [leads]);
   const sourceOptions = useMemo(() => [...new Set(leads.map((l) => l.source).filter(Boolean))].sort(), [leads]);
+  const industryOptions = useMemo(() => [...new Set(leads.map((l) => l.companyIndustry).filter(Boolean) as string[])].sort(), [leads]);
+  const locationOptions = useMemo(() => [...new Set(leads.map((l) => l.companyLocation).filter(Boolean) as string[])].sort(), [leads]);
+
+  // How many leads sit at each company — powers the "Leads in company" filter.
+  const companyLeadCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const l of leads) {
+      const key = (l.company || "Unknown").toLowerCase();
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }, [leads]);
 
   // Apply filters
   const filtered = useMemo(() => {
@@ -323,6 +355,28 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
     }
     if (f.companies.length > 0) {
       result = result.filter((l) => f.companies.includes(l.company));
+    }
+    if (f.industries.length > 0) {
+      result = result.filter((l) => !!l.companyIndustry && f.industries.includes(l.companyIndustry));
+    }
+    if (f.locations.length > 0) {
+      result = result.filter((l) => !!l.companyLocation && f.locations.includes(l.companyLocation));
+    }
+    if (f.sizeMin !== null) {
+      result = result.filter((l) => (l.companyEmployeeCount ?? -1) >= f.sizeMin!);
+    }
+    if (f.sizeMax !== null) {
+      result = result.filter((l) => l.companyEmployeeCount != null && l.companyEmployeeCount <= f.sizeMax!);
+    }
+    if (f.hasJobs === "true") {
+      result = result.filter((l) => (l.companyHiringRoles?.length ?? 0) > 0);
+    } else if (f.hasJobs === "false") {
+      result = result.filter((l) => (l.companyHiringRoles?.length ?? 0) === 0);
+    }
+    if (f.leadsInCompanyMin !== null) {
+      result = result.filter(
+        (l) => (companyLeadCounts.get((l.company || "Unknown").toLowerCase()) ?? 0) >= f.leadsInCompanyMin!,
+      );
     }
     if (f.sources.length > 0) {
       result = result.filter((l) => f.sources.includes(l.source));
@@ -369,7 +423,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
     // Preserve the incoming order (the page sorts leads deterministically and
     // shares that order with the focus view — we must not re-sort here).
     return result;
-  }, [leads, filters, stepFilter, activityMap]);
+  }, [leads, filters, stepFilter, activityMap, companyLeadCounts]);
 
   // Group leads by company
   const companyGroups = useMemo(() => {
@@ -489,6 +543,8 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
         onChange={(f) => { setFilters(f); setCurrentPage(1); }}
         companyOptions={companyOptions}
         sourceOptions={sourceOptions}
+        industryOptions={industryOptions}
+        locationOptions={locationOptions}
       />
 
       {/* Count + step filter + group toggle + sort */}

@@ -350,6 +350,18 @@ export async function advanceLead(
   };
 }
 
+/** Persist the campaign's shared lead filters (stored in funnels.config so the
+ *  filtered view is the same for every rep and survives a refresh). */
+export async function saveLeadFilters(
+  funnelId: string,
+  leadFilters: Record<string, unknown>,
+): Promise<void> {
+  await apiRequest(`/funnels/${encodeURIComponent(funnelId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ leadFilters }),
+  });
+}
+
 /** Magic Enrich → "Find job posts": search TheirStack for each company's recent
  *  open jobs and add them as hiring roles on every lead at that company in this
  *  campaign. Idempotent (dedupes by role title per lead). */
