@@ -163,6 +163,11 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   // Hard stop flag set the instant the rep ends a session — blocks any auto-dial
   // even before the session-null re-render lands. Reset when a new session begins.
   const stoppedRef = useRef(false);
+  // Live mirror of `mode`, set SYNCHRONOUSLY by pause()/resume() (not waiting for
+  // a re-render). The auto-dial interval consults this so a tick can never fire a
+  // call in the window between "paused" being set and the ref-updating render —
+  // the root of the intermittent "dials while paused" bug.
+  const modeRef = useRef<DialerMode>("running");
 
   // ── Discover an active session on mount ──────────────────────────
   useEffect(() => {
@@ -187,6 +192,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
         // A restored session ALWAYS comes back paused — never start auto-dialing
         // the instant the app loads. The rep resumes explicitly from the bar.
         // (Fixes "it starts dialing immediately when I first log in".)
+        modeRef.current = "paused";
         setMode("paused");
       } catch {
         // No active session / failed — leave the bar hidden.
@@ -237,6 +243,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   const beginSession = useCallback(
     (next: DialerSession) => {
       stoppedRef.current = false;
+      modeRef.current = "running";
       setSession(next);
       setMode("running");
       setError(null);
@@ -353,6 +360,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
 
   const pause = useCallback(async () => {
     if (!session) return;
+    modeRef.current = "paused"; // synchronous gate — blocks any in-flight tick
     setMode("paused");
     stopCountdown(); // kill the live interval now, not just the displayed number
     try {
@@ -365,6 +373,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
 
   const resume = useCallback(async () => {
     if (!session) return;
+    modeRef.current = "running";
     setMode("running");
     try {
       await resumeSession(session.id);
@@ -392,6 +401,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     //    no bar showing ("I ended it and someone started speaking")
     //  • clear session state so the bar disappears and canAutoDial goes false
     stoppedRef.current = true;
+    modeRef.current = "paused";
     stopCountdown();
     if (call.activeCall) call.endCall();
     setSession(null);
@@ -407,6 +417,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
 
   const dismiss = useCallback(() => {
     stoppedRef.current = true;
+    modeRef.current = "paused";
     stopCountdown();
     setSession(null);
     setCurrentItem(null);
@@ -525,6 +536,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   // firing a call after the dialer was paused (the "dials while paused" race).
   const canAutoDialRef = useRef(canAutoDial);
   canAutoDialRef.current = canAutoDial;
+  modeRef.current = mode;
   useEffect(() => {
     if (!canAutoDial) {
       setCountdown(null);
@@ -532,10 +544,15 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     }
     let n = autoAdvanceSeconds;
     setCountdown(n);
+    // The gate the interval trusts on EVERY tick: canAutoDial holds AND we're
+    // synchronously still running (modeRef flips to "paused" inside pause()
+    // before any render, closing the intermittent "dials while paused" race).
+    const gateOpen = () =>
+      canAutoDialRef.current && !stoppedRef.current && modeRef.current === "running";
     const id = setInterval(() => {
       // Re-validate against live state — never auto-dial once paused / busy /
-      // ended (stoppedRef flips the instant the rep hits End).
-      if (!canAutoDialRef.current || stoppedRef.current) {
+      // ended (modeRef/stoppedRef flip the instant the rep pauses or ends).
+      if (!gateOpen()) {
         clearInterval(id);
         if (countdownIntervalRef.current === id) countdownIntervalRef.current = null;
         setCountdown(null);
@@ -546,7 +563,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
         clearInterval(id);
         if (countdownIntervalRef.current === id) countdownIntervalRef.current = null;
         setCountdown(null);
-        if (canAutoDialRef.current && !stoppedRef.current) startNextRef.current();
+        if (gateOpen()) startNextRef.current();
       } else {
         setCountdown(n);
       }
