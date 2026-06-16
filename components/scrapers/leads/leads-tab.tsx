@@ -36,6 +36,11 @@ interface LeadsTabProps {
   assignmentId: string;
   companiesWithLinkedIn: number;
   onCountChange?: (count: number) => void;
+  /** Company names from the Companies-tab filters — scopes the leads list to
+   *  the same companies so the two tabs stay in sync. */
+  companyNames?: string[];
+  /** Clears the Companies-tab filter (drives the banner's Clear button). */
+  onClearCompanyFilter?: () => void;
 }
 
 interface StatusMessage {
@@ -43,7 +48,7 @@ interface StatusMessage {
   text: string;
 }
 
-export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }: LeadsTabProps) {
+export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, companyNames, onClearCompanyFilter }: LeadsTabProps) {
   const isAuthReady = useAuthReady();
   const [contacts, setContacts] = useState<ScraperContactRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -118,6 +123,12 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
 
   const fetchContacts = useCallback(async (p: number, f?: LeadsFilters) => {
     const activeFilters = f || filters;
+    // Scope to companies from the Companies-tab filters (if any), unioned with
+    // the user's own company filter on this tab.
+    const companyList = [
+      ...activeFilters.companies,
+      ...(companyNames && companyNames.length ? companyNames : []),
+    ];
     try {
       const result = await getContacts({
         assignmentId,
@@ -125,7 +136,7 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
         pageSize,
         status: activeFilters.contactStatus || undefined,
         enrichmentStatus: activeFilters.enrichmentStatus || undefined,
-        company: activeFilters.companies.length > 0 ? activeFilters.companies.join(",") : undefined,
+        company: companyList.length > 0 ? companyList.join(",") : undefined,
         title: activeFilters.title || undefined,
         location: activeFilters.location || undefined,
         hasEmail: activeFilters.hasEmail || undefined,
@@ -146,7 +157,16 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
     } catch (err) {
       console.error("Failed to fetch contacts:", err);
     }
-  }, [assignmentId, filters, onCountChange]);
+  }, [assignmentId, filters, onCountChange, companyNames]);
+
+  // Refetch when the Companies-tab company filter changes.
+  const companyKey = (companyNames || []).join("|");
+  useEffect(() => {
+    if (!isAuthReady) return;
+    setPage(1);
+    void fetchContacts(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyKey]);
 
   // Initial load
   useEffect(() => {
@@ -603,6 +623,18 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange }:
           >
             <XIcon size={12} />
           </button>
+        </div>
+      )}
+
+      {/* Companies-tab filter banner — leads scoped to the filtered companies. */}
+      {companyNames && companyNames.length > 0 && (
+        <div className="flex items-center justify-between gap-2 mb-3 px-3 py-2 rounded-[10px] bg-signal-blue/10 border border-signal-blue-text/20">
+          <span className="text-[11px] text-signal-blue-text font-medium">
+            Filtered to {companyNames.length} {companyNames.length === 1 ? "company" : "companies"} from the Companies tab
+          </span>
+          {onClearCompanyFilter && (
+            <button onClick={onClearCompanyFilter} className="text-[11px] text-signal-blue-text hover:underline">Clear</button>
+          )}
         </div>
       )}
 

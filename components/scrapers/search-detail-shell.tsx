@@ -263,6 +263,35 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
   const jobsFilter = useJobsInlineFilters(runFilteredResults, resolvedRunId);
   const companiesFilter = useCompaniesInlineFilters(uniqueCompanies);
 
+  // Persist company filters per-assignment so they survive a refresh / revisit.
+  // Restore on mount (when the URL carries none); a Save button writes the
+  // current set so it sticks.
+  const FILTERS_KEY = `leadey:scraper-company-filters:${searchId}`;
+  const filtersRestoredRef = useRef(false);
+  const { setFilters: setCompaniesFilters } = companiesFilter;
+  const [filtersSaved, setFiltersSaved] = useState(false);
+  useEffect(() => {
+    if (filtersRestoredRef.current) return;
+    filtersRestoredRef.current = true;
+    if (!companiesFilter.isEmpty) return; // URL already provided filters
+    try {
+      const saved = window.localStorage.getItem(FILTERS_KEY);
+      if (saved) setCompaniesFilters(JSON.parse(saved));
+    } catch {
+      /* ignore */
+    }
+  }, [companiesFilter.isEmpty, setCompaniesFilters, FILTERS_KEY]);
+  const saveCompanyFilters = useCallback(() => {
+    try {
+      if (companiesFilter.isEmpty) window.localStorage.removeItem(FILTERS_KEY);
+      else window.localStorage.setItem(FILTERS_KEY, JSON.stringify(companiesFilter.filters));
+      setFiltersSaved(true);
+      window.setTimeout(() => setFiltersSaved(false), 1800);
+    } catch {
+      /* ignore */
+    }
+  }, [companiesFilter.filters, companiesFilter.isEmpty, FILTERS_KEY]);
+
   // Filter displayed rows. When a run is selected we use runFilteredResults
   // (sourced from allResults, which fetches everything in 2000-row pages)
   // rather than results.data (the 25-row server page) — otherwise the Jobs
@@ -613,6 +642,10 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
             <button
               onClick={() => setShowDiscoveryModal(true)}
               disabled={selectedCompanyLinkedInUrls.length === 0}
+              title={
+                `${selectedCompanyLinkedInUrls.length} of ${activeSelection.selectedCount} selected companies have a LinkedIn profile and can be searched for contacts. ` +
+                `Companies without a LinkedIn URL can't be searched.`
+              }
               className="flex items-center gap-1 px-3 py-1.5 rounded-[20px] text-[11px] font-medium bg-signal-green/20 text-signal-green-text hover:bg-signal-green/30 transition-colors disabled:opacity-50"
             >
               <Sparkles size={10} />
@@ -699,15 +732,26 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
 
       {activeTab === "companies" && (
         <>
-          <CompaniesFilterBar
-            filters={companiesFilter.filters}
-            setFilters={companiesFilter.setFilters}
-            updateFilter={companiesFilter.updateFilter}
-            clearAll={companiesFilter.clearAll}
-            isEmpty={companiesFilter.isEmpty}
-            search={companiesSearch}
-            onSearchChange={setCompaniesSearch}
-          />
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <CompaniesFilterBar
+                filters={companiesFilter.filters}
+                setFilters={companiesFilter.setFilters}
+                updateFilter={companiesFilter.updateFilter}
+                clearAll={companiesFilter.clearAll}
+                isEmpty={companiesFilter.isEmpty}
+                search={companiesSearch}
+                onSearchChange={setCompaniesSearch}
+              />
+            </div>
+            <button
+              onClick={saveCompanyFilters}
+              title="Save these filters so they persist on refresh"
+              className="shrink-0 mt-0.5 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle"
+            >
+              {filtersSaved ? "Saved ✓" : "Save filters"}
+            </button>
+          </div>
           <CompaniesTab
             companies={companiesSearch
               ? companiesFilter.filteredCompanies.filter((c) => {
@@ -734,6 +778,12 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
           assignmentId={searchId}
           companiesWithLinkedIn={uniqueCompanies.filter((c) => c.linkedinUrl).length}
           onCountChange={setLeadsCount}
+          companyNames={
+            !companiesFilter.isEmpty
+              ? companiesFilter.filteredCompanies.slice(0, 500).map((c) => c.name)
+              : undefined
+          }
+          onClearCompanyFilter={companiesFilter.clearAll}
         />
       )}
 

@@ -201,6 +201,28 @@ export function CompaniesFilterBar({ filters, setFilters, updateFilter, clearAll
           );
         })}
 
+        {/* Custom employee headcount min/max (high & low) */}
+        <div className="flex items-center gap-1 px-2 py-1 rounded-[8px] border border-border-subtle bg-section/40">
+          <span className="text-[11px] text-ink-muted">Size</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="min"
+            value={filters.minEmployees ?? ""}
+            onChange={(e) => updateFilter("minEmployees", e.target.value === "" ? null : Math.max(0, Number(e.target.value)))}
+            className="w-14 px-1.5 py-0.5 rounded-[6px] bg-surface border border-border-subtle text-[11px] text-ink text-center outline-none focus:border-border-default"
+          />
+          <span className="text-[11px] text-ink-faint">–</span>
+          <input
+            type="number"
+            min={0}
+            placeholder="max"
+            value={filters.maxEmployees ?? ""}
+            onChange={(e) => updateFilter("maxEmployees", e.target.value === "" ? null : Math.max(0, Number(e.target.value)))}
+            className="w-14 px-1.5 py-0.5 rounded-[6px] bg-surface border border-border-subtle text-[11px] text-ink text-center outline-none focus:border-border-default"
+          />
+        </div>
+
         {/* + Add Filter */}
         {availableAdditional.length > 0 && (
           <div className="relative">

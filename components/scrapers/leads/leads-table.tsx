@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ExternalLink, Sparkles, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -136,9 +137,12 @@ export function LeadsTable({
                       </div>
                     )}
                     <div className="min-w-0">
-                      <p className="text-[12px] font-medium text-ink truncate">
+                      <Link
+                        href={`/dashboard/contacts/${contact.id}`}
+                        className="text-[12px] font-medium text-ink truncate block hover:text-accent hover:underline"
+                      >
                         {contact.fullName || `${contact.firstName || ""} ${contact.lastName || ""}`.trim() || "Unknown"}
-                      </p>
+                      </Link>
                       {contact.headline && (
                         <p className="text-[10px] text-ink-muted truncate max-w-[180px]">
                           {contact.headline}

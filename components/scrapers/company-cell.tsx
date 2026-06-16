@@ -1,14 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 interface CompanyCellProps {
   name: string;
   domain: string | null;
   industry: string | null;
+  /** LinkedIn URL fallback for the company-profile link when no domain. */
+  linkedinUrl?: string | null;
 }
 
-export function CompanyCell({ name, domain, industry }: CompanyCellProps) {
+export function CompanyCell({ name, domain, industry, linkedinUrl }: CompanyCellProps) {
   const [imgError, setImgError] = useState(false);
   const initials = name
     .split(/\s+/)
@@ -16,6 +19,8 @@ export function CompanyCell({ name, domain, industry }: CompanyCellProps) {
     .map((w) => w[0])
     .join("")
     .toUpperCase();
+  // Link to the standalone company profile — domain preferred, else LinkedIn URL.
+  const profileKey = domain || linkedinUrl || null;
 
   return (
     <div className="flex items-center gap-2.5">
@@ -32,7 +37,17 @@ export function CompanyCell({ name, domain, industry }: CompanyCellProps) {
         </div>
       )}
       <div className="min-w-0">
-        <div className="text-[12px] font-medium text-ink truncate">{name}</div>
+        {profileKey ? (
+          <Link
+            href={`/dashboard/companies/${encodeURIComponent(profileKey)}`}
+            className="text-[12px] font-medium text-ink truncate block hover:text-accent hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {name}
+          </Link>
+        ) : (
+          <div className="text-[12px] font-medium text-ink truncate">{name}</div>
+        )}
         <div className="flex items-center gap-1.5">
           {domain && <span className="text-[10px] text-ink-faint truncate">{domain}</span>}
           {industry && (

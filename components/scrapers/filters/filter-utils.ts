@@ -120,6 +120,8 @@ export function isCompaniesFilterEmpty(f: CompaniesFilterState): boolean {
     f.industry.length === 0 &&
     f.country.length === 0 &&
     f.employeeSizeRanges.length === 0 &&
+    f.minEmployees === null &&
+    f.maxEmployees === null &&
     f.fundingStage.length === 0 &&
     f.minJobCount === null
   );
@@ -145,6 +147,14 @@ export function applyCompaniesFilters(
     // Employee size (multi-select presets)
     if (filters.employeeSizeRanges.length > 0) {
       if (!matchesAnyPresetRange(c.employeeCount, filters.employeeSizeRanges, EMPLOYEE_PRESETS)) return false;
+    }
+
+    // Employee size (custom min/max headcount)
+    if (filters.minEmployees !== null) {
+      if (c.employeeCount == null || c.employeeCount < filters.minEmployees) return false;
+    }
+    if (filters.maxEmployees !== null) {
+      if (c.employeeCount == null || c.employeeCount > filters.maxEmployees) return false;
     }
 
     // Funding stage

@@ -79,6 +79,60 @@ export async function getContacts(opts: {
   return apiRequestRaw(`/contacts?${params}`);
 }
 
+// ─── Standalone profiles ────────────────────────────────────────────
+
+export interface ContactProfile {
+  id: string;
+  assignmentId: string | null;
+  fullName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  headline: string | null;
+  title: string | null;
+  company: string | null;
+  companyDomain: string | null;
+  companyLinkedinUrl: string | null;
+  linkedinUrl: string | null;
+  location: string | null;
+  profileImageUrl: string | null;
+  email: string | null;
+  emailStatus: string | null;
+  phone: string | null;
+  phoneStatus: string | null;
+  enrichmentStatus: string;
+  status: string;
+  doNotCall: boolean;
+  callsTotal: number;
+  campaigns: { leadId: string; funnelId: string; funnelName: string; status: string; currentStep: number; totalSteps: number }[];
+  calls: { id: string; direction: string; number: string; duration: number; disposition: string; calledAt: string | null }[];
+}
+
+export async function getContactProfile(id: string): Promise<ContactProfile> {
+  return apiRequest<ContactProfile>(`/contacts/${id}/profile`);
+}
+
+export interface CompanyProfile {
+  company: {
+    id?: string;
+    name: string;
+    domain: string | null;
+    linkedinUrl: string | null;
+    industry?: string | null;
+    employeeCount?: number | null;
+    fundingStage?: string | null;
+    country?: string | null;
+    city?: string | null;
+    logo?: string | null;
+    description?: string | null;
+  };
+  contacts: { id: string; fullName: string | null; title: string | null; linkedinUrl: string | null; email: string | null; phone: string | null; status: string }[];
+  leads: { leadId: string; funnelId: string; name: string; title: string; status: string }[];
+}
+
+export async function getCompanyProfile(key: string): Promise<CompanyProfile> {
+  return apiRequest<CompanyProfile>(`/companies/profile?key=${encodeURIComponent(key)}`);
+}
+
 // ─── Enrichment ─────────────────────────────────────────────────────
 
 export async function enrichContacts(

@@ -88,6 +88,9 @@ export interface CompaniesFilterState {
   industry: string[];
   country: string[];
   employeeSizeRanges: string[];
+  /** Custom employee headcount bounds (independent of the preset ranges). */
+  minEmployees: number | null;
+  maxEmployees: number | null;
   fundingStage: string[];
   minJobCount: number | null;
 }
@@ -113,6 +116,8 @@ export const DEFAULT_COMPANIES_FILTER: CompaniesFilterState = {
   industry: [],
   country: [],
   employeeSizeRanges: [],
+  minEmployees: null,
+  maxEmployees: null,
   fundingStage: [],
   minJobCount: null,
 };
