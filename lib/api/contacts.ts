@@ -60,6 +60,8 @@ export async function getContacts(opts: {
   status?: string;
   enrichmentStatus?: string;
   company?: string;
+  /** LinkedIn company URLs to scope by (matches the searched company reliably). */
+  companyUrls?: string;
   title?: string;
   location?: string;
   hasEmail?: string;
@@ -72,6 +74,7 @@ export async function getContacts(opts: {
   if (opts.status) params.set("status", opts.status);
   if (opts.enrichmentStatus) params.set("enrichmentStatus", opts.enrichmentStatus);
   if (opts.company) params.set("company", opts.company);
+  if (opts.companyUrls) params.set("companyUrls", opts.companyUrls);
   if (opts.title) params.set("title", opts.title);
   if (opts.location) params.set("location", opts.location);
   if (opts.hasEmail) params.set("hasEmail", opts.hasEmail);

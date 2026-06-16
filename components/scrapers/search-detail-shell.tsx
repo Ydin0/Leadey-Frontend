@@ -786,6 +786,11 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
               ? companiesFilter.filteredCompanies.slice(0, 500).map((c) => c.name)
               : undefined
           }
+          companyUrls={
+            !companiesFilter.isEmpty
+              ? (companiesFilter.filteredCompanies.slice(0, 500).map((c) => c.linkedinUrl).filter(Boolean) as string[])
+              : undefined
+          }
           onClearCompanyFilter={companiesFilter.clearAll}
         />
       )}

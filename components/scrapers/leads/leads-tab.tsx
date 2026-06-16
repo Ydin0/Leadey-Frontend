@@ -39,6 +39,9 @@ interface LeadsTabProps {
   /** Company names from the Companies-tab filters — scopes the leads list to
    *  the same companies so the two tabs stay in sync. */
   companyNames?: string[];
+  /** LinkedIn company URLs for the same companies — the reliable scope key
+   *  (matches each contact's searched company URL, naming-independent). */
+  companyUrls?: string[];
   /** Clears the Companies-tab filter (drives the banner's Clear button). */
   onClearCompanyFilter?: () => void;
 }
@@ -48,7 +51,7 @@ interface StatusMessage {
   text: string;
 }
 
-export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, companyNames, onClearCompanyFilter }: LeadsTabProps) {
+export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, companyNames, companyUrls, onClearCompanyFilter }: LeadsTabProps) {
   const isAuthReady = useAuthReady();
   const [contacts, setContacts] = useState<ScraperContactRow[]>([]);
   const [totalCount, setTotalCount] = useState(0);
@@ -137,6 +140,7 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, c
         status: activeFilters.contactStatus || undefined,
         enrichmentStatus: activeFilters.enrichmentStatus || undefined,
         company: companyList.length > 0 ? companyList.join(",") : undefined,
+        companyUrls: companyUrls && companyUrls.length ? companyUrls.join(",") : undefined,
         title: activeFilters.title || undefined,
         location: activeFilters.location || undefined,
         hasEmail: activeFilters.hasEmail || undefined,
@@ -157,10 +161,10 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, c
     } catch (err) {
       console.error("Failed to fetch contacts:", err);
     }
-  }, [assignmentId, filters, onCountChange, companyNames]);
+  }, [assignmentId, filters, onCountChange, companyNames, companyUrls]);
 
   // Refetch when the Companies-tab company filter changes.
-  const companyKey = (companyNames || []).join("|");
+  const companyKey = [...(companyNames || []), ...(companyUrls || [])].join("|");
   useEffect(() => {
     if (!isAuthReady) return;
     setPage(1);
