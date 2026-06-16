@@ -274,7 +274,7 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, c
       const newRun = runs.find((r) => r.id === result.runId);
       if (newRun) setActiveRun(newRun);
     } catch (err) {
-      showStatus("error", "Failed to start discovery");
+      showStatus("error", err instanceof Error ? err.message : "Failed to start discovery");
       console.error("Failed to start discovery:", err);
     } finally {
       setSubmittingDiscovery(false);

@@ -71,6 +71,7 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
   // Discovery modal state
   const [showDiscoveryModal, setShowDiscoveryModal] = useState(false);
   const [discoverySubmitting, setDiscoverySubmitting] = useState(false);
+  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
 
   // Run modal state
   const [showRunModal, setShowRunModal] = useState(false);
@@ -414,6 +415,7 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
 
   const handleDiscoverySubmit = async (config: DiscoveryConfig) => {
     setDiscoverySubmitting(true);
+    setDiscoveryError(null);
     try {
       await startDiscovery(searchId, config);
       setShowDiscoveryModal(false);
@@ -421,6 +423,7 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
       setActiveTab("leads");
     } catch (err) {
       console.error("Discovery failed:", err);
+      setDiscoveryError(err instanceof Error ? err.message : "Failed to start discovery");
     } finally {
       setDiscoverySubmitting(false);
     }
@@ -797,11 +800,12 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
 
       <DiscoveryConfigModal
         open={showDiscoveryModal}
-        onClose={() => setShowDiscoveryModal(false)}
+        onClose={() => { setShowDiscoveryModal(false); setDiscoveryError(null); }}
         onSubmit={handleDiscoverySubmit}
         companiesWithLinkedIn={selectedCompanyLinkedInUrls.length || uniqueCompanies.filter((c) => c.linkedinUrl).length}
         companyLinkedinUrls={selectedCompanyLinkedInUrls.length > 0 ? selectedCompanyLinkedInUrls : undefined}
         submitting={discoverySubmitting}
+        error={discoveryError}
       />
     </div>
   );

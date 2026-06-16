@@ -23,6 +23,8 @@ interface DiscoveryConfigModalProps {
   companiesWithLinkedIn: number;
   companyLinkedinUrls?: string[];
   submitting?: boolean;
+  /** Error from the last submit attempt — shown in the modal. */
+  error?: string | null;
 }
 
 export function DiscoveryConfigModal({
@@ -32,6 +34,7 @@ export function DiscoveryConfigModal({
   companiesWithLinkedIn,
   companyLinkedinUrls,
   submitting,
+  error,
 }: DiscoveryConfigModalProps) {
   const [selectedRoles, setSelectedRoles] = useState<string[]>(["CTO", "VP Engineering", "Founder", "CEO", "Head of Engineering"]);
   const [selectedSeniority, setSelectedSeniority] = useState<string[]>(["C-Level", "VP", "Director", "Head", "Manager", "Senior"]);
@@ -174,6 +177,13 @@ export function DiscoveryConfigModal({
             Estimated cost: ${estimatedCost}
           </p>
         </div>
+
+        {/* Error */}
+        {error && (
+          <div className="rounded-[10px] bg-signal-red/10 border border-signal-red-text/20 px-4 py-2.5 mb-3">
+            <p className="text-[11px] text-signal-red-text">{error}</p>
+          </div>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-2 justify-end">
