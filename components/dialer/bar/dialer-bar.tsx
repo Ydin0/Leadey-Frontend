@@ -28,6 +28,22 @@ export function DialerBar() {
 
   const { session, currentItem, mode, countdown, autoAdvanceSeconds } = dialer;
 
+  // Click-anywhere-to-pause: while the auto-dial countdown is ticking, a click
+  // anywhere OUTSIDE the dialer bar (e.g. the rep starting to disposition or
+  // read the lead) pauses it — so a lead is never auto-skipped mid-work, which
+  // was poisoning redial data. The dialer bar's own controls are excluded so
+  // they keep their normal behaviour.
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (!dialer.session || dialer.mode !== "running" || dialer.countdown === null) return;
+      const t = e.target as HTMLElement | null;
+      if (t && t.closest("[data-dialer-bar]")) return;
+      dialer.pauseForEngagement();
+    }
+    document.addEventListener("mousedown", onDown, true);
+    return () => document.removeEventListener("mousedown", onDown, true);
+  }, [dialer]);
+
   // Nothing to show until a session exists.
   if (!session) return null;
 
@@ -54,7 +70,7 @@ export function DialerBar() {
   const displayPhone = inCall ? callPhone : currentItem?.leadPhone || null;
 
   return (
-    <div className="sticky top-14 z-30 mx-0">
+    <div className="sticky top-14 z-30 mx-0" data-dialer-bar>
       <div className="flex items-center gap-3 px-4 py-2 bg-surface border-b border-border-default shadow-sm">
         {/* Brand / progress */}
         <div className="flex items-center gap-2 shrink-0">
