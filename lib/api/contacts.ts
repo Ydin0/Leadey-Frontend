@@ -136,11 +136,12 @@ export async function getCompanyProfile(key: string): Promise<CompanyProfile> {
 // ─── Enrichment ─────────────────────────────────────────────────────
 
 export async function enrichContacts(
-  contactIds: string[],
+  selection: string[] | { allMatching: true; filters: ContactFilterPayload },
 ): Promise<{ requestIds: string[]; contactCount: number }> {
+  const body = Array.isArray(selection) ? { contactIds: selection } : selection;
   return apiRequest(`/contacts/enrich`, {
     method: "POST",
-    body: JSON.stringify({ contactIds }),
+    body: JSON.stringify(body),
   });
 }
 

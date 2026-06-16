@@ -317,6 +317,21 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, c
   }
 
   async function handleEnrichSelected() {
+    // "Select all matching" → enrich EVERY matching unenriched contact server-
+    // side (not just the loaded page).
+    if (selection.isAllMatching) {
+      try {
+        const result = await enrichContacts({ allMatching: true, filters: currentFilterPayload() });
+        setEnrichRequestIds(result.requestIds);
+        selection.clearSelection();
+        showStatus("success", `Enrichment started for ${result.contactCount} contacts`);
+        await fetchContacts(page);
+      } catch (err) {
+        showStatus("error", "Failed to start enrichment");
+        console.error("Failed to bulk enrich (all matching):", err);
+      }
+      return;
+    }
     const ids = Array.from(selection.selectedIds);
     const unenriched = contacts
       .filter((c) => ids.includes(c.id) && c.enrichmentStatus === "none")
@@ -465,19 +480,21 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, c
   }
 
   // Maps the active filter UI state to the backend contact-filter query.
-  const currentFilterPayload = useCallback(
-    () => ({
+  const currentFilterPayload = useCallback(() => {
+    // Include the Companies-tab company scope so "select all matching" targets
+    // exactly the leads shown (filtered to those companies), not the whole list.
+    const companyList = [...filters.companies, ...(companyNames || [])];
+    return {
       assignmentId,
       status: filters.contactStatus || undefined,
       enrichmentStatus: filters.enrichmentStatus || undefined,
-      company: filters.companies.length > 0 ? filters.companies.join(",") : undefined,
+      company: companyList.length > 0 ? companyList.join(",") : undefined,
       title: filters.title || undefined,
       location: filters.location || undefined,
       hasEmail: filters.hasEmail || undefined,
       hasPhone: filters.hasPhone || undefined,
-    }),
-    [assignmentId, filters],
-  );
+    };
+  }, [assignmentId, filters, companyNames]);
 
   async function handleSendToFunnel(funnelId: string) {
     const isAll = selection.isAllMatching;

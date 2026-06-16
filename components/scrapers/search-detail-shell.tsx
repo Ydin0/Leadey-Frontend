@@ -1028,7 +1028,29 @@ function CompaniesTab({
             position="below"
           />
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {/* Sort by */}
+          <select
+            value={sortField ? `${sortField}:${sortAsc ? "asc" : "desc"}` : ""}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) { setSortField(null); setCompanyPage(1); return; }
+              const [field, dir] = v.split(":");
+              setSortField(field);
+              setSortAsc(dir === "asc");
+              setCompanyPage(1);
+            }}
+            className="px-2.5 py-1.5 rounded-[20px] bg-surface text-ink text-[11px] font-medium border border-border-subtle outline-none focus:border-border-default cursor-pointer"
+            title="Sort companies"
+          >
+            <option value="">Sort: default</option>
+            <option value="name:asc">Company A–Z</option>
+            <option value="name:desc">Company Z–A</option>
+            <option value="leadCount:desc">Most leads</option>
+            <option value="employeeCount:desc">Largest (employees)</option>
+            <option value="employeeCount:asc">Smallest (employees)</option>
+            <option value="jobCount:desc">Most jobs</option>
+          </select>
           <button
             onClick={handleExportCompanies}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] text-[11px] font-medium bg-surface text-ink border border-border-subtle hover:bg-hover transition-colors"
