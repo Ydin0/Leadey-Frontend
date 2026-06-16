@@ -122,6 +122,11 @@ function hydrateLead(raw: ApiFunnelLead): FunnelLead {
     unipileProviderId: (raw as any).unipileProviderId || null,
     createdAt: (raw as any).createdAt ? parseDate((raw as any).createdAt) : undefined,
     events,
+    // Server-computed activity totals (calls by phone / emails by address across
+    // the whole org) — must be carried through or the table falls back to
+    // counting the lite payload's empty events array and shows 0.
+    callCount: (raw as any).callCount != null ? asNumber((raw as any).callCount) : undefined,
+    emailCount: (raw as any).emailCount != null ? asNumber((raw as any).emailCount) : undefined,
   };
 }
 
