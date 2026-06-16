@@ -90,6 +90,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const callRef = useRef<Call | null>(null);
   const incomingCallRef = useRef<Call | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // SYNCHRONOUS in-flight guard. `activeCall` is React state and lags a tick, so
+  // a call that fails instantly (e.g. a bad number) could be re-fired several
+  // times before `activeCall` updated — the "spam dialling" storm. This ref is
+  // set the instant a dial starts and cleared only when the call fully ends, so
+  // no second dial can slip through the gap.
+  const dialingRef = useRef(false);
   // 0 until the call actually CONNECTS (accept fires). A call that never
   // connects must log duration 0 — not (now - 0) ≈ epoch seconds, which is what
   // corrupted durations into the billions and broke cost reporting.
@@ -519,6 +525,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
           setActiveCall(null);
           callRef.current = null;
+          dialingRef.current = false;
         }, 800);
       });
 
@@ -529,6 +536,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
           setActiveCall(null);
           callRef.current = null;
+          dialingRef.current = false;
         }, 800);
       });
 
@@ -539,6 +547,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
           setActiveCall(null);
           callRef.current = null;
+          dialingRef.current = false;
         }, 800);
       });
 
@@ -546,6 +555,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         console.error("[Twilio Call Error]", err);
         setActiveCall(null);
         callRef.current = null;
+        dialingRef.current = false;
       });
     },
     [selectedLineId, phoneLines]
@@ -554,9 +564,18 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // ── Start an outbound call ────────────────────
   const startCall = useCallback(
     async (to: string, meta?: CallMeta) => {
-      if (activeCall) return;
+      if (dialingRef.current || activeCall) return; // synchronous spam guard
       if (!deviceRef.current || !deviceReady) {
         console.error("[Twilio] Device not ready");
+        return;
+      }
+
+      // Sanitise the destination to a dialable E.164-ish number — strip CSV junk
+      // (a leading apostrophe, spaces, brackets). A malformed number was being
+      // treated as a client identity and cutting instantly.
+      const cleanTo = (to || "").replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
+      if (!/^\+?\d{7,15}$/.test(cleanTo)) {
+        console.warn("[Twilio] Skipping dial — invalid number:", to);
         return;
       }
 
@@ -569,11 +588,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       // Clear stale ended-call info so the dialer doesn't apply the
       // previous call's record to this one if there's a race.
       setLastEndedCall(null);
+      dialingRef.current = true;
 
       try {
         const call = await deviceRef.current.connect({
           params: {
-            To: to,
+            To: cleanTo,
             CallerId: callerId,
           },
         });
@@ -581,8 +601,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         callRef.current = call;
         // Pass the numbers we already know — see bindCallEvents for why we
         // can't rely on call.parameters for outbound.
-        bindCallEvents(call, "outbound", meta, { to, from: line.number });
+        bindCallEvents(call, "outbound", meta, { to: cleanTo, from: line.number });
       } catch (err) {
+        dialingRef.current = false;
         console.error("[Twilio] Connect failed:", err);
       }
     },
