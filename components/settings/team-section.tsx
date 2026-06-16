@@ -50,6 +50,7 @@ export function TeamSection() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   // Role change
   const [changingRole, setChangingRole] = useState<string | null>(null);
@@ -96,6 +97,7 @@ export function TeamSection() {
       setInviteEmail("");
       setInviteFirstName("");
       setInviteLastName("");
+      setShowInviteModal(false);
       setInviteSuccess(true);
       setTimeout(() => setInviteSuccess(false), 3000);
       await loadData();
@@ -177,66 +179,13 @@ export function TeamSection() {
         )}
       </div>
 
-      {/* Invite Form */}
-      <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
-        <h3 className="text-[14px] font-semibold text-ink mb-1">Invite Team Member</h3>
-        <p className="text-[11px] text-ink-muted mb-4">Add their name and email — they&apos;ll get a sign-in link to join your team.</p>
-
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <input
-            type="text"
-            value={inviteFirstName}
-            onChange={(e) => setInviteFirstName(e.target.value)}
-            placeholder="First name"
-            disabled={seatsFull}
-            className="px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default disabled:opacity-50"
-          />
-          <input
-            type="text"
-            value={inviteLastName}
-            onChange={(e) => setInviteLastName(e.target.value)}
-            placeholder="Last name"
-            disabled={seatsFull}
-            className="px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default disabled:opacity-50"
-          />
+      {/* Invite success banner (the form now lives in a modal) */}
+      {inviteSuccess && (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-[12px] bg-signal-green/10 border border-signal-green-text/20">
+          <Mail size={14} className="text-signal-green-text shrink-0" />
+          <span className="text-[12px] text-ink-secondary">Invitation sent successfully!</span>
         </div>
-
-        <div className="flex items-center gap-2">
-          <input
-            type="email"
-            value={inviteEmail}
-            onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null); }}
-            placeholder="name@company.com"
-            disabled={seatsFull}
-            className="flex-1 px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default disabled:opacity-50"
-          />
-          <NativeSelect
-            value={inviteRole}
-            onChange={(e) => setInviteRole(e.target.value)}
-            disabled={seatsFull}
-            className="w-auto min-w-[120px]"
-          >
-            {ROLES.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
-            ))}
-          </NativeSelect>
-          <button
-            onClick={handleInvite}
-            disabled={!inviteEmail.trim() || inviting || seatsFull}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {inviting ? <Loader2 size={12} className="animate-spin" /> : <UserPlus size={12} />}
-            Invite
-          </button>
-        </div>
-
-        {inviteError && (
-          <p className="text-[11px] text-signal-red-text mt-2">{inviteError}</p>
-        )}
-        {inviteSuccess && (
-          <p className="text-[11px] text-signal-green-text mt-2">Invitation sent successfully!</p>
-        )}
-      </div>
+      )}
 
       {/* Pending Invitations */}
       {invitations.length > 0 && (
@@ -268,7 +217,17 @@ export function TeamSection() {
 
       {/* Active Members */}
       <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
-        <h3 className="text-[14px] font-semibold text-ink mb-3">Team Members</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[14px] font-semibold text-ink">Team Members</h3>
+          <button
+            onClick={() => { setInviteError(null); setInviteSuccess(false); setShowInviteModal(true); }}
+            disabled={seatsFull}
+            title={seatsFull ? "All seats are in use — upgrade to add more members" : "Add a team member"}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <UserPlus size={12} /> Add member
+          </button>
+        </div>
         <div className="space-y-2">
           {members.map((member) => (
             <div key={member.id} className="flex items-center justify-between py-2.5 px-3 rounded-[8px] hover:bg-hover/30 transition-colors">
@@ -334,6 +293,82 @@ export function TeamSection() {
           ))}
         </div>
       </div>
+
+      {/* Invite member modal */}
+      {showInviteModal && (
+        <Modal onClose={() => (inviting ? null : setShowInviteModal(false))} maxWidth={460}>
+          <ModalHeader
+            title="Add team member"
+            onClose={() => (inviting ? null : setShowInviteModal(false))}
+          />
+          <div className="p-[18px]">
+            <p className="text-[11.5px] text-ink-muted mb-4">
+              Add their name and email — they&apos;ll get a sign-in link to join your team.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <input
+                type="text"
+                autoFocus
+                value={inviteFirstName}
+                onChange={(e) => setInviteFirstName(e.target.value)}
+                placeholder="First name"
+                className="px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+              />
+              <input
+                type="text"
+                value={inviteLastName}
+                onChange={(e) => setInviteLastName(e.target.value)}
+                placeholder="Last name"
+                className="px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+              />
+            </div>
+
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null); }}
+              placeholder="name@company.com"
+              className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default mb-2"
+            />
+
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Role</label>
+              <NativeSelect
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value)}
+                className="w-full"
+              >
+                {ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </NativeSelect>
+            </div>
+
+            {inviteError && (
+              <p className="text-[11.5px] text-signal-red-text mt-3">{inviteError}</p>
+            )}
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                onClick={() => setShowInviteModal(false)}
+                disabled={inviting}
+                className="px-4 py-2 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleInvite}
+                disabled={!inviteEmail.trim() || inviting}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {inviting ? <Loader2 size={12} className="animate-spin" /> : <UserPlus size={12} />}
+                Send invite
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {/* Confirm remove modal */}
       {confirmRemove && (
