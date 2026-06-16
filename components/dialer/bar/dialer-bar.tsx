@@ -286,12 +286,14 @@ function NextCallButton({
       type="button"
       onClick={onClick}
       title={counting ? "Dial now — skip the wait" : inCall ? "Hang up & go to the next lead" : "Call this lead now"}
-      className="relative shrink-0 overflow-hidden inline-flex items-center rounded-full bg-signal-blue/15 text-signal-blue-text px-4 py-1.5 text-[12px] font-semibold hover:brightness-95 transition-[filter]"
+      className="relative shrink-0 overflow-hidden inline-flex items-center rounded-full bg-signal-blue/10 ring-1 ring-inset ring-signal-blue-text/20 text-signal-blue-text px-4 py-1.5 text-[12px] font-semibold hover:brightness-95 transition-[filter]"
     >
-      {/* Fill — animates smoothly between the 1s countdown ticks. */}
+      {/* Fill — animates smoothly between the 1s countdown ticks. Uses the
+          saturated electric-blue (not a faint tint of the track) so the
+          countdown progress is clearly visible. */}
       <span
         aria-hidden
-        className="absolute inset-y-0 left-0 bg-signal-blue/35"
+        className="absolute inset-y-0 left-0 bg-signal-blue-text/30 border-r-2 border-signal-blue-text"
         style={{ width: `${progress}%`, transition: counting ? "width 1s linear" : "none" }}
       />
       <span className="relative z-10 inline-flex items-center gap-1.5">
