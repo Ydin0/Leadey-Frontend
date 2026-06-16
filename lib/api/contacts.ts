@@ -105,6 +105,8 @@ export interface ContactProfile {
   callsTotal: number;
   campaigns: { leadId: string; funnelId: string; funnelName: string; status: string; currentStep: number; totalSteps: number }[];
   calls: { id: string; direction: string; number: string; duration: number; disposition: string; calledAt: string | null }[];
+  /** Hiring roles inherited from the company's scraped job posts. */
+  hiringRoles: { id: string; title: string; description: string; salaryRange: string; location: string; postedAgo: string; seniority: string; url: string }[];
 }
 
 export async function getContactProfile(id: string): Promise<ContactProfile> {

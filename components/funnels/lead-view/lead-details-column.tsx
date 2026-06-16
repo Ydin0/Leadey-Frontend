@@ -46,6 +46,8 @@ interface LeadDetailsColumnProps {
   statuses: LeadStatusOption[];
   /** Per-lead campaign progress (LeadStepTracker), rendered atop the Details tab. */
   stepTracker?: ReactNode;
+  /** Read-only hiring roles for a standalone contact (from scraped jobs). */
+  seedHiringRoles?: import("@/lib/api/hiring-roles").HiringRole[];
 }
 
 function initials(name: string): string {
@@ -186,6 +188,7 @@ export function LeadDetailsColumn({
   leads,
   statuses,
   stepTracker,
+  seedHiringRoles,
 }: LeadDetailsColumnProps) {
   const [tab, setTab] = useState<"details" | "leads">("details");
 
@@ -284,7 +287,7 @@ export function LeadDetailsColumn({
           </Section>
 
           {/* Hiring roles — full CRUD (title, salary, location, seniority, …) */}
-          <LeadHiringRolesSection funnelId={funnelId} leadId={leadId} />
+          <LeadHiringRolesSection funnelId={funnelId} leadId={leadId} seedRoles={seedHiringRoles} />
 
           {/* Custom fields */}
           {customFields.length > 0 && (

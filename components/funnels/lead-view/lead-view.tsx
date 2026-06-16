@@ -34,6 +34,10 @@ interface LeadViewProps {
   leadId: string;
   onLeadPatch?: (leadId: string, patch: Partial<FunnelLead>) => void;
   onLeadsChanged?: () => void;
+  /** Read-only hiring roles for a standalone (non-campaign) contact — derived
+   *  from the company's scraped jobs. When set, the Hiring roles section shows
+   *  these instead of fetching per-lead roles. */
+  seedHiringRoles?: import("@/lib/api/hiring-roles").HiringRole[];
 }
 
 const TERMINAL_OUTCOMES = new Set(["replied", "bounced", "completed"]);
@@ -44,7 +48,7 @@ interface ProgressOverride {
   events: FunnelLeadEvent[];
 }
 
-export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }: LeadViewProps) {
+export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, seedHiringRoles }: LeadViewProps) {
   const steps = funnel.steps;
   const funnelId = funnel.id;
   const router = useRouter();
@@ -496,6 +500,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged }:
             onDnc={handleDnc}
             leads={leads}
             statuses={statuses}
+            seedHiringRoles={seedHiringRoles}
             stepTracker={
               steps.length > 0 ? (
                 <LeadStepTracker

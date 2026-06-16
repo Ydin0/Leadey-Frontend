@@ -36,9 +36,21 @@ const EMPTY: Draft = {
 const inputClass =
   "w-full bg-surface border border-border-subtle rounded-md px-2 py-1.5 text-[11.5px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default";
 
-export function LeadHiringRolesSection({ funnelId, leadId }: { funnelId: string; leadId: string }) {
+export function LeadHiringRolesSection({
+  funnelId,
+  leadId,
+  seedRoles,
+}: {
+  funnelId: string;
+  leadId: string;
+  /** Pre-supplied roles for a standalone (non-campaign) contact — derived from
+   *  the company's scraped job posts. When set, the section is read-only and
+   *  skips the per-lead fetch. */
+  seedRoles?: HiringRole[];
+}) {
   const isAuthReady = useAuthReady();
-  const [roles, setRoles] = useState<HiringRole[]>([]);
+  const readOnly = !!seedRoles;
+  const [roles, setRoles] = useState<HiringRole[]>(seedRoles ?? []);
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const [saving, setSaving] = useState(false);
@@ -52,9 +64,9 @@ export function LeadHiringRolesSection({ funnelId, leadId }: { funnelId: string;
   }, [funnelId, leadId]);
 
   useEffect(() => {
-    if (!isAuthReady) return;
+    if (!isAuthReady || readOnly) return;
     void load();
-  }, [isAuthReady, load]);
+  }, [isAuthReady, load, readOnly]);
 
   function startAdd() {
     setDraft(EMPTY);
@@ -180,7 +192,7 @@ export function LeadHiringRolesSection({ funnelId, leadId }: { funnelId: string;
       icon={Briefcase}
       title="Hiring roles"
       count={roles.length}
-      actions={<MiniBtn icon={Plus} title="Add role" onClick={startAdd} />}
+      actions={readOnly ? undefined : <MiniBtn icon={Plus} title="Add role" onClick={startAdd} />}
     >
       <div className="flex flex-col gap-1.5">
         {roles.map((r) =>
@@ -239,20 +251,24 @@ export function LeadHiringRolesSection({ funnelId, leadId }: { funnelId: string;
                       <ExternalLink size={12} />
                     </a>
                   )}
-                  <button
-                    onClick={() => startEdit(r)}
-                    title="Edit role"
-                    className="text-ink-faint hover:text-ink transition-colors"
-                  >
-                    <Pencil size={12} />
-                  </button>
-                  <button
-                    onClick={() => void remove(r.id)}
-                    title="Delete role"
-                    className="text-ink-faint hover:text-signal-red-text transition-colors"
-                  >
-                    <X size={12} />
-                  </button>
+                  {!readOnly && (
+                    <>
+                      <button
+                        onClick={() => startEdit(r)}
+                        title="Edit role"
+                        className="text-ink-faint hover:text-ink transition-colors"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                      <button
+                        onClick={() => void remove(r.id)}
+                        title="Delete role"
+                        className="text-ink-faint hover:text-signal-red-text transition-colors"
+                      >
+                        <X size={12} />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -261,7 +277,10 @@ export function LeadHiringRolesSection({ funnelId, leadId }: { funnelId: string;
 
         {editing === "new" && form}
 
-        {roles.length === 0 && editing !== "new" && (
+        {roles.length === 0 && editing !== "new" && readOnly && (
+          <p className="py-1.5 px-1 text-[11.5px] text-ink-muted">No hiring roles found for this company.</p>
+        )}
+        {roles.length === 0 && editing !== "new" && !readOnly && (
           <button
             onClick={startAdd}
             className="flex items-center gap-2 py-1.5 px-1 text-[11.5px] text-ink-muted hover:text-ink-secondary transition-colors"

@@ -10,6 +10,7 @@ import { getContactProfile, type ContactProfile } from "@/lib/api/contacts";
 import { getFunnelById } from "@/lib/api/funnels";
 import { sortLeads, DEFAULT_LEAD_SORT } from "@/lib/utils/sort-leads";
 import type { Funnel, FunnelLead, FunnelLeadEvent } from "@/lib/types/funnel";
+import type { HiringRole } from "@/lib/api/hiring-roles";
 
 /**
  * Discovered-contact profile. We render the SAME LeadView the campaign uses —
@@ -24,6 +25,7 @@ export default function ContactLeadPage() {
 
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [leadId, setLeadId] = useState<string | null>(null);
+  const [seedRoles, setSeedRoles] = useState<HiringRole[] | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,12 +35,18 @@ export default function ContactLeadPage() {
     try {
       const c: ContactProfile = await getContactProfile(id);
       if (c.campaigns.length > 0) {
-        // Real campaign lead — open the exact campaign LeadView.
+        // Real campaign lead — open the exact campaign LeadView (its hiring
+        // roles were materialised when it was sent to the funnel).
         const camp = c.campaigns[0];
         const data = await getFunnelById(camp.funnelId, { lite: true, fullLeadId: camp.leadId });
         setFunnel(data);
         setLeadId(camp.leadId);
+        setSeedRoles(undefined);
       } else {
+        // Standalone contact — seed hiring roles from the company's scraped jobs.
+        setSeedRoles(
+          c.hiringRoles.map((r) => ({ ...r, funnelId: "", leadId: c.id, createdAt: "" })),
+        );
         // Not in a campaign — synthesise a funnel/lead so the same view renders.
         const events: FunnelLeadEvent[] = c.calls.map((call) => ({
           id: call.id,
@@ -119,6 +127,7 @@ export default function ContactLeadPage() {
       funnel={funnel}
       leads={leads}
       leadId={leadId}
+      seedHiringRoles={seedRoles}
       onLeadPatch={(lid, patch) =>
         setFunnel((prev) => (prev ? { ...prev, leads: prev.leads.map((l) => (l.id === lid ? { ...l, ...patch } : l)) } : prev))
       }
