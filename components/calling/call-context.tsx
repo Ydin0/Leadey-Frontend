@@ -364,14 +364,22 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           return "";
         }
       };
+      // Standard telephony convention so every reader (recordings list, contact
+      // profiles, dialer recency) is consistent: from = caller, to = callee.
+      //  • Outbound: from = our line, to = the lead we dialled.
+      //  • Inbound:  from = the caller (lead), to = us (our line / client leg).
+      // For INBOUND the Twilio SDK populates call.parameters.From with the real
+      // caller and call.parameters.To with our client identity — earlier code
+      // had these swapped, so the caller leaked the rep's "client:<id>" into the
+      // record and the contact column showed it.
       const to =
         direction === "outbound"
           ? known?.to || cp("To") || call.parameters?.To || ""
-          : call.parameters?.From || "";
+          : lineNumber || call.parameters?.To || "";
       const from =
         direction === "outbound"
           ? known?.from || cp("CallerId") || lineNumber || call.parameters?.From || ""
-          : call.parameters?.To || lineNumber || "";
+          : call.parameters?.From || "";
       const callId = call.parameters?.CallSid || `call_${Date.now()}`;
 
       setActiveCall({
@@ -409,11 +417,14 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         setActiveCall((prev) =>
           prev ? { ...prev, state: "connected" } : prev
         );
-        // Identify the caller against the org's leads/contacts when we don't
-        // already have a name (inbound calls, or ad-hoc dial-pad outbound), so
-        // the live-call UI shows who it is + a link to their profile.
-        if (!contactName && to) {
-          resolveCaller(to)
+        // Identify the counterparty against the org's leads/contacts when we
+        // don't already have a name (inbound calls, or ad-hoc dial-pad
+        // outbound), so the live-call UI shows who it is + a link to their
+        // profile. The counterparty is the caller for inbound, the callee for
+        // outbound.
+        const counterparty = direction === "inbound" ? from : to;
+        if (!contactName && counterparty) {
+          resolveCaller(counterparty)
             .then((r) => {
               if (!r.name && !r.company && !r.leadId) return;
               setActiveCall((prev) =>
