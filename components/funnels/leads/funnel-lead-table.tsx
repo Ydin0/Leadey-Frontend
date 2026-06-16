@@ -184,11 +184,17 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
     onLeadAdvanced?.();
   }, [lastLoggedCall, funnelId, onLeadAdvanced]);
 
-  // Compute activity counts for all leads
+  // Activity counts: prefer the server-computed totals (present even in the
+  // lite leads payload, which omits per-lead events); fall back to deriving them
+  // from events on the full lead view.
   const activityMap = useMemo(() => {
     const map = new Map<string, { calls: number; emails: number }>();
     for (const lead of leads) {
-      map.set(lead.id, computeActivityCounts(lead.events || []));
+      if (lead.callCount != null || lead.emailCount != null) {
+        map.set(lead.id, { calls: lead.callCount ?? 0, emails: lead.emailCount ?? 0 });
+      } else {
+        map.set(lead.id, computeActivityCounts(lead.events || []));
+      }
     }
     return map;
   }, [leads]);

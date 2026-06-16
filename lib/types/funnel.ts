@@ -121,6 +121,10 @@ export interface FunnelLead {
   /** Org-defined custom field values (label/value/isLink), from the backend. */
   customFields?: { key: string; label: string; value: string; isLink: boolean }[];
   events?: FunnelLeadEvent[];
+  /** Server-computed activity totals — present even on the lite leads payload
+   *  (which omits per-lead events), so the table shows real call/email counts. */
+  callCount?: number;
+  emailCount?: number;
 }
 
 export interface FunnelAnalyticsStep {
