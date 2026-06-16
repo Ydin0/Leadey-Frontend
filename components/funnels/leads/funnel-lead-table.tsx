@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "react";
-import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, ChevronRight, Users, Ban } from "lucide-react";
+import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, ChevronRight, Users, Ban, Sparkles, Search, Bot, UserPlus, Check } from "lucide-react";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { useRowLimit } from "@/lib/hooks/use-row-limit";
-import { advanceLead } from "@/lib/api/funnels";
+import { advanceLead, enrichJobPosts } from "@/lib/api/funnels";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { FunnelLeadsFilterBar, DEFAULT_FUNNEL_LEADS_FILTERS, type FunnelLeadsFilters } from "./funnel-leads-filter-bar";
 import {
@@ -163,6 +163,114 @@ function LeadActionMenu({
   );
 }
 
+interface SelectedCompany {
+  name: string;
+  domain?: string | null;
+  linkedinUrl?: string | null;
+}
+
+/** Bulk action bar shown when ≥1 company is selected in the grouped view.
+ *  "Magic Enrich" dropdown — only "Find job posts" is wired up today. */
+function MagicEnrichBar({
+  funnelId,
+  companies,
+  onClear,
+  onDone,
+}: {
+  funnelId: string;
+  companies: SelectedCompany[];
+  onClear: () => void;
+  onDone: (summary: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  async function findJobPosts() {
+    setOpen(false);
+    setBusy(true);
+    try {
+      const res = await enrichJobPosts(funnelId, companies);
+      const summary =
+        res.rolesCreated > 0
+          ? `Added ${res.rolesCreated} hiring role${res.rolesCreated === 1 ? "" : "s"} across ${res.leadsEnriched} lead${res.leadsEnriched === 1 ? "" : "s"} · ${res.jobsFound} jobs found in ${res.companiesSearched} companies`
+          : `No new open roles found across ${res.companiesSearched} compan${res.companiesSearched === 1 ? "y" : "ies"}`;
+      onDone(summary);
+    } catch (err) {
+      onDone(err instanceof Error ? err.message : "Magic Enrich failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-3 mb-3 px-3 py-2 rounded-[10px] bg-signal-blue/10 border border-signal-blue-text/20">
+      <span className="text-[12px] font-medium text-ink">
+        {companies.length} compan{companies.length === 1 ? "y" : "ies"} selected
+      </span>
+      <button onClick={onClear} className="text-[11px] text-ink-muted hover:text-ink transition-colors">
+        Clear
+      </button>
+      <div className="ml-auto relative" ref={ref}>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          disabled={busy}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
+        >
+          {busy ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+          {busy ? "Enriching…" : "Magic Enrich"}
+        </button>
+        {open && (
+          <div className="absolute right-0 top-full mt-1.5 z-50 w-[260px] bg-surface rounded-[12px] border border-border-subtle shadow-lg py-1.5">
+            <button
+              onClick={() => void findJobPosts()}
+              className="w-full text-left px-3 py-2 hover:bg-hover transition-colors flex items-start gap-2.5"
+            >
+              <Search size={14} className="text-signal-blue-text mt-0.5 shrink-0" />
+              <span>
+                <span className="block text-[12px] font-medium text-ink">Find job posts</span>
+                <span className="block text-[10.5px] text-ink-muted leading-snug">
+                  Search if these companies are hiring and add the roles to each lead.
+                </span>
+              </span>
+            </button>
+            <div className="my-1 border-t border-border-subtle" />
+            <div className="w-full text-left px-3 py-2 flex items-start gap-2.5 opacity-50 cursor-not-allowed">
+              <Bot size={14} className="text-ink-muted mt-0.5 shrink-0" />
+              <span>
+                <span className="flex items-center gap-1.5 text-[12px] font-medium text-ink">
+                  Enrich company data
+                  <span className="text-[9px] font-medium rounded-full px-1.5 py-px bg-section text-ink-muted">Soon</span>
+                </span>
+                <span className="block text-[10.5px] text-ink-muted leading-snug">AI-enrich firmographics & insights.</span>
+              </span>
+            </div>
+            <div className="w-full text-left px-3 py-2 flex items-start gap-2.5 opacity-50 cursor-not-allowed">
+              <UserPlus size={14} className="text-ink-muted mt-0.5 shrink-0" />
+              <span>
+                <span className="flex items-center gap-1.5 text-[12px] font-medium text-ink">
+                  Find more contacts
+                  <span className="text-[9px] font-medium rounded-full px-1.5 py-px bg-section text-ink-muted">Soon</span>
+                </span>
+                <span className="block text-[10.5px] text-ink-muted leading-snug">Discover additional people at these companies.</span>
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortChange, onLeadAdvanced, onLeadClick }: FunnelLeadTableProps) {
   const [filters, setFilters] = useState<FunnelLeadsFilters>(DEFAULT_FUNNEL_LEADS_FILTERS);
   const [stepFilter, setStepFilter] = useState<number | null>(null);
@@ -171,6 +279,8 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [groupByCompany, setGroupByCompany] = useState(true);
   const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
+  const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
+  const [enrichToast, setEnrichToast] = useState<string | null>(null);
   const { startCall, activeCall, lastLoggedCall } = useCallContext();
   const { statuses } = useLeadStatuses();
 
@@ -271,6 +381,42 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
     }
     return groups;
   }, [filtered]);
+
+  // Resolve {name, domain, linkedinUrl} for a company group (for Magic Enrich).
+  const companyMeta = useCallback((companyName: string): SelectedCompany => {
+    const group = companyGroups.get(companyName) || [];
+    const domain = group.reduce<string | undefined>((found, l) => {
+      if (found) return found;
+      if (l.companyDomain) return l.companyDomain;
+      const emailDomain = l.email?.split("@")[1];
+      if (emailDomain && !["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com"].includes(emailDomain)) return emailDomain;
+      return undefined;
+    }, undefined);
+    const linkedinUrl = group.find((l) => l.companyLinkedin)?.companyLinkedin;
+    return { name: companyName, domain: domain || null, linkedinUrl: linkedinUrl || null };
+  }, [companyGroups]);
+
+  function toggleSelectCompany(name: string) {
+    setSelectedCompanies((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  const allCompanyKeys = useMemo(() => [...companyGroups.keys()], [companyGroups]);
+  const allCompaniesSelected = allCompanyKeys.length > 0 && allCompanyKeys.every((k) => selectedCompanies.has(k));
+
+  function toggleSelectAllCompanies() {
+    if (allCompaniesSelected) setSelectedCompanies(new Set());
+    else setSelectedCompanies(new Set(allCompanyKeys));
+  }
+
+  const selectedCompanyList = useMemo(
+    () => [...selectedCompanies].filter((n) => companyGroups.has(n)).map((n) => companyMeta(n)),
+    [selectedCompanies, companyGroups, companyMeta],
+  );
 
   const resetPage = useCallback(() => setCurrentPage(1), []);
   const displayItems = groupByCompany ? [...companyGroups.keys()] : filtered;
@@ -375,6 +521,31 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
         )}
       </div>
 
+      {/* Magic Enrich bulk bar (grouped view) */}
+      {groupByCompany && selectedCompanyList.length > 0 && (
+        <MagicEnrichBar
+          funnelId={funnelId}
+          companies={selectedCompanyList}
+          onClear={() => setSelectedCompanies(new Set())}
+          onDone={(summary) => {
+            setEnrichToast(summary);
+            setSelectedCompanies(new Set());
+            onLeadAdvanced?.();
+          }}
+        />
+      )}
+
+      {/* Enrich result toast */}
+      {enrichToast && (
+        <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-[10px] bg-signal-green/10 border border-signal-green-text/20">
+          <Check size={13} className="text-signal-green-text shrink-0" />
+          <span className="text-[11.5px] text-ink-secondary flex-1">{enrichToast}</span>
+          <button onClick={() => setEnrichToast(null)} className="text-[11px] text-ink-muted hover:text-ink transition-colors">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-surface rounded-[14px] border border-border-subtle overflow-hidden">
         {groupByCompany ? (
@@ -383,7 +554,16 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
             <Table>
               <TableHeader>
                 <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
-                  <TableHead className="w-8" />
+                  <TableHead className="w-9 px-3">
+                    <input
+                      type="checkbox"
+                      className="rounded"
+                      checked={allCompaniesSelected}
+                      onChange={toggleSelectAllCompanies}
+                      title="Select all companies"
+                    />
+                  </TableHead>
+                  <TableHead className="w-7" />
                   <TableHead className="text-left w-[220px]">Company</TableHead>
                   <TableHead className="text-left w-[130px]">Status</TableHead>
                   <TableHead className="text-left w-[150px]">Industry</TableHead>
@@ -437,7 +617,15 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
                           });
                         }}
                       >
-                        <TableCell className="w-8 px-3">
+                        <TableCell className="w-9 px-3" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            className="rounded"
+                            checked={selectedCompanies.has(companyName)}
+                            onChange={() => toggleSelectCompany(companyName)}
+                          />
+                        </TableCell>
+                        <TableCell className="w-7 px-0">
                           <ChevronRight size={14} className={cn("text-ink-muted transition-transform", isExpanded && "rotate-90")} />
                         </TableCell>
                         <TableCell>
@@ -500,7 +688,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], sortBy, onSortCha
                             {/* Lead detail rendered as one clean strip — it isn't
                                 column-aligned to the company's Industry/Employees/
                                 Location headers (those describe the company row). */}
-                            <TableCell colSpan={8} className="py-2">
+                            <TableCell colSpan={9} className="py-2">
                               <div className="flex items-center gap-3 pl-[60px] pr-2">
                                 {/* Name + title — red when Do-Not-Contact. Status
                                     is company-level so it isn't repeated here. */}

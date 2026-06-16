@@ -350,6 +350,22 @@ export async function advanceLead(
   };
 }
 
+/** Magic Enrich → "Find job posts": search TheirStack for each company's recent
+ *  open jobs and add them as hiring roles on every lead at that company in this
+ *  campaign. Idempotent (dedupes by role title per lead). */
+export async function enrichJobPosts(
+  funnelId: string,
+  companies: { name: string; domain?: string | null; linkedinUrl?: string | null }[],
+): Promise<{ companiesSearched: number; jobsFound: number; rolesCreated: number; leadsEnriched: number }> {
+  return apiRequest(
+    `/funnels/${encodeURIComponent(funnelId)}/enrich-job-posts`,
+    {
+      method: "POST",
+      body: JSON.stringify({ companies }),
+    },
+  );
+}
+
 /** Logs a real phone call against a lead. Always counts as a call touch; ticks
  *  the step forward only when the lead's current step is a call step. */
 export async function logLeadCall(
