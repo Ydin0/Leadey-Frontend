@@ -36,6 +36,18 @@ const EMPTY: Draft = {
 const inputClass =
   "w-full bg-surface border border-border-subtle rounded-md px-2 py-1.5 text-[11.5px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default";
 
+/** Job descriptions come back as long raw markdown. Turn them into a clean,
+ *  one-paragraph summary: drop markdown markers (**bold**, #, -, links) and
+ *  collapse whitespace. The card then clamps it to ~3 lines visually. */
+function summarize(text: string): string {
+  return text
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, "$1") // links/images → label
+    .replace(/[*_`#>]+/g, " ") // markdown emphasis / headings / quotes
+    .replace(/^\s*[-•]\s*/gm, "") // list bullets
+    .replace(/\s+/g, " ") // collapse whitespace/newlines
+    .trim();
+}
+
 export function LeadHiringRolesSection({
   funnelId,
   leadId,
@@ -236,7 +248,12 @@ export function LeadHiringRolesSection({
                     </div>
                   )}
                   {r.description && (
-                    <p className="text-[11px] text-ink-muted mt-1 leading-snug">{r.description}</p>
+                    <p
+                      className="text-[11px] text-ink-muted mt-1 leading-snug line-clamp-3"
+                      title={summarize(r.description)}
+                    >
+                      {summarize(r.description)}
+                    </p>
                   )}
                 </div>
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
