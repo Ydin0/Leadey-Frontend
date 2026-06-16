@@ -91,8 +91,15 @@ export interface CompaniesFilterState {
   /** Custom employee headcount bounds (independent of the preset ranges). */
   minEmployees: number | null;
   maxEmployees: number | null;
+  /** When a size filter is set, also keep companies whose employee count is
+   *  unknown (the scraper didn't return one) instead of excluding them. */
+  includeUnknownSize: boolean;
   fundingStage: string[];
   minJobCount: number | null;
+  /** Filter by how many leads have been discovered for the company — e.g. set
+   *  max=0 to find companies not yet enriched, or min=1 for already-enriched. */
+  minLeadCount: number | null;
+  maxLeadCount: number | null;
 }
 
 export const DEFAULT_JOBS_FILTER: JobsFilterState = {
@@ -118,8 +125,11 @@ export const DEFAULT_COMPANIES_FILTER: CompaniesFilterState = {
   employeeSizeRanges: [],
   minEmployees: null,
   maxEmployees: null,
+  includeUnknownSize: false,
   fundingStage: [],
   minJobCount: null,
+  minLeadCount: null,
+  maxLeadCount: null,
 };
 
 // ─── Unique Company (re-exported for convenience) ────────────────────

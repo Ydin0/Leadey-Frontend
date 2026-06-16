@@ -123,7 +123,9 @@ export function isCompaniesFilterEmpty(f: CompaniesFilterState): boolean {
     f.minEmployees === null &&
     f.maxEmployees === null &&
     f.fundingStage.length === 0 &&
-    f.minJobCount === null
+    f.minJobCount === null &&
+    f.minLeadCount === null &&
+    f.maxLeadCount === null
   );
 }
 
@@ -144,17 +146,25 @@ export function applyCompaniesFilters(
       if (!c.country || !filters.country.includes(c.country)) return false;
     }
 
-    // Employee size (multi-select presets)
-    if (filters.employeeSizeRanges.length > 0) {
-      if (!matchesAnyPresetRange(c.employeeCount, filters.employeeSizeRanges, EMPLOYEE_PRESETS)) return false;
-    }
-
-    // Employee size (custom min/max headcount)
-    if (filters.minEmployees !== null) {
-      if (c.employeeCount == null || c.employeeCount < filters.minEmployees) return false;
-    }
-    if (filters.maxEmployees !== null) {
-      if (c.employeeCount == null || c.employeeCount > filters.maxEmployees) return false;
+    // Employee size (presets + custom min/max). Companies with an unknown
+    // employee count are excluded by a size filter unless "include unknown" is on.
+    const hasSizeFilter =
+      filters.employeeSizeRanges.length > 0 ||
+      filters.minEmployees !== null ||
+      filters.maxEmployees !== null;
+    if (hasSizeFilter && c.employeeCount == null) {
+      if (!filters.includeUnknownSize) return false;
+      // unknown size allowed — skip the numeric size checks below
+    } else {
+      if (filters.employeeSizeRanges.length > 0) {
+        if (!matchesAnyPresetRange(c.employeeCount, filters.employeeSizeRanges, EMPLOYEE_PRESETS)) return false;
+      }
+      if (filters.minEmployees !== null) {
+        if (c.employeeCount == null || c.employeeCount < filters.minEmployees) return false;
+      }
+      if (filters.maxEmployees !== null) {
+        if (c.employeeCount == null || c.employeeCount > filters.maxEmployees) return false;
+      }
     }
 
     // Funding stage
@@ -165,6 +175,15 @@ export function applyCompaniesFilters(
     // Min job count
     if (filters.minJobCount !== null) {
       if (c.jobCount < filters.minJobCount) return false;
+    }
+
+    // Lead count (discovered leads) — min/max. Lets you find un-enriched
+    // companies (max=0) or already-enriched ones (min=1).
+    if (filters.minLeadCount !== null) {
+      if ((c.leadCount ?? 0) < filters.minLeadCount) return false;
+    }
+    if (filters.maxLeadCount !== null) {
+      if ((c.leadCount ?? 0) > filters.maxLeadCount) return false;
     }
 
     return true;
@@ -240,6 +259,15 @@ export function getCompaniesFilterPills(f: CompaniesFilterState): ActiveFilterPi
   if (f.minJobCount !== null) {
     pills.push({ key: "minJobCount", label: `Min Jobs: ${f.minJobCount}` });
   }
+  if (f.minLeadCount !== null || f.maxLeadCount !== null) {
+    const label =
+      f.minLeadCount !== null && f.maxLeadCount !== null
+        ? `Leads: ${f.minLeadCount}–${f.maxLeadCount}`
+        : f.minLeadCount !== null
+          ? `Leads: ${f.minLeadCount}+`
+          : `Leads: ≤${f.maxLeadCount}`;
+    pills.push({ key: "leadCount", label });
+  }
 
   return pills;
 }
@@ -281,6 +309,7 @@ export function clearCompaniesFilterKey(
     case "industry": return { ...f, industry: [] };
     case "country": return { ...f, country: [] };
     case "minJobCount": return { ...f, minJobCount: null };
+    case "leadCount": return { ...f, minLeadCount: null, maxLeadCount: null };
     default: return f;
   }
 }

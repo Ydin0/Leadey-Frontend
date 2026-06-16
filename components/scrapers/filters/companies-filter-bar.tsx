@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X, ChevronDown, Search } from "lucide-react";
+import { Plus, X, ChevronDown, Search, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FilterPopover } from "./filter-popover";
 import type { CompaniesFilterState } from "./filter-types";
@@ -24,12 +24,13 @@ interface CompaniesFilterBarProps {
   onSearchChange?: (value: string) => void;
 }
 
-type AdditionalFilterKey = "industry" | "country" | "minJobCount";
+type AdditionalFilterKey = "industry" | "country" | "minJobCount" | "leadCount";
 
 const ADDITIONAL_FILTER_DEFS: { key: AdditionalFilterKey; label: string }[] = [
   { key: "industry", label: "Industry" },
   { key: "country", label: "Country" },
   { key: "minJobCount", label: "Min Jobs" },
+  { key: "leadCount", label: "Leads" },
 ];
 
 function toggleInArray(arr: string[], value: string): string[] {
@@ -123,6 +124,7 @@ export function CompaniesFilterBar({ filters, setFilters, updateFilter, clearAll
               case "industry": return filters.industry.length > 0;
               case "country": return filters.country.length > 0;
               case "minJobCount": return filters.minJobCount !== null;
+              case "leadCount": return filters.minLeadCount !== null || filters.maxLeadCount !== null;
               default: return false;
             }
           })();
@@ -187,6 +189,67 @@ export function CompaniesFilterBar({ filters, setFilters, updateFilter, clearAll
                   </div>
                 )}
 
+                {key === "leadCount" && (
+                  <div className="space-y-2 w-[230px]">
+                    {/* Quick shortcuts for the common cases. */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {[
+                        { label: "No leads yet", min: null, max: 0 },
+                        { label: "Has leads", min: 1, max: null },
+                      ].map((s) => {
+                        const on = filters.minLeadCount === s.min && filters.maxLeadCount === s.max;
+                        return (
+                          <button
+                            key={s.label}
+                            type="button"
+                            onClick={() =>
+                              setFilters({
+                                ...filters,
+                                minLeadCount: on ? null : s.min,
+                                maxLeadCount: on ? null : s.max,
+                              })
+                            }
+                            className={cn(
+                              "px-2.5 py-1 rounded-[6px] text-[11px] font-medium transition-colors border",
+                              on
+                                ? "bg-signal-blue/15 text-signal-blue-text border-signal-blue-text/20"
+                                : "bg-section text-ink-secondary border-transparent hover:bg-hover",
+                            )}
+                          >
+                            {s.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="min"
+                        value={filters.minLeadCount ?? ""}
+                        onChange={(e) => {
+                          const d = e.target.value.replace(/[^0-9]/g, "");
+                          updateFilter("minLeadCount", d === "" ? null : Number(d));
+                        }}
+                        className="w-full px-2 py-1.5 rounded-[8px] bg-section text-[12px] text-ink text-center outline-none border border-border-subtle focus:border-signal-blue-text/30"
+                      />
+                      <span className="text-[11px] text-ink-faint">–</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="max"
+                        value={filters.maxLeadCount ?? ""}
+                        onChange={(e) => {
+                          const d = e.target.value.replace(/[^0-9]/g, "");
+                          updateFilter("maxLeadCount", d === "" ? null : Number(d));
+                        }}
+                        className="w-full px-2 py-1.5 rounded-[8px] bg-section text-[12px] text-ink text-center outline-none border border-border-subtle focus:border-signal-blue-text/30"
+                      />
+                    </div>
+                    <p className="text-[10px] text-ink-faint">Filter by discovered leads — e.g. &ldquo;No leads yet&rdquo; to find companies to enrich.</p>
+                  </div>
+                )}
+
                 <div className="pt-1.5 border-t border-border-subtle">
                   <button
                     type="button"
@@ -228,6 +291,26 @@ export function CompaniesFilterBar({ filters, setFilters, updateFilter, clearAll
             }}
             className="w-16 px-2 py-0.5 rounded-[6px] bg-surface border border-border-subtle text-[11px] text-ink text-center outline-none focus:border-border-default"
           />
+          {/* Keep companies whose headcount is unknown when a size filter is set. */}
+          <button
+            type="button"
+            onClick={() => updateFilter("includeUnknownSize", !filters.includeUnknownSize)}
+            title="Also include companies with no employee count"
+            className={cn(
+              "ml-1 flex items-center gap-1 px-2 py-0.5 rounded-[6px] text-[11px] font-medium border transition-colors",
+              filters.includeUnknownSize
+                ? "bg-signal-blue/15 text-signal-blue-text border-signal-blue-text/20"
+                : "bg-surface text-ink-muted border-border-subtle hover:bg-hover",
+            )}
+          >
+            <span className={cn(
+              "inline-flex items-center justify-center w-3 h-3 rounded-[3px] border",
+              filters.includeUnknownSize ? "bg-signal-blue-text border-signal-blue-text text-on-ink" : "border-border-default",
+            )}>
+              {filters.includeUnknownSize && <Check size={9} strokeWidth={3} />}
+            </span>
+            Incl. unknown
+          </button>
         </div>
 
         {/* + Add Filter */}
