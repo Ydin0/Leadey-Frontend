@@ -132,7 +132,7 @@ export function DialerBar() {
               countdown={countdown}
               total={autoAdvanceSeconds}
               inCall={inCall}
-              onClick={() => (countingDown ? dialer.startNext() : void dialer.nextNow())}
+              onClick={() => (inCall ? void dialer.nextNow() : dialer.startNext())}
             />
 
             {/* Controls */}
@@ -285,7 +285,7 @@ function NextCallButton({
     <button
       type="button"
       onClick={onClick}
-      title={counting ? "Dial now — skip the wait" : inCall ? "Hang up & go to the next lead" : "Dial the next lead"}
+      title={counting ? "Dial now — skip the wait" : inCall ? "Hang up & go to the next lead" : "Call this lead now"}
       className="relative shrink-0 overflow-hidden inline-flex items-center rounded-full bg-signal-blue/15 text-signal-blue-text px-4 py-1.5 text-[12px] font-semibold hover:brightness-95 transition-[filter]"
     >
       {/* Fill — animates smoothly between the 1s countdown ticks. */}
