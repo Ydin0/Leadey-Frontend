@@ -129,6 +129,8 @@ export interface CompanyProfile {
   };
   contacts: { id: string; fullName: string | null; title: string | null; linkedinUrl: string | null; email: string | null; phone: string | null; status: string }[];
   leads: { leadId: string; funnelId: string; name: string; title: string; status: string }[];
+  /** Hiring roles from the company's scraped job posts. */
+  hiringRoles: { id: string; title: string; description: string; salaryRange: string; location: string; postedAgo: string; seniority: string; url: string }[];
 }
 
 export async function getCompanyProfile(key: string): Promise<CompanyProfile> {
