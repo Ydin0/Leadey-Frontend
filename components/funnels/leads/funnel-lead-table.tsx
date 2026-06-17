@@ -11,6 +11,7 @@ import { advanceLead, enrichJobPosts, saveLeadFilters } from "@/lib/api/funnels"
 import { useCredits } from "@/components/providers/credits-provider";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { FilterBuilder } from "@/components/filters/filter-builder";
+import { SmartViewBar } from "@/components/filters/smart-view-bar";
 import { EMPTY_FILTER, type FilterGroup } from "@/lib/types/lead-filter";
 import { matchesFilter } from "@/lib/utils/eval-lead-filter";
 import {
@@ -502,8 +503,14 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
 
   return (
     <div>
-      {/* Filter builder + search */}
+      {/* Smart Views + filter builder + search */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <SmartViewBar
+          scope="campaign"
+          funnelId={funnelId}
+          current={filterGroup}
+          onApply={(g) => { setFilterGroup(g); setCurrentPage(1); }}
+        />
         <FilterBuilder
           value={filterGroup}
           onChange={(g) => { setFilterGroup(g); setCurrentPage(1); }}
