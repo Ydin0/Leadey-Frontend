@@ -140,15 +140,16 @@ export function DialerBar() {
 
             {/* Animated "Next Call" button — fills as the countdown runs down.
                 During a live countdown it means "dial the current lead now"
-                (skip the wait → startNext). Otherwise — in a call, or stuck
-                between leads with no countdown — it means "move to the NEXT
-                lead" (nextNow: hangs up if needed, then dials the next). */}
+                (skip the wait → startNext). In a call, or after stepping BACK to
+                a previous lead, it means "move to the NEXT lead" (nextNow: hangs
+                up if needed, then advances) — never re-dial the lead you stepped
+                back to. */}
             <NextCallButton
               counting={countingDown}
               countdown={countdown}
               total={autoAdvanceSeconds}
               inCall={inCall}
-              onClick={() => (inCall ? void dialer.nextNow() : dialer.startNext())}
+              onClick={() => (inCall || dialer.steppedBack ? void dialer.nextNow() : dialer.startNext())}
             />
 
             {/* Controls */}

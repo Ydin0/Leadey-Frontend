@@ -45,6 +45,9 @@ interface DialerContextValue {
   currentItem: DialerQueueItem | null;
   upcoming: DialerQueueItem[];
   voicemails: VoicemailDrop[];
+  /** True when viewing a previously-dialled lead via Previous — "Next Call"
+   *  should advance forward, not re-dial this lead. */
+  steppedBack: boolean;
   /** "running" auto-dials between calls; "paused" halts the countdown. */
   mode: DialerMode;
   /** Seconds left before the next auto-dial, or null when not counting. */
@@ -103,6 +106,10 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<DialerSession | null>(null);
   const [currentItem, setCurrentItem] = useState<DialerQueueItem | null>(null);
   const [upcoming, setUpcoming] = useState<DialerQueueItem[]>([]);
+  // True while the rep has navigated BACK to a previously-dialled lead (via the
+  // Previous button). In that state "Next Call" must move FORWARD to the next
+  // lead, not re-dial the one they stepped back to ("you stop for a reason").
+  const [steppedBack, setSteppedBack] = useState(false);
   const [voicemails, setVoicemails] = useState<VoicemailDrop[]>([]);
   const [mode, setMode] = useState<DialerMode>("running");
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -288,6 +295,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       if (call.activeCall || call.incomingCall) return; // busy or a call is ringing in
       if (item.lead?.doNotCall && !confirmDncCall(item.lead?.name)) return;
       setCountdown(null);
+      setSteppedBack(false); // placing a call clears the "viewing previous" state
       lastDialedItemIdRef.current = item.id;
       call.startCall(item.leadPhone, {
         contactName: item.lead?.name || null,
@@ -353,10 +361,15 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     try {
       await backSession(session.id);
       await refresh(session.id);
+      // Mark that we're viewing a previous lead so "Next Call" advances forward
+      // instead of re-dialling this one. Also kill any pending countdown so a
+      // running dialer doesn't auto-redial the lead we just stepped back to.
+      setSteppedBack(true);
+      stopCountdown();
     } catch {
       await reconcile(session.id);
     }
-  }, [session, refresh, reconcile]);
+  }, [session, refresh, reconcile, stopCountdown]);
 
   // `hangUp` ends any live call too — that's what the explicit Pause button /
   // Space key do ("stop the call completely"). The auto-pause on engagement
@@ -533,6 +546,9 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     // Never auto-dial the contact we just called — if the queue hasn't moved on
     // yet (advance still settling, or it failed), wait rather than re-dial them.
     currentItem?.id !== lastDialedItemIdRef.current &&
+    // Stepped back to review a previous lead — don't auto-redial it; the rep
+    // must explicitly choose Next Call (advance) or Call now (re-ring).
+    !steppedBack &&
     autoAdvanceSeconds > 0;
   // Live mirror of the gating condition. The interval below re-checks this on
   // every tick so a Pause (or an incoming/active call) that lands mid-countdown
@@ -606,6 +622,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
         currentItem,
         upcoming,
         voicemails,
+        steppedBack,
         mode,
         countdown,
         followMode,
