@@ -62,6 +62,9 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
           detail = (e.meta?.body as string) || "";
         }
         else { type = "status_change"; summary = labelize(outcome) || "Step completed"; }
+      } else if (e.type === "call" || e.outcome === "call_completed") {
+        type = "call";
+        summary = "Call logged";
       } else if (e.type === "linkedin_action") {
         type = "linkedin";
         summary = labelize(outcome) || "LinkedIn action";

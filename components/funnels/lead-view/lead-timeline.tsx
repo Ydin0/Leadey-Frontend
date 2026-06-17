@@ -376,10 +376,11 @@ export function LeadTimeline({ activities, callRecords, emailMessages, onAddNote
       record: r,
       actor: toActor(r.userId, r.userName),
     }));
-    // Email events are rendered as rich cards from the real message thread, so
-    // drop the flattened "Email sent/opened" activities to avoid duplicates.
+    // Email events are rendered as rich cards from the real message thread, and
+    // calls as the authoritative CallCard (from callRecords) — so drop the
+    // flattened "Email sent/opened" and "Call" activities to avoid duplicates.
     const acts: FeedItem[] = activities
-      .filter((a) => a.type !== "email_sent" && a.type !== "email_opened")
+      .filter((a) => a.type !== "email_sent" && a.type !== "email_opened" && a.type !== "call")
       .map((a) => ({
         id: a.id,
         kind: "activity" as const,
