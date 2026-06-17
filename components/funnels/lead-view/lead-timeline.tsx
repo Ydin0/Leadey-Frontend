@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Phone,
   Mail,
@@ -18,10 +18,11 @@ import {
   Trash2,
   Trophy,
   MessageSquare,
+  Loader2,
   type LucideIcon,
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
-import { AudioPlayer } from "@/components/recordings/audio-player";
+import { CallReview } from "@/components/recordings/call-review";
 import { summarizeCall } from "@/lib/api/phone-lines";
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { useTeamMembers } from "@/hooks/use-team-members";
@@ -77,41 +78,52 @@ function fmtDuration(sec: number): string {
   return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
 }
 
-/* ── Call card — real recording + AI summary ─────────────────────────── */
+/* ── Call card — real recording + AI summary + full transcript ───────── */
 function CallCard({ record, actor }: { record: CallRecord; actor: Actor | null }) {
   const [expanded, setExpanded] = useState(false);
-  const [tab, setTab] = useState<"summary" | "notes">("summary");
-  const [summary, setSummary] = useState<string | null>(record.summary ?? null);
-  const [transcript, setTranscript] = useState<string | null>(record.transcript ?? null);
+  // Local copy so generated transcript/summary data merges into the record we
+  // hand to <CallReview> (the same rich view the Recordings tab renders).
+  const [rec, setRec] = useState<CallRecord>(record);
   const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState<string | null>(null);
 
-  async function ensureSummary() {
-    if (generating || summary || !record.recordingUrl) return;
+  useEffect(() => { setRec(record); }, [record]);
+
+  const hasReview = !!(rec.transcriptSegments?.length || rec.summaryStructured || rec.transcript || rec.summary);
+  const canExpand = !!rec.recordingUrl;
+
+  const generate = useCallback(async () => {
+    if (generating || !rec.recordingUrl) return;
     setGenerating(true);
+    setGenError(null);
     try {
-      const res = await summarizeCall(record.id);
-      setSummary(res.summary ?? null);
-      setTranscript(res.transcript ?? null);
+      const res = await summarizeCall(rec.id);
+      setRec((prev) => ({ ...prev, ...res }));
     } catch (err) {
-      console.error("Failed to summarize call:", err);
+      setGenError(err instanceof Error ? err.message : "Transcription failed");
     } finally {
       setGenerating(false);
     }
-  }
+  }, [generating, rec.recordingUrl, rec.id]);
 
   function toggle() {
+    if (!canExpand) return;
     const opening = !expanded;
     setExpanded(opening);
-    if (opening) void ensureSummary();
+    // Auto-transcribe on first open so the transcript "just shows" (Close-style).
+    if (opening && !hasReview && !generating) void generate();
   }
 
-  const who = record.contactName || record.to;
+  const who = rec.contactName || rec.to;
 
   return (
     <div className="rounded-xl border border-border-subtle bg-surface p-3.5">
-      <div className="flex items-center justify-between cursor-pointer" onClick={toggle}>
+      <div
+        className={cn("flex items-center justify-between", canExpand && "cursor-pointer")}
+        onClick={toggle}
+      >
         <div className="flex items-center gap-2 min-w-0">
-          {record.recordingUrl ? (
+          {canExpand ? (
             expanded ? (
               <ChevronDown size={13} className="text-ink-faint shrink-0" />
             ) : (
@@ -123,55 +135,43 @@ function CallCard({ record, actor }: { record: CallRecord; actor: Actor | null }
           <span className="text-[13px] font-medium text-ink truncate">Called {who}</span>
           <span className="flex items-center gap-1 text-[11px] text-ink-muted shrink-0">
             <Clock size={11} />
-            {fmtDuration(record.duration)}
+            {fmtDuration(rec.duration)}
           </span>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
           <ActorBadge actor={actor} />
-          <span className="text-[10.5px] text-ink-faint">{formatRelativeTime(record.timestamp)}</span>
+          <span className="text-[10.5px] text-ink-faint">{formatRelativeTime(rec.timestamp)}</span>
         </div>
       </div>
 
-      {record.recordingUrl && expanded && (
-        <>
-          <div className="flex items-center gap-1.5 mt-3">
-            {(["summary", "notes"] as const).map((t) => (
+      {canExpand && expanded && (
+        <div className="mt-3.5">
+          {generating && !hasReview ? (
+            <div className="flex items-center gap-2 text-[12px] text-ink-muted">
+              <Loader2 size={14} className="animate-spin" />
+              Transcribing &amp; summarizing this call…
+            </div>
+          ) : hasReview ? (
+            <CallReview
+              record={rec}
+              initialDuration={rec.recordingDuration || rec.duration}
+              onRegenerate={() => void generate()}
+              regenerating={generating}
+            />
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <span className={cn("text-[12px]", genError ? "text-signal-red-text" : "text-ink-muted")}>
+                {genError || "No transcript yet for this call."}
+              </span>
               <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={cn(
-                  "flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11.5px] font-medium border transition-colors capitalize",
-                  tab === t
-                    ? "bg-section text-ink border-border-subtle"
-                    : "border-transparent text-ink-muted hover:text-ink-secondary",
-                )}
+                onClick={(e) => { e.stopPropagation(); void generate(); }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity shrink-0"
               >
-                {t === "summary" ? <Sparkles size={12} className={tab === t ? "text-accent" : ""} /> : <FileText size={12} />}
-                {t === "summary" ? "Summary" : "Notes"}
+                <Sparkles size={11} /> {genError ? "Retry" : "Generate transcript"}
               </button>
-            ))}
-          </div>
-
-          <div className="mt-3 p-3.5 rounded-[10px] bg-section">
-            {generating ? (
-              <p className="text-[12px] text-ink-muted">Generating AI summary…</p>
-            ) : tab === "summary" ? (
-              summary ? (
-                <p className="text-[12px] text-ink-secondary leading-relaxed whitespace-pre-line">{summary}</p>
-              ) : (
-                <p className="text-[12px] text-ink-faint">No summary available for this call.</p>
-              )
-            ) : transcript ? (
-              <p className="text-[12px] text-ink-secondary leading-relaxed whitespace-pre-line">{transcript}</p>
-            ) : (
-              <p className="text-[12px] text-ink-faint">No transcript available.</p>
-            )}
-          </div>
-
-          <div className="mt-3">
-            <AudioPlayer recordId={record.id} />
-          </div>
-        </>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
