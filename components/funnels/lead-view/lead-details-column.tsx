@@ -13,6 +13,8 @@ import {
   Building2,
   Ban,
   Loader2,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { confirmDncCall } from "@/lib/utils/dnc";
@@ -42,6 +44,11 @@ interface LeadDetailsColumnProps {
   /** Opens the in-app email composer addressed to this contact. */
   onEmail: (email: string, name: string) => void;
   onDnc: (contactId: string, value: boolean) => void | Promise<void>;
+  /** Persist edited contact details — drives the per-contact edit (pencil). */
+  onContactSave?: (
+    contactId: string,
+    patch: { name?: string; title?: string; email?: string; phone?: string; linkedinUrl?: string },
+  ) => Promise<void>;
   leads: FunnelLead[];
   statuses: LeadStatusOption[];
   /** Per-lead campaign progress (LeadStepTracker), rendered atop the Details tab. */
@@ -59,19 +66,40 @@ function initials(name: string): string {
     .join("");
 }
 
+type ContactDraft = { name: string; title: string; email: string; phone: string; linkedinUrl: string };
+
+const contactInputClass =
+  "w-full bg-surface border border-border-subtle rounded-md px-2 py-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default";
+
 function ContactRow({
   c,
   onCall,
   onEmail,
   onDnc,
+  onSave,
 }: {
   c: FunnelLeadContact;
   onCall: (phone: string, name: string) => void;
   onEmail: (email: string, name: string) => void;
   onDnc?: (contactId: string, value: boolean) => void | Promise<void>;
+  /** Persist edited contact details. When provided, an edit (pencil) action shows. */
+  onSave?: (
+    contactId: string,
+    patch: { name?: string; title?: string; email?: string; phone?: string; linkedinUrl?: string },
+  ) => Promise<void>;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ContactDraft>({
+    name: c.name,
+    title: c.title || "",
+    email: c.email || "",
+    phone: c.phone || "",
+    linkedinUrl: c.linkedinUrl || "",
+  });
 
   function call() {
     if (!c.phone) return;
@@ -88,6 +116,55 @@ function ContactRow({
       setBusy(false);
       setConfirming(false);
     }
+  }
+
+  function startEdit() {
+    setDraft({ name: c.name, title: c.title || "", email: c.email || "", phone: c.phone || "", linkedinUrl: c.linkedinUrl || "" });
+    setError(null);
+    setEditing(true);
+  }
+
+  async function save() {
+    if (!onSave) return;
+    if (!draft.name.trim()) { setError("Name is required"); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(c.id, {
+        name: draft.name.trim(),
+        title: draft.title.trim(),
+        email: draft.email.trim(),
+        phone: draft.phone.trim(),
+        linkedinUrl: draft.linkedinUrl.trim(),
+      });
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="rounded-lg border border-border-subtle bg-section/40 p-2.5 my-1">
+        <div className="flex flex-col gap-1.5">
+          <input autoFocus value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Full name" className={contactInputClass} />
+          <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Title" className={contactInputClass} />
+          <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="Email" className={contactInputClass} />
+          <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} placeholder="Phone" className={contactInputClass} />
+          <input value={draft.linkedinUrl} onChange={(e) => setDraft({ ...draft, linkedinUrl: e.target.value })} placeholder="LinkedIn URL" className={contactInputClass} />
+        </div>
+        {error && <p className="text-[10.5px] text-signal-red-text mt-1.5">{error}</p>}
+        <div className="flex items-center justify-end gap-1.5 mt-2">
+          <button onClick={() => setEditing(false)} disabled={saving} className="px-2.5 py-1 rounded-full text-[11px] text-ink-muted hover:bg-hover disabled:opacity-50">Cancel</button>
+          <button onClick={() => void save()} disabled={saving || !draft.name.trim()} className="flex items-center gap-1 px-3 py-1 rounded-full bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 disabled:opacity-50">
+            {saving ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+            Save
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -123,6 +200,16 @@ function ContactRow({
             />
           )}
           {c.phone && <MiniBtn icon={Phone} title={`Call ${c.phone}`} onClick={call} />}
+          {onSave && (
+            <button
+              type="button"
+              onClick={startEdit}
+              title="Edit contact"
+              className="flex items-center justify-center w-[22px] h-[22px] rounded-md text-ink-muted hover:bg-hover hover:text-ink transition-colors"
+            >
+              <Pencil size={12} />
+            </button>
+          )}
           {onDnc && (
             <button
               type="button"
@@ -185,6 +272,7 @@ export function LeadDetailsColumn({
   onCall,
   onEmail,
   onDnc,
+  onContactSave,
   leads,
   statuses,
   stepTracker,
@@ -279,7 +367,7 @@ export function LeadDetailsColumn({
           <Section icon={Users} title="Contacts" count={contacts.length}>
             <div className="flex flex-col">
               {contacts.length ? (
-                contacts.map((c) => <ContactRow key={c.id} c={c} onCall={onCall} onEmail={onEmail} onDnc={onDnc} />)
+                contacts.map((c) => <ContactRow key={c.id} c={c} onCall={onCall} onEmail={onEmail} onDnc={onDnc} onSave={onContactSave} />)
               ) : (
                 <p className="text-[12px] text-ink-faint px-1">No other contacts at this company.</p>
               )}

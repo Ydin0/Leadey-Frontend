@@ -350,6 +350,28 @@ export async function advanceLead(
   };
 }
 
+/** Edit a contact's details (name / title / email / phone / LinkedIn) from the
+ *  lead profile view. Campaign contacts (a real funnelId) hit the lead endpoint;
+ *  standalone discovered contacts (no funnelId) hit the contacts endpoint. */
+export interface ContactEditPatch {
+  name?: string;
+  title?: string;
+  email?: string;
+  phone?: string;
+  linkedinUrl?: string;
+}
+
+export async function updateLeadContact(
+  funnelId: string,
+  contactId: string,
+  patch: ContactEditPatch,
+): Promise<{ id: string; name: string; title: string; email: string; phone: string; linkedinUrl: string }> {
+  const path = funnelId
+    ? `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(contactId)}/contact`
+    : `/contacts/${encodeURIComponent(contactId)}`;
+  return apiRequest(path, { method: "PATCH", body: JSON.stringify(patch) });
+}
+
 /** Persist the campaign's shared lead filters (stored in funnels.config so the
  *  filtered view is the same for every rep and survives a refresh). */
 export async function saveLeadFilters(

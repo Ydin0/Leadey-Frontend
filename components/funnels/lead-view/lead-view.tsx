@@ -12,7 +12,7 @@ import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
 import { SmsThreadDrawer } from "@/components/sms/sms-thread-drawer";
 import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
-import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc } from "@/lib/api/funnels";
+import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc, updateLeadContact, type ContactEditPatch } from "@/lib/api/funnels";
 import { getCallRecords } from "@/lib/api/phone-lines";
 import { getLeadEmailThread, type LeadEmailMessage } from "@/lib/api/email";
 import type { EmailReplyMode } from "./email-activity-card";
@@ -436,6 +436,20 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     }
   }
 
+  // Save edited contact details (name / title / email / phone / LinkedIn).
+  // Updates the lead in place so the change shows instantly. Throws on failure
+  // so the edit form can surface the error.
+  const handleContactSave = useCallback(async (contactId: string, patch: ContactEditPatch) => {
+    const res = await updateLeadContact(funnelId, contactId, patch);
+    onLeadPatch?.(contactId, {
+      name: res.name,
+      title: res.title,
+      email: res.email,
+      phone: res.phone,
+      linkedinUrl: res.linkedinUrl,
+    });
+  }, [funnelId, onLeadPatch]);
+
   if (!currentLead) {
     return (
       <div className="rounded-[14px] border border-border-subtle bg-surface p-6">
@@ -498,6 +512,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
             onCall={(phone, name) => dial(phone, name)}
             onEmail={(email) => { pauseForEngagement(); setReplyPrefill({ to: email, subject: "", body: "" }); setShowComposer(true); }}
             onDnc={handleDnc}
+            onContactSave={handleContactSave}
             leads={leads}
             statuses={statuses}
             seedHiringRoles={seedHiringRoles}
