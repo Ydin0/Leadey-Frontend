@@ -28,10 +28,16 @@ function dueLabel(dueAt: string | null): { text: string; urgent: boolean } | nul
     due.getFullYear() === now.getFullYear() &&
     due.getMonth() === now.getMonth() &&
     due.getDate() === now.getDate();
-  if (sameDay) return { text: "Today", urgent: true };
+  // Show the time when one was set (non-midnight) so timed tasks read clearly.
+  const hasTime = due.getHours() !== 0 || due.getMinutes() !== 0;
+  const timeStr = hasTime
+    ? due.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : "";
+  if (sameDay) return { text: timeStr ? `Today ${timeStr}` : "Today", urgent: true };
   const overdue = due.getTime() < now.getTime();
+  const dateStr = due.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   return {
-    text: due.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    text: timeStr ? `${dateStr}, ${timeStr}` : dateStr,
     urgent: overdue,
   };
 }
@@ -172,7 +178,7 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
     try {
       const created = await createLeadTask(funnelId, leadId, {
         label: label.trim(),
-        dueAt: due ? new Date(due + "T12:00:00").toISOString() : null,
+        dueAt: due ? new Date(due).toISOString() : null,
         // Members can only self-assign; admins pick anyone.
         assigneeId: isManager ? assignee : userId,
       });
@@ -273,7 +279,7 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
               <label className="flex items-center gap-1.5 text-ink-faint cursor-pointer">
                 <Calendar size={12} />
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={due}
                   onChange={(e) => setDue(e.target.value)}
                   className="bg-transparent text-[11px] text-ink-secondary focus:outline-none"
