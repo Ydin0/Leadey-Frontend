@@ -10,7 +10,9 @@ import { useRowLimit } from "@/lib/hooks/use-row-limit";
 import { advanceLead, enrichJobPosts, saveLeadFilters } from "@/lib/api/funnels";
 import { useCredits } from "@/components/providers/credits-provider";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
-import { FunnelLeadsFilterBar, DEFAULT_FUNNEL_LEADS_FILTERS, normalizeFunnelLeadsFilters, type FunnelLeadsFilters } from "./funnel-leads-filter-bar";
+import { FilterBuilder } from "@/components/filters/filter-builder";
+import { EMPTY_FILTER, type FilterGroup } from "@/lib/types/lead-filter";
+import { matchesFilter } from "@/lib/utils/eval-lead-filter";
 import {
   getStatusDotClass,
   getStatusLabel,
@@ -32,8 +34,8 @@ interface FunnelLeadTableProps {
   funnelId: string;
   /** Campaign sequence steps — powers the "Step" filter. */
   steps?: FunnelStep[];
-  /** Shared filters restored from the campaign config (persisted server-side). */
-  initialFilters?: FunnelLeadsFilters;
+  /** Shared filter restored from the campaign config (persisted server-side). */
+  initialFilters?: FilterGroup;
   sortBy?: LeadSortKey;
   onSortChange?: (key: LeadSortKey) => void;
   onLeadAdvanced?: () => void;
@@ -277,25 +279,28 @@ function MagicEnrichBar({
 }
 
 export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, sortBy, onSortChange, onLeadAdvanced, onLeadClick }: FunnelLeadTableProps) {
-  const [filters, setFilters] = useState<FunnelLeadsFilters>(
-    initialFilters ? normalizeFunnelLeadsFilters(initialFilters) : DEFAULT_FUNNEL_LEADS_FILTERS,
+  // Close-style query builder. Restored from the campaign config (a FilterGroup);
+  // a legacy/other shape falls back to empty.
+  const [filterGroup, setFilterGroup] = useState<FilterGroup>(
+    initialFilters && Array.isArray((initialFilters as Partial<FilterGroup>).conditions)
+      ? (initialFilters as FilterGroup)
+      : EMPTY_FILTER,
   );
+  const [search, setSearch] = useState("");
 
-  // Persist filter changes to the shared campaign config (debounced) so the
-  // filtered view is the same for every rep and survives a refresh. The first
-  // render (hydrating from the server value) must not trigger a save-back.
+  // Persist the shared filter to the campaign config (debounced) so the filtered
+  // view is the same for every rep and survives a refresh. The first render
+  // (hydrating from the server value) must not trigger a save-back.
   const hydratedRef = useRef(false);
   useEffect(() => {
     if (!hydratedRef.current) { hydratedRef.current = true; return; }
     const t = setTimeout(() => {
-      // Persist everything except the free-text search — that stays per-rep.
-      const { search: _omit, ...shared } = filters;
-      void saveLeadFilters(funnelId, shared as unknown as Record<string, unknown>).catch((err) =>
+      void saveLeadFilters(funnelId, filterGroup as unknown as Record<string, unknown>).catch((err) =>
         console.error("Failed to save lead filters:", err),
       );
     }, 600);
     return () => clearTimeout(t);
-  }, [filters, funnelId]);
+  }, [filterGroup, funnelId]);
   const [stepFilter, setStepFilter] = useState<number | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
@@ -332,13 +337,12 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
     return map;
   }, [leads]);
 
-  // Extract unique companies and sources for filter dropdowns
-  const companyOptions = useMemo(() => [...new Set(leads.map((l) => l.company).filter(Boolean))].sort(), [leads]);
+  // Enum option lists for the filter builder (status comes from useLeadStatuses).
   const sourceOptions = useMemo(() => [...new Set(leads.map((l) => l.source).filter(Boolean))].sort(), [leads]);
   const industryOptions = useMemo(() => [...new Set(leads.map((l) => l.companyIndustry).filter(Boolean) as string[])].sort(), [leads]);
   const locationOptions = useMemo(() => [...new Set(leads.map((l) => l.companyLocation).filter(Boolean) as string[])].sort(), [leads]);
 
-  // How many leads sit at each company — powers the "Leads in company" filter.
+  // How many leads sit at each company — powers the "Leads in company" field.
   const companyLeadCounts = useMemo(() => {
     const map = new Map<string, number>();
     for (const l of leads) {
@@ -348,85 +352,43 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
     return map;
   }, [leads]);
 
-  // Apply filters
+  const dynamicOptions = useMemo(
+    () => ({
+      status: statuses.map((s) => ({ value: s.key, label: s.label })),
+      source: sourceOptions.map((s) => ({ value: s, label: s })),
+      industry: industryOptions.map((s) => ({ value: s, label: s })),
+      location: locationOptions.map((s) => ({ value: s, label: s })),
+    }),
+    [statuses, sourceOptions, industryOptions, locationOptions],
+  );
+
+  // Resolve a filter field key → value for a given lead (incl. derived fields).
+  const getLeadValue = useCallback(
+    (l: FunnelLead, key: string): unknown => {
+      switch (key) {
+        case "callCount": return activityMap.get(l.id)?.calls ?? 0;
+        case "emailCount": return activityMap.get(l.id)?.emails ?? 0;
+        case "leadsInCompany": return companyLeadCounts.get((l.company || "Unknown").toLowerCase()) ?? 0;
+        default: return (l as unknown as Record<string, unknown>)[key];
+      }
+    },
+    [activityMap, companyLeadCounts],
+  );
+
+  // Apply the query-builder filter + free-text search + sequence-step filter.
   const filtered = useMemo(() => {
-    let result = leads;
-    const f = filters;
-
-    if (f.statuses.length > 0) {
-      result = result.filter((l) => (f.statuses as string[]).includes(l.status));
-    }
-    if (f.companies.length > 0) {
-      result = result.filter((l) => f.companies.includes(l.company));
-    }
-    if (f.industries.length > 0) {
-      result = result.filter((l) => !!l.companyIndustry && f.industries.includes(l.companyIndustry));
-    }
-    if (f.locations.length > 0) {
-      result = result.filter((l) => !!l.companyLocation && f.locations.includes(l.companyLocation));
-    }
-    if (f.sizeMin !== null) {
-      result = result.filter((l) => (l.companyEmployeeCount ?? -1) >= f.sizeMin!);
-    }
-    if (f.sizeMax !== null) {
-      result = result.filter((l) => l.companyEmployeeCount != null && l.companyEmployeeCount <= f.sizeMax!);
-    }
-    if (f.hasJobs === "true") {
-      result = result.filter((l) => (l.companyHiringRoles?.length ?? 0) > 0);
-    } else if (f.hasJobs === "false") {
-      result = result.filter((l) => (l.companyHiringRoles?.length ?? 0) === 0);
-    }
-    if (f.leadsInCompanyMin !== null) {
-      result = result.filter(
-        (l) => (companyLeadCounts.get((l.company || "Unknown").toLowerCase()) ?? 0) >= f.leadsInCompanyMin!,
-      );
-    }
-    if (f.sources.length > 0) {
-      result = result.filter((l) => f.sources.includes(l.source));
-    }
-    if (f.scoreMin !== null) {
-      result = result.filter((l) => l.score >= f.scoreMin!);
-    }
-    if (f.hasEmail === "true") {
-      result = result.filter((l) => !!l.email);
-    } else if (f.hasEmail === "false") {
-      result = result.filter((l) => !l.email);
-    }
-    if (f.hasPhone === "true") {
-      result = result.filter((l) => !!l.phone);
-    } else if (f.hasPhone === "false") {
-      result = result.filter((l) => !l.phone);
-    }
-    if (f.isOverdue) {
-      result = result.filter((l) =>
-        l.nextDate.getTime() < Date.now() &&
-        !isTerminalStatus(l.status)
-      );
-    }
-    if (f.callCountMin !== null) {
-      result = result.filter((l) => (activityMap.get(l.id)?.calls ?? 0) >= f.callCountMin!);
-    }
-    if (f.emailCountMin !== null) {
-      result = result.filter((l) => (activityMap.get(l.id)?.emails ?? 0) >= f.emailCountMin!);
-    }
-    if (f.search) {
-      const q = f.search.toLowerCase();
-      result = result.filter(
-        (l) =>
-          l.name.toLowerCase().includes(q) ||
-          l.company.toLowerCase().includes(q) ||
-          l.email.toLowerCase().includes(q)
-      );
-    }
-    // Sequence-step filter — show only leads sitting on a given campaign step.
-    if (stepFilter !== null) {
-      result = result.filter((l) => (l.currentStep || 1) === stepFilter);
-    }
-
-    // Preserve the incoming order (the page sorts leads deterministically and
-    // shares that order with the focus view — we must not re-sort here).
-    return result;
-  }, [leads, filters, stepFilter, activityMap, companyLeadCounts]);
+    const q = search.trim().toLowerCase();
+    return leads.filter((l) => {
+      if (stepFilter !== null && (l.currentStep || 1) !== stepFilter) return false;
+      if (q && !(
+        l.name.toLowerCase().includes(q) ||
+        l.company.toLowerCase().includes(q) ||
+        (l.email || "").toLowerCase().includes(q) ||
+        (l.title || "").toLowerCase().includes(q)
+      )) return false;
+      return matchesFilter(filterGroup, (key) => getLeadValue(l, key));
+    });
+  }, [leads, filterGroup, search, stepFilter, getLeadValue]);
 
   // Group leads by company
   const companyGroups = useMemo(() => {
@@ -540,15 +502,24 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
 
   return (
     <div>
-      {/* Filter bar */}
-      <FunnelLeadsFilterBar
-        filters={filters}
-        onChange={(f) => { setFilters(f); setCurrentPage(1); }}
-        companyOptions={companyOptions}
-        sourceOptions={sourceOptions}
-        industryOptions={industryOptions}
-        locationOptions={locationOptions}
-      />
+      {/* Filter builder + search */}
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <FilterBuilder
+          value={filterGroup}
+          onChange={(g) => { setFilterGroup(g); setCurrentPage(1); }}
+          dynamicOptions={dynamicOptions}
+        />
+        <div className="relative ml-auto">
+          <Search size={13} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+            placeholder="Search leads..."
+            className="pl-8 pr-3 py-1.5 rounded-full bg-section border border-border-subtle text-[11px] text-ink placeholder:text-ink-faint w-48 focus:outline-none focus:border-border-default"
+          />
+        </div>
+      </div>
 
       {/* Count + step filter + group toggle + sort */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">

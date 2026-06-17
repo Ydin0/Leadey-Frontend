@@ -13,7 +13,7 @@ import { FunnelStatsBar } from "@/components/funnels/dashboard/funnel-stats-bar"
 import { FunnelTabNav, type FunnelTab } from "@/components/funnels/dashboard/funnel-tab-nav";
 
 import { FunnelLeadTable } from "@/components/funnels/leads/funnel-lead-table";
-import type { FunnelLeadsFilters } from "@/components/funnels/leads/funnel-leads-filter-bar";
+import type { FilterGroup } from "@/lib/types/lead-filter";
 import { LeadSortMenu } from "@/components/funnels/leads/lead-sort-menu";
 import { CockpitView } from "@/components/funnels/cockpit/cockpit-view";
 import { AnalyticsView } from "@/components/funnels/analytics/analytics-view";
@@ -306,7 +306,7 @@ export default function FunnelDetailPage() {
           leads={sortedLeads}
           steps={funnel.steps}
           funnelId={funnel.id}
-          initialFilters={funnel.config?.leadFilters as FunnelLeadsFilters | undefined}
+          initialFilters={funnel.config?.leadFilters as FilterGroup | undefined}
           sortBy={sortBy}
           onSortChange={changeSort}
           onLeadAdvanced={() => void loadFunnel()}
