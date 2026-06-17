@@ -12,8 +12,9 @@ import { useCredits } from "@/components/providers/credits-provider";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { FilterBuilder } from "@/components/filters/filter-builder";
 import { SmartViewBar } from "@/components/filters/smart-view-bar";
-import { EMPTY_FILTER, type FilterGroup } from "@/lib/types/lead-filter";
+import { EMPTY_FILTER, customFieldsToFilterFields, type FilterGroup, type FilterFieldDef } from "@/lib/types/lead-filter";
 import { matchesFilter } from "@/lib/utils/eval-lead-filter";
+import { listCustomFields } from "@/lib/api/custom-fields";
 import {
   getStatusDotClass,
   getStatusLabel,
@@ -288,6 +289,14 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
       : EMPTY_FILTER,
   );
   const [search, setSearch] = useState("");
+  const [customFields, setCustomFields] = useState<FilterFieldDef[]>([]);
+
+  // Org custom fields → extra filterable fields in the builder.
+  useEffect(() => {
+    listCustomFields()
+      .then((defs) => setCustomFields(customFieldsToFilterFields(defs)))
+      .catch(() => {});
+  }, []);
 
   // Persist the shared filter to the campaign config (debounced) so the filtered
   // view is the same for every rep and survives a refresh. The first render
@@ -366,6 +375,10 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   // Resolve a filter field key → value for a given lead (incl. derived fields).
   const getLeadValue = useCallback(
     (l: FunnelLead, key: string): unknown => {
+      if (key.startsWith("custom:")) {
+        const ck = key.slice("custom:".length);
+        return l.customFields?.find((f) => f.key === ck)?.value ?? "";
+      }
       switch (key) {
         case "callCount": return activityMap.get(l.id)?.calls ?? 0;
         case "emailCount": return activityMap.get(l.id)?.emails ?? 0;
@@ -515,6 +528,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
           value={filterGroup}
           onChange={(g) => { setFilterGroup(g); setCurrentPage(1); }}
           dynamicOptions={dynamicOptions}
+          extraFields={customFields}
         />
         <div className="relative ml-auto">
           <Search size={13} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />

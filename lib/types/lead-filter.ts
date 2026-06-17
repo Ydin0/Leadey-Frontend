@@ -37,7 +37,7 @@ export const EMPTY_FILTER: FilterGroup = { match: "and", conditions: [] };
 export interface FilterFieldDef {
   key: string;
   label: string;
-  group: "Lead" | "Company" | "Activity";
+  group: "Lead" | "Company" | "Activity" | "Custom";
   type: FilterFieldType;
   operators: FilterOperator[];
   /** Static enum options (e.g. boolean); dynamic ones (status/company) are
@@ -103,6 +103,20 @@ export const LEAD_FILTER_FIELDS: FilterFieldDef[] = [
 
 export function fieldDef(key: string): FilterFieldDef | undefined {
   return LEAD_FILTER_FIELDS.find((f) => f.key === key);
+}
+
+/** Build filter fields for the org's custom lead fields (keyed `custom:<key>`).
+ *  All treated as text so the client + server evaluators stay consistent. */
+export function customFieldsToFilterFields(
+  defs: { key: string; label: string }[],
+): FilterFieldDef[] {
+  return defs.map((d) => ({
+    key: `custom:${d.key}`,
+    label: d.label,
+    group: "Custom" as const,
+    type: "text" as const,
+    operators: ["contains", "is", "is_not", "is_set", "is_empty"] as FilterOperator[],
+  }));
 }
 
 /** Count of conditions that are "complete" enough to apply (used for the pill badge). */

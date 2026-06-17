@@ -6,7 +6,6 @@ import { FilterPopover } from "@/components/scrapers/filters/filter-popover";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
   LEAD_FILTER_FIELDS,
-  fieldDef,
   OPERATOR_LABELS,
   NO_VALUE_OPS,
   activeConditionCount,
@@ -23,27 +22,31 @@ interface FilterBuilderProps {
   onChange: (g: FilterGroup) => void;
   /** Runtime options for enum fields, keyed by FilterFieldDef.dynamicOptionsKey. */
   dynamicOptions?: Record<string, OptionList>;
+  /** Extra filterable fields (e.g. the org's custom fields). */
+  extraFields?: FilterFieldDef[];
 }
 
 const inputCls =
   "bg-surface border border-border-subtle rounded-md px-2 py-1 text-[11.5px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default";
 
-const GROUPS: FilterFieldDef["group"][] = ["Lead", "Company", "Activity"];
+const GROUPS: FilterFieldDef["group"][] = ["Lead", "Company", "Activity", "Custom"];
 
-export function FilterBuilder({ value, onChange, dynamicOptions = {} }: FilterBuilderProps) {
+export function FilterBuilder({ value, onChange, dynamicOptions = {}, extraFields = [] }: FilterBuilderProps) {
   const group = value ?? EMPTY_FILTER;
   const count = activeConditionCount(group);
+  const allFields = [...LEAD_FILTER_FIELDS, ...extraFields];
+  const getDef = (key: string) => allFields.find((f) => f.key === key);
 
   const update = (next: FilterGroup) => onChange(next);
   const setCond = (i: number, patch: Partial<FilterCondition>) =>
     update({ ...group, conditions: group.conditions.map((c, idx) => (idx === i ? { ...c, ...patch } : c)) });
   const removeCond = (i: number) => update({ ...group, conditions: group.conditions.filter((_, idx) => idx !== i) });
   const addCond = () => {
-    const f = LEAD_FILTER_FIELDS[0];
+    const f = allFields[0];
     update({ ...group, conditions: [...group.conditions, { field: f.key, op: f.operators[0], value: "" }] });
   };
   const changeField = (i: number, key: string) => {
-    const d = fieldDef(key)!;
+    const d = getDef(key)!;
     setCond(i, { field: key, op: d.operators[0], value: d.type === "boolean" ? "true" : "" });
   };
 
@@ -80,7 +83,7 @@ export function FilterBuilder({ value, onChange, dynamicOptions = {} }: FilterBu
 
         <div className="space-y-1.5 max-h-[340px] overflow-y-auto">
           {group.conditions.map((c, i) => {
-            const def = fieldDef(c.field);
+            const def = getDef(c.field);
             return (
               <div key={i} className="flex items-start gap-1.5">
                 <NativeSelect
@@ -88,13 +91,17 @@ export function FilterBuilder({ value, onChange, dynamicOptions = {} }: FilterBu
                   onChange={(e) => changeField(i, e.target.value)}
                   className="w-[130px] shrink-0 text-[11.5px]"
                 >
-                  {GROUPS.map((g) => (
-                    <optgroup key={g} label={g}>
-                      {LEAD_FILTER_FIELDS.filter((f) => f.group === g).map((f) => (
-                        <option key={f.key} value={f.key}>{f.label}</option>
-                      ))}
-                    </optgroup>
-                  ))}
+                  {GROUPS.map((g) => {
+                    const fs = allFields.filter((f) => f.group === g);
+                    if (fs.length === 0) return null;
+                    return (
+                      <optgroup key={g} label={g}>
+                        {fs.map((f) => (
+                          <option key={f.key} value={f.key}>{f.label}</option>
+                        ))}
+                      </optgroup>
+                    );
+                  })}
                 </NativeSelect>
 
                 <NativeSelect

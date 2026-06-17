@@ -16,8 +16,9 @@ import { getStatusDotClass, getStatusLabel } from "@/lib/utils/lead-status";
 import { ImportsView } from "@/components/leads/imports-view";
 import { FilterBuilder } from "@/components/filters/filter-builder";
 import { SmartViewBar } from "@/components/filters/smart-view-bar";
-import { EMPTY_FILTER, type FilterGroup } from "@/lib/types/lead-filter";
+import { EMPTY_FILTER, customFieldsToFilterFields, type FilterGroup, type FilterFieldDef } from "@/lib/types/lead-filter";
 import { encodeFilter } from "@/lib/api/lead-filter";
+import { listCustomFields } from "@/lib/api/custom-fields";
 import { downloadCSV } from "@/lib/export-csv";
 import { Download } from "lucide-react";
 import {
@@ -61,6 +62,7 @@ export function GlobalLeadsShell() {
   const [facets, setFacets] = useState<LeadsFacets | null>(null);
   const [filters, setFilters] = useState<LeadFilters>({});
   const [filterGroup, setFilterGroup] = useState<FilterGroup>(EMPTY_FILTER);
+  const [customFields, setCustomFields] = useState<FilterFieldDef[]>([]);
   const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -87,6 +89,7 @@ export function GlobalLeadsShell() {
   useEffect(() => {
     if (!isAuthReady) return;
     getLeadsFacets().then(setFacets).catch(() => {});
+    listCustomFields().then((d) => setCustomFields(customFieldsToFilterFields(d))).catch(() => {});
   }, [isAuthReady]);
 
   const load = useCallback(async () => {
@@ -238,7 +241,7 @@ export function GlobalLeadsShell() {
 
               <div className="w-px h-[22px] bg-border-subtle" />
               <SmartViewBar scope="org" current={filterGroup} onApply={(g) => { setFilterGroup(g); setPage(1); }} />
-              <FilterBuilder value={filterGroup} onChange={(g) => { setFilterGroup(g); setPage(1); }} dynamicOptions={dynamicOptions} />
+              <FilterBuilder value={filterGroup} onChange={(g) => { setFilterGroup(g); setPage(1); }} dynamicOptions={dynamicOptions} extraFields={customFields} />
               <button
                 onClick={() => void handleExport()}
                 disabled={exporting || total === 0}
