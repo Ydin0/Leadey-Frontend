@@ -154,6 +154,11 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   // Tracks the lead id we last navigated to in follow mode, so we can tell a
   // lead change (re-navigate) apart from the user navigating away (stop).
   const lastNavLeadRef = useRef<string | null>(null);
+  // Set when a call ends: follow mode HOLDS on the just-called lead through the
+  // post-call delay so the rep can disposition / take notes, instead of being
+  // yanked to the next lead's page. Cleared when the next lead is actually
+  // dialled (or the rep navigates via Previous).
+  const holdNavRef = useRef(false);
   // The queue item the dialer last placed a call to. The auto-dialer refuses to
   // dial the same item twice in a row, so a stale countdown can never re-call a
   // contact whose call already ended.
@@ -296,6 +301,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       if (item.lead?.doNotCall && !confirmDncCall(item.lead?.name)) return;
       setCountdown(null);
       setSteppedBack(false); // placing a call clears the "viewing previous" state
+      holdNavRef.current = false; // dialing the next lead releases the follow hold
       lastDialedItemIdRef.current = item.id;
       call.startCall(item.leadPhone, {
         contactName: item.lead?.name || null,
@@ -365,6 +371,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       // instead of re-dialling this one. Also kill any pending countdown so a
       // running dialer doesn't auto-redial the lead we just stepped back to.
       setSteppedBack(true);
+      holdNavRef.current = false; // Previous is an explicit nav — follow it
       stopCountdown();
     } catch {
       await reconcile(session.id);
@@ -525,6 +532,10 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       prevDirectionRef.current === "outbound"
     ) {
       autoVmRef.current = false;
+      // Keep the rep on the just-called lead's page through the post-call delay
+      // (time to disposition) — follow mode only moves to the next lead when it's
+      // actually dialled, not the instant the queue advances.
+      holdNavRef.current = true;
       void advanceRef.current();
     }
     prevStateRef.current = state;
@@ -606,11 +617,15 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!followMode) return;
     if (!currentItem || !session?.funnelId) return;
+    // Post-call disposition window: stay on the just-called lead until the next
+    // lead is actually dialled (holdNavRef is cleared in dialItem). The dep on
+    // the active call's id re-runs this the moment that dial starts.
+    if (holdNavRef.current) return;
     const leadId = currentItem.leadId;
     if (lastNavLeadRef.current === leadId) return;
     lastNavLeadRef.current = leadId;
     navigateToLead(leadId);
-  }, [followMode, currentItem, session?.funnelId, navigateToLead]);
+  }, [followMode, currentItem, session?.funnelId, navigateToLead, call.activeCall?.callId]);
 
   const isDialing =
     call.activeCall?.state === "ringing" || call.activeCall?.state === "connected";
