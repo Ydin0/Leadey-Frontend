@@ -89,6 +89,10 @@ export interface FunnelLeadEvent {
 export interface FunnelLead {
   id: string;
   name: string;
+  /** Explicit first/last name (from CSV import / scraper) for email merge
+   *  variables; falls back to splitting `name` when absent. */
+  firstName?: string | null;
+  lastName?: string | null;
   company: string;
   title: string;
   email: string;

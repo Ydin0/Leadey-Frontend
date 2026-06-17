@@ -598,6 +598,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         lead={{
           id: currentLead.id,
           name: currentLead.name,
+          firstName: currentLead.firstName,
+          lastName: currentLead.lastName,
           email: currentLead.email,
           company: currentLead.company,
           title: currentLead.title,

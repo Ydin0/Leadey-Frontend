@@ -11,7 +11,7 @@ import {
 } from "@/lib/api/funnels";
 
 // ── Field vocabulary (grouped, Close-style) ──────────────────────────────
-const LEAD_FIELDS = ["Lead Name", "Lead Email", "Lead Title", "Lead Phone", "Lead LinkedIn"] as const;
+const LEAD_FIELDS = ["Lead Name", "Lead First Name", "Lead Last Name", "Lead Email", "Lead Title", "Lead Phone", "Lead LinkedIn"] as const;
 const COMPANY_FIELDS = ["Company Name", "Company Domain", "Company LinkedIn", "Company Industry", "Company Location", "Company Size", "Company Description", "Company Annual Revenue", "Company Hiring Roles"] as const;
 const OTHER_FIELDS = ["Notes", "--- Skip ---"] as const;
 const ALL_FIELDS = [...LEAD_FIELDS, ...COMPANY_FIELDS, ...OTHER_FIELDS];
@@ -87,6 +87,9 @@ function autoMapField(header: string): MappedField {
   if (n.includes("linkedin") || n.includes("profileurl")) return "Lead LinkedIn";
   if (n.includes("title") || n.includes("role") || n.includes("position") || n.includes("jobtitle")) return "Lead Title";
   if (n.includes("phone") || n.includes("mobile") || n.includes("telephone")) return "Lead Phone";
+  // First/last must be checked BEFORE the generic "name" match below.
+  if (n === "firstname" || n === "fname" || n === "givenname" || (n.includes("first") && n.includes("name"))) return "Lead First Name";
+  if (n === "lastname" || n === "lname" || n === "surname" || n === "familyname" || (n.includes("last") && n.includes("name"))) return "Lead Last Name";
   if (n.includes("name") || n.includes("contact")) return "Lead Name";
   if (n.includes("company")) return "Company Name";
   return "--- Skip ---";
@@ -171,7 +174,12 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
   };
 
   const mappedSet = new Set(mappings.map((m) => m.mappedField));
-  const missingRequired = REQUIRED.filter((f) => !mappedSet.has(f));
+  // A mapped "Lead First Name" satisfies the name requirement — the backend
+  // composes the full name from first + last when no full-name column is mapped.
+  const hasNameSource = mappedSet.has("Lead Name") || mappedSet.has("Lead First Name");
+  const missingRequired = REQUIRED.filter(
+    (f) => !mappedSet.has(f) && !(f === "Lead Name" && hasNameSource),
+  );
   const canProceed = missingRequired.length === 0;
 
   const loadReview = useCallback(async (gb: CsvGroupBy) => {
