@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -14,8 +14,14 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { getStatusDotClass, getStatusLabel } from "@/lib/utils/lead-status";
 import { ImportsView } from "@/components/leads/imports-view";
+import { FilterBuilder } from "@/components/filters/filter-builder";
+import { SmartViewBar } from "@/components/filters/smart-view-bar";
+import { EMPTY_FILTER, type FilterGroup } from "@/lib/types/lead-filter";
+import { encodeFilter } from "@/lib/api/lead-filter";
+import { downloadCSV } from "@/lib/export-csv";
+import { Download } from "lucide-react";
 import {
-  getOrgLeads, getOrgLeadCompanies, getLeadsFacets, createCampaignFromLeads,
+  getOrgLeads, getOrgLeadCompanies, getLeadsFacets, createCampaignFromLeads, exportOrgLeads,
   type OrgLead, type LeadCompanyRow, type LeadsFacets, type LeadFilters,
 } from "@/lib/api/leads";
 
@@ -54,6 +60,8 @@ export function GlobalLeadsShell() {
   const [tab, setTab] = useState<Tab>("companies");
   const [facets, setFacets] = useState<LeadsFacets | null>(null);
   const [filters, setFilters] = useState<LeadFilters>({});
+  const [filterGroup, setFilterGroup] = useState<FilterGroup>(EMPTY_FILTER);
+  const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
@@ -84,14 +92,15 @@ export function GlobalLeadsShell() {
   const load = useCallback(async () => {
     if (!isAuthReady || tab === "imports") return;
     setLoading(true);
+    const q = { ...filters, filter: encodeFilter(filterGroup) };
     try {
       if (tab === "companies") {
-        const r = await getOrgLeadCompanies({ ...filters, page, pageSize: 25 });
+        const r = await getOrgLeadCompanies({ ...q, page, pageSize: 25 });
         setCompanies(r.data);
         setTotal(r.meta.totalCount);
         setTotalPages(r.meta.totalPages);
       } else {
-        const r = await getOrgLeads({ ...filters, page, pageSize: 50 });
+        const r = await getOrgLeads({ ...q, page, pageSize: 50 });
         setLeads(r.data);
         setTotal(r.meta.totalCount);
         setTotalPages(r.meta.totalPages);
@@ -101,7 +110,27 @@ export function GlobalLeadsShell() {
     } finally {
       setLoading(false);
     }
-  }, [isAuthReady, tab, filters, page, showStatus]);
+  }, [isAuthReady, tab, filters, filterGroup, page, showStatus]);
+
+  const dynamicOptions = useMemo(
+    () => ({
+      status: (facets?.statuses ?? []).map((s) => ({ value: s, label: STATUS_LABEL[s] ?? s })),
+      source: (facets?.sources ?? []).map((s) => ({ value: s, label: s })),
+    }),
+    [facets],
+  );
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      const csv = await exportOrgLeads({ ...filters, filter: encodeFilter(filterGroup) });
+      downloadCSV(csv, `leads-export-${new Date().toISOString().slice(0, 10)}.csv`);
+    } catch {
+      showStatus("error", "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => { void load(); }, [load]);
 
@@ -206,6 +235,19 @@ export function GlobalLeadsShell() {
               <Toggle label="Has phone" on={!!filters.hasPhone} onClick={() => toggle("hasPhone")} />
               <Toggle label="Has LinkedIn" on={!!filters.hasLinkedin} onClick={() => toggle("hasLinkedin")} />
               <Toggle label="DNC only" on={!!filters.doNotCall} onClick={() => toggle("doNotCall")} />
+
+              <div className="w-px h-[22px] bg-border-subtle" />
+              <SmartViewBar scope="org" current={filterGroup} onApply={(g) => { setFilterGroup(g); setPage(1); }} />
+              <FilterBuilder value={filterGroup} onChange={(g) => { setFilterGroup(g); setPage(1); }} dynamicOptions={dynamicOptions} />
+              <button
+                onClick={() => void handleExport()}
+                disabled={exporting || total === 0}
+                title="Export filtered leads to CSV"
+                className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle disabled:opacity-50"
+              >
+                {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                Export
+              </button>
             </div>
 
             {chips.length > 0 && (

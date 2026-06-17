@@ -1,4 +1,6 @@
-import { apiRequest, apiRequestRaw } from "./client";
+import { apiRequest, apiRequestRaw, getAuthToken } from "./client";
+
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:3001";
 
 export interface OrgLead {
   id: string;
@@ -64,6 +66,8 @@ export interface LeadFilters {
   doNotCall?: boolean;
   minEmployees?: number;
   maxEmployees?: number;
+  /** Base64-encoded query-builder FilterGroup (Smart Views). */
+  filter?: string;
 }
 
 interface Paged<T> {
@@ -90,6 +94,16 @@ export async function getOrgLeadCompanies(
   filters: LeadFilters & { page?: number; pageSize?: number },
 ): Promise<Paged<LeadCompanyRow>> {
   return apiRequestRaw<Paged<LeadCompanyRow>>(`/leads/companies${qs(filters)}`);
+}
+
+/** Fetch the filtered leads as CSV text (server applies the same filter). */
+export async function exportOrgLeads(filters: LeadFilters): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/leads/export${qs(filters)}`, {
+    headers: { Authorization: `Bearer ${getAuthToken() ?? ""}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Export failed");
+  return res.text();
 }
 
 export async function getLeadsFacets(): Promise<LeadsFacets> {
