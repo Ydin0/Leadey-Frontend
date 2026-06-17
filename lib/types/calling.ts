@@ -130,6 +130,9 @@ export interface CallRecord {
   to: string;
   contactName: string | null;
   companyName: string | null;
+  /** Resolved lead this call is with — drives the clickable name → lead profile. */
+  leadId?: string | null;
+  funnelId?: string | null;
   lineId: string;
   duration: number; // seconds
   disposition: CallDisposition;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, Fragment } from "react";
+import Link from "next/link";
 import {
   PhoneIncoming, PhoneOutgoing, PhoneMissed,
   Sparkles, ChevronRight, Loader2, FileText,
@@ -129,21 +130,35 @@ export function RecordingsTable({
                     />
                   </TableCell>
 
-                  {/* Contact — name if we know it, otherwise the raw number */}
+                  {/* Contact — clickable name → lead profile (falls back to the
+                      raw number when we couldn't link a lead). */}
                   <TableCell>
                     {(() => {
                       const raw = record.direction === "outbound" ? record.to : record.from;
                       const numberLabel =
                         !raw || raw === "Unknown" ? "Unknown number" : formatPhoneIntl(raw);
+                      const label = record.contactName || numberLabel;
+                      const href = record.leadId
+                        ? record.funnelId
+                          ? `/dashboard/funnels/${record.funnelId}/leads/${record.leadId}`
+                          : `/dashboard/leads/${record.leadId}`
+                        : null;
                       return (
                         <div className="min-w-0">
-                          <p className="text-[12px] font-medium text-ink truncate">
-                            {record.contactName || numberLabel}
-                          </p>
+                          {href ? (
+                            <Link
+                              href={href}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[12px] font-medium text-signal-blue-text hover:underline truncate block"
+                            >
+                              {label}
+                            </Link>
+                          ) : (
+                            <p className="text-[12px] font-medium text-ink truncate">{label}</p>
+                          )}
                           {record.companyName ? (
                             <p className="text-[10px] text-ink-muted truncate">{record.companyName}</p>
                           ) : null}
-                          {/* Show the number underneath only when the primary line is a name */}
                           {record.contactName && (
                             <p className="text-[10px] text-ink-faint tabular-nums truncate">{numberLabel}</p>
                           )}
