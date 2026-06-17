@@ -71,9 +71,27 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   const [showConvert, setShowConvert] = useState(false);
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
   const [emailMessages, setEmailMessages] = useState<LeadEmailMessage[]>([]);
+  const [emailContact, setEmailContact] = useState<Record<string, string>>({});
   const [replyPrefill, setReplyPrefill] = useState<{ to: string; subject: string; body: string } | null>(null);
+  // Quick filter — when set, the timeline narrows to a single contact's activity
+  // (click a contact in the sidebar). Null = show the whole company's activity.
+  const [contactFilter, setContactFilter] = useState<string | null>(null);
 
   const currentLead = useMemo(() => leads.find((l) => l.id === leadId) || null, [leads, leadId]);
+
+  // All contacts (lead rows) of the focused lead's company. The lead profile is
+  // a company view, so its activity aggregates across ALL of these — not just
+  // the clicked contact. Falls back to the single lead when it has no company.
+  const companyLeadIds = useMemo(() => {
+    if (!currentLead) return [] as string[];
+    const key = (currentLead.company || "").trim().toLowerCase();
+    if (!key) return [currentLead.id];
+    return leads.filter((l) => (l.company || "").trim().toLowerCase() === key).map((l) => l.id);
+  }, [leads, currentLead]);
+  const companyLeadIdsKey = companyLeadIds.join(",");
+
+  // Reset the per-contact filter whenever we move to a different lead/company.
+  useEffect(() => { setContactFilter(null); }, [companyLeadIdsKey]);
 
   // ── Prev / next navigation — by COMPANY, not by individual contact ──
   // The lead view shows a company with all its contacts, so several leads map
@@ -114,39 +132,67 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     [router, funnelId, leadId],
   );
 
-  // ── Real per-lead call records (audio + AI summary in the timeline) ──
+  // ── Real call records across ALL company contacts (audio + AI summary) ──
+  // Each record is stamped with the contact we fetched it under so the quick
+  // filter can narrow by contact; merged + deduped by record id.
   const reloadCalls = useCallback(async () => {
+    if (!companyLeadIds.length) { setCallRecords([]); return; }
     try {
-      const res = await getCallRecords({ leadId, limit: 50 });
-      setCallRecords(res.data);
+      const results = await Promise.all(
+        companyLeadIds.map((id) =>
+          getCallRecords({ leadId: id, limit: 50 })
+            .then((r) => r.data.map((rec) => ({ ...rec, leadId: id })))
+            .catch(() => [] as CallRecord[]),
+        ),
+      );
+      const seen = new Set<string>();
+      setCallRecords(results.flat().filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true))));
     } catch (err) {
       console.error("Failed to load call records:", err);
     }
-  }, [leadId]);
+  }, [companyLeadIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void reloadCalls();
   }, [reloadCalls]);
 
-  // ── Real per-lead email thread (rich, expandable cards in the timeline) ──
+  // ── Real email threads across ALL company contacts (rich timeline cards) ──
   const reloadEmails = useCallback(async () => {
+    if (!companyLeadIds.length) { setEmailMessages([]); setEmailContact({}); return; }
     try {
-      setEmailMessages(await getLeadEmailThread(funnelId, leadId));
+      const results = await Promise.all(
+        companyLeadIds.map((id) =>
+          getLeadEmailThread(funnelId, id).then((msgs) => ({ id, msgs })).catch(() => ({ id, msgs: [] as LeadEmailMessage[] })),
+        ),
+      );
+      const merged: LeadEmailMessage[] = [];
+      const map: Record<string, string> = {};
+      const seen = new Set<string>();
+      for (const { id, msgs } of results) {
+        for (const m of msgs) {
+          if (seen.has(m.id)) continue;
+          seen.add(m.id);
+          merged.push(m);
+          map[m.id] = id;
+        }
+      }
+      setEmailMessages(merged);
+      setEmailContact(map);
     } catch {
-      // no thread / not emailable yet — leave empty
+      // no threads / not emailable yet — leave empty
     }
-  }, [funnelId, leadId]);
+  }, [funnelId, companyLeadIdsKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     void reloadEmails();
   }, [reloadEmails]);
 
-  // Refetch shortly after a call against this lead ends + is saved.
+  // Refetch shortly after a call against any of this company's contacts ends.
   useEffect(() => {
-    if (lastEndedCall?.leadId !== leadId) return;
+    if (!lastEndedCall?.leadId || !companyLeadIds.includes(lastEndedCall.leadId)) return;
     const t = setTimeout(() => void reloadCalls(), 1500);
     return () => clearTimeout(t);
-  }, [lastEndedCall, leadId, reloadCalls]);
+  }, [lastEndedCall, companyLeadIdsKey, reloadCalls]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ← / → arrow keys jump between leads — ignored while typing or with a
   // modal/composer open. The handler reads the latest prev/next from a ref
@@ -458,15 +504,20 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     );
   }
 
-  // Timeline activities = session + real backend events (calls come from the
-  // real call records instead, so we drop event-derived "call" rows). Apply
-  // the note edit/delete overlays and dedupe by id (a freshly-added note can
-  // exist both as a session item and a refetched event with the same id).
+  // Timeline aggregates the WHOLE company: session items + real backend events
+  // for EVERY contact (calls come from the call records instead, so drop
+  // event-derived "call" rows). Each item is tagged with its contact so the
+  // quick filter can narrow by person. Apply note edit/delete overlays, dedupe
+  // by id, then apply the active contact filter.
   const seenActivityIds = new Set<string>();
-  const timelineActivities = [
-    ...(extraActivities[currentLead.id] ?? []),
-    ...mapEventsToActivities(currentLead.events ?? []),
-  ]
+  const timelineActivities = companyContacts
+    .flatMap((c) => {
+      const lead = leads.find((l) => l.id === c.id);
+      return [
+        ...(extraActivities[c.id] ?? []),
+        ...mapEventsToActivities(lead?.events ?? []),
+      ].map((a) => ({ ...a, contactId: c.id, contactName: c.name }));
+    })
     .filter((a) => a.type !== "call")
     .filter((a) => !deletedNotes.has(a.id))
     .filter((a) => {
@@ -474,7 +525,16 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
       seenActivityIds.add(a.id);
       return true;
     })
+    .filter((a) => !contactFilter || a.contactId === contactFilter)
     .map((a) => (editedNotes[a.id] ? { ...a, summary: editedNotes[a.id] } : a));
+
+  // Calls + emails narrowed to the active contact (when filtering).
+  const visibleCalls = contactFilter ? callRecords.filter((r) => r.leadId === contactFilter) : callRecords;
+  const visibleEmails = contactFilter ? emailMessages.filter((m) => emailContact[m.id] === contactFilter) : emailMessages;
+  const filterContactName = contactFilter
+    ? companyContacts.find((c) => c.id === contactFilter)?.name ?? null
+    : null;
+  const toggleContactFilter = (id: string) => setContactFilter((prev) => (prev === id ? null : id));
 
   return (
     <div className="-m-6 h-[calc(100vh-3.5rem)] flex flex-col bg-page">
@@ -513,6 +573,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
             onEmail={(email) => { pauseForEngagement(); setReplyPrefill({ to: email, subject: "", body: "" }); setShowComposer(true); }}
             onDnc={handleDnc}
             onContactSave={handleContactSave}
+            activeContactId={contactFilter}
+            onContactSelect={toggleContactFilter}
             leads={leads}
             statuses={statuses}
             seedHiringRoles={seedHiringRoles}
@@ -535,12 +597,14 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         <section className="flex-1 min-w-0">
           <LeadTimeline
             activities={timelineActivities}
-            callRecords={callRecords}
-            emailMessages={emailMessages}
+            callRecords={visibleCalls}
+            emailMessages={visibleEmails}
             onAddNote={addNote}
             onEditNote={editNote}
             onDeleteNote={deleteNote}
             onReplyEmail={handleReplyEmail}
+            filterContactName={filterContactName}
+            onClearFilter={() => setContactFilter(null)}
           />
         </section>
       </div>

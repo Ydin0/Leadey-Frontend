@@ -19,6 +19,8 @@ import {
   Trophy,
   MessageSquare,
   Loader2,
+  Filter,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -183,11 +185,14 @@ function ActivityCard({
   actor,
   onEdit,
   onDelete,
+  showContact,
 }: {
   a: FunnelLeadActivity;
   actor: Actor | null;
   onEdit?: (id: string, text: string) => void;
   onDelete?: (id: string) => void;
+  /** Show which contact this row belongs to (company-wide, unfiltered feed). */
+  showContact?: boolean;
 }) {
   const editable = a.type === "note" && (!!onEdit || !!onDelete);
   const [editing, setEditing] = useState(false);
@@ -238,6 +243,11 @@ function ActivityCard({
           {a.detail && <p className="text-[11.5px] text-ink-muted mt-1 leading-relaxed">{a.detail}</p>}
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
+          {showContact && a.contactName && (
+            <span className="text-[10px] text-ink-muted bg-section rounded-full px-2 py-0.5 truncate max-w-[140px]" title={a.contactName}>
+              {a.contactName}
+            </span>
+          )}
           {editable && (
             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
@@ -274,12 +284,14 @@ function TimelineRow({
   onEditNote,
   onDeleteNote,
   onReplyEmail,
+  showContact,
 }: {
   item: FeedItem;
   last: boolean;
   onEditNote?: (id: string, text: string) => void;
   onDeleteNote?: (id: string) => void;
   onReplyEmail?: (message: LeadEmailMessage, mode: EmailReplyMode) => void;
+  showContact?: boolean;
 }) {
   const meta =
     item.kind === "email"
@@ -300,7 +312,7 @@ function TimelineRow({
         ) : item.kind === "email" ? (
           <EmailActivityCard message={item.message} onReply={onReplyEmail} />
         ) : (
-          <ActivityCard a={item.activity} actor={item.actor} onEdit={onEditNote} onDelete={onDeleteNote} />
+          <ActivityCard a={item.activity} actor={item.actor} onEdit={onEditNote} onDelete={onDeleteNote} showContact={showContact} />
         )}
       </div>
     </div>
@@ -349,12 +361,16 @@ interface LeadTimelineProps {
   onEditNote?: (id: string, text: string) => void;
   onDeleteNote?: (id: string) => void;
   onReplyEmail?: (message: LeadEmailMessage, mode: EmailReplyMode) => void;
+  /** When the feed is narrowed to one contact, their name (drives the banner). */
+  filterContactName?: string | null;
+  /** Clear the per-contact quick filter. */
+  onClearFilter?: () => void;
 }
 
 const FILTERS = ["All", "Important", "Conversations", "Notes"] as const;
 type Filter = (typeof FILTERS)[number];
 
-export function LeadTimeline({ activities, callRecords, emailMessages, onAddNote, onEditNote, onDeleteNote, onReplyEmail }: LeadTimelineProps) {
+export function LeadTimeline({ activities, callRecords, emailMessages, onAddNote, onEditNote, onDeleteNote, onReplyEmail, filterContactName, onClearFilter }: LeadTimelineProps) {
   const [filter, setFilter] = useState<Filter>("All");
   const { resolveMember } = useTeamMembers();
 
@@ -437,6 +453,22 @@ export function LeadTimeline({ activities, callRecords, emailMessages, onAddNote
           </div>
         </div>
 
+        {/* Active contact filter banner */}
+        {filterContactName && (
+          <div className="flex items-center justify-between gap-3 mb-5 rounded-[12px] border border-accent/25 bg-accent/[0.06] px-3.5 py-2.5">
+            <span className="flex items-center gap-2 text-[12.5px] text-ink-secondary min-w-0">
+              <Filter size={13} className="text-accent shrink-0" />
+              Showing only <strong className="text-ink font-semibold truncate">{filterContactName}</strong>’s activity
+            </span>
+            <button
+              onClick={onClearFilter}
+              className="inline-flex items-center gap-1.5 rounded-full bg-surface border border-border-subtle px-2.5 py-1 text-[11px] font-medium text-ink-secondary hover:border-border-default transition-colors shrink-0"
+            >
+              <X size={12} /> Show all contacts
+            </button>
+          </div>
+        )}
+
         {/* Feed */}
         {items.length ? (
           <div>
@@ -448,6 +480,7 @@ export function LeadTimeline({ activities, callRecords, emailMessages, onAddNote
                 onEditNote={onEditNote}
                 onDeleteNote={onDeleteNote}
                 onReplyEmail={onReplyEmail}
+                showContact={!filterContactName}
               />
             ))}
           </div>

@@ -44,6 +44,10 @@ export interface FunnelLeadActivity {
   /** The team member who performed this activity (when known). */
   userId?: string | null;
   userName?: string | null;
+  /** Which contact (lead row) of the company this activity belongs to — used to
+   *  label rows in the aggregated company timeline and drive the quick filter. */
+  contactId?: string | null;
+  contactName?: string | null;
 }
 
 export interface FunnelLeadCustomField {

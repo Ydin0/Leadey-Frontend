@@ -49,6 +49,10 @@ interface LeadDetailsColumnProps {
     contactId: string,
     patch: { name?: string; title?: string; email?: string; phone?: string; linkedinUrl?: string },
   ) => Promise<void>;
+  /** The contact whose activity the timeline is currently filtered to (or null). */
+  activeContactId?: string | null;
+  /** Click a contact to toggle the activity quick-filter to just that person. */
+  onContactSelect?: (contactId: string) => void;
   leads: FunnelLead[];
   statuses: LeadStatusOption[];
   /** Per-lead campaign progress (LeadStepTracker), rendered atop the Details tab. */
@@ -77,6 +81,8 @@ function ContactRow({
   onEmail,
   onDnc,
   onSave,
+  active,
+  onSelect,
 }: {
   c: FunnelLeadContact;
   onCall: (phone: string, name: string) => void;
@@ -87,6 +93,10 @@ function ContactRow({
     contactId: string,
     patch: { name?: string; title?: string; email?: string; phone?: string; linkedinUrl?: string },
   ) => Promise<void>;
+  /** Highlighted when this contact is the active activity filter. */
+  active?: boolean;
+  /** Click the row to toggle the activity filter to this contact. */
+  onSelect?: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -168,8 +178,12 @@ function ContactRow({
   }
 
   return (
-    <div className="rounded-lg hover:bg-hover/50 transition-colors">
-      <div className="group flex items-center gap-2.5 py-2 px-1">
+    <div className={cn("rounded-lg transition-colors", active ? "bg-accent/10 ring-1 ring-accent/30" : "hover:bg-hover/50")}>
+      <div
+        className={cn("group flex items-center gap-2.5 py-2 px-1", onSelect && "cursor-pointer")}
+        onClick={onSelect}
+        title={onSelect ? (active ? "Showing this contact — click to show all" : `Show only ${c.name}'s activity`) : undefined}
+      >
         <div className="w-7 h-7 rounded-full bg-section flex items-center justify-center text-[10px] font-medium text-ink-secondary shrink-0">
           {initials(c.name)}
         </div>
@@ -183,6 +197,11 @@ function ContactRow({
                 Primary
               </span>
             )}
+            {active && (
+              <span className="text-[9px] font-medium rounded-full px-1.5 py-px bg-accent/15 text-accent">
+                Filtering
+              </span>
+            )}
             {c.doNotCall && (
               <span className="inline-flex items-center gap-0.5 px-1.5 py-px rounded-full bg-signal-red/15 text-signal-red-text text-[9px] font-semibold uppercase tracking-wide">
                 <Ban size={9} strokeWidth={2} /> DNC
@@ -191,7 +210,7 @@ function ContactRow({
           </div>
           {c.title && <div className="text-[11px] text-ink-muted truncate">{c.title}</div>}
         </div>
-        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
           {c.email && (
             <MiniBtn
               icon={Mail}
@@ -273,6 +292,8 @@ export function LeadDetailsColumn({
   onEmail,
   onDnc,
   onContactSave,
+  activeContactId,
+  onContactSelect,
   leads,
   statuses,
   stepTracker,
@@ -367,7 +388,18 @@ export function LeadDetailsColumn({
           <Section icon={Users} title="Contacts" count={contacts.length}>
             <div className="flex flex-col">
               {contacts.length ? (
-                contacts.map((c) => <ContactRow key={c.id} c={c} onCall={onCall} onEmail={onEmail} onDnc={onDnc} onSave={onContactSave} />)
+                contacts.map((c) => (
+                  <ContactRow
+                    key={c.id}
+                    c={c}
+                    onCall={onCall}
+                    onEmail={onEmail}
+                    onDnc={onDnc}
+                    onSave={onContactSave}
+                    active={activeContactId === c.id}
+                    onSelect={onContactSelect ? () => onContactSelect(c.id) : undefined}
+                  />
+                ))
               ) : (
                 <p className="text-[12px] text-ink-faint px-1">No other contacts at this company.</p>
               )}
