@@ -75,7 +75,7 @@ interface DialerContextValue {
    *  button) — bypasses the countdown instead of resetting it. */
   nextNow: () => Promise<void>;
   back: () => Promise<void>;
-  pause: () => Promise<void>;
+  pause: (hangUp?: boolean) => Promise<void>;
   resume: () => Promise<void>;
   /** Auto-pause the countdown when the rep starts working the lead (clicks
    *  email/text/note etc.) — Close-style. No-ops unless a countdown is live. */
@@ -358,18 +358,22 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session, refresh, reconcile]);
 
-  const pause = useCallback(async () => {
+  // `hangUp` ends any live call too — that's what the explicit Pause button /
+  // Space key do ("stop the call completely"). The auto-pause on engagement
+  // (pauseForEngagement) passes false so logging a note mid-call never drops it.
+  const pause = useCallback(async (hangUp = false) => {
     if (!session) return;
     modeRef.current = "paused"; // synchronous gate — blocks any in-flight tick
     setMode("paused");
     stopCountdown(); // kill the live interval now, not just the displayed number
+    if (hangUp && call.activeCall) call.endCall();
     try {
       const updated = await pauseSession(session.id);
       setSession(updated);
     } catch {
       // local pause still applies
     }
-  }, [session, stopCountdown]);
+  }, [session, stopCountdown, call]);
 
   const resume = useCallback(async () => {
     if (!session) return;

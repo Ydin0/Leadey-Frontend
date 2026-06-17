@@ -31,7 +31,7 @@ export function useDialerKeyboard(): void {
       if (key === " " || key === "Spacebar") {
         e.preventDefault();
         if (dialer.mode === "paused") void dialer.resume();
-        else void dialer.pause();
+        else void dialer.pause(true); // explicit pause hangs up the live call
         return;
       }
 

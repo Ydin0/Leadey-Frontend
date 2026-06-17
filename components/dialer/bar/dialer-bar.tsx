@@ -184,7 +184,7 @@ export function DialerBar() {
                   <Play size={14} />
                 </IconButton>
               ) : (
-                <IconButton title="Pause (Space)" onClick={() => void dialer.pause()}>
+                <IconButton title="Pause (Space)" onClick={() => void dialer.pause(true)}>
                   <Pause size={14} />
                 </IconButton>
               )}
