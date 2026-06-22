@@ -722,12 +722,10 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                   </TableHead>
                   <TableHead className="w-7" />
                   {companyColumns.map((col) => (
-                    <TableHead
-                      key={col.key}
-                      className={col.align === "center" ? "text-center" : "text-left"}
-                      style={{ width: col.width, minWidth: col.width }}
-                    >
-                      {col.companyLabel ?? col.label}
+                    <TableHead key={col.key} style={{ width: col.width, minWidth: col.width }}>
+                      <div className={cn("flex items-center", col.align === "center" ? "justify-center" : "justify-start")}>
+                        {col.companyLabel ?? col.label}
+                      </div>
                     </TableHead>
                   ))}
                 </TableRow>
@@ -763,12 +761,10 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                           <ChevronRight size={14} className={cn("text-ink-muted transition-transform", isExpanded && "rotate-90")} />
                         </TableCell>
                         {companyColumns.map((col) => (
-                          <TableCell
-                            key={col.key}
-                            className={col.align === "center" ? "text-center" : undefined}
-                            style={{ width: col.width, minWidth: col.width }}
-                          >
-                            {col.companyRender!(companyLeads, columnCtx)}
+                          <TableCell key={col.key} style={{ width: col.width, minWidth: col.width }}>
+                            <div className={cn("flex items-center min-w-0", col.align === "center" ? "justify-center" : "justify-start")}>
+                              {col.companyRender!(companyLeads, columnCtx)}
+                            </div>
                           </TableCell>
                         ))}
                       </TableRow>
@@ -864,15 +860,15 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                   <input type="checkbox" className="rounded" checked={allSelected} onChange={toggleSelectAll} />
                 </TableHead>
                 {visibleColumns.map((col) => (
-                  <TableHead
-                    key={col.key}
-                    className={col.align === "center" ? "text-center" : "text-left"}
-                    style={{ width: col.width, minWidth: col.width }}
-                  >
-                    {col.label}
+                  <TableHead key={col.key} style={{ width: col.width, minWidth: col.width }}>
+                    <div className={cn("flex items-center", col.align === "center" ? "justify-center" : "justify-start")}>
+                      {col.label}
+                    </div>
                   </TableHead>
                 ))}
-                <TableHead className="text-center w-[120px]">Actions</TableHead>
+                <TableHead className="w-[120px]">
+                  <div className="flex items-center justify-center">Actions</div>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -894,12 +890,10 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                     </TableCell>
 
                     {visibleColumns.map((col) => (
-                      <TableCell
-                        key={col.key}
-                        className={col.align === "center" ? "text-center" : undefined}
-                        style={{ width: col.width, minWidth: col.width }}
-                      >
-                        {col.render(lead, columnCtx)}
+                      <TableCell key={col.key} style={{ width: col.width, minWidth: col.width }}>
+                        <div className={cn("flex items-center min-w-0", col.align === "center" ? "justify-center" : "justify-start")}>
+                          {col.render(lead, columnCtx)}
+                        </div>
                       </TableCell>
                     ))}
 
