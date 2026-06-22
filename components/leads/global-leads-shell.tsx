@@ -155,7 +155,7 @@ export function GlobalLeadsShell() {
   const clearAll = () => { setSearch(""); setFilters({}); setPage(1); };
 
   return (
-    <div className="max-w-[1640px] mx-auto">
+    <div>
       {/* Header */}
       <div className="flex items-start justify-between mb-5">
         <div>
