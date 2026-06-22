@@ -476,12 +476,6 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
     });
   }
 
-  const allCompanyKeys = useMemo(() => [...companyGroups.keys()], [companyGroups]);
-  const allCompaniesSelected = allCompanyKeys.length > 0 && allCompanyKeys.every((k) => selectedCompanies.has(k));
-
-  // Select every matching company across all pages (the bottom-bar banner).
-  const selectAllMatching = useCallback(() => setSelectedCompanies(new Set(allCompanyKeys)), [allCompanyKeys]);
-
   const selectedCompanyList = useMemo(
     () => [...selectedCompanies].filter((n) => companyGroups.has(n)).map((n) => companyMeta(n)),
     [selectedCompanies, companyGroups, companyMeta],
@@ -498,6 +492,17 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   const paginatedPage = Math.min(currentPage, totalPages);
   const paginatedKeys = limited.slice((paginatedPage - 1) * pageSize, paginatedPage * pageSize);
   const paginated = groupByCompany ? [] as FunnelLead[] : paginatedKeys as unknown as FunnelLead[];
+
+  // "Select all" is scoped to the row-limited window (`limited`), NOT every
+  // company — so a row limit of e.g. 1000 selects exactly those 1000 for a
+  // Magic Enrich, instead of the full 3,413.
+  const limitedCompanyKeys = limited as unknown as string[];
+  const allCompaniesSelected =
+    limitedCompanyKeys.length > 0 && limitedCompanyKeys.every((k) => selectedCompanies.has(k));
+  const selectAllMatching = useCallback(
+    () => setSelectedCompanies(new Set(limited as unknown as string[])),
+    [limited],
+  );
 
   // Header checkbox is PAGE-scoped: ticking it selects only the companies shown
   // on this page (finer control). "Select all {N}" in the bottom bar then opts
@@ -633,7 +638,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
         <MagicEnrichBar
           funnelId={funnelId}
           companies={selectedCompanyList}
-          totalCount={allCompanyKeys.length}
+          totalCount={limitedCompanyKeys.length}
           pageFullySelected={pageAllSelected}
           allSelected={allCompaniesSelected}
           onSelectAll={selectAllMatching}

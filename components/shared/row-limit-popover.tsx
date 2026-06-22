@@ -129,7 +129,7 @@ export function RowLimitPopover({
               </button>
               <button
                 onClick={handleSave}
-                className="px-3 py-1.5 rounded-[8px] bg-signal-blue-text text-white text-[11px] font-medium hover:opacity-90 transition-opacity"
+                className="px-3 py-1.5 rounded-[8px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity"
               >
                 Save changes
               </button>
