@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "react";
-import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, ChevronRight, Users, Ban, Sparkles, Search, Bot, UserPlus, Check } from "lucide-react";
+import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, ChevronRight, Users, Ban, Sparkles, Search, Bot, UserPlus, Check, Columns3 } from "lucide-react";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -29,6 +29,11 @@ import { Briefcase } from "lucide-react";
 import type { FunnelLead, FunnelStep } from "@/lib/types/funnel";
 import { LeadSortMenu } from "./lead-sort-menu";
 import { LeadStepFilter } from "./lead-step-filter";
+import { ColumnSettingsDrawer } from "./column-settings-drawer";
+import {
+  buildLeadColumns, resolveColumns, loadColumnPrefs, saveColumnPrefs,
+  type ColumnPrefs, type LeadColumnCtx,
+} from "@/lib/funnels/lead-columns";
 import type { LeadSortKey } from "@/lib/utils/sort-leads";
 
 interface FunnelLeadTableProps {
@@ -329,6 +334,11 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   const [search, setSearch] = useState("");
   const [customFields, setCustomFields] = useState<FilterFieldDef[]>([]);
 
+  // ── Configurable columns (flat lead view) — Close-style picker + persistence.
+  const [columnsOpen, setColumnsOpen] = useState(false);
+  const [columnPrefs, setColumnPrefs] = useState<ColumnPrefs | null>(null);
+  useEffect(() => { setColumnPrefs(loadColumnPrefs()); }, []);
+
   // Org custom fields → extra filterable fields in the builder.
   useEffect(() => {
     listCustomFields()
@@ -426,6 +436,31 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
     },
     [activityMap, companyLeadCounts],
   );
+
+  // ── Column catalog + resolved (ordered/visible) state for the flat view ──
+  const columnCatalog = useMemo(() => buildLeadColumns(customFields), [customFields]);
+  const resolvedColumns = useMemo(() => resolveColumns(columnCatalog, columnPrefs), [columnCatalog, columnPrefs]);
+  const visibleColumns = useMemo(() => resolvedColumns.filter((r) => r.visible).map((r) => r.col), [resolvedColumns]);
+  const columnCtx: LeadColumnCtx = useMemo(() => ({
+    statuses,
+    activity: (id: string) => activityMap.get(id) ?? { calls: 0, emails: 0 },
+    value: getLeadValue,
+    linkified: !!onLeadClick,
+  }), [statuses, activityMap, getLeadValue, onLeadClick]);
+
+  const applyColumns = useCallback((order: string[], hidden: string[]) => {
+    const prefs = { order, hidden };
+    setColumnPrefs(prefs);
+    saveColumnPrefs(prefs);
+  }, []);
+  const resetColumns = useCallback(() => {
+    const prefs = {
+      order: columnCatalog.map((c) => c.key),
+      hidden: columnCatalog.filter((c) => !c.defaultVisible).map((c) => c.key),
+    };
+    setColumnPrefs(prefs);
+    saveColumnPrefs(prefs);
+  }, [columnCatalog]);
 
   // Apply the query-builder filter + free-text search + sequence-step filter.
   const filtered = useMemo(() => {
@@ -626,11 +661,17 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
           <Building2 size={11} />
           Group by company
         </button>
-        {onSortChange && sortBy && (
-          <div className="ml-auto">
-            <LeadSortMenu value={sortBy} onChange={onSortChange} />
-          </div>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {onSortChange && sortBy && <LeadSortMenu value={sortBy} onChange={onSortChange} />}
+          <button
+            onClick={() => { if (groupByCompany) { setGroupByCompany(false); setCurrentPage(1); } setColumnsOpen(true); }}
+            title="Choose which columns to show"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[8px] text-[11px] font-medium border border-border-subtle text-ink-secondary hover:bg-hover transition-colors"
+          >
+            <Columns3 size={12} strokeWidth={1.5} />
+            Columns
+          </button>
+        </div>
       </div>
 
       {/* Magic Enrich bulk bar (grouped view) — floats at the bottom */}
@@ -873,29 +914,28 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
             </Table>
           </>
         ) : (
-          /* ── Flat View (ungrouped) ── */
+          /* ── Flat View (ungrouped) — configurable columns ── */
+          <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
                 <TableHead className="w-8 px-3">
                   <input type="checkbox" className="rounded" checked={allSelected} onChange={toggleSelectAll} />
                 </TableHead>
-                <TableHead className="text-left w-[240px]">Name</TableHead>
-                <TableHead className="text-center w-[110px]">Status</TableHead>
-                <TableHead className="text-center w-[80px]">Step</TableHead>
-                <TableHead className="text-center w-[110px]">Activity</TableHead>
-                <TableHead className="text-left w-[160px]">Next Due</TableHead>
-                <TableHead className="text-left w-[100px]">Source</TableHead>
+                {visibleColumns.map((col) => (
+                  <TableHead
+                    key={col.key}
+                    className={col.align === "center" ? "text-center" : "text-left"}
+                    style={{ width: col.width, minWidth: col.width }}
+                  >
+                    {col.label}
+                  </TableHead>
+                ))}
                 <TableHead className="text-center w-[120px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginated.map((lead) => {
-                const activity = activityMap.get(lead.id) || { calls: 0, emails: 0 };
-                const isOverdue =
-                  lead.nextDate.getTime() < Date.now() &&
-                  !isTerminalStatus(lead.status);
-
                 return (
                   <TableRow
                     key={lead.id}
@@ -912,61 +952,15 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                       />
                     </TableCell>
 
-                    <TableCell>
-                      <div className="flex items-center gap-2.5">
-                        <CompanyAvatar name={lead.company} size="md" domain={lead.companyDomain || lead.email?.split("@")[1]} />
-                        <div>
-                          <span className={cn("text-[12px] font-medium", onLeadClick ? "text-signal-blue-text" : "text-ink")}>
-                            {lead.company}
-                          </span>
-                          <div className="text-[10px] text-ink-muted">
-                            <span className={cn("inline-flex items-center gap-1", lead.doNotCall && "text-signal-red-text font-medium")}>
-                              {lead.doNotCall && <Ban size={9} strokeWidth={2} />}{lead.name}
-                            </span> &middot; {lead.title}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <div className={cn("w-1.5 h-1.5 rounded-full", getStatusDotClass(lead.status, statuses))} />
-                        <span className="text-[11px] text-ink-secondary">{getStatusLabel(lead.status, statuses)}</span>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      <ProgressDots current={lead.currentStep} total={lead.totalSteps} />
-                    </TableCell>
-
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <Phone size={11} strokeWidth={1.5} className={cn(activity.calls > 0 ? "text-ink-secondary" : "text-ink-faint")} />
-                          <span className={cn("text-[11px]", activity.calls > 0 ? "text-ink-secondary" : "text-ink-faint")}>{activity.calls}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Mail size={11} strokeWidth={1.5} className={cn(activity.emails > 0 ? "text-ink-secondary" : "text-ink-faint")} />
-                          <span className={cn("text-[11px]", activity.emails > 0 ? "text-ink-secondary" : "text-ink-faint")}>{activity.emails}</span>
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <div>
-                        <span className="text-[10px] font-medium rounded-full px-2 py-0.5 bg-section text-ink-secondary">
-                          {lead.nextAction}
-                        </span>
-                        <div className={cn("text-[11px] mt-0.5", isOverdue ? "text-signal-red-text" : "text-ink-muted")}>
-                          {lead.nextDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                          {isOverdue ? " \u00b7 overdue" : ""}
-                        </div>
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <span className="text-[10px] text-ink-muted">{lead.source}</span>
-                    </TableCell>
+                    {visibleColumns.map((col) => (
+                      <TableCell
+                        key={col.key}
+                        className={col.align === "center" ? "text-center" : undefined}
+                        style={{ width: col.width, minWidth: col.width }}
+                      >
+                        {col.render(lead, columnCtx)}
+                      </TableCell>
+                    ))}
 
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-0.5">
@@ -1000,6 +994,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
               })}
             </TableBody>
           </Table>
+          </div>
         )}
         {filtered.length === 0 && (
           <div className="py-8 text-center">
@@ -1021,6 +1016,15 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
           />
         )}
       </div>
+
+      {/* Column settings drawer (Close-style) */}
+      <ColumnSettingsDrawer
+        open={columnsOpen}
+        onClose={() => setColumnsOpen(false)}
+        resolved={resolvedColumns}
+        onChange={applyColumns}
+        onReset={resetColumns}
+      />
     </div>
   );
 }
