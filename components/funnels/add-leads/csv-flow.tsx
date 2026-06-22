@@ -111,6 +111,7 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
   const [loadingReview, setLoadingReview] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const importingRef = useRef(false);
   const [result, setResult] = useState<ImportCsvResult | null>(null);
 
   const ingestFile = useCallback((file: File) => {
@@ -207,7 +208,12 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
   }
 
   async function runImport() {
-    if (isImporting) return;
+    // Synchronous re-entrancy guard — `isImporting` state lags a render, so a
+    // rapid double-click could otherwise fire the import twice. The backend
+    // also locks per-funnel + de-dupes, so duplicates can't be created even if
+    // a second request slips through (retry, refresh, two tabs).
+    if (isImporting || importingRef.current) return;
+    importingRef.current = true;
     setError(null);
     setIsImporting(true);
     try {
@@ -219,6 +225,7 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
       setError(e instanceof Error ? e.message : "Failed to import CSV");
     } finally {
       setIsImporting(false);
+      importingRef.current = false;
     }
   }
 
