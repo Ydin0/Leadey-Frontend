@@ -4,17 +4,17 @@ import { Icon } from "./icon";
 import { StatCard, MetricCard, Panel, ChannelLegend, Avatar, DeltaPill, POD_COLOR } from "./team-shared";
 import { TrendChart, Donut, Ring, Meter, attColor } from "./charts";
 import {
-  CH_IDS, CH_MAP, WIN_MAP, teamTotals, bucketed, attainment, sparkFor, talkSparkFor, fmtTalkTime,
-  type WindowId,
+  CH_IDS, CH_MAP, teamTotals, bucketed, attainment, sparkFor, talkSparkFor, fmtTalkTime,
+  type DayRange,
 } from "@/lib/team/team-data";
+import { useTeamData } from "@/lib/team/team-data-context";
 
 // Talk time gets its own accent (warm amber) so it reads as a duration metric
 // distinct from the green "Calls" channel it derives from.
 const TALK_COLOR = "#E0A878";
-import { useTeamData } from "@/lib/team/team-data-context";
 
-export function TeamAnalytics({ win, trendMode, onPickRep }: {
-  win: WindowId; trendMode: "area" | "bars"; onPickRep: (id: string) => void;
+export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
+  range: DayRange; rangeLabel: string; trendMode: "area" | "bars"; onPickRep: (id: string) => void;
 }) {
   const { activeMembers: members } = useTeamData();
   if (members.length === 0) {
@@ -24,15 +24,15 @@ export function TeamAnalytics({ win, trendMode, onPickRep }: {
       </div>
     );
   }
-  const tot = teamTotals(members, win);
-  const chart = bucketed(members, win);
+  const tot = teamTotals(members, range);
+  const chart = bucketed(members, range);
 
   const att = members.reduce((acc, m) => {
-    const a = attainment(m, win);
+    const a = attainment(m, range);
     acc.got += a.got.total; acc.tgt += a.tgt.total; return acc;
   }, { got: 0, tgt: 0 });
   const overallPct = att.tgt ? att.got / att.tgt : 0;
-  const onTrack = members.filter((m) => attainment(m, win).overall >= 0.85).length;
+  const onTrack = members.filter((m) => attainment(m, range).overall >= 0.85).length;
 
   const mixParts = CH_IDS.map((ch) => ({ label: CH_MAP[ch].label, value: tot.cur[ch], color: CH_MAP[ch].color }));
   const mixTotal = mixParts.reduce((a, p) => a + p.value, 0);
@@ -40,11 +40,11 @@ export function TeamAnalytics({ win, trendMode, onPickRep }: {
   const pods = ["Enterprise", "Mid-Market", "SMB"];
   const podRows = pods.map((p) => {
     const ms = members.filter((m) => m.pod === p);
-    const c = ms.reduce((acc, m) => { const a = attainment(m, win); acc.got += a.got.total; acc.tgt += a.tgt.total; acc.vol += a.got.total; return acc; }, { got: 0, tgt: 0, vol: 0 });
+    const c = ms.reduce((acc, m) => { const a = attainment(m, range); acc.got += a.got.total; acc.tgt += a.tgt.total; acc.vol += a.got.total; return acc; }, { got: 0, tgt: 0, vol: 0 });
     return { pod: p, count: ms.length, pct: c.tgt ? c.got / c.tgt : 0, vol: c.vol };
   });
 
-  const ranked = members.map((m) => ({ m, a: attainment(m, win) })).sort((x, y) => y.a.overall - x.a.overall);
+  const ranked = members.map((m) => ({ m, a: attainment(m, range) })).sort((x, y) => y.a.overall - x.a.overall);
 
   return (
     <div className="fade" style={{ display: "grid", gap: 16 }}>
@@ -54,7 +54,7 @@ export function TeamAnalytics({ win, trendMode, onPickRep }: {
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14 }}>
         {CH_IDS.map((ch) => (
-          <StatCard key={ch} ch={ch} total={tot.cur[ch]} delta={tot.delta[ch]} spark={sparkFor(members, win, ch)} />
+          <StatCard key={ch} ch={ch} total={tot.cur[ch]} delta={tot.delta[ch]} spark={sparkFor(members, range, ch)} />
         ))}
         <MetricCard
           label="Talk time"
@@ -62,12 +62,12 @@ export function TeamAnalytics({ win, trendMode, onPickRep }: {
           color={TALK_COLOR}
           value={fmtTalkTime(tot.cur.talkTime)}
           delta={tot.delta.talkTime}
-          spark={talkSparkFor(members, win)}
+          spark={talkSparkFor(members, range)}
         />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 16 }}>
-        <Panel title="Activity over time" sub={`${tot.cur.total.toLocaleString()} total touches this ${WIN_MAP[win].label.toLowerCase()}`} right={<ChannelLegend />}>
+        <Panel title="Activity over time" sub={`${tot.cur.total.toLocaleString()} total touches · ${rangeLabel}`} right={<ChannelLegend />}>
           <TrendChart chart={chart} mode={trendMode} height={236} />
         </Panel>
 

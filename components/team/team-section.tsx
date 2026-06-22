@@ -7,9 +7,12 @@ import { TeamAnalytics } from "./team-analytics";
 import { TeamLeaderboard } from "./team-leaderboard";
 import { TeamMembers, MemberModal, type MemberFormData } from "./team-members";
 import { TeamRep } from "./team-rep";
+import { DateRangePicker } from "./date-range-picker";
 import { TeamDataProvider, useTeamData } from "@/lib/team/team-data-context";
 import { Loader2 } from "lucide-react";
-import type { WindowId } from "@/lib/team/team-data";
+import { WIN_MAP, windowRange, fmtRange, DAYS, type WindowId, type DayRange } from "@/lib/team/team-data";
+
+const DAY_MS = 86400000;
 
 type Tab = "analytics" | "leaderboard" | "members";
 type Modal = { mode: "add" } | { mode: "edit"; id: string } | null;
@@ -18,12 +21,32 @@ function TeamSectionInner() {
   const { members, seatUsage, loading, addMember, updateTargets } = useTeamData();
   const [tab, setTab] = React.useState<Tab>("analytics");
   const [win, setWin] = React.useState<WindowId>("week");
+  // Custom calendar selection — overrides the preset window when set.
+  const [customRange, setCustomRange] = React.useState<DayRange | null>(null);
   const [repId, setRepId] = React.useState<string | null>(null);
   const [modal, setModal] = React.useState<Modal>(null);
 
   const trendMode: "area" | "bars" = "area";
   const podium = true;
   const seatsFull = seatUsage.used >= seatUsage.included;
+
+  // Effective range + label driving every analytics view: the custom calendar
+  // range when chosen, otherwise the active preset (1D/1W/1M/1Q).
+  const range: DayRange = customRange ?? windowRange(win);
+  const rangeLabel = customRange ? fmtRange(customRange) : WIN_MAP[win].label.toLowerCase();
+
+  // Calendar bounds: any day in the last rolling year, up to today.
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const minDate = new Date(today.getTime() - (DAYS - 1) * DAY_MS);
+
+  const pickPreset = (w: WindowId) => { setCustomRange(null); setWin(w); };
+
+  const dateControls = (
+    <div className="row" style={{ gap: 8 }}>
+      <WindowSeg value={customRange ? null : win} onChange={pickPreset} />
+      <DateRangePicker value={customRange} onChange={setCustomRange} minDate={minDate} maxDate={today} />
+    </div>
+  );
 
   const TABS: [Tab, string, string][] = [
     ["analytics", "Analytics", "bar-chart-3"],
@@ -55,7 +78,7 @@ function TeamSectionInner() {
             <p style={{ fontSize: 12, color: "var(--fg-muted)", marginTop: 2 }}>{members.length} {members.length === 1 ? "rep" : "reps"} · activity, KPIs &amp; leaderboard across your team.</p>
           </div>
           <div className="row" style={{ gap: 10 }}>
-            {showWindow && <WindowSeg value={win} onChange={setWin} />}
+            {showWindow && dateControls}
             <span className="pill pill-soft" style={{ pointerEvents: "none", color: seatsFull ? "var(--signal-red-text)" : "var(--fg2)" }}>
               <Icon name="users-round" size={12} />{seatUsage.used}/{seatUsage.included} seats
             </span>
@@ -67,7 +90,7 @@ function TeamSectionInner() {
           <button className="row" onClick={() => setRepId(null)} style={{ gap: 7, fontSize: 12, color: "var(--fg-muted)", whiteSpace: "nowrap" }}>
             <Icon name="arrow-left" size={14} />Back to {tab === "members" ? "members" : tab === "leaderboard" ? "leaderboard" : "analytics"}
           </button>
-          <WindowSeg value={win} onChange={setWin} />
+          {dateControls}
         </div>
       )}
 
@@ -87,11 +110,11 @@ function TeamSectionInner() {
           <Loader2 size={20} className="animate-spin" style={{ color: "var(--fg-muted)" }} />
         </div>
       ) : repId ? (
-        <TeamRep memberId={repId} win={win} trendMode={trendMode} onEdit={(id) => setModal({ mode: "edit", id })} />
+        <TeamRep memberId={repId} range={range} rangeLabel={rangeLabel} trendMode={trendMode} onEdit={(id) => setModal({ mode: "edit", id })} />
       ) : tab === "analytics" ? (
-        <TeamAnalytics win={win} trendMode={trendMode} onPickRep={setRepId} />
+        <TeamAnalytics range={range} rangeLabel={rangeLabel} trendMode={trendMode} onPickRep={setRepId} />
       ) : tab === "leaderboard" ? (
-        <TeamLeaderboard win={win} podium={podium} onPickRep={setRepId} />
+        <TeamLeaderboard range={range} podium={podium} onPickRep={setRepId} />
       ) : (
         <TeamMembers onPickRep={setRepId} onEdit={(id) => setModal({ mode: "edit", id })} />
       )}

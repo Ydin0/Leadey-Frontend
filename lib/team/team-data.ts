@@ -89,7 +89,10 @@ export const ROLE_TARGETS: Record<string, Targets> = {
   Manager: { calls: 12, emails: 25, sms: 6, linkedin: 12 },
 };
 
-export const DAYS = 90;
+// We fetch a full rolling year so the calendar can select any single date or
+// custom range within the last 12 months without a refetch. Presets (1D/1W/
+// 1M/1Q) just slice the tail of this same series.
+export const DAYS = 365;
 const DAY_MS = 86400000;
 
 /** Raw daily record from GET /api/team/analytics. */
@@ -124,8 +127,8 @@ export function hydrateSeries(api: ApiDayRec[]): DayRec[] {
   });
 }
 
-/** A zero-filled 90-day series anchored to today — used when a member has no
- *  activity rows yet, so windowing/charts still render (as zeros). */
+/** A zero-filled series spanning the fetch window, anchored to today — used
+ *  when a member has no activity rows yet, so windowing/charts still render. */
 export function emptySeries(): DayRec[] {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
@@ -148,15 +151,68 @@ export const WIN_MAP: Record<WindowId, TimeWindow> = Object.fromEntries(
   WINDOWS.map((w) => [w.id, w]),
 ) as Record<WindowId, TimeWindow>;
 
-export function winSlice(series: DayRec[], winId: WindowId): DayRec[] {
-  const w = WIN_MAP[winId];
-  return series.slice(DAYS - w.days, DAYS);
+// ── date ranges ─────────────────────────────────────────────────────────
+// The engine works on an explicit [start, end] day range (inclusive, local
+// midnight). Presets resolve to a today-anchored range; the calendar supplies
+// an arbitrary one. Everything downstream (slices, targets, buckets, deltas)
+// derives from the range, so a single day and a custom period work uniformly.
+export interface DayRange {
+  start: Date; // inclusive, local midnight
+  end: Date;   // inclusive, local midnight
 }
-export function prevSlice(series: DayRec[], winId: WindowId): DayRec[] {
-  const w = WIN_MAP[winId];
-  const end = DAYS - w.days;
-  return series.slice(Math.max(0, end - w.days), end);
+
+/** Today-anchored range for a preset window (e.g. "week" → last 7 days). */
+export function windowRange(winId: WindowId): DayRange {
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  const start = new Date(end.getTime() - (WIN_MAP[winId].days - 1) * DAY_MS);
+  return { start, end };
 }
+
+/** Normalise an arbitrary pair of dates into an ordered, midnight-aligned range. */
+export function makeRange(a: Date, b: Date): DayRange {
+  const x = new Date(a); x.setHours(0, 0, 0, 0);
+  const y = new Date(b); y.setHours(0, 0, 0, 0);
+  return x.getTime() <= y.getTime() ? { start: x, end: y } : { start: y, end: x };
+}
+
+/** Inclusive day count in a range. */
+export function rangeDays(r: DayRange): number {
+  return Math.round((r.end.getTime() - r.start.getTime()) / DAY_MS) + 1;
+}
+
+/** The equal-length period immediately before the range (for delta comparisons). */
+export function prevRange(r: DayRange): DayRange {
+  const len = rangeDays(r);
+  const end = new Date(r.start.getTime() - DAY_MS);
+  const start = new Date(end.getTime() - (len - 1) * DAY_MS);
+  return { start, end };
+}
+
+/** Bucket granularity for charts — daily for short ranges, weekly past ~6 weeks. */
+export function bucketMode(r: DayRange): "day" | "week" {
+  return rangeDays(r) > 45 ? "week" : "day";
+}
+
+/** The days of a series that fall within the range (inclusive). */
+export function sliceRange(series: DayRec[], r: DayRange): DayRec[] {
+  const lo = r.start.getTime();
+  const hi = r.end.getTime();
+  return series.filter((d) => d.ts >= lo && d.ts <= hi);
+}
+
+/** Human label for a range, e.g. "12 Jun" (single day) or "1–15 Jun". */
+export function fmtRange(r: DayRange): string {
+  const sameDay = r.start.getTime() === r.end.getTime();
+  const d = (x: Date, withMonth = true) =>
+    x.toLocaleDateString("en-GB", withMonth ? { day: "numeric", month: "short" } : { day: "numeric" });
+  if (sameDay) return d(r.start);
+  const sameMonth = r.start.getMonth() === r.end.getMonth() && r.start.getFullYear() === r.end.getFullYear();
+  const sameYear = r.start.getFullYear() === r.end.getFullYear();
+  if (sameMonth) return `${d(r.start, false)}–${d(r.end)}`;
+  return sameYear ? `${d(r.start)} – ${d(r.end)}` : `${r.start.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })} – ${r.end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" })}`;
+}
+
 export function workingDays(slice: DayRec[]): number {
   return slice.filter((d) => { const x = d.date.getDay(); return x !== 0 && x !== 6; }).length || 1;
 }
@@ -167,8 +223,8 @@ export function sumSlice(slice: DayRec[]): Totals {
   return out;
 }
 
-export function targetFor(member: Member, winId: WindowId): Totals {
-  const wd = winId === "today" ? 1 : workingDays(winSlice(member.series, winId));
+export function targetFor(member: Member, range: DayRange): Totals {
+  const wd = Math.max(1, workingDays(sliceRange(member.series, range)));
   const t = { calls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 } as Totals;
   CH_IDS.forEach((ch) => { t[ch] = member.targets[ch] * wd; });
   t.total = CH_IDS.reduce((a, ch) => a + t[ch], 0);
@@ -181,9 +237,9 @@ export interface Attainment {
   got: Totals;
   tgt: Totals;
 }
-export function attainment(member: Member, winId: WindowId): Attainment {
-  const got = sumSlice(winSlice(member.series, winId));
-  const tgt = targetFor(member, winId);
+export function attainment(member: Member, range: DayRange): Attainment {
+  const got = sumSlice(sliceRange(member.series, range));
+  const tgt = targetFor(member, range);
   const per = {} as Record<ChannelId, number>;
   CH_IDS.forEach((ch) => { per[ch] = tgt[ch] ? got[ch] / tgt[ch] : 0; });
   return { overall: tgt.total ? got.total / tgt.total : 0, per, got, tgt };
@@ -196,13 +252,12 @@ export interface Bucketed {
   /** Talk time (seconds) per bucket — parallels totals, for talk-time sparklines. */
   talk: number[];
 }
-export function bucketed(members: Member | Member[], winId: WindowId): Bucketed {
-  const w = WIN_MAP[winId];
+export function bucketed(members: Member | Member[], range: DayRange): Bucketed {
   const list = Array.isArray(members) ? members : [members];
 
-  const slices = list.map((m) => winSlice(m.series, winId));
-  const n = slices[0].length;
-  if (w.bucket === "week") {
+  const slices = list.map((m) => sliceRange(m.series, range));
+  const n = slices[0]?.length ?? 0;
+  if (bucketMode(range) === "week") {
     const groups: [number, number][] = [];
     for (let i = 0; i < n; i += 7) groups.push([i, Math.min(n, i + 7)]);
     const labels = groups.map((_, i) => "W" + (i + 1));
@@ -214,7 +269,7 @@ export function bucketed(members: Member | Member[], winId: WindowId): Bucketed 
     return { labels, series, totals, talk };
   }
 
-  const ref = slices[0];
+  const ref = slices[0] ?? [];
   const labels = ref.map((d) => d.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }));
   const series = {} as Record<ChannelId, number[]>;
   CH_IDS.forEach((ch) => (series[ch] = ref.map(() => 0)));
@@ -229,12 +284,13 @@ export interface TeamTotals {
   prev: Totals;
   delta: Record<keyof Totals, number>;
 }
-export function teamTotals(members: Member[], winId: WindowId): TeamTotals {
+export function teamTotals(members: Member[], range: DayRange): TeamTotals {
   const cur: Totals = { calls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
   const prev: Totals = { ...cur };
+  const pr = prevRange(range);
   members.forEach((m) => {
-    const c = sumSlice(winSlice(m.series, winId));
-    const p = sumSlice(prevSlice(m.series, winId));
+    const c = sumSlice(sliceRange(m.series, range));
+    const p = sumSlice(sliceRange(m.series, pr));
     (Object.keys(cur) as (keyof Totals)[]).forEach((k) => { cur[k] += c[k]; prev[k] += p[k]; });
   });
   const delta = {} as Record<keyof Totals, number>;
@@ -242,13 +298,13 @@ export function teamTotals(members: Member[], winId: WindowId): TeamTotals {
   return { cur, prev, delta };
 }
 
-export function sparkFor(members: Member[], winId: WindowId, ch: ChannelId): number[] {
-  return bucketed(members, winId).series[ch];
+export function sparkFor(members: Member[], range: DayRange, ch: ChannelId): number[] {
+  return bucketed(members, range).series[ch];
 }
 
 /** Per-bucket talk-time series (seconds) for the talk-time stat-card sparkline. */
-export function talkSparkFor(members: Member[], winId: WindowId): number[] {
-  return bucketed(members, winId).talk;
+export function talkSparkFor(members: Member[], range: DayRange): number[] {
+  return bucketed(members, range).talk;
 }
 
 /** Format a talk-time duration (seconds) compactly: "2h 14m" / "47m" / "38s". */

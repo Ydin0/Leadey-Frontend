@@ -65,7 +65,7 @@ export function StatusDot({ status }: { status: MemberStatus }) {
   );
 }
 
-export function WindowSeg({ value, onChange }: { value: WindowId; onChange: (v: WindowId) => void }) {
+export function WindowSeg({ value, onChange }: { value: WindowId | null; onChange: (v: WindowId) => void }) {
   return (
     <div className="seg">
       {WINDOWS.map((w) => (

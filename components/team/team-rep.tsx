@@ -4,23 +4,23 @@ import { Icon } from "./icon";
 import { Avatar, StatusDot, Panel, ChannelLegend } from "./team-shared";
 import { TrendChart, Ring, Meter, attColor } from "./charts";
 import {
-  CH_IDS, CH_MAP, WIN_MAP, attainment, bucketed, workingDays, winSlice, fmtTalkTime,
-  type WindowId,
+  CH_IDS, CH_MAP, attainment, bucketed, workingDays, sliceRange, fmtTalkTime,
+  type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
 
-export function TeamRep({ memberId, win, trendMode, onEdit }: {
-  memberId: string; win: WindowId; trendMode: "area" | "bars"; onEdit: (id: string) => void;
+export function TeamRep({ memberId, range, rangeLabel, trendMode, onEdit }: {
+  memberId: string; range: DayRange; rangeLabel: string; trendMode: "area" | "bars"; onEdit: (id: string) => void;
 }) {
   const { activeMembers } = useTeamData();
   const m = activeMembers.find((x) => x.id === memberId);
   if (!m) return null;
-  const a = attainment(m, win);
-  const chart = bucketed(m, win);
+  const a = attainment(m, range);
+  const chart = bucketed(m, range);
   const tot = a.got;
-  const wlabel = WIN_MAP[win].label.toLowerCase();
+  const wlabel = rangeLabel;
 
-  const rank = activeMembers.map((x) => ({ id: x.id, v: attainment(x, win).overall })).sort((p, q) => q.v - p.v).findIndex((x) => x.id === m.id) + 1;
+  const rank = activeMembers.map((x) => ({ id: x.id, v: attainment(x, range).overall })).sort((p, q) => q.v - p.v).findIndex((x) => x.id === m.id) + 1;
 
   // [label, display value, icon] — talk time + avg call length are formatted durations.
   const summary: [string, string, string][] = [
@@ -28,7 +28,7 @@ export function TeamRep({ memberId, win, trendMode, onEdit }: {
     ["Avg call length", tot.calls ? fmtTalkTime(tot.talkTime / tot.calls) : "—", "phone-call"],
     ["Meetings booked", tot.meetings.toLocaleString(), "calendar-check"],
     ["Replies", tot.replies.toLocaleString(), "message-square"],
-    ["Avg / working day", Math.round(tot.total / workingDays(winSlice(m.series, win))).toLocaleString(), "activity"],
+    ["Avg / working day", Math.round(tot.total / workingDays(sliceRange(m.series, range))).toLocaleString(), "activity"],
     ["Daily KPI total", CH_IDS.reduce((s, ch) => s + m.targets[ch], 0).toLocaleString(), "target"],
   ];
 
@@ -81,7 +81,7 @@ export function TeamRep({ memberId, win, trendMode, onEdit }: {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 16 }}>
-        <Panel title="Activity over time" sub={`${tot.total.toLocaleString()} touches this ${wlabel}`} right={<ChannelLegend />}>
+        <Panel title="Activity over time" sub={`${tot.total.toLocaleString()} touches · ${wlabel}`} right={<ChannelLegend />}>
           <TrendChart chart={chart} mode={trendMode} height={230} />
         </Panel>
         <Panel title="This period">

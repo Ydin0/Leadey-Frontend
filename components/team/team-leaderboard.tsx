@@ -5,13 +5,13 @@ import { Avatar } from "./team-shared";
 import { Sparkline, Meter, attColor } from "./charts";
 import { DeltaPill } from "./team-shared";
 import {
-  CH_IDS, CH_MAP, attainment, prevSlice, sumSlice, bucketed, fmtTalkTime,
-  type ChannelId, type WindowId,
+  CH_IDS, CH_MAP, attainment, prevRange, sliceRange, sumSlice, bucketed, fmtTalkTime,
+  type ChannelId, type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
 
-export function TeamLeaderboard({ win, podium, onPickRep }: {
-  win: WindowId; podium: boolean; onPickRep: (id: string) => void;
+export function TeamLeaderboard({ range, podium, onPickRep }: {
+  range: DayRange; podium: boolean; onPickRep: (id: string) => void;
 }) {
   const { activeMembers } = useTeamData();
   const [rankBy, setRankBy] = React.useState<string>("attainment");
@@ -20,12 +20,13 @@ export function TeamLeaderboard({ win, podium, onPickRep }: {
   let members = activeMembers;
   if (pod !== "all") members = members.filter((m) => m.pod === pod);
 
+  const pr = prevRange(range);
   const rows = members.map((m) => {
-    const a = attainment(m, win);
-    const prevTot = sumSlice(prevSlice(m.series, win)).total;
+    const a = attainment(m, range);
+    const prevTot = sumSlice(sliceRange(m.series, pr)).total;
     const curTot = a.got.total;
     const trend = prevTot ? (curTot - prevTot) / prevTot : 0;
-    return { m, a, spark: bucketed(m, win).totals, trend };
+    return { m, a, spark: bucketed(m, range).totals, trend };
   });
 
   rows.sort((x, y) => {
