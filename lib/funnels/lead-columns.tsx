@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Ban, Linkedin, Phone, Mail, Users } from "lucide-react";
+import { Ban, Linkedin, Phone, Mail, Users, Briefcase } from "lucide-react";
 import { cn, formatPhoneIntl } from "@/lib/utils";
 import { getStatusDotClass, getStatusLabel, isTerminalStatus, type LeadStatusOption } from "@/lib/utils/lead-status";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
@@ -74,6 +74,12 @@ const text = (v: unknown): ReactNode => {
   const s = v == null || v === "" ? "" : String(v);
   return s ? <span className="text-[11px] text-ink-secondary truncate">{s}</span> : dash;
 };
+const roleCount = (n: number): ReactNode =>
+  n > 0 ? (
+    <span className="inline-flex items-center gap-1 text-[11px] text-ink-secondary tabular-nums" title={`${n} open role${n === 1 ? "" : "s"}`}>
+      <Briefcase size={11} strokeWidth={1.5} className="text-ink-faint" /> {n}
+    </span>
+  ) : dash;
 
 /** The full catalog of built-in lead columns (custom fields appended separately). */
 export const BUILTIN_LEAD_COLUMNS: LeadColumn[] = [
@@ -186,6 +192,13 @@ export const BUILTIN_LEAD_COLUMNS: LeadColumn[] = [
   {
     key: "revenue", label: "Annual revenue", group: "Company", align: "left", width: 130, defaultVisible: false,
     render: (l) => text(l.companyAnnualRevenue), companyRender: (g) => text(firstWith(g, (l) => l.companyAnnualRevenue)),
+  },
+  {
+    key: "hiringRoles", label: "Hiring roles", group: "Company", align: "center", width: 96, defaultVisible: false,
+    render: (l) => roleCount(l.companyHiringRoles?.length ?? 0),
+    companyLabel: "Hiring roles",
+    // A company's open roles — the largest set found across its contacts.
+    companyRender: (g) => roleCount(g.reduce((m, l) => Math.max(m, l.companyHiringRoles?.length ?? 0), 0)),
   },
   // Sequence
   {
