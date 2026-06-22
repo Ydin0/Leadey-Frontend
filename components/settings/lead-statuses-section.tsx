@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Trash2, Lock } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Loader2, Plus, Trash2, Lock, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { saveCustomLeadStatuses } from "@/lib/api/lead-statuses";
 import {
+  BUILTIN_STATUS_OPTIONS,
   STATUS_COLOR_DOT,
   type LeadStatusColor,
-  type LeadStatusOption,
 } from "@/lib/utils/lead-status";
+
+// "New" is the default status every lead starts in — it can't be hidden.
+const PROTECTED_STATUS_KEYS = new Set(["new"]);
 
 const COLORS: LeadStatusColor[] = [
   "slate",
@@ -30,10 +33,13 @@ type DraftStatus = {
 export function LeadStatusesSection() {
   const { statuses, loading, reload } = useLeadStatuses();
 
-  const builtIns = useMemo(
-    () => statuses.filter((s) => s.isBuiltIn),
-    [statuses],
-  );
+  // Built-in statuses the org has hidden = the built-ins missing from the
+  // merged list the backend returns (it filters hidden ones out).
+  const [hiddenKeys, setHiddenKeys] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    const visible = new Set(statuses.filter((s) => s.isBuiltIn).map((s) => s.key));
+    setHiddenKeys(new Set(BUILTIN_STATUS_OPTIONS.filter((b) => !visible.has(b.key)).map((b) => b.key)));
+  }, [statuses]);
 
   const [custom, setCustom] = useState<DraftStatus[]>([]);
   const [newLabel, setNewLabel] = useState("");
@@ -77,12 +83,23 @@ export function LeadStatusesSection() {
     setSaved(false);
   }
 
+  function toggleHidden(key: string) {
+    if (PROTECTED_STATUS_KEYS.has(key)) return;
+    setHiddenKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+    setSaved(false);
+  }
+
   async function handleSave() {
     setSaving(true);
     setError(null);
     setSaved(false);
     try {
-      await saveCustomLeadStatuses(custom);
+      await saveCustomLeadStatuses(custom, [...hiddenKeys]);
       await reload();
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -103,22 +120,54 @@ export function LeadStatusesSection() {
 
   return (
     <div className="space-y-6">
-      {/* Built-in statuses (read-only) */}
+      {/* Built-in statuses — toggle which ones appear in the pickers */}
       <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-[14px] font-semibold text-ink">Lead Statuses</h3>
           <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">
-            {builtIns.length} built-in · {custom.length} custom
+            {BUILTIN_STATUS_OPTIONS.length - hiddenKeys.size} shown · {hiddenKeys.size} hidden
           </span>
         </div>
         <p className="text-[11px] text-ink-muted mb-4">
           Statuses appear in the lead status dropdown across funnels and the
-          cold-calling view. Built-in statuses can&apos;t be edited.
+          cold-calling view. Hide any built-in statuses you don&apos;t use — leads
+          already on a hidden status keep it, it just won&apos;t be selectable.
         </p>
         <div className="flex flex-wrap gap-2">
-          {builtIns.map((s) => (
-            <StatusChip key={s.key} status={s} locked />
-          ))}
+          {BUILTIN_STATUS_OPTIONS.map((s) => {
+            const hidden = hiddenKeys.has(s.key);
+            const protectedKey = PROTECTED_STATUS_KEYS.has(s.key);
+            return (
+              <span
+                key={s.key}
+                className={cn(
+                  "inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full border text-[11px] font-medium transition-colors",
+                  hidden
+                    ? "bg-transparent border-border-subtle text-ink-faint"
+                    : "bg-section border-border-subtle text-ink-secondary",
+                )}
+              >
+                <span className={cn("w-1.5 h-1.5 rounded-full", STATUS_COLOR_DOT[s.color], hidden && "opacity-40")} />
+                <span className={cn(hidden && "line-through")}>{s.label}</span>
+                {s.isTerminal && !hidden && (
+                  <span className="text-[9px] uppercase tracking-wide text-ink-faint">end</span>
+                )}
+                {protectedKey ? (
+                  <span className="p-1 text-ink-faint" title="The default status can't be hidden">
+                    <Lock size={11} />
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => toggleHidden(s.key)}
+                    title={hidden ? "Show this status" : "Hide this status"}
+                    className="p-1 rounded-md text-ink-muted hover:bg-hover hover:text-ink transition-colors"
+                  >
+                    {hidden ? <Eye size={12} /> : <EyeOff size={12} />}
+                  </button>
+                )}
+              </span>
+            );
+          })}
         </div>
       </div>
 
@@ -221,25 +270,6 @@ export function LeadStatusesSection() {
         </p>
       </div>
     </div>
-  );
-}
-
-function StatusChip({
-  status,
-  locked,
-}: {
-  status: LeadStatusOption;
-  locked?: boolean;
-}) {
-  return (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary">
-      <span className={cn("w-1.5 h-1.5 rounded-full", STATUS_COLOR_DOT[status.color])} />
-      {status.label}
-      {status.isTerminal && (
-        <span className="text-[9px] uppercase tracking-wide text-ink-faint">end</span>
-      )}
-      {locked && <Lock size={9} className="text-ink-faint" />}
-    </span>
   );
 }
 

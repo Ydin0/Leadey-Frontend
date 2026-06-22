@@ -14,13 +14,15 @@ export async function getLeadStatuses(): Promise<LeadStatusOption[]> {
   return apiRequest<LeadStatusOption[]>("/lead-statuses");
 }
 
-/** PUT /api/lead-statuses — replace the org's custom statuses. Returns the
- *  full merged list (built-ins + saved custom). */
+/** PUT /api/lead-statuses — replace the org's custom statuses and the set of
+ *  hidden built-in statuses. Returns the full merged list (visible built-ins +
+ *  saved custom). `hidden` is the list of built-in keys to hide. */
 export async function saveCustomLeadStatuses(
   custom: CustomLeadStatusInput[],
+  hidden?: string[],
 ): Promise<LeadStatusOption[]> {
   return apiRequest<LeadStatusOption[]>("/lead-statuses", {
     method: "PUT",
-    body: JSON.stringify({ custom }),
+    body: JSON.stringify({ custom, ...(hidden ? { hidden } : {}) }),
   });
 }
