@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Ban, Linkedin, Phone, Mail } from "lucide-react";
+import { Ban, Linkedin, Phone, Mail, Users } from "lucide-react";
 import { cn, formatPhoneIntl } from "@/lib/utils";
 import { getStatusDotClass, getStatusLabel, isTerminalStatus, type LeadStatusOption } from "@/lib/utils/lead-status";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
@@ -30,6 +30,26 @@ export interface LeadColumn {
   width: number;
   defaultVisible: boolean;
   render: (lead: FunnelLead, ctx: LeadColumnCtx) => ReactNode;
+  /** Company-level header label (grouped view), when it differs from `label`. */
+  companyLabel?: string;
+  /** Company-level renderer for the grouped (by-company) view. Columns without
+   *  this are lead-specific and simply don't appear when grouping. */
+  companyRender?: (group: FunnelLead[], ctx: LeadColumnCtx) => ReactNode;
+}
+
+/** Best non-generic domain for a company group (mirrors the table's logic). */
+function groupDomain(group: FunnelLead[]): string | undefined {
+  return group.reduce<string | undefined>((found, l) => {
+    if (found) return found;
+    if (l.companyDomain) return l.companyDomain;
+    const ed = l.email?.split("@")[1];
+    if (ed && !["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com"].includes(ed)) return ed;
+    return undefined;
+  }, undefined);
+}
+function firstWith<T>(group: FunnelLead[], pick: (l: FunnelLead) => T | undefined | null): T | undefined {
+  for (const l of group) { const v = pick(l); if (v != null && v !== "") return v as T; }
+  return undefined;
 }
 
 function ProgressDots({ current, total }: { current: number; total: number }) {
@@ -58,7 +78,7 @@ const text = (v: unknown): ReactNode => {
 /** The full catalog of built-in lead columns (custom fields appended separately). */
 export const BUILTIN_LEAD_COLUMNS: LeadColumn[] = [
   {
-    key: "contact", label: "Contact", group: "Lead", align: "left", width: 240, defaultVisible: true,
+    key: "contact", label: "Contact", companyLabel: "Company", group: "Lead", align: "left", width: 240, defaultVisible: true,
     render: (lead, ctx) => (
       <div className="flex items-center gap-2.5 min-w-0">
         <CompanyAvatar name={lead.company} size="md" domain={lead.companyDomain || lead.email?.split("@")[1]} />
@@ -75,6 +95,19 @@ export const BUILTIN_LEAD_COLUMNS: LeadColumn[] = [
         </div>
       </div>
     ),
+    companyRender: (group) => {
+      const company = group[0]?.company || "";
+      const domain = groupDomain(group);
+      return (
+        <div className="flex items-center gap-2.5 min-w-0">
+          <CompanyAvatar name={company} size="md" domain={domain} />
+          <div className="min-w-0">
+            <span className="text-[12px] font-medium text-ink truncate block">{company}</span>
+            {domain && <div className="text-[10px] text-ink-faint truncate">{domain}</div>}
+          </div>
+        </div>
+      );
+    },
   },
   { key: "name", label: "Name", group: "Lead", align: "left", width: 150, defaultVisible: false, render: (l) => text(l.name) },
   { key: "title", label: "Title", group: "Lead", align: "left", width: 160, defaultVisible: false, render: (l) => text(l.title) },
@@ -101,21 +134,59 @@ export const BUILTIN_LEAD_COLUMNS: LeadColumn[] = [
         <span className="text-[11px] text-ink-secondary">{getStatusLabel(l.status, ctx.statuses)}</span>
       </div>
     ),
+    companyLabel: "Status",
+    companyRender: (group, ctx) => {
+      // Company status = the most meaningful status across its contacts.
+      const status = group.find((l) => l.status !== "new" && l.status !== "pending")?.status || group[0]?.status || "new";
+      return (
+        <div className="flex items-center gap-1.5">
+          <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", getStatusDotClass(status, ctx.statuses))} />
+          <span className="text-[11px] text-ink-secondary truncate">{getStatusLabel(status, ctx.statuses)}</span>
+        </div>
+      );
+    },
   },
   {
     key: "score", label: "Score", group: "Lead", align: "center", width: 72, defaultVisible: false,
     render: (l) => <span className="text-[11px] text-ink-secondary tabular-nums">{l.score ?? 0}</span>,
   },
-  { key: "source", label: "Source", group: "Lead", align: "left", width: 110, defaultVisible: true, render: (l) => text(l.source) },
-  // Company
-  { key: "industry", label: "Industry", group: "Company", align: "left", width: 160, defaultVisible: false, render: (l) => text(l.companyIndustry) },
   {
-    key: "employees", label: "Employees", group: "Company", align: "center", width: 96, defaultVisible: false,
-    render: (l) => (l.companyEmployeeCount ? <span className="text-[11px] text-ink-secondary tabular-nums">{l.companyEmployeeCount.toLocaleString()}</span> : dash),
+    key: "source", label: "Source", group: "Lead", align: "left", width: 110, defaultVisible: true,
+    render: (l) => text(l.source), companyLabel: "Source", companyRender: (g) => text(firstWith(g, (l) => l.source)),
   },
-  { key: "location", label: "Location", group: "Company", align: "left", width: 150, defaultVisible: false, render: (l) => text(l.companyLocation) },
-  { key: "domain", label: "Domain", group: "Company", align: "left", width: 150, defaultVisible: false, render: (l) => text(l.companyDomain) },
-  { key: "revenue", label: "Annual revenue", group: "Company", align: "left", width: 130, defaultVisible: false, render: (l) => text(l.companyAnnualRevenue) },
+  {
+    key: "contacts", label: "Contacts", group: "Company", align: "center", width: 84, defaultVisible: true,
+    render: (l, ctx) => <span className="text-[11px] text-ink-secondary tabular-nums">{String(ctx.value(l, "leadsInCompany") ?? "")}</span>,
+    companyLabel: "Contacts",
+    companyRender: (g) => (
+      <div className="flex items-center justify-center gap-1">
+        <Users size={11} className="text-ink-faint" />
+        <span className="text-[11px] text-ink-secondary">{g.length}</span>
+      </div>
+    ),
+  },
+  // Company
+  {
+    key: "industry", label: "Industry", group: "Company", align: "left", width: 160, defaultVisible: true,
+    render: (l) => text(l.companyIndustry), companyRender: (g) => text(firstWith(g, (l) => l.companyIndustry)),
+  },
+  {
+    key: "employees", label: "Employees", group: "Company", align: "center", width: 96, defaultVisible: true,
+    render: (l) => (l.companyEmployeeCount ? <span className="text-[11px] text-ink-secondary tabular-nums">{l.companyEmployeeCount.toLocaleString()}</span> : dash),
+    companyRender: (g) => { const n = firstWith(g, (l) => l.companyEmployeeCount); return n ? <span className="text-[11px] text-ink-secondary tabular-nums">{n.toLocaleString()}</span> : dash; },
+  },
+  {
+    key: "location", label: "Location", group: "Company", align: "left", width: 150, defaultVisible: true,
+    render: (l) => text(l.companyLocation), companyRender: (g) => text(firstWith(g, (l) => l.companyLocation)),
+  },
+  {
+    key: "domain", label: "Domain", group: "Company", align: "left", width: 150, defaultVisible: false,
+    render: (l) => text(l.companyDomain), companyRender: (g) => text(groupDomain(g)),
+  },
+  {
+    key: "revenue", label: "Annual revenue", group: "Company", align: "left", width: 130, defaultVisible: false,
+    render: (l) => text(l.companyAnnualRevenue), companyRender: (g) => text(firstWith(g, (l) => l.companyAnnualRevenue)),
+  },
   // Sequence
   {
     key: "step", label: "Step", group: "Sequence", align: "center", width: 96, defaultVisible: true,
@@ -144,6 +215,17 @@ export const BUILTIN_LEAD_COLUMNS: LeadColumn[] = [
         <div className="flex items-center justify-center gap-3">
           <span className={cn("flex items-center gap-1 text-[11px]", a.calls > 0 ? "text-ink-secondary" : "text-ink-faint")}><Phone size={11} strokeWidth={1.5} /> {a.calls}</span>
           <span className={cn("flex items-center gap-1 text-[11px]", a.emails > 0 ? "text-ink-secondary" : "text-ink-faint")}><Mail size={11} strokeWidth={1.5} /> {a.emails}</span>
+        </div>
+      );
+    },
+    companyLabel: "Activity",
+    companyRender: (group, ctx) => {
+      const calls = group.reduce((s, l) => s + ctx.activity(l.id).calls, 0);
+      const emails = group.reduce((s, l) => s + ctx.activity(l.id).emails, 0);
+      return (
+        <div className="flex items-center justify-center gap-2">
+          <span className={cn("flex items-center gap-0.5 text-[10px]", calls > 0 ? "text-ink-secondary" : "text-ink-faint")}><Phone size={10} strokeWidth={1.5} /> {calls}</span>
+          <span className={cn("flex items-center gap-0.5 text-[10px]", emails > 0 ? "text-ink-secondary" : "text-ink-faint")}><Mail size={10} strokeWidth={1.5} /> {emails}</span>
         </div>
       );
     },

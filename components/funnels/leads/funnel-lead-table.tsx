@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "react";
-import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, ChevronRight, Users, Ban, Sparkles, Search, Bot, UserPlus, Check, Columns3 } from "lucide-react";
+import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, ChevronRight, Ban, Sparkles, Search, Bot, UserPlus, Check, Columns3 } from "lucide-react";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -9,17 +9,12 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { useRowLimit } from "@/lib/hooks/use-row-limit";
 import { advanceLead, enrichJobPosts, saveLeadFilters } from "@/lib/api/funnels";
 import { useCredits } from "@/components/providers/credits-provider";
-import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { FilterBuilder } from "@/components/filters/filter-builder";
 import { SmartViewBar } from "@/components/filters/smart-view-bar";
 import { EMPTY_FILTER, customFieldsToFilterFields, type FilterGroup, type FilterFieldDef } from "@/lib/types/lead-filter";
 import { matchesFilter } from "@/lib/utils/eval-lead-filter";
 import { listCustomFields } from "@/lib/api/custom-fields";
-import {
-  getStatusDotClass,
-  getStatusLabel,
-  isTerminalStatus,
-} from "@/lib/utils/lead-status";
+import { isTerminalStatus } from "@/lib/utils/lead-status";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { computeActivityCounts } from "@/lib/utils/lead-activity";
 import { useCallContext } from "@/components/calling/call-context";
@@ -441,6 +436,9 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   const columnCatalog = useMemo(() => buildLeadColumns(customFields), [customFields]);
   const resolvedColumns = useMemo(() => resolveColumns(columnCatalog, columnPrefs), [columnCatalog, columnPrefs]);
   const visibleColumns = useMemo(() => resolvedColumns.filter((r) => r.visible).map((r) => r.col), [resolvedColumns]);
+  // The grouped (by-company) view shows only the company-applicable visible
+  // columns, so a user's company column choices carry across both views.
+  const companyColumns = useMemo(() => visibleColumns.filter((c) => c.companyRender), [visibleColumns]);
   const columnCtx: LeadColumnCtx = useMemo(() => ({
     statuses,
     activity: (id: string) => activityMap.get(id) ?? { calls: 0, emails: 0 },
@@ -651,20 +649,21 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
         />
         <button
           onClick={() => { setGroupByCompany(!groupByCompany); setExpandedCompanies(new Set()); setCurrentPage(1); }}
+          aria-pressed={groupByCompany}
           className={cn(
             "flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] text-[11px] font-medium border transition-colors",
             groupByCompany
-              ? "bg-signal-blue/10 text-signal-blue-text border-signal-blue-text/20"
+              ? "bg-signal-blue text-signal-blue-text border-signal-blue-text/40 shadow-sm"
               : "text-ink-muted border-border-subtle hover:bg-hover"
           )}
         >
-          <Building2 size={11} />
+          {groupByCompany ? <Check size={12} strokeWidth={2.5} /> : <Building2 size={11} />}
           Group by company
         </button>
         <div className="ml-auto flex items-center gap-2">
           {onSortChange && sortBy && <LeadSortMenu value={sortBy} onChange={onSortChange} />}
           <button
-            onClick={() => { if (groupByCompany) { setGroupByCompany(false); setCurrentPage(1); } setColumnsOpen(true); }}
+            onClick={() => setColumnsOpen(true)}
             title="Choose which columns to show"
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[8px] text-[11px] font-medium border border-border-subtle text-ink-secondary hover:bg-hover transition-colors"
           >
@@ -722,48 +721,25 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                     />
                   </TableHead>
                   <TableHead className="w-7" />
-                  <TableHead className="text-left w-[220px]">Company</TableHead>
-                  <TableHead className="text-left w-[130px]">Status</TableHead>
-                  <TableHead className="text-left w-[150px]">Industry</TableHead>
-                  <TableHead className="text-center w-[90px]">Employees</TableHead>
-                  <TableHead className="text-left w-[150px]">Location</TableHead>
-                  <TableHead className="text-center w-[80px]">Contacts</TableHead>
-                  <TableHead className="text-center w-[100px]">Activity</TableHead>
+                  {companyColumns.map((col) => (
+                    <TableHead
+                      key={col.key}
+                      className={col.align === "center" ? "text-center" : "text-left"}
+                      style={{ width: col.width, minWidth: col.width }}
+                    >
+                      {col.companyLabel ?? col.label}
+                    </TableHead>
+                  ))}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {(paginatedKeys as unknown as string[]).map((companyName) => {
                   const companyLeads = companyGroups.get(companyName) || [];
                   const isExpanded = expandedCompanies.has(companyName);
-                  const firstLead = companyLeads[0];
-
-                  // Find best domain from leads
-                  const domain = companyLeads.reduce<string | undefined>((found, l) => {
-                    if (found) return found;
-                    if (l.companyDomain) return l.companyDomain;
-                    const emailDomain = l.email?.split("@")[1];
-                    if (emailDomain && !["gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "icloud.com"].includes(emailDomain)) return emailDomain;
-                    return undefined;
-                  }, undefined);
-
-                  // Aggregate company-level data from first lead that has it
-                  const industry = companyLeads.find((l) => l.companyIndustry)?.companyIndustry;
-                  const employeeCount = companyLeads.find((l) => l.companyEmployeeCount)?.companyEmployeeCount;
-                  const location = companyLeads.find((l) => l.companyLocation)?.companyLocation;
-
-                  // Aggregate activity across all company leads
-                  const totalCalls = companyLeads.reduce((sum, l) => sum + (activityMap.get(l.id)?.calls ?? 0), 0);
-                  const totalEmails = companyLeads.reduce((sum, l) => sum + (activityMap.get(l.id)?.emails ?? 0), 0);
-
-                  // Status is company-level (synced across contacts). Prefer a
-                  // meaningful status over "new"/"pending" if any contact differs.
-                  const companyStatus =
-                    companyLeads.find((l) => l.status !== "new" && l.status !== "pending")?.status ||
-                    firstLead?.status || "new";
 
                   return (
                     <Fragment key={companyName}>
-                      {/* Company row */}
+                      {/* Company row \u2014 renders the company-applicable visible columns */}
                       <TableRow
                         className="cursor-pointer hover:bg-hover/50"
                         onClick={() => {
@@ -786,50 +762,15 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                         <TableCell className="w-7 px-0">
                           <ChevronRight size={14} className={cn("text-ink-muted transition-transform", isExpanded && "rotate-90")} />
                         </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2.5">
-                            <CompanyAvatar name={companyName} size="md" domain={domain} />
-                            <div>
-                              <span className="text-[12px] font-medium text-ink">{companyName}</span>
-                              {domain && <div className="text-[10px] text-ink-faint">{domain}</div>}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1.5">
-                            <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", getStatusDotClass(companyStatus, statuses))} />
-                            <span className="text-[11px] text-ink-secondary truncate">{getStatusLabel(companyStatus, statuses)}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-[11px] text-ink-secondary">{industry || "\u2013"}</span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="text-[11px] text-ink-secondary">
-                            {employeeCount ? employeeCount.toLocaleString() : "\u2013"}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="text-[11px] text-ink-muted">{location || "\u2013"}</span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
-                            <Users size={11} className="text-ink-faint" />
-                            <span className="text-[11px] text-ink-secondary">{companyLeads.length}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="flex items-center gap-0.5">
-                              <Phone size={10} strokeWidth={1.5} className={cn(totalCalls > 0 ? "text-ink-secondary" : "text-ink-faint")} />
-                              <span className={cn("text-[10px]", totalCalls > 0 ? "text-ink-secondary" : "text-ink-faint")}>{totalCalls}</span>
-                            </div>
-                            <div className="flex items-center gap-0.5">
-                              <Mail size={10} strokeWidth={1.5} className={cn(totalEmails > 0 ? "text-ink-secondary" : "text-ink-faint")} />
-                              <span className={cn("text-[10px]", totalEmails > 0 ? "text-ink-secondary" : "text-ink-faint")}>{totalEmails}</span>
-                            </div>
-                          </div>
-                        </TableCell>
+                        {companyColumns.map((col) => (
+                          <TableCell
+                            key={col.key}
+                            className={col.align === "center" ? "text-center" : undefined}
+                            style={{ width: col.width, minWidth: col.width }}
+                          >
+                            {col.companyRender!(companyLeads, columnCtx)}
+                          </TableCell>
+                        ))}
                       </TableRow>
 
                       {/* Expanded contacts */}
@@ -846,7 +787,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                             {/* Lead detail rendered as one clean strip — it isn't
                                 column-aligned to the company's Industry/Employees/
                                 Location headers (those describe the company row). */}
-                            <TableCell colSpan={9} className="py-2">
+                            <TableCell colSpan={2 + companyColumns.length} className="py-2">
                               <div className="flex items-center gap-3 pl-[60px] pr-2">
                                 {/* Name + title — red when Do-Not-Contact. Status
                                     is company-level so it isn't repeated here. */}
