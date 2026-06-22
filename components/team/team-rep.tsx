@@ -4,7 +4,7 @@ import { Icon } from "./icon";
 import { Avatar, StatusDot, Panel, ChannelLegend } from "./team-shared";
 import { TrendChart, Ring, Meter, attColor } from "./charts";
 import {
-  CH_IDS, CH_MAP, WIN_MAP, attainment, bucketed, workingDays, winSlice,
+  CH_IDS, CH_MAP, WIN_MAP, attainment, bucketed, workingDays, winSlice, fmtTalkTime,
   type WindowId,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -22,11 +22,14 @@ export function TeamRep({ memberId, win, trendMode, onEdit }: {
 
   const rank = activeMembers.map((x) => ({ id: x.id, v: attainment(x, win).overall })).sort((p, q) => q.v - p.v).findIndex((x) => x.id === m.id) + 1;
 
-  const summary: [string, number, string][] = [
-    ["Meetings booked", tot.meetings, "calendar-check"],
-    ["Replies", tot.replies, "message-square"],
-    ["Avg / working day", Math.round(tot.total / workingDays(winSlice(m.series, win))), "activity"],
-    ["Daily KPI total", CH_IDS.reduce((s, ch) => s + m.targets[ch], 0), "target"],
+  // [label, display value, icon] — talk time + avg call length are formatted durations.
+  const summary: [string, string, string][] = [
+    ["Talk time", fmtTalkTime(tot.talkTime), "clock"],
+    ["Avg call length", tot.calls ? fmtTalkTime(tot.talkTime / tot.calls) : "—", "phone-call"],
+    ["Meetings booked", tot.meetings.toLocaleString(), "calendar-check"],
+    ["Replies", tot.replies.toLocaleString(), "message-square"],
+    ["Avg / working day", Math.round(tot.total / workingDays(winSlice(m.series, win))).toLocaleString(), "activity"],
+    ["Daily KPI total", CH_IDS.reduce((s, ch) => s + m.targets[ch], 0).toLocaleString(), "target"],
   ];
 
   return (
@@ -86,7 +89,7 @@ export function TeamRep({ memberId, win, trendMode, onEdit }: {
             {summary.map(([l, v, ic], i) => (
               <div key={l} className="between" style={{ padding: "13px 0", borderTop: i ? "1px solid var(--border-subtle)" : "none" }}>
                 <span className="row" style={{ gap: 9, fontSize: 12, color: "var(--fg2)" }}><Icon name={ic} size={15} style={{ color: "var(--fg-muted)" }} />{l}</span>
-                <span style={{ fontSize: 16, fontWeight: 600 }}>{v.toLocaleString()}</span>
+                <span style={{ fontSize: 16, fontWeight: 600 }}>{v}</span>
               </div>
             ))}
           </div>

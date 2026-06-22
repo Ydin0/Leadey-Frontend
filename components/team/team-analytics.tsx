@@ -1,12 +1,16 @@
 "use client";
 
 import { Icon } from "./icon";
-import { StatCard, Panel, ChannelLegend, Avatar, DeltaPill, POD_COLOR } from "./team-shared";
+import { StatCard, MetricCard, Panel, ChannelLegend, Avatar, DeltaPill, POD_COLOR } from "./team-shared";
 import { TrendChart, Donut, Ring, Meter, attColor } from "./charts";
 import {
-  CH_IDS, CH_MAP, WIN_MAP, teamTotals, bucketed, attainment, sparkFor,
+  CH_IDS, CH_MAP, WIN_MAP, teamTotals, bucketed, attainment, sparkFor, talkSparkFor, fmtTalkTime,
   type WindowId,
 } from "@/lib/team/team-data";
+
+// Talk time gets its own accent (warm amber) so it reads as a duration metric
+// distinct from the green "Calls" channel it derives from.
+const TALK_COLOR = "#E0A878";
 import { useTeamData } from "@/lib/team/team-data-context";
 
 export function TeamAnalytics({ win, trendMode, onPickRep }: {
@@ -48,10 +52,18 @@ export function TeamAnalytics({ win, trendMode, onPickRep }: {
         <Icon name="activity" size={12} />
         Calls &amp; meetings are tracked live. Email, SMS &amp; LinkedIn populate once their integrations are connected.
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14 }}>
         {CH_IDS.map((ch) => (
           <StatCard key={ch} ch={ch} total={tot.cur[ch]} delta={tot.delta[ch]} spark={sparkFor(members, win, ch)} />
         ))}
+        <MetricCard
+          label="Talk time"
+          icon="clock"
+          color={TALK_COLOR}
+          value={fmtTalkTime(tot.cur.talkTime)}
+          delta={tot.delta.talkTime}
+          spark={talkSparkFor(members, win)}
+        />
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 16 }}>
@@ -93,8 +105,9 @@ export function TeamAnalytics({ win, trendMode, onPickRep }: {
 
         <Panel title="Outcomes">
           <div className="col" style={{ gap: 16, marginTop: 2 }}>
-            {([["Meetings booked", tot.cur.meetings, tot.delta.meetings, "calendar-check"],
-              ["Replies", tot.cur.replies, tot.delta.replies, "message-square"]] as const).map(([l, v, d, ic]) => (
+            {([["Talk time", fmtTalkTime(tot.cur.talkTime), tot.delta.talkTime, "clock"],
+              ["Meetings booked", tot.cur.meetings.toLocaleString(), tot.delta.meetings, "calendar-check"],
+              ["Replies", tot.cur.replies.toLocaleString(), tot.delta.replies, "message-square"]] as const).map(([l, v, d, ic]) => (
               <div key={l} className="between">
                 <span className="row" style={{ gap: 9, color: "var(--fg2)", fontSize: 12 }}>
                   <Icon name={ic} size={15} style={{ color: "var(--fg-muted)" }} />{l}
@@ -142,6 +155,9 @@ export function TeamAnalytics({ win, trendMode, onPickRep }: {
                 </div>
               </div>
               <div className="row" style={{ gap: 16 }}>
+                <span className="row" style={{ gap: 5, fontSize: 11, color: "var(--fg-muted)" }} title="Talk time">
+                  <Icon name="clock" size={12} style={{ color: TALK_COLOR }} />{fmtTalkTime(r.a.got.talkTime)}
+                </span>
                 <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>{r.a.got.total.toLocaleString()} touches</span>
                 <div style={{ width: 90 }}><Meter pct={r.a.overall} /></div>
                 <span style={{ width: 40, textAlign: "right", fontSize: 12, fontWeight: 600, color: attColor(r.a.overall) }}>{Math.round(r.a.overall * 100)}%</span>

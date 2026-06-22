@@ -110,6 +110,30 @@ export function StatCard({ ch, total, delta, spark }: {
   );
 }
 
+/** A generic KPI stat card (not channel-bound) — used for talk time, where the
+ *  value is a preformatted string (e.g. "2h 14m") rather than a raw count. */
+export function MetricCard({ label, icon, color, value, delta, spark }: {
+  label: string; icon: string; color: string; value: string; delta: number; spark: number[];
+}) {
+  return (
+    <div className="card" style={{ padding: 16 }}>
+      <div className="between">
+        <div className="row" style={{ gap: 9 }}>
+          <div className="row" style={{ width: 30, height: 30, borderRadius: 9, justifyContent: "center", background: color + "1f" }}>
+            <Icon name={icon} size={15} style={{ color }} />
+          </div>
+          <span style={{ fontSize: 12, color: "var(--fg-muted)" }}>{label}</span>
+        </div>
+        <DeltaPill d={delta} />
+      </div>
+      <div className="between" style={{ marginTop: 12, alignItems: "flex-end" }}>
+        <div style={{ fontSize: 28, fontWeight: 600, letterSpacing: "-0.02em", lineHeight: 1 }}>{value}</div>
+        <Sparkline data={spark} color={color} width={104} height={32} />
+      </div>
+    </div>
+  );
+}
+
 export function ChannelLegend({ channels }: { channels?: ChannelId[] }) {
   const list = channels || (Object.keys(CH_MAP) as ChannelId[]);
   return (
