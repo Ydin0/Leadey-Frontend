@@ -30,6 +30,10 @@ export interface Targets {
 export interface DayRec {
   date: Date;
   ts: number;
+  /** The day this record belongs to as a YYYY-MM-DD key (the backend's UTC
+   *  bucket date). Range filtering compares on this — never raw timestamps —
+   *  so it stays correct regardless of the viewer's timezone. */
+  dayKey: string;
   calls: number;
   /** Seconds spent on calls that day (sum of call durations). */
   talkTime: number;
@@ -107,6 +111,15 @@ export interface ApiDayRec {
   replies: number;
 }
 
+/** A YYYY-MM-DD key from a date's LOCAL calendar components — used for range
+ *  bounds so "the day the user picked" matches the backend's date buckets. */
+export function localDayKey(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 /** Convert a backend series into the DayRec shape the analytics engine uses. */
 export function hydrateSeries(api: ApiDayRec[]): DayRec[] {
   return api.map((r) => {
@@ -115,6 +128,7 @@ export function hydrateSeries(api: ApiDayRec[]): DayRec[] {
     return {
       date,
       ts: date.getTime(),
+      dayKey: r.date.slice(0, 10), // backend ISO is UTC-midnight → its date part
       calls: r.calls || 0,
       talkTime: r.talkTime || 0,
       emails: r.emails || 0,
@@ -135,7 +149,7 @@ export function emptySeries(): DayRec[] {
   const days: DayRec[] = [];
   for (let i = 0; i < DAYS; i++) {
     const date = new Date(start.getTime() - (DAYS - 1 - i) * DAY_MS);
-    days.push({ date, ts: date.getTime(), calls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 });
+    days.push({ date, ts: date.getTime(), dayKey: localDayKey(date), calls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 });
   }
   return days;
 }
@@ -194,11 +208,14 @@ export function bucketMode(r: DayRange): "day" | "week" {
   return rangeDays(r) > 45 ? "week" : "day";
 }
 
-/** The days of a series that fall within the range (inclusive). */
+/** The days of a series that fall within the range (inclusive). Compares on
+ *  YYYY-MM-DD calendar keys (not timestamps) so the viewer's timezone never
+ *  shifts a day out of the selected window — e.g. "Today" / a single picked
+ *  date matches the backend's UTC day bucket regardless of offset. */
 export function sliceRange(series: DayRec[], r: DayRange): DayRec[] {
-  const lo = r.start.getTime();
-  const hi = r.end.getTime();
-  return series.filter((d) => d.ts >= lo && d.ts <= hi);
+  const lo = localDayKey(r.start);
+  const hi = localDayKey(r.end);
+  return series.filter((d) => d.dayKey >= lo && d.dayKey <= hi);
 }
 
 /** Human label for a range, e.g. "12 Jun" (single day) or "1–15 Jun". */
