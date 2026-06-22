@@ -13,6 +13,7 @@ import {
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { AudioPlayer } from "./audio-player";
 import { CallReview } from "./call-review";
+import { ShareRecordingButton } from "./share-recording-button";
 import { summarizeCall } from "@/lib/api/phone-lines";
 import type { CallRecord } from "@/lib/types/calling";
 
@@ -103,6 +104,7 @@ export function RecordingsTable({
             <TableHead className="text-center w-[90px]">Result</TableHead>
             <TableHead className="text-left w-[240px]">Recording</TableHead>
             <TableHead className="text-center w-[100px]">Transcript</TableHead>
+            <TableHead className="text-center w-[52px]">Share</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -238,12 +240,17 @@ export function RecordingsTable({
                       <span className="text-[10px] text-ink-faint">&mdash;</span>
                     )}
                   </TableCell>
+
+                  {/* Share — copy a deep link to this recording */}
+                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                    <ShareRecordingButton recordId={record.id} />
+                  </TableCell>
                 </TableRow>
 
                 {/* Expanded transcript / summary panel */}
                 {isExpanded && (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={9} className="p-0">
+                    <TableCell colSpan={10} className="p-0">
                       <div className="px-6 py-4 bg-section/30 border-t border-border-subtle">
                         {isGenerating ? (
                           <div className="flex items-center gap-2 text-[12px] text-ink-muted">

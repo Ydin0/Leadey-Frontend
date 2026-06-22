@@ -116,6 +116,11 @@ export async function getCallRecords(params?: {
   return apiRequestRaw<{ data: CallRecord[]; meta: { page: number; pageSize: number; totalCount: number; totalPages: number } }>(`/phone-lines/call-records${qs ? `?${qs}` : ""}`);
 }
 
+/** Fetch a single call record by id — powers shareable recording links. */
+export async function getCallRecord(id: string): Promise<CallRecord> {
+  return apiRequest<CallRecord>(`/phone-lines/call-records/${encodeURIComponent(id)}`);
+}
+
 export async function saveCallRecord(data: {
   lineId?: string;
   twilioCallSid?: string;
