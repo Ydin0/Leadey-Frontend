@@ -176,16 +176,29 @@ interface SelectedCompany {
   linkedinUrl?: string | null;
 }
 
-/** Bulk action bar shown when ≥1 company is selected in the grouped view.
- *  "Magic Enrich" dropdown — only "Find job posts" is wired up today. */
+/** Floating bottom bulk-action bar shown when ≥1 company is selected in the
+ *  grouped view (mirrors the scrapers tables). "Magic Enrich" dropdown — only
+ *  "Find job posts" is wired up today. */
 function MagicEnrichBar({
   funnelId,
   companies,
+  totalCount,
+  pageFullySelected,
+  allSelected,
+  onSelectAll,
   onClear,
   onDone,
 }: {
   funnelId: string;
   companies: SelectedCompany[];
+  /** Total companies matching the current filters (across all pages). */
+  totalCount: number;
+  /** Whether every company on the current page is selected. */
+  pageFullySelected: boolean;
+  /** Whether every matching company (all pages) is selected. */
+  allSelected: boolean;
+  /** Select every matching company across all pages. */
+  onSelectAll: () => void;
   onClear: () => void;
   onDone: (summary: string) => void;
 }) {
@@ -209,10 +222,14 @@ function MagicEnrichBar({
     try {
       const res = await enrichJobPosts(funnelId, companies);
       refreshCredits(); // job scraping spent credits — update the header pill
-      const summary =
+      const base =
         res.rolesCreated > 0
           ? `Added ${res.rolesCreated} hiring role${res.rolesCreated === 1 ? "" : "s"} across ${res.leadsEnriched} lead${res.leadsEnriched === 1 ? "" : "s"} · ${res.jobsFound} jobs found in ${res.companiesSearched} companies`
           : `No new open roles found across ${res.companiesSearched} compan${res.companiesSearched === 1 ? "y" : "ies"}`;
+      // Be explicit when we only processed the first batch of a larger selection.
+      const summary = res.capped
+        ? `${base} · Searched ${res.companiesSearched} of ${res.companiesRequested} selected — run again to enrich the rest.`
+        : base;
       onDone(summary);
     } catch (err) {
       onDone(err instanceof Error ? err.message : "Magic Enrich failed");
@@ -222,14 +239,35 @@ function MagicEnrichBar({
   }
 
   return (
-    <div className="flex items-center gap-3 mb-3 px-3 py-2 rounded-[10px] bg-signal-blue/10 border border-signal-blue-text/20">
-      <span className="text-[12px] font-medium text-ink">
-        {companies.length} compan{companies.length === 1 ? "y" : "ies"} selected
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-[14px] bg-surface border border-border-default shadow-lg">
+      <span className="text-[12px] font-medium text-signal-blue-text">
+        {companies.length.toLocaleString()} compan{companies.length === 1 ? "y" : "ies"} selected
       </span>
+
+      {/* Select-all-matching banner — only once the page is fully ticked, so the
+          header checkbox stays a page-scoped control for finer selection. */}
+      {pageFullySelected && !allSelected && totalCount > companies.length && (
+        <>
+          <span className="text-[10px] text-ink-faint">|</span>
+          <button onClick={onSelectAll} className="text-[11px] font-medium text-signal-blue-text hover:underline">
+            Select all {totalCount.toLocaleString()}
+          </button>
+        </>
+      )}
+      {allSelected && totalCount > 1 && (
+        <>
+          <span className="text-[10px] text-ink-faint">|</span>
+          <span className="text-[11px] text-signal-blue-text">All companies</span>
+        </>
+      )}
+
       <button onClick={onClear} className="text-[11px] text-ink-muted hover:text-ink transition-colors">
         Clear
       </button>
-      <div className="ml-auto relative" ref={ref}>
+
+      <div className="w-px h-5 bg-border-subtle mx-1" />
+
+      <div className="relative" ref={ref}>
         <button
           onClick={() => setOpen((v) => !v)}
           disabled={busy}
@@ -239,7 +277,7 @@ function MagicEnrichBar({
           {busy ? "Enriching…" : "Magic Enrich"}
         </button>
         {open && (
-          <div className="absolute right-0 top-full mt-1.5 z-50 w-[260px] bg-surface rounded-[12px] border border-border-subtle shadow-lg py-1.5">
+          <div className="absolute right-0 bottom-full mb-1.5 z-50 w-[260px] bg-surface rounded-[12px] border border-border-subtle shadow-lg py-1.5">
             <button
               onClick={() => void findJobPosts()}
               className="w-full text-left px-3 py-2 hover:bg-hover transition-colors flex items-start gap-2.5"
@@ -441,10 +479,8 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   const allCompanyKeys = useMemo(() => [...companyGroups.keys()], [companyGroups]);
   const allCompaniesSelected = allCompanyKeys.length > 0 && allCompanyKeys.every((k) => selectedCompanies.has(k));
 
-  function toggleSelectAllCompanies() {
-    if (allCompaniesSelected) setSelectedCompanies(new Set());
-    else setSelectedCompanies(new Set(allCompanyKeys));
-  }
+  // Select every matching company across all pages (the bottom-bar banner).
+  const selectAllMatching = useCallback(() => setSelectedCompanies(new Set(allCompanyKeys)), [allCompanyKeys]);
 
   const selectedCompanyList = useMemo(
     () => [...selectedCompanies].filter((n) => companyGroups.has(n)).map((n) => companyMeta(n)),
@@ -462,6 +498,26 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   const paginatedPage = Math.min(currentPage, totalPages);
   const paginatedKeys = limited.slice((paginatedPage - 1) * pageSize, paginatedPage * pageSize);
   const paginated = groupByCompany ? [] as FunnelLead[] : paginatedKeys as unknown as FunnelLead[];
+
+  // Header checkbox is PAGE-scoped: ticking it selects only the companies shown
+  // on this page (finer control). "Select all {N}" in the bottom bar then opts
+  // into every matching company across all pages.
+  const pageCompanyKeys = paginatedKeys as unknown as string[];
+  const pageAllSelected = pageCompanyKeys.length > 0 && pageCompanyKeys.every((k) => selectedCompanies.has(k));
+  const pageSomeSelected = pageCompanyKeys.some((k) => selectedCompanies.has(k));
+  const headerCbRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (headerCbRef.current) headerCbRef.current.indeterminate = pageSomeSelected && !pageAllSelected;
+  }, [pageSomeSelected, pageAllSelected]);
+
+  function toggleSelectPageCompanies() {
+    setSelectedCompanies((prev) => {
+      const next = new Set(prev);
+      if (pageAllSelected) pageCompanyKeys.forEach((k) => next.delete(k));
+      else pageCompanyKeys.forEach((k) => next.add(k));
+      return next;
+    });
+  }
 
   function toggleSelect(id: string) {
     setSelectedIds((prev) => {
@@ -572,11 +628,15 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
         )}
       </div>
 
-      {/* Magic Enrich bulk bar (grouped view) */}
+      {/* Magic Enrich bulk bar (grouped view) — floats at the bottom */}
       {groupByCompany && selectedCompanyList.length > 0 && (
         <MagicEnrichBar
           funnelId={funnelId}
           companies={selectedCompanyList}
+          totalCount={allCompanyKeys.length}
+          pageFullySelected={pageAllSelected}
+          allSelected={allCompaniesSelected}
+          onSelectAll={selectAllMatching}
           onClear={() => setSelectedCompanies(new Set())}
           onDone={(summary) => {
             setEnrichToast(summary);
@@ -607,11 +667,12 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                 <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
                   <TableHead className="w-9 px-3">
                     <input
+                      ref={headerCbRef}
                       type="checkbox"
                       className="rounded"
-                      checked={allCompaniesSelected}
-                      onChange={toggleSelectAllCompanies}
-                      title="Select all companies"
+                      checked={pageAllSelected}
+                      onChange={toggleSelectPageCompanies}
+                      title="Select all companies on this page"
                     />
                   </TableHead>
                   <TableHead className="w-7" />

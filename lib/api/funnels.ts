@@ -392,7 +392,7 @@ export async function saveLeadFilters(
 export async function enrichJobPosts(
   funnelId: string,
   companies: { name: string; domain?: string | null; linkedinUrl?: string | null }[],
-): Promise<{ companiesSearched: number; jobsFound: number; rolesCreated: number; leadsEnriched: number }> {
+): Promise<{ companiesSearched: number; companiesRequested: number; capped: boolean; jobsFound: number; rolesCreated: number; leadsEnriched: number }> {
   return apiRequest(
     `/funnels/${encodeURIComponent(funnelId)}/enrich-job-posts`,
     {
