@@ -1,8 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Ban, Linkedin, Phone, Mail, Users, Briefcase } from "lucide-react";
+import { Ban, Linkedin, Phone, Mail, Users, Briefcase, Clock } from "lucide-react";
 import { cn, formatPhoneIntl } from "@/lib/utils";
+import { leadLocalTime } from "@/lib/utils/lead-timezone";
 import { getStatusDotClass, getStatusLabel, isTerminalStatus, type LeadStatusOption } from "@/lib/utils/lead-status";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import type { FunnelLead } from "@/lib/types/funnel";
@@ -74,6 +75,21 @@ const text = (v: unknown): ReactNode => {
   const s = v == null || v === "" ? "" : String(v);
   return s ? <span className="text-[11px] text-ink-secondary truncate">{s}</span> : dash;
 };
+function localTimeCell(lead: FunnelLead): ReactNode {
+  const lt = leadLocalTime(lead);
+  if (!lt) return dash;
+  // Out-of-hours (before 8am / after 8pm local) reads dimmer.
+  const off = lt.hour < 8 || lt.hour >= 20;
+  return (
+    <span
+      className={cn("inline-flex items-center gap-1 text-[11px] whitespace-nowrap", off ? "text-ink-faint" : "text-ink-secondary")}
+      title={`Local time · ${lt.tz}${off ? " (likely outside working hours)" : ""}`}
+    >
+      <Clock size={11} strokeWidth={1.5} className={off ? "text-ink-faint" : "text-ink-muted"} /> {lt.label}
+    </span>
+  );
+}
+
 const roleCount = (n: number): ReactNode =>
   n > 0 ? (
     <span className="inline-flex items-center gap-1 text-[11px] text-ink-secondary tabular-nums" title={`${n} open role${n === 1 ? "" : "s"}`}>
@@ -184,6 +200,11 @@ export const BUILTIN_LEAD_COLUMNS: LeadColumn[] = [
   {
     key: "location", label: "Location", group: "Company", align: "left", width: 150, defaultVisible: true,
     render: (l) => text(l.companyLocation), companyRender: (g) => text(firstWith(g, (l) => l.companyLocation)),
+  },
+  {
+    key: "localTime", label: "Local time", group: "Company", align: "left", width: 150, defaultVisible: false,
+    render: (l) => localTimeCell(l),
+    companyRender: (g) => { const l = g.find((x) => leadLocalTime(x)) ?? g[0]; return l ? localTimeCell(l) : dash; },
   },
   {
     key: "domain", label: "Domain", group: "Company", align: "left", width: 150, defaultVisible: false,
