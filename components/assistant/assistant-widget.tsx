@@ -29,6 +29,15 @@ export function AssistantWidget() {
     if (open) setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
 
+  // Auto-grow the composer with its content (up to a max), so multi-line input
+  // expands the box instead of scrolling text out of view.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 128)}px`;
+  }, [input]);
+
   async function send(text: string) {
     const content = text.trim();
     if (!content || busy) return;
@@ -144,7 +153,7 @@ export function AssistantWidget() {
                 onKeyDown={onKeyDown}
                 rows={1}
                 placeholder="Ask anything about your workspace…"
-                className="flex-1 bg-transparent border-0 outline-0 resize-none text-[12.5px] text-ink placeholder:text-ink-faint max-h-28"
+                className="flex-1 bg-transparent border-0 outline-0 resize-none text-[12.5px] leading-relaxed text-ink placeholder:text-ink-faint max-h-32 overflow-y-auto"
               />
               <button
                 onClick={() => void send(input)}
