@@ -22,6 +22,7 @@ import type {
 } from "@/lib/types/calling";
 import { getPhoneLines, getCallRecords, saveCallRecord, resolveCaller } from "@/lib/api/phone-lines";
 import { logLeadCall } from "@/lib/api/funnels";
+import { getLocalPresenceConfig, resolveCallerId } from "@/lib/api/calls";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 
 const CallContext = createContext<CallContextValue | null>(null);
@@ -107,6 +108,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const callSidRef = useRef<string | null>(null);
   const callSidPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Whether local-presence dialing is on for the org (loaded once). When on,
+  // startCall asks the server for the best owned caller-ID per destination.
+  const localPresenceRef = useRef(false);
+
   // ── Fetch phone lines + call records once auth is ready ──
   useEffect(() => {
     if (!isAuthReady) return;
@@ -131,6 +136,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
 
     load();
+    // Local-presence flag (best-effort; defaults off).
+    getLocalPresenceConfig()
+      .then((r) => { if (!cancelled) localPresenceRef.current = !!r.config.enabled; })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [isAuthReady]);
 
@@ -593,8 +602,23 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       const line = phoneLines.find((l) => l.id === selectedLineId);
       if (!line) return;
 
-      // Strip formatting from the line number to get a clean caller ID
-      const callerId = line.number.replace(/[^\d+]/g, "");
+      // Default caller ID = the rep's selected line.
+      let callerId = line.number.replace(/[^\d+]/g, "");
+      let fromNumber = line.number;
+
+      // Local presence: ask the server for an owned number matching the lead's
+      // state. Match-only + best-effort — any failure keeps the selected line.
+      if (localPresenceRef.current) {
+        try {
+          const resolved = await resolveCallerId(cleanTo);
+          if (resolved.source === "match" && resolved.callerId) {
+            callerId = resolved.callerId.replace(/[^\d+]/g, "");
+            fromNumber = resolved.callerId;
+          }
+        } catch {
+          /* keep the selected line */
+        }
+      }
 
       // Clear stale ended-call info so the dialer doesn't apply the
       // previous call's record to this one if there's a race.
@@ -612,7 +636,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         callRef.current = call;
         // Pass the numbers we already know — see bindCallEvents for why we
         // can't rely on call.parameters for outbound.
-        bindCallEvents(call, "outbound", meta, { to: cleanTo, from: line.number });
+        bindCallEvents(call, "outbound", meta, { to: cleanTo, from: fromNumber });
       } catch (err) {
         dialingRef.current = false;
         console.error("[Twilio] Connect failed:", err);
