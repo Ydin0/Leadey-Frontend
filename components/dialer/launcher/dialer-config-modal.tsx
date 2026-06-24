@@ -4,6 +4,9 @@ import { useState } from "react";
 import { X, Loader2, ShieldCheck, UserCheck, Clock, Calendar, AlertCircle, Play } from "lucide-react";
 import { createSession, getActiveSession, endSession } from "@/lib/api/dialer";
 import { useDialerContext } from "@/components/dialer/context/dialer-context";
+import { getLocalPresenceConfig, coverageScan, type UncoveredState } from "@/lib/api/calls";
+import { LocalPresencePreflightModal } from "./local-presence-preflight-modal";
+import type { DialerSession } from "@/lib/types/dialer";
 import type { FunnelStep } from "@/lib/types/funnel";
 
 interface DialerConfigModalProps {
@@ -27,6 +30,16 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
   const [error, setError] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [ending, setEnding] = useState(false);
+  // Local-presence pre-flight: when set, prompt to buy numbers for uncovered
+  // states before the (already-created) session begins.
+  const [preflight, setPreflight] = useState<
+    { session: DialerSession; uncovered: UncoveredState[]; costPer: number; canProvision: boolean } | null
+  >(null);
+
+  function begin(session: DialerSession) {
+    dialer.beginSession(session); // shows the persistent dialer bar — no nav
+    onClose();
+  }
 
   async function handleStart() {
     setStarting(true);
@@ -43,9 +56,25 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
           maxAttempts,
         },
       });
-      // Show the persistent dialer bar in place — no navigation.
-      dialer.beginSession(session);
-      onClose();
+      // Local-presence pre-flight — one consolidated buy prompt for uncovered
+      // states. Best-effort: any failure just starts dialing normally.
+      try {
+        const cfg = await getLocalPresenceConfig();
+        if (cfg.config.enabled) {
+          const scan = await coverageScan({ sessionId: session.id });
+          if (scan.uncovered.length > 0) {
+            setPreflight({
+              session,
+              uncovered: scan.uncovered,
+              costPer: scan.monthlyCostPerNumber,
+              canProvision: cfg.isAdmin || cfg.config.whoCanProvision === "anyone",
+            });
+            setStarting(false);
+            return; // wait for the pre-flight decision before beginning
+          }
+        }
+      } catch { /* proceed without pre-flight */ }
+      begin(session);
     } catch (err: any) {
       const msg = err?.message || "Failed to start dialer";
       if (msg.toLowerCase().includes("active dialer session")) {
@@ -89,6 +118,17 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
     } finally {
       setEnding(false);
     }
+  }
+
+  if (preflight) {
+    return (
+      <LocalPresencePreflightModal
+        uncovered={preflight.uncovered}
+        costPer={preflight.costPer}
+        canProvision={preflight.canProvision}
+        onProceed={() => begin(preflight.session)}
+      />
+    );
   }
 
   return (

@@ -162,6 +162,9 @@ export interface CallMeta {
   /** Campaign this lead belongs to — set so the call is logged as a step
    *  touch (advances the call step + increments the call counter). */
   funnelId?: string | null;
+  /** Placed by the power dialer — suppresses the per-call local-presence buy
+   *  prompt (the dialer handles coverage up front in its pre-flight). */
+  viaDialer?: boolean;
 }
 
 export interface ActiveCall {

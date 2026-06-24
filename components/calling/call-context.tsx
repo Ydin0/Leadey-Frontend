@@ -9,6 +9,7 @@ import {
   useEffect,
 } from "react";
 import { useAuth } from "@clerk/nextjs";
+import { Loader2 } from "lucide-react";
 import { Device, Call } from "@twilio/voice-sdk";
 import type {
   ActiveCall,
@@ -22,7 +23,7 @@ import type {
 } from "@/lib/types/calling";
 import { getPhoneLines, getCallRecords, saveCallRecord, resolveCaller } from "@/lib/api/phone-lines";
 import { logLeadCall } from "@/lib/api/funnels";
-import { getLocalPresenceConfig, resolveCallerId } from "@/lib/api/calls";
+import { getLocalPresenceConfig, resolveCallerId, provisionLocalNumber } from "@/lib/api/calls";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 
 const CallContext = createContext<CallContextValue | null>(null);
@@ -111,6 +112,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // Whether local-presence dialing is on for the org (loaded once). When on,
   // startCall asks the server for the best owned caller-ID per destination.
   const localPresenceRef = useRef(false);
+  // Manual-dial buy prompt for an uncovered US state (offer to add a local #).
+  const [localBuyPrompt, setLocalBuyPrompt] = useState<
+    { to: string; meta?: CallMeta; stateName: string; areaCode: string } | null
+  >(null);
 
   // ── Fetch phone lines + call records once auth is ready ──
   useEffect(() => {
@@ -583,7 +588,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   // ── Start an outbound call ────────────────────
   const startCall = useCallback(
-    async (to: string, meta?: CallMeta) => {
+    async (to: string, meta?: CallMeta, opts?: { skipLocalPresence?: boolean }) => {
       if (dialingRef.current || activeCall) return; // synchronous spam guard
       if (!deviceRef.current || !deviceReady) {
         console.error("[Twilio] Device not ready");
@@ -608,12 +613,20 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
       // Local presence: ask the server for an owned number matching the lead's
       // state. Match-only + best-effort — any failure keeps the selected line.
-      if (localPresenceRef.current) {
+      if (localPresenceRef.current && !opts?.skipLocalPresence) {
         try {
           const resolved = await resolveCallerId(cleanTo);
           if (resolved.source === "match" && resolved.callerId) {
             callerId = resolved.callerId.replace(/[^\d+]/g, "");
             fromNumber = resolved.callerId;
+          } else if (
+            resolved.usUncovered && resolved.canProvision && resolved.stateName && resolved.areaCode &&
+            !meta?.viaDialer
+          ) {
+            // Manual one-off dial to an uncovered state — offer to buy a local
+            // number before dialing (the dialer suppresses this via viaDialer).
+            setLocalBuyPrompt({ to: cleanTo, meta, stateName: resolved.stateName, areaCode: resolved.areaCode });
+            return;
           }
         } catch {
           /* keep the selected line */
@@ -746,6 +759,56 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+      {localBuyPrompt && (
+        <LocalBuyPrompt
+          prompt={localBuyPrompt}
+          onBuy={async () => {
+            const p = localBuyPrompt;
+            setLocalBuyPrompt(null);
+            try { await provisionLocalNumber({ areaCode: p.areaCode }); } catch { /* fall through — dial anyway */ }
+            void startCall(p.to, { ...(p.meta || {}), viaDialer: true });
+          }}
+          onDefault={() => {
+            const p = localBuyPrompt;
+            setLocalBuyPrompt(null);
+            void startCall(p.to, p.meta, { skipLocalPresence: true });
+          }}
+          onCancel={() => setLocalBuyPrompt(null)}
+        />
+      )}
     </CallContext.Provider>
+  );
+}
+
+function LocalBuyPrompt({
+  prompt, onBuy, onDefault, onCancel,
+}: {
+  prompt: { stateName: string; areaCode: string };
+  onBuy: () => void | Promise<void>;
+  onDefault: () => void;
+  onCancel: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onCancel}>
+      <div className="bg-surface rounded-[14px] border border-border-subtle w-full max-w-sm mx-4 p-5" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-[14px] font-semibold text-ink">Call from a local number?</h3>
+        <p className="text-[12px] text-ink-muted mt-1.5">
+          This contact is in <strong className="text-ink">{prompt.stateName}</strong> ({prompt.areaCode}), where you don&apos;t have a local number yet. Buy one (~$1.15/mo) to call with a local caller ID, or call from your default line.
+        </p>
+        <div className="flex items-center justify-end gap-2 mt-4">
+          <button onClick={onCancel} disabled={busy} className="px-3 py-1.5 rounded-[20px] text-[11px] font-medium text-ink-muted hover:bg-hover transition-colors disabled:opacity-50">Cancel</button>
+          <button onClick={onDefault} disabled={busy} className="px-3 py-1.5 rounded-[20px] bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors disabled:opacity-50">Use default</button>
+          <button
+            onClick={async () => { setBusy(true); await onBuy(); }}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-60"
+          >
+            {busy && <Loader2 size={11} className="animate-spin" />}
+            Buy &amp; call
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

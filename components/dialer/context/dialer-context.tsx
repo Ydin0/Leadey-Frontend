@@ -307,6 +307,8 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
         contactName: item.lead?.name || null,
         companyName: item.lead?.company || null,
         leadId: item.leadId || null,
+        // Coverage is handled by the dialer's pre-flight; never prompt mid-run.
+        viaDialer: true,
       });
     },
     [call],

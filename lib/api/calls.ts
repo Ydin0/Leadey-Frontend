@@ -12,6 +12,11 @@ export interface ResolvedCallerId {
   callerId: string | null;
   lineId: string | null;
   state: string | null;
+  /** Default because the lead is in a US state with no owned number. */
+  usUncovered?: boolean;
+  stateName?: string | null;
+  areaCode?: string | null;
+  canProvision?: boolean;
 }
 
 /** Local-presence config for the org + whether the current user can edit it. */
@@ -58,9 +63,9 @@ export interface UncoveredState {
 }
 
 export async function coverageScan(
-  phones: string[],
+  params: { phones?: string[]; sessionId?: string },
 ): Promise<{ uncovered: UncoveredState[]; ownedByState: Record<string, number>; monthlyCostPerNumber: number }> {
-  return apiRequest("/calls/coverage-scan", { method: "POST", body: JSON.stringify({ phones }) });
+  return apiRequest("/calls/coverage-scan", { method: "POST", body: JSON.stringify(params) });
 }
 
 /** Buy one local US number (admin-gated server-side). */
