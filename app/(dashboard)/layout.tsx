@@ -28,12 +28,17 @@ export default function DashboardLayout({
             <div className="min-h-screen dashboard-backdrop bg-page">
               <Sidebar />
               <Header />
-              <main className="ml-[56px] mt-14">
+              {/* Fixed-height app shell: the header/sidebar are fixed, the
+                  dialer + trial bars pin to the top of main, and only the
+                  content area scrolls. This keeps full-height views (e.g. the
+                  lead profile) flush to the viewport instead of overflowing
+                  past the bottom. */}
+              <main className="ml-[56px] mt-14 h-[calc(100vh-3.5rem)] flex flex-col">
                 {/* Persistent power-dialer bar — only renders while a session
-                    is running. Sticky under the header. */}
+                    is running. Pinned above the scroll area. */}
                 <DialerBar />
                 <TrialBanner />
-                <div className="p-6">{children}</div>
+                <div className="flex-1 min-h-0 overflow-y-auto p-6">{children}</div>
               </main>
               <ScraperRunsWidget />
               {/* AI assistant — floating launcher (bottom-right) + chat panel. */}
