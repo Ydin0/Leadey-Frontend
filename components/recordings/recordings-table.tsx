@@ -14,7 +14,9 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { AudioPlayer } from "./audio-player";
 import { CallReview } from "./call-review";
 import { ShareRecordingButton } from "./share-recording-button";
-import { summarizeCall } from "@/lib/api/phone-lines";
+import { CallOutcomeSelect } from "@/components/calling/call-outcome-select";
+import { useCallOutcomes } from "@/lib/hooks/use-call-outcomes";
+import { summarizeCall, setCallOutcome } from "@/lib/api/phone-lines";
 import type { CallRecord } from "@/lib/types/calling";
 
 interface RecordingsTableProps {
@@ -58,6 +60,7 @@ export function RecordingsTable({
   onRecordUpdated,
 }: RecordingsTableProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const { outcomes } = useCallOutcomes();
   const [generating, setGenerating] = useState<string | null>(null);
   const [genError, setGenError] = useState<Record<string, string>>({});
 
@@ -102,6 +105,7 @@ export function RecordingsTable({
             <TableHead className="text-center w-[80px]">Duration</TableHead>
             <TableHead className="text-left w-[100px]">Date</TableHead>
             <TableHead className="text-center w-[90px]">Result</TableHead>
+            <TableHead className="text-left w-[180px]">Outcome</TableHead>
             <TableHead className="text-left w-[240px]">Recording</TableHead>
             <TableHead className="text-center w-[100px]">Transcript</TableHead>
             <TableHead className="text-center w-[52px]">Share</TableHead>
@@ -208,6 +212,20 @@ export function RecordingsTable({
                     </span>
                   </TableCell>
 
+                  {/* Outcome — AI-classified, click to confirm/change */}
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <CallOutcomeSelect
+                      value={record.outcome}
+                      outcomes={outcomes}
+                      onChange={(key) => {
+                        onRecordUpdated?.(record.id, { outcome: key, outcomeManual: true });
+                        void setCallOutcome(record.id, key).catch((err) => console.error("Failed to set outcome:", err));
+                      }}
+                      aiSuggested={!record.outcomeManual}
+                      size="sm"
+                    />
+                  </TableCell>
+
                   {/* Player */}
                   <TableCell>
                     {hasRecording ? (
@@ -250,7 +268,7 @@ export function RecordingsTable({
                 {/* Expanded transcript / summary panel */}
                 {isExpanded && (
                   <TableRow className="hover:bg-transparent">
-                    <TableCell colSpan={10} className="p-0">
+                    <TableCell colSpan={11} className="p-0">
                       <div className="px-6 py-4 bg-section/30 border-t border-border-subtle">
                         {isGenerating ? (
                           <div className="flex items-center gap-2 text-[12px] text-ink-muted">

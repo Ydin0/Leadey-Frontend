@@ -136,6 +136,10 @@ export interface CallRecord {
   lineId: string;
   duration: number; // seconds
   disposition: CallDisposition;
+  /** Sales outcome key (e.g. "booked_meeting") — AI-classified, rep-overridable. */
+  outcome?: string | null;
+  /** True once a human set the outcome (AI won't overwrite it). */
+  outcomeManual?: boolean;
   recordingUrl?: string | null;
   recordingSid?: string | null;
   recordingDuration?: number;

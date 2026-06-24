@@ -166,11 +166,22 @@ export async function fetchCallRecordingBlobUrl(callRecordId: string): Promise<s
 
 export async function summarizeCall(
   callRecordId: string,
-): Promise<Pick<CallRecord, "transcript" | "summary" | "transcriptSegments" | "speakers" | "summaryStructured">> {
+): Promise<Pick<CallRecord, "transcript" | "summary" | "transcriptSegments" | "speakers" | "summaryStructured" | "outcome" | "outcomeManual">> {
   return apiRequest(
     `/phone-lines/call-records/${callRecordId}/summarize`,
     { method: "POST" },
   );
+}
+
+/** Manually set (or clear) a call's outcome. */
+export async function setCallOutcome(
+  callRecordId: string,
+  outcome: string | null,
+): Promise<{ id: string; outcome: string | null; outcomeManual: boolean }> {
+  return apiRequest(`/phone-lines/call-records/${callRecordId}/outcome`, {
+    method: "PATCH",
+    body: JSON.stringify({ outcome }),
+  });
 }
 
 // ── Regulatory Bundles ────────────────────────────

@@ -33,6 +33,7 @@ import { mockSettings } from "@/lib/mock-data/settings";
 import { UnipileIntegration } from "./unipile-integration";
 import { PhoneLinesTab } from "@/components/calling/settings/phone-lines-tab";
 import { LocalPresenceSection } from "./local-presence-section";
+import { CallOutcomesSection } from "./call-outcomes-section";
 import { DialerSettingsTab } from "@/components/dialer/settings/dialer-settings-tab";
 import { PipelineSettings } from "@/components/opportunities/settings/pipeline-settings";
 import { LinkedInTeamTab } from "./linkedin-team-tab";
@@ -50,6 +51,7 @@ type SettingsTab =
   | "custom-fields"
   | "phone-lines"
   | "local-presence"
+  | "call-outcomes"
   | "dialer"
   | "pipelines"
   | "linkedin"
@@ -67,6 +69,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "custom-fields", label: "Custom Fields", icon: ListPlus },
   { id: "phone-lines", label: "Phone Lines", icon: Phone },
   { id: "local-presence", label: "Local Presence", icon: MapPin },
+  { id: "call-outcomes", label: "Call Outcomes", icon: PhoneCall },
   { id: "dialer", label: "Power Dialer", icon: PhoneCall },
   { id: "pipelines", label: "Pipelines", icon: Briefcase },
   { id: "linkedin", label: "LinkedIn", icon: Linkedin },
@@ -185,6 +188,7 @@ const VALID_TABS: SettingsTab[] = [
   "custom-fields",
   "phone-lines",
   "local-presence",
+  "call-outcomes",
   "dialer",
   "pipelines",
   "linkedin",
@@ -315,6 +319,8 @@ export function SettingsShell() {
           {activeTab === "phone-lines" && <PhoneLinesTab />}
 
           {activeTab === "local-presence" && <LocalPresenceSection />}
+
+          {activeTab === "call-outcomes" && <CallOutcomesSection />}
           {activeTab === "email-accounts" && <EmailAccountsSection />}
 
           {activeTab === "dialer" && <DialerSettingsTab />}

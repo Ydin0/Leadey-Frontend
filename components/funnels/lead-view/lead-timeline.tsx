@@ -25,7 +25,9 @@ import {
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { CallReview } from "@/components/recordings/call-review";
-import { summarizeCall } from "@/lib/api/phone-lines";
+import { summarizeCall, setCallOutcome } from "@/lib/api/phone-lines";
+import { CallOutcomeSelect } from "@/components/calling/call-outcome-select";
+import { useCallOutcomes } from "@/lib/hooks/use-call-outcomes";
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import type { FunnelLeadActivity } from "@/lib/types/funnel-focus";
@@ -88,8 +90,14 @@ function CallCard({ record, actor }: { record: CallRecord; actor: Actor | null }
   const [rec, setRec] = useState<CallRecord>(record);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const { outcomes } = useCallOutcomes();
 
   useEffect(() => { setRec(record); }, [record]);
+
+  const changeOutcome = useCallback((key: string | null) => {
+    setRec((prev) => ({ ...prev, outcome: key, outcomeManual: true }));
+    void setCallOutcome(rec.id, key).catch((err) => console.error("Failed to set outcome:", err));
+  }, [rec.id]);
 
   const hasReview = !!(rec.transcriptSegments?.length || rec.summaryStructured || rec.transcript || rec.summary);
   const canExpand = !!rec.recordingUrl;
@@ -144,6 +152,18 @@ function CallCard({ record, actor }: { record: CallRecord; actor: Actor | null }
           <ActorBadge actor={actor} />
           <span className="text-[10.5px] text-ink-faint">{formatRelativeTime(rec.timestamp)}</span>
         </div>
+      </div>
+
+      {/* Call outcome — AI-classified, click to confirm/change */}
+      <div className="flex items-center gap-2 mt-2.5 pl-[21px]" onClick={(e) => e.stopPropagation()}>
+        <span className="text-[11px] text-ink-muted">Outcome</span>
+        <CallOutcomeSelect
+          value={rec.outcome}
+          outcomes={outcomes}
+          onChange={changeOutcome}
+          aiSuggested={!rec.outcomeManual}
+          size="sm"
+        />
       </div>
 
       {canExpand && expanded && (
