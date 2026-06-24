@@ -15,8 +15,13 @@ import {
   Loader2,
   Pencil,
   Check,
+  Clock,
+  ChevronRight,
+  Linkedin,
+  Filter,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatPhoneIntl } from "@/lib/utils";
+import { localTimeFromPhone } from "@/lib/utils/lead-timezone";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import type { FunnelLead } from "@/lib/types/funnel";
 import type {
@@ -83,6 +88,7 @@ function ContactRow({
   onSave,
   active,
   onSelect,
+  fallbackLocation,
 }: {
   c: FunnelLeadContact;
   onCall: (phone: string, name: string) => void;
@@ -95,9 +101,13 @@ function ContactRow({
   ) => Promise<void>;
   /** Highlighted when this contact is the active activity filter. */
   active?: boolean;
-  /** Click the row to toggle the activity filter to this contact. */
+  /** Toggle the activity filter to this contact (rendered inside the details). */
   onSelect?: () => void;
+  /** Company location, used as a fallback for local time when the phone has no
+   *  recognisable prefix. */
+  fallbackLocation?: string | null;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -177,13 +187,16 @@ function ContactRow({
     );
   }
 
+  const localTime = c.phone ? localTimeFromPhone(c.phone, fallbackLocation) : null;
+
   return (
-    <div className={cn("rounded-lg transition-colors", active ? "bg-accent/10 ring-1 ring-accent/30" : "hover:bg-hover/50")}>
+    <div className={cn("rounded-lg transition-colors", active ? "bg-accent/10 ring-1 ring-accent/30" : expanded ? "bg-section/40" : "hover:bg-hover/50")}>
       <div
-        className={cn("group flex items-center gap-2.5 py-2 px-1", onSelect && "cursor-pointer")}
-        onClick={onSelect}
-        title={onSelect ? (active ? "Showing this contact — click to show all" : `Show only ${c.name}'s activity`) : undefined}
+        className="group flex items-center gap-2.5 py-2 px-1 cursor-pointer"
+        onClick={() => setExpanded((v) => !v)}
+        title="Show contact details"
       >
+        <ChevronRight size={13} className={cn("text-ink-faint shrink-0 transition-transform", expanded && "rotate-90")} />
         <div className="w-7 h-7 rounded-full bg-section flex items-center justify-center text-[10px] font-medium text-ink-secondary shrink-0">
           {initials(c.name)}
         </div>
@@ -247,6 +260,53 @@ function ContactRow({
         </div>
       </div>
 
+      {/* Expanded per-contact details */}
+      {expanded && (
+        <div className="ml-[34px] mr-1 mb-2 pb-1 flex flex-col gap-2 text-[12px]">
+          <DetailRow icon={Phone} muted={!c.phone}>
+            {c.phone ? (
+              <button onClick={() => onCall(c.phone as string, c.name)} className="text-ink hover:text-accent transition-colors tabular-nums">
+                {formatPhoneIntl(c.phone)}
+              </button>
+            ) : <span className="text-ink-faint">No phone</span>}
+          </DetailRow>
+          <DetailRow icon={Mail} muted={!c.email}>
+            {c.email ? (
+              <button onClick={() => onEmail(c.email as string, c.name)} className="text-ink hover:text-accent transition-colors truncate">
+                {c.email}
+              </button>
+            ) : <span className="text-ink-faint">No email</span>}
+          </DetailRow>
+          {c.linkedinUrl && (
+            <DetailRow icon={Linkedin}>
+              <a href={c.linkedinUrl.startsWith("http") ? c.linkedinUrl : `https://www.linkedin.com/in/${c.linkedinUrl}`} target="_blank" rel="noreferrer" className="text-accent hover:underline truncate">
+                LinkedIn profile
+              </a>
+            </DetailRow>
+          )}
+          <DetailRow icon={Clock} muted={!localTime}>
+            {localTime ? (
+              <span className="text-ink-secondary">
+                Estimated local time: <span className="text-ink font-medium">{localTime.label}</span>
+                {(localTime.hour < 8 || localTime.hour >= 20) && <span className="text-ink-faint"> · off hours</span>}
+              </span>
+            ) : <span className="text-ink-faint">Local time unknown</span>}
+          </DetailRow>
+          {onSelect && (
+            <button
+              onClick={onSelect}
+              className={cn(
+                "inline-flex items-center gap-1.5 self-start mt-0.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors",
+                active ? "bg-accent/15 text-accent border-accent/30" : "bg-section text-ink-secondary border-border-subtle hover:bg-hover",
+              )}
+            >
+              <Filter size={11} />
+              {active ? "Showing this contact — show all" : "Show only this contact's activity"}
+            </button>
+          )}
+        </div>
+      )}
+
       {confirming && onDnc && (
         <div className="mx-1 mb-2 flex items-center justify-between gap-2 rounded-[8px] bg-signal-red/10 border border-signal-red-text/20 px-2.5 py-2">
           <span className="text-[10px] text-signal-red-text leading-snug">
@@ -275,6 +335,15 @@ function ContactRow({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function DetailRow({ icon: Icon, muted, children }: { icon: typeof Phone; muted?: boolean; children: ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <Icon size={13} className={cn("shrink-0", muted ? "text-ink-faint" : "text-ink-muted")} strokeWidth={1.5} />
+      <div className="min-w-0 truncate">{children}</div>
     </div>
   );
 }
@@ -398,6 +467,7 @@ export function LeadDetailsColumn({
                     onSave={onContactSave}
                     active={activeContactId === c.id}
                     onSelect={onContactSelect ? () => onContactSelect(c.id) : undefined}
+                    fallbackLocation={company?.address ?? null}
                   />
                 ))
               ) : (
