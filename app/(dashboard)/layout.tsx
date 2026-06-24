@@ -10,6 +10,7 @@ import { AuthTokenSync } from "@/components/providers/auth-token-sync";
 import { ScraperRunsProvider } from "@/components/providers/scraper-runs-provider";
 import { CreditsProvider } from "@/components/providers/credits-provider";
 import { ScraperRunsWidget } from "@/components/scrapers/scraper-runs-widget";
+import { AssistantWidget } from "@/components/assistant/assistant-widget";
 
 export default function DashboardLayout({
   children,
@@ -35,6 +36,8 @@ export default function DashboardLayout({
                 <div className="p-6">{children}</div>
               </main>
               <ScraperRunsWidget />
+              {/* AI assistant — floating launcher (bottom-right) + chat panel. */}
+              <AssistantWidget />
               {/* Global ringing prompt for inbound calls (accept/reject). */}
               <IncomingCallPrompt />
               {/* Auto-reloads stale tabs so reps never run outdated call code. */}

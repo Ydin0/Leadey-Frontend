@@ -611,7 +611,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
 
       {/* Prev / next lead navigation — bottom right (also ← / → keys) */}
       {companyNav.reps.length > 1 && currentIndex >= 0 && (
-        <div className="fixed bottom-6 right-6 z-30 flex items-center gap-1 rounded-full bg-surface border border-border-default shadow-xl px-1.5 py-1.5">
+        <div className="fixed bottom-6 right-[5.5rem] z-30 flex items-center gap-1 rounded-full bg-surface border border-border-default shadow-xl px-1.5 py-1.5">
           <button
             onClick={() => goToLeadId(prevId)}
             disabled={!prevId}
