@@ -30,3 +30,42 @@ export async function saveLocalPresenceConfig(
 export async function resolveCallerId(to: string): Promise<ResolvedCallerId> {
   return apiRequest("/calls/resolve-caller-id", { method: "POST", body: JSON.stringify({ to }) });
 }
+
+export interface OwnedLocalLine {
+  id: string;
+  number: string;
+  areaCode: string | null;
+  state: string;
+  stateName: string;
+}
+
+export interface LocalPresenceCoverage {
+  lines: OwnedLocalLine[];
+  config: LocalPresenceConfig;
+  isAdmin: boolean;
+  monthlyCostPerNumber: number;
+}
+
+export async function getLocalPresenceCoverage(): Promise<LocalPresenceCoverage> {
+  return apiRequest("/calls/local-presence/coverage");
+}
+
+export interface UncoveredState {
+  state: string;
+  stateName: string;
+  sampleAreaCode: string;
+  leadCount: number;
+}
+
+export async function coverageScan(
+  phones: string[],
+): Promise<{ uncovered: UncoveredState[]; ownedByState: Record<string, number>; monthlyCostPerNumber: number }> {
+  return apiRequest("/calls/coverage-scan", { method: "POST", body: JSON.stringify({ phones }) });
+}
+
+/** Buy one local US number (admin-gated server-side). */
+export async function provisionLocalNumber(
+  opts: { areaCode?: string; state?: string },
+): Promise<{ id: string; number: string; areaCode: string; state: string }> {
+  return apiRequest("/calls/provision-local", { method: "POST", body: JSON.stringify(opts) });
+}
