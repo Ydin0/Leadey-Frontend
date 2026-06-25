@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Phone, ChevronsUpDown, Check } from "lucide-react";
+import { Phone, ChevronsUpDown, Check, Search } from "lucide-react";
 import { cn, formatPhoneIntl } from "@/lib/utils";
 import { useCallContext } from "@/components/calling/call-context";
 
@@ -17,9 +17,18 @@ function lineLabel(friendlyName: string | undefined, number: string): string | n
 export function LineSelector() {
   const { phoneLines, selectedLineId, setSelectedLineId } = useCallContext();
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
   const activeLines = phoneLines.filter((l) => l.status === "active");
+  const q = query.trim().toLowerCase();
+  const visibleLines = q
+    ? activeLines.filter(
+        (l) =>
+          l.number.replace(/\D/g, "").includes(q.replace(/\D/g, "")) ||
+          (l.friendlyName || "").toLowerCase().includes(q),
+      )
+    : activeLines;
 
   useEffect(() => {
     if (!open) return;
@@ -43,7 +52,7 @@ export function LineSelector() {
 
       <button
         type="button"
-        onClick={() => canSwitch && setOpen((v) => !v)}
+        onClick={() => { if (canSwitch) { setQuery(""); setOpen((v) => !v); } }}
         className={cn(
           "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-[12px] bg-section border border-border-subtle text-left transition-colors",
           canSwitch && "hover:bg-hover focus:outline-none focus:border-signal-blue-text/30",
@@ -74,11 +83,29 @@ export function LineSelector() {
 
       {open && canSwitch && (
         <div className="relative">
-          <div className="absolute left-0 right-0 top-1.5 z-50 bg-surface rounded-[12px] border border-border-default shadow-xl py-1.5 max-h-64 overflow-y-auto">
-            <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-ink-muted font-medium">
-              Your numbers
+          <div className="absolute left-0 right-0 top-1.5 z-50 bg-surface rounded-[12px] border border-border-default shadow-xl py-1.5 max-h-72 overflow-y-auto">
+            <div className="flex items-center justify-between px-3 py-1">
+              <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">Your numbers</span>
+              <span className="text-[10px] text-ink-faint tabular-nums">{visibleLines.length}/{activeLines.length}</span>
             </div>
-            {activeLines.map((line) => {
+            {activeLines.length > 6 && (
+              <div className="px-2 pb-1.5">
+                <div className="flex items-center gap-1.5 bg-section border border-border-subtle rounded-[8px] px-2 py-1.5">
+                  <Search size={12} className="text-ink-faint shrink-0" />
+                  <input
+                    autoFocus
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Search number or label…"
+                    className="bg-transparent border-0 outline-0 text-[12px] text-ink placeholder:text-ink-faint w-full"
+                  />
+                </div>
+              </div>
+            )}
+            {visibleLines.length === 0 && (
+              <div className="px-3 py-3 text-[11px] text-ink-faint">No numbers match.</div>
+            )}
+            {visibleLines.map((line) => {
               const label = lineLabel(line.friendlyName, line.number);
               const isSelected = line.id === selectedLineId;
               return (

@@ -15,9 +15,15 @@ export function DialerDropdown() {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<DialerView>("dialpad");
   const ref = useRef<HTMLDivElement>(null);
-  const { activeCall, phoneLines } = useCallContext();
+  const { activeCall, phoneLines, refreshPhoneLines } = useCallContext();
 
   const hasActiveLines = phoneLines.some((l) => l.status === "active");
+
+  // Refresh the line list each time the dial pad opens so newly-provisioned /
+  // unassigned org numbers appear without a full page reload.
+  useEffect(() => {
+    if (open) void refreshPhoneLines();
+  }, [open, refreshPhoneLines]);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
