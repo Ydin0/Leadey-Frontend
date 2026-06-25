@@ -268,6 +268,8 @@ export interface Bucketed {
   totals: number[];
   /** Talk time (seconds) per bucket — parallels totals, for talk-time sparklines. */
   talk: number[];
+  /** Opportunities created per bucket — for the opportunities sparkline. */
+  meetings: number[];
 }
 export function bucketed(members: Member | Member[], range: DayRange): Bucketed {
   const list = Array.isArray(members) ? members : [members];
@@ -281,9 +283,10 @@ export function bucketed(members: Member | Member[], range: DayRange): Bucketed 
     const series = {} as Record<ChannelId, number[]>;
     CH_IDS.forEach((ch) => (series[ch] = groups.map(() => 0)));
     const talk = groups.map(() => 0);
-    groups.forEach(([a, b], gi) => slices.forEach((s) => { for (let i = a; i < b; i++) { CH_IDS.forEach((ch) => (series[ch][gi] += s[i][ch] || 0)); talk[gi] += s[i].talkTime || 0; } }));
+    const meetings = groups.map(() => 0);
+    groups.forEach(([a, b], gi) => slices.forEach((s) => { for (let i = a; i < b; i++) { CH_IDS.forEach((ch) => (series[ch][gi] += s[i][ch] || 0)); talk[gi] += s[i].talkTime || 0; meetings[gi] += s[i].meetings || 0; } }));
     const totals = labels.map((_, i) => CH_IDS.reduce((a, ch) => a + series[ch][i], 0));
-    return { labels, series, totals, talk };
+    return { labels, series, totals, talk, meetings };
   }
 
   const ref = slices[0] ?? [];
@@ -291,9 +294,10 @@ export function bucketed(members: Member | Member[], range: DayRange): Bucketed 
   const series = {} as Record<ChannelId, number[]>;
   CH_IDS.forEach((ch) => (series[ch] = ref.map(() => 0)));
   const talk = ref.map(() => 0);
-  slices.forEach((s) => s.forEach((d, i) => { CH_IDS.forEach((ch) => (series[ch][i] += d[ch] || 0)); talk[i] += d.talkTime || 0; }));
+  const meetings = ref.map(() => 0);
+  slices.forEach((s) => s.forEach((d, i) => { CH_IDS.forEach((ch) => (series[ch][i] += d[ch] || 0)); talk[i] += d.talkTime || 0; meetings[i] += d.meetings || 0; }));
   const totals = labels.map((_, i) => CH_IDS.reduce((a, ch) => a + series[ch][i], 0));
-  return { labels, series, totals, talk };
+  return { labels, series, totals, talk, meetings };
 }
 
 export interface TeamTotals {
@@ -317,6 +321,11 @@ export function teamTotals(members: Member[], range: DayRange): TeamTotals {
 
 export function sparkFor(members: Member[], range: DayRange, ch: ChannelId): number[] {
   return bucketed(members, range).series[ch];
+}
+
+/** Per-bucket opportunities-created series for the opportunities sparkline. */
+export function meetingsSparkFor(members: Member[], range: DayRange): number[] {
+  return bucketed(members, range).meetings;
 }
 
 /** Per-bucket talk-time series (seconds) for the talk-time stat-card sparkline. */

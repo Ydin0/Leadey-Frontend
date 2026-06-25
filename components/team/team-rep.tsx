@@ -26,7 +26,7 @@ export function TeamRep({ memberId, range, rangeLabel, trendMode, onEdit }: {
   const summary: [string, string, string][] = [
     ["Talk time", fmtTalkTime(tot.talkTime), "clock"],
     ["Avg call length", tot.calls ? fmtTalkTime(tot.talkTime / tot.calls) : "—", "phone-call"],
-    ["Meetings booked", tot.meetings.toLocaleString(), "calendar-check"],
+    ["Opportunities created", tot.meetings.toLocaleString(), "briefcase"],
     ["Replies", tot.replies.toLocaleString(), "message-square"],
     ["Avg / working day", Math.round(tot.total / workingDays(sliceRange(m.series, range))).toLocaleString(), "activity"],
     ["Daily KPI total", CH_IDS.reduce((s, ch) => s + m.targets[ch], 0).toLocaleString(), "target"],

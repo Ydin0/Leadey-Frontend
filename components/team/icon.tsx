@@ -2,7 +2,7 @@
 
 import {
   Phone, Mail, MessageSquare, Linkedin, BarChart3, Trophy, UsersRound,
-  UserPlus, ArrowLeft, TrendingUp, TrendingDown, CheckCircle2, CalendarCheck,
+  UserPlus, ArrowLeft, TrendingUp, TrendingDown, CheckCircle2, CalendarCheck, Briefcase,
   Award, SlidersHorizontal, X, Minus, Plus, Check, Activity, Target,
   PlayCircle, FileText, PhoneCall, ListChecks, Paperclip, HelpCircle,
   ChevronRight, ChevronLeft, ChevronDown, FolderPlus, Settings2, Play, BookOpen, Clock, Calendar,
@@ -26,6 +26,7 @@ const MAP: Record<string, LucideIcon> = {
   "trending-down": TrendingDown,
   "check-circle-2": CheckCircle2,
   "calendar-check": CalendarCheck,
+  briefcase: Briefcase,
   award: Award,
   "sliders-horizontal": SlidersHorizontal,
   x: X,

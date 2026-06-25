@@ -4,7 +4,7 @@ import { Icon } from "./icon";
 import { StatCard, MetricCard, Panel, ChannelLegend, Avatar, DeltaPill, POD_COLOR } from "./team-shared";
 import { TrendChart, Donut, Ring, Meter, attColor } from "./charts";
 import {
-  CH_IDS, CH_MAP, teamTotals, bucketed, attainment, sparkFor, talkSparkFor, fmtTalkTime,
+  CH_IDS, CH_MAP, teamTotals, bucketed, attainment, sparkFor, talkSparkFor, meetingsSparkFor, fmtTalkTime,
   type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -12,6 +12,8 @@ import { useTeamData } from "@/lib/team/team-data-context";
 // Talk time gets its own accent (warm amber) so it reads as a duration metric
 // distinct from the green "Calls" channel it derives from.
 const TALK_COLOR = "#E0A878";
+// Opportunities created — the headline conversion metric (signal green).
+const OPP_COLOR = "#6FBEA8";
 
 export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
   range: DayRange; rangeLabel: string; trendMode: "area" | "bars"; onPickRep: (id: string) => void;
@@ -50,9 +52,9 @@ export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
     <div className="fade" style={{ display: "grid", gap: 16 }}>
       <div className="row" style={{ gap: 7, fontSize: 11, color: "var(--fg-faint)" }}>
         <Icon name="activity" size={12} />
-        Calls &amp; meetings are tracked live. Email, SMS &amp; LinkedIn populate once their integrations are connected.
+        Calls, talk time &amp; opportunities are tracked live. Email, SMS &amp; LinkedIn populate once their integrations are connected.
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 14 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 14 }}>
         {CH_IDS.map((ch) => (
           <StatCard key={ch} ch={ch} total={tot.cur[ch]} delta={tot.delta[ch]} spark={sparkFor(members, range, ch)} />
         ))}
@@ -63,6 +65,14 @@ export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
           value={fmtTalkTime(tot.cur.talkTime)}
           delta={tot.delta.talkTime}
           spark={talkSparkFor(members, range)}
+        />
+        <MetricCard
+          label="Opportunities"
+          icon="briefcase"
+          color={OPP_COLOR}
+          value={tot.cur.meetings.toLocaleString()}
+          delta={tot.delta.meetings}
+          spark={meetingsSparkFor(members, range)}
         />
       </div>
 
@@ -106,7 +116,7 @@ export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
         <Panel title="Outcomes">
           <div className="col" style={{ gap: 16, marginTop: 2 }}>
             {([["Talk time", fmtTalkTime(tot.cur.talkTime), tot.delta.talkTime, "clock"],
-              ["Meetings booked", tot.cur.meetings.toLocaleString(), tot.delta.meetings, "calendar-check"],
+              ["Opportunities created", tot.cur.meetings.toLocaleString(), tot.delta.meetings, "briefcase"],
               ["Replies", tot.cur.replies.toLocaleString(), tot.delta.replies, "message-square"]] as const).map(([l, v, d, ic]) => (
               <div key={l} className="between">
                 <span className="row" style={{ gap: 9, color: "var(--fg2)", fontSize: 12 }}>
