@@ -23,6 +23,42 @@ const DISPOSITION_OPTIONS = [
   { value: "failed", label: "Failed" },
 ];
 
+// Persist the recordings filter bar across reloads / navigation.
+const FILTERS_STORAGE_KEY = "leadey:recordings:filters:v1";
+
+type RecordingsFilters = {
+  direction: string | null;
+  disposition: string | null;
+  hasRecording: string | null;
+  memberId: string | null;
+  search: string;
+  dateRange: "all" | "today" | "7d" | "30d" | "90d";
+  durMode: "any" | "more" | "less";
+  durMinutes: string;
+};
+
+const DEFAULT_FILTERS: RecordingsFilters = {
+  direction: null,
+  disposition: null,
+  hasRecording: null,
+  memberId: null,
+  search: "",
+  dateRange: "all",
+  durMode: "any",
+  durMinutes: "2",
+};
+
+function loadFilters(): RecordingsFilters {
+  if (typeof window === "undefined") return DEFAULT_FILTERS;
+  try {
+    const raw = window.localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!raw) return DEFAULT_FILTERS;
+    return { ...DEFAULT_FILTERS, ...(JSON.parse(raw) as Partial<RecordingsFilters>) };
+  } catch {
+    return DEFAULT_FILTERS;
+  }
+}
+
 export default function RecordingsPage() {
   const isAuthReady = useAuthReady();
   const { members } = useTeamMembers();
@@ -33,15 +69,29 @@ export default function RecordingsPage() {
   const [loading, setLoading] = useState(true);
   const pageSize = 25;
 
-  // Filters
-  const [direction, setDirection] = useState<string | null>(null);
-  const [disposition, setDisposition] = useState<string | null>(null);
-  const [hasRecording, setHasRecording] = useState<string | null>(null);
-  const [memberId, setMemberId] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
-  const [dateRange, setDateRange] = useState<"all" | "today" | "7d" | "30d" | "90d">("all");
-  const [durMode, setDurMode] = useState<"any" | "more" | "less">("any");
-  const [durMinutes, setDurMinutes] = useState("2");
+  // Filters — initialised from localStorage so they survive reloads / navigation.
+  const [initial] = useState(loadFilters);
+  const [direction, setDirection] = useState<string | null>(initial.direction);
+  const [disposition, setDisposition] = useState<string | null>(initial.disposition);
+  const [hasRecording, setHasRecording] = useState<string | null>(initial.hasRecording);
+  const [memberId, setMemberId] = useState<string | null>(initial.memberId);
+  const [search, setSearch] = useState(initial.search);
+  const [dateRange, setDateRange] = useState<"all" | "today" | "7d" | "30d" | "90d">(initial.dateRange);
+  const [durMode, setDurMode] = useState<"any" | "more" | "less">(initial.durMode);
+  const [durMinutes, setDurMinutes] = useState(initial.durMinutes);
+
+  // Persist filters whenever any of them change.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const payload: RecordingsFilters = {
+      direction, disposition, hasRecording, memberId, search, dateRange, durMode, durMinutes,
+    };
+    try {
+      window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      /* storage unavailable — ignore */
+    }
+  }, [direction, disposition, hasRecording, memberId, search, dateRange, durMode, durMinutes]);
 
   const fetchRecords = useCallback(async (p: number) => {
     // Date range → an ISO startDate.
@@ -290,7 +340,7 @@ export default function RecordingsPage() {
         {hasFilters && (
           <button
             type="button"
-            onClick={() => { setDirection(null); setDisposition(null); setHasRecording(null); setMemberId(null); setDateRange("all"); setDurMode("any"); }}
+            onClick={() => { setDirection(null); setDisposition(null); setHasRecording(null); setMemberId(null); setDateRange("all"); setDurMode("any"); setDurMinutes("2"); setSearch(""); setPage(1); }}
             className="text-[11px] font-medium text-ink-muted hover:text-ink-secondary transition-colors ml-1"
           >
             Clear all
