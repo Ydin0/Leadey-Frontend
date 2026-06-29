@@ -13,7 +13,7 @@ import { useTeamData } from "@/lib/team/team-data-context";
 export function TeamLeaderboard({ range, podium, onPickRep }: {
   range: DayRange; podium: boolean; onPickRep: (id: string) => void;
 }) {
-  const { activeMembers } = useTeamData();
+  const { activeMembers, departments } = useTeamData();
   const [rankBy, setRankBy] = React.useState<string>("attainment");
   const [pod, setPod] = React.useState<string>("all");
 
@@ -61,8 +61,8 @@ export function TeamLeaderboard({ range, podium, onPickRep }: {
             {rankOpts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </div>
-        <div className="seg">
-          {[["all", "All pods"], ["Enterprise", "Enterprise"], ["Mid-Market", "Mid-Market"], ["SMB", "SMB"]].map(([v, l]) => (
+        <div className="seg" style={{ flexWrap: "wrap" }}>
+          {[["all", "All departments"], ...departments.map((d) => [d.name, d.name] as [string, string])].map(([v, l]) => (
             <button key={v} className={"seg-btn" + (pod === v ? " on" : "")} onClick={() => setPod(v)}>{l}</button>
           ))}
         </div>

@@ -2,10 +2,10 @@
 
 import React from "react";
 import { Icon } from "./icon";
-import { Avatar, StatusDot, POD_COLOR } from "./team-shared";
+import { Avatar, StatusDot } from "./team-shared";
 import { useTeamData } from "@/lib/team/team-data-context";
 import {
-  CH_IDS, CH_MAP, ROLE_TARGETS, type Member, type Targets, type ChannelId,
+  CH_IDS, CH_MAP, ROLE_TARGETS, departmentColor, type Member, type Targets, type ChannelId,
 } from "@/lib/team/team-data";
 
 export function KpiStepper({ value, onChange, step = 5 }: {
@@ -29,10 +29,11 @@ export function MemberModal({ mode, member, seatUsage, onClose, onSave }: {
   seatUsage: { used: number; included: number };
   onClose: () => void; onSave: (data: MemberFormData) => Promise<{ ok: boolean; error?: string }>;
 }) {
+  const { departments } = useTeamData();
   const [name, setName] = React.useState(member ? member.name : "");
   const [email, setEmail] = React.useState(member ? (member.email || "") : "");
   const [role, setRole] = React.useState(member ? member.role : "SDR");
-  const [pod, setPod] = React.useState(member ? member.pod : "Enterprise");
+  const [pod, setPod] = React.useState(member ? member.pod : (departments[0]?.name || "Enterprise"));
   const [targets, setTargets] = React.useState<Targets>(member ? { ...member.targets } : { ...ROLE_TARGETS.SDR });
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -103,9 +104,9 @@ export function MemberModal({ mode, member, seatUsage, onClose, onSave }: {
                   </select>
                 </div>
                 <div>
-                  <label className="lbl">Pod</label>
+                  <label className="lbl">Department</label>
                   <select className="field" value={pod} onChange={(e) => setPod(e.target.value)}>
-                    {["Enterprise", "Mid-Market", "SMB"].map((p) => <option key={p} value={p}>{p}</option>)}
+                    {departments.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
                   </select>
                 </div>
               </div>
@@ -154,14 +155,14 @@ export function MemberModal({ mode, member, seatUsage, onClose, onSave }: {
 export function TeamMembers({ onPickRep, onEdit }: {
   onPickRep: (id: string) => void; onEdit: (id: string) => void;
 }) {
-  const { members } = useTeamData();
+  const { members, departments } = useTeamData();
   return (
     <div className="fade card" style={{ overflow: "hidden", padding: 0 }}>
       <table className="tt">
         <thead>
           <tr>
             <th>Member</th>
-            <th>Pod</th>
+            <th>Department</th>
             <th>Status</th>
             <th style={{ textAlign: "center" }}>Calls</th>
             <th style={{ textAlign: "center" }}>Emails</th>
@@ -186,7 +187,7 @@ export function TeamMembers({ onPickRep, onEdit }: {
                     </div>
                   </div>
                 </td>
-                <td><span className="row" style={{ gap: 7, fontSize: 11.5, color: "var(--fg2)" }}><span style={{ width: 8, height: 8, borderRadius: 2, background: POD_COLOR[m.pod] }}></span>{m.pod}</span></td>
+                <td><span className="row" style={{ gap: 7, fontSize: 11.5, color: "var(--fg2)" }}><span style={{ width: 8, height: 8, borderRadius: 2, background: departmentColor(m.pod, departments) }}></span>{m.pod}</span></td>
                 <td><StatusDot status={m.status} /></td>
                 {CH_IDS.map((ch) => (
                   <td key={ch} style={{ textAlign: "center", color: "var(--fg2)", fontWeight: 500 }}>{m.targets[ch]}</td>

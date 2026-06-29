@@ -95,6 +95,31 @@ export const CH_MAP: Record<ChannelId, Channel> = Object.fromEntries(
   CHANNELS.map((c) => [c.id, c]),
 ) as Record<ChannelId, Channel>;
 
+/** Default departments (formerly "pods") — seeded for orgs that haven't
+ *  customised theirs yet, and used as a client-side fallback. */
+export const DEFAULT_DEPARTMENTS: { name: string; color: string }[] = [
+  { name: "Enterprise", color: "#97A4D6" },
+  { name: "Mid-Market", color: "#86EFAC" },
+  { name: "SMB", color: "#6E7BCB" },
+];
+
+const DEPT_FALLBACK_COLORS = [
+  "#97A4D6", "#86EFAC", "#6E7BCB", "#E0A878", "#C58FD6", "#5FB6C9", "#E08FA8", "#6FBEA8",
+];
+
+/** Resolve a department name to its colour from the org's list, with a stable
+ *  deterministic fallback for names not in the list (e.g. just-renamed). */
+export function departmentColor(
+  name: string,
+  departments: { name: string; color: string }[],
+): string {
+  const found = departments.find((d) => d.name === name);
+  if (found) return found.color;
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return DEPT_FALLBACK_COLORS[Math.abs(hash) % DEPT_FALLBACK_COLORS.length];
+}
+
 export const ROLE_TARGETS: Record<string, Targets> = {
   SDR: { calls: 60, emails: 80, sms: 25, linkedin: 30 },
   AE: { calls: 30, emails: 45, sms: 12, linkedin: 18 },

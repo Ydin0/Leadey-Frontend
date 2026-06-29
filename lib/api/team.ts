@@ -5,6 +5,23 @@ export async function getTeamMembers(): Promise<{ members: TeamMember[]; seatUsa
   return apiRequest<{ members: TeamMember[]; seatUsage: SeatUsage }>("/team");
 }
 
+/** A department (formerly "pod") — an org-defined grouping of reps. */
+export interface Department {
+  name: string;
+  color: string;
+}
+
+export async function getDepartments(): Promise<Department[]> {
+  return apiRequest<Department[]>("/team/departments");
+}
+
+export async function saveDepartments(departments: Department[]): Promise<Department[]> {
+  return apiRequest<Department[]>("/team/departments", {
+    method: "PUT",
+    body: JSON.stringify({ departments }),
+  });
+}
+
 /** Per-member sales role / pod / daily KPI targets, keyed by lowercased email. */
 export interface TeamKpiEntry {
   role?: string;

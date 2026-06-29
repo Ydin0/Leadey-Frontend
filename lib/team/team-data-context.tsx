@@ -4,11 +4,11 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import {
   getTeamMembers, getPendingInvitations, inviteTeamMember,
-  getTeamKpiConfig, saveTeamKpiConfig, getTeamAnalytics,
-  type TeamKpiConfig, type TeamAnalyticsDay,
+  getTeamKpiConfig, saveTeamKpiConfig, getTeamAnalytics, getDepartments,
+  type TeamKpiConfig, type TeamAnalyticsDay, type Department,
 } from "@/lib/api/team";
 import {
-  ROLE_TARGETS, hydrateSeries, emptySeries,
+  ROLE_TARGETS, hydrateSeries, emptySeries, DEFAULT_DEPARTMENTS,
   type Member, type Targets, type DayRec, type MemberStatus,
 } from "./team-data";
 
@@ -16,6 +16,7 @@ interface TeamDataValue {
   members: Member[];        // includes pending invites (for the roster)
   activeMembers: Member[];  // excludes pending (for analytics/leaderboard)
   seatUsage: { used: number; included: number };
+  departments: Department[];
   loading: boolean;
   refresh: () => Promise<void>;
   addMember: (data: { name: string; email: string; role: string; pod: string; targets: Targets }) => Promise<{ ok: boolean; error?: string }>;
@@ -46,16 +47,19 @@ export function TeamDataProvider({ children }: { children: React.ReactNode }) {
   const isAuthReady = useAuthReady();
   const [members, setMembers] = useState<Member[]>([]);
   const [seatUsage, setSeatUsage] = useState({ used: 0, included: 1 });
+  const [departments, setDepartments] = useState<Department[]>(DEFAULT_DEPARTMENTS);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
-      const [team, invites, cfg, analytics] = await Promise.all([
+      const [team, invites, cfg, analytics, depts] = await Promise.all([
         getTeamMembers(),
         getPendingInvitations().catch(() => []),
         getTeamKpiConfig().catch(() => ({} as TeamKpiConfig)),
         getTeamAnalytics().catch(() => ({ members: [] as { id: string; series: TeamAnalyticsDay[] }[] })),
+        getDepartments().catch(() => DEFAULT_DEPARTMENTS),
       ]);
+      setDepartments(depts.length ? depts : DEFAULT_DEPARTMENTS);
       const byEmail = (e: string) => cfg[(e || "").toLowerCase()];
       // Real activity series keyed by member id.
       const seriesById = new Map(analytics.members.map((a) => [a.id, hydrateSeries(a.series)]));
@@ -126,7 +130,7 @@ export function TeamDataProvider({ children }: { children: React.ReactNode }) {
   const activeMembers = members.filter((m) => m.status !== "pending");
 
   return (
-    <Ctx.Provider value={{ members, activeMembers, seatUsage, loading, refresh, addMember, updateTargets }}>
+    <Ctx.Provider value={{ members, activeMembers, seatUsage, departments, loading, refresh, addMember, updateTargets }}>
       {children}
     </Ctx.Provider>
   );

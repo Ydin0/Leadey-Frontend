@@ -16,7 +16,12 @@ import {
   updateMemberRole,
   updateMember,
   removeMember,
+  getDepartments,
+  getTeamKpiConfig,
+  saveTeamKpiConfig,
+  type Department,
 } from "@/lib/api/team";
+import { DepartmentsManager } from "./departments-manager";
 import type { TeamMember, PendingInvitation, SeatUsage } from "@/lib/types/team";
 
 const ROLES = [
@@ -41,6 +46,10 @@ export function TeamSection() {
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [seatUsage, setSeatUsage] = useState<SeatUsage>({ used: 0, included: 1 });
+  const [departments, setDepartments] = useState<Department[]>([]);
+  // member email (lowercased) → assigned department name
+  const [deptByEmail, setDeptByEmail] = useState<Record<string, string>>({});
+  const [savingDept, setSavingDept] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Invite form
@@ -102,19 +111,42 @@ export function TeamSection() {
 
   const loadData = useCallback(async () => {
     try {
-      const [teamData, invData] = await Promise.all([
+      const [teamData, invData, depts, kpi] = await Promise.all([
         getTeamMembers(),
         getPendingInvitations(),
+        getDepartments().catch(() => [] as Department[]),
+        getTeamKpiConfig().catch(() => ({})),
       ]);
       setMembers(teamData.members);
       setSeatUsage(teamData.seatUsage);
       setInvitations(invData);
+      setDepartments(depts);
+      const map: Record<string, string> = {};
+      for (const [email, cfg] of Object.entries(kpi)) {
+        const pod = (cfg as { pod?: string })?.pod;
+        if (pod) map[email.toLowerCase()] = pod;
+      }
+      setDeptByEmail(map);
     } catch (err) {
       console.error("Failed to load team:", err);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  async function handleDeptChange(email: string, department: string) {
+    const key = email.toLowerCase();
+    setSavingDept(key);
+    const prev = deptByEmail[key];
+    setDeptByEmail((m) => ({ ...m, [key]: department }));
+    try {
+      await saveTeamKpiConfig({ key: email, pod: department });
+    } catch {
+      setDeptByEmail((m) => ({ ...m, [key]: prev || "" }));
+    } finally {
+      setSavingDept(null);
+    }
+  }
 
   useEffect(() => {
     if (!isAuthReady) return;
@@ -254,6 +286,9 @@ export function TeamSection() {
         </div>
       )}
 
+      {/* Departments */}
+      <DepartmentsManager onSaved={setDepartments} />
+
       {/* Active Members */}
       <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
         <div className="flex items-center justify-between mb-3">
@@ -279,6 +314,25 @@ export function TeamSection() {
               </div>
 
               <div className="flex items-center gap-2">
+                {/* Department dropdown */}
+                {departments.length > 0 && (
+                  <div className="relative flex items-center">
+                    <select
+                      value={deptByEmail[(member.email || "").toLowerCase()] || ""}
+                      onChange={(e) => handleDeptChange(member.email, e.target.value)}
+                      disabled={savingDept === (member.email || "").toLowerCase()}
+                      className="appearance-none pl-2.5 pr-6 py-1 rounded-[8px] text-[11px] font-medium bg-section border border-border-subtle text-ink-secondary hover:bg-hover transition-colors focus:outline-none disabled:opacity-50"
+                      title="Department"
+                    >
+                      <option value="">No department</option>
+                      {departments.map((d) => (
+                        <option key={d.name} value={d.name}>{d.name}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={10} className="absolute right-2 pointer-events-none text-ink-muted" />
+                  </div>
+                )}
+
                 {/* Role dropdown */}
                 <div className="relative">
                   <button

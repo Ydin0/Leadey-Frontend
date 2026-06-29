@@ -1,11 +1,11 @@
 "use client";
 
 import { Icon } from "./icon";
-import { StatCard, MetricCard, Panel, ChannelLegend, Avatar, DeltaPill, POD_COLOR } from "./team-shared";
+import { StatCard, MetricCard, Panel, ChannelLegend, Avatar, DeltaPill } from "./team-shared";
 import { TrendChart, Donut, Ring, Meter, attColor } from "./charts";
 import {
   CH_IDS, CH_MAP, teamTotals, bucketed, attainment, sparkFor, talkSparkFor, meetingsSparkFor, fmtTalkTime,
-  connectRate, connectRateSparkFor, voicemailSparkFor,
+  connectRate, connectRateSparkFor, voicemailSparkFor, departmentColor,
   type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -22,7 +22,7 @@ const VM_COLOR = "#9AA3C4";
 export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
   range: DayRange; rangeLabel: string; trendMode: "area" | "bars"; onPickRep: (id: string) => void;
 }) {
-  const { activeMembers: members } = useTeamData();
+  const { activeMembers: members, departments } = useTeamData();
   if (members.length === 0) {
     return (
       <div className="card fade" style={{ padding: 48, textAlign: "center" }}>
@@ -43,11 +43,10 @@ export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
   const mixParts = CH_IDS.map((ch) => ({ label: CH_MAP[ch].label, value: tot.cur[ch], color: CH_MAP[ch].color }));
   const mixTotal = mixParts.reduce((a, p) => a + p.value, 0);
 
-  const pods = ["Enterprise", "Mid-Market", "SMB"];
-  const podRows = pods.map((p) => {
-    const ms = members.filter((m) => m.pod === p);
+  const podRows = departments.map((d) => {
+    const ms = members.filter((m) => m.pod === d.name);
     const c = ms.reduce((acc, m) => { const a = attainment(m, range); acc.got += a.got.total; acc.tgt += a.tgt.total; acc.vol += a.got.total; return acc; }, { got: 0, tgt: 0, vol: 0 });
-    return { pod: p, count: ms.length, pct: c.tgt ? c.got / c.tgt : 0, vol: c.vol };
+    return { pod: d.name, count: ms.length, pct: c.tgt ? c.got / c.tgt : 0, vol: c.vol };
   });
 
   const ranked = members.map((m) => ({ m, a: attainment(m, range) })).sort((x, y) => y.a.overall - x.a.overall);
@@ -151,13 +150,13 @@ export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
           </div>
         </Panel>
 
-        <Panel title="By pod">
+        <Panel title="By department">
           <div className="col" style={{ gap: 13, marginTop: 2 }}>
             {podRows.map((r) => (
               <div key={r.pod}>
                 <div className="between" style={{ marginBottom: 6 }}>
                   <span className="row" style={{ gap: 7, fontSize: 12, color: "var(--fg2)" }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 2, background: POD_COLOR[r.pod] }}></span>{r.pod}
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: departmentColor(r.pod, departments) }}></span>{r.pod}
                     <span style={{ color: "var(--fg-faint)", fontSize: 11 }}>· {r.count}</span>
                   </span>
                   <span style={{ fontSize: 12, fontWeight: 600, color: attColor(r.pct) }}>{Math.round(r.pct * 100)}%</span>
