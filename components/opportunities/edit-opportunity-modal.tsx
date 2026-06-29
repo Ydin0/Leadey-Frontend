@@ -88,6 +88,16 @@ export function EditOpportunityModal({
 
   const activePipeline = pipelines.find((p) => p.id === pipelineId);
 
+  // Switching pipeline: move the deal to that pipeline's first open stage so
+  // the Stage select can never show a stage from the old pipeline.
+  function handlePipelineChange(id: string) {
+    setPipelineId(id);
+    setPipelineName(pipelines.find((p) => p.id === id)?.name || "");
+    const p = pipelines.find((x) => x.id === id);
+    const firstOpen = p?.stages.find((s) => s.type === "open") || p?.stages[0];
+    if (firstOpen) setStageId(firstOpen.id);
+  }
+
   async function handleSave() {
     if (!name.trim()) {
       setError("Give the opportunity a name");
@@ -98,6 +108,7 @@ export function EditOpportunityModal({
     try {
       await updateOpportunity(opportunityId, {
         name: name.trim(),
+        pipelineId,
         stageId,
         value: value.trim() ? Number(value) : 0,
         probabilityOverride: probability.trim() ? Number(probability) : null,
@@ -159,16 +170,25 @@ export function EditOpportunityModal({
               <input type="text" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
             </Field>
 
-            <Field label="Stage">
-              <select value={stageId} onChange={(e) => setStageId(e.target.value)} className={inputClass}>
-                {activePipeline?.stages.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.label}
-                    {s.type !== "open" ? ` (${s.type})` : ""}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Pipeline">
+                <select value={pipelineId} onChange={(e) => handlePipelineChange(e.target.value)} className={inputClass}>
+                  {pipelines.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Stage">
+                <select value={stageId} onChange={(e) => setStageId(e.target.value)} className={inputClass}>
+                  {activePipeline?.stages.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                      {s.type !== "open" ? ` (${s.type})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Value (USD)">

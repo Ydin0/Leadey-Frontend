@@ -5,6 +5,7 @@ import { Loader2, Plus, Trash2, Save } from "lucide-react";
 import {
   listPipelines,
   createPipeline,
+  updatePipeline,
   deletePipeline,
   updateStage,
   createStage,
@@ -129,10 +130,30 @@ function PipelineCard({ pipeline, onReload, onDelete }: PipelineCardProps) {
   const [stages, setStages] = useState<PipelineStage[]>(pipeline.stages);
   const [adding, setAdding] = useState(false);
   const [newStageLabel, setNewStageLabel] = useState("");
+  const [name, setName] = useState(pipeline.name);
 
   useEffect(() => {
     setStages(pipeline.stages);
   }, [pipeline.stages]);
+  useEffect(() => {
+    setName(pipeline.name);
+  }, [pipeline.name]);
+
+  // Rename works for EVERY pipeline, including the default one.
+  async function saveName() {
+    const trimmed = name.trim();
+    if (!trimmed || trimmed === pipeline.name) {
+      setName(pipeline.name);
+      return;
+    }
+    try {
+      await updatePipeline(pipeline.id, { name: trimmed });
+      onReload();
+    } catch (err: any) {
+      alert(err?.message || "Failed to rename pipeline");
+      setName(pipeline.name);
+    }
+  }
 
   function patchLocal(stageId: string, patch: Partial<PipelineStage>) {
     setStages((cur) =>
@@ -179,9 +200,16 @@ function PipelineCard({ pipeline, onReload, onDelete }: PipelineCardProps) {
     <div className="card-brand bg-surface rounded-[14px] p-4">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h4 className="text-[13px] font-semibold text-ink">{pipeline.name}</h4>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={saveName}
+            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+            title="Click to rename this pipeline"
+            className="text-[13px] font-semibold text-ink bg-transparent outline-none border-b border-transparent hover:border-border-subtle focus:border-border-default rounded-none px-0 py-0.5 min-w-[140px]"
+          />
           {pipeline.isDefault && (
-            <span className="text-[10px] uppercase tracking-wider text-ink-faint">Default</span>
+            <span className="block text-[10px] uppercase tracking-wider text-ink-faint">Default</span>
           )}
         </div>
         {!pipeline.isDefault && (

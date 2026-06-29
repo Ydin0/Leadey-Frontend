@@ -130,6 +130,7 @@ export async function updateOpportunity(
   id: string,
   data: Partial<{
     name: string;
+    pipelineId: string;
     stageId: string;
     masterCompanyId: string | null;
     masterContactId: string | null;
