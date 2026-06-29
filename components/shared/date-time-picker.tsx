@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, CalendarClock, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+const POPOVER_W = 260;
+const POPOVER_H = 380;
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -24,18 +28,43 @@ export function DateTimePicker({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const selected = value ? new Date(value) : null;
   const [viewMonth, setViewMonth] = useState<Date>(() => startOfDay(selected ?? new Date()));
 
+  // Position the (portaled, fixed) popover relative to the trigger, flipping to
+  // stay fully on-screen — so it's never clipped by an overflow-hidden card.
+  const reposition = useCallback(() => {
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const left = Math.min(Math.max(8, r.left), window.innerWidth - POPOVER_W - 8);
+    const below = r.bottom + 6;
+    const top = below + POPOVER_H > window.innerHeight ? Math.max(8, r.top - POPOVER_H - 6) : below;
+    setPos({ top, left });
+  }, []);
+
   useEffect(() => {
     if (!open) return;
-    function onDoc(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    reposition();
+    function onDoc(e: MouseEvent) {
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t) || popoverRef.current?.contains(t)) return;
+      setOpen(false);
+    }
     function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
-  }, [open]);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [open, reposition]);
 
   // 6-week grid of days for the displayed month.
   const days = useMemo(() => {
@@ -70,8 +99,9 @@ export function DateTimePicker({
   const today = startOfDay(new Date());
 
   return (
-    <div className={cn("relative", className)} ref={ref}>
+    <div className={cn("relative inline-block", className)}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((o) => !o)}
         className={cn(
@@ -85,8 +115,11 @@ export function DateTimePicker({
         <span className="whitespace-nowrap">{selected ? fmt(selected) : placeholder}</span>
       </button>
 
-      {open && (
-        <div className="absolute left-0 top-full mt-1.5 z-50 w-[260px] bg-surface rounded-[12px] border border-border-subtle shadow-lg p-3">
+      {open && createPortal(
+        <div
+          ref={popoverRef}
+          style={{ position: "fixed", top: pos.top, left: pos.left, width: POPOVER_W }}
+          className="z-[80] bg-surface rounded-[12px] border border-border-subtle shadow-xl p-3">
           {/* Month header */}
           <div className="flex items-center justify-between mb-2">
             <button type="button" onClick={() => setViewMonth(new Date(viewMonth.getFullYear(), viewMonth.getMonth() - 1, 1))}
@@ -149,7 +182,8 @@ export function DateTimePicker({
             <button type="button" onClick={() => setOpen(false)}
               className="flex items-center gap-1 px-2.5 py-1 rounded-[14px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90"><Check size={11} /> Done</button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
