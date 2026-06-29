@@ -38,6 +38,16 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ||
   "http://localhost:3001";
 
+/** Rough dial-country of a phone number, so a UK call never goes out from a US
+ *  caller ID (and vice-versa). */
+function countryOf(num: string | null | undefined): "us" | "uk" | "other" {
+  const raw = (num || "").replace(/[^\d+]/g, "");
+  const d = raw.replace(/\D/g, "");
+  if (raw.startsWith("+44") || d.startsWith("44") || /^07\d{9}$/.test(d)) return "uk";
+  if (raw.startsWith("+1") || (d.length === 11 && d.startsWith("1")) || (!raw.startsWith("+") && d.length === 10)) return "us";
+  return "other";
+}
+
 const AUDIO_INPUT_KEY = "leadey:audioInputDevice";
 const AUDIO_OUTPUT_KEY = "leadey:audioOutputDevice";
 
@@ -98,6 +108,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // set the instant a dial starts and cleared only when the call fully ends, so
   // no second dial can slip through the gap.
   const dialingRef = useRef(false);
+  const watchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 0 until the call actually CONNECTS (accept fires). A call that never
   // connects must log duration 0 — not (now - 0) ≈ epoch seconds, which is what
   // corrupted durations into the billions and broke cost reporting.
@@ -353,7 +364,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       call: Call,
       direction: "outbound" | "inbound",
       meta?: CallMeta,
-      known?: { to?: string; from?: string },
+      known?: { to?: string; from?: string; lineId?: string },
     ) => {
       // Fresh call — clear any carry-over from the previous one so a
       // non-connected call can't inherit a stale start time or SID.
@@ -364,7 +375,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         callSidPollRef.current = null;
       }
 
-      const lineId = selectedLineId || "unknown";
+      const lineId = known?.lineId || selectedLineId || "unknown";
       const contactName = meta?.contactName || null;
       const companyName = meta?.companyName || null;
       const leadId = meta?.leadId || null;
@@ -418,6 +429,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
 
       call.on("accept", () => {
+        if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
         callStartRef.current = Date.now();
         // Capture the CallSid now that the call is live. For outbound it may
         // arrive a beat after accept, so poll briefly until it appears — this
@@ -465,6 +477,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
 
       call.on("disconnect", () => {
+        if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
         if (callSidPollRef.current) {
           clearInterval(callSidPollRef.current);
           callSidPollRef.current = null;
@@ -562,6 +575,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
 
       call.on("cancel", () => {
+        if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
         setActiveCall((prev) =>
           prev ? { ...prev, state: "ended" } : prev
         );
@@ -573,6 +587,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
 
       call.on("reject", () => {
+        if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
         setActiveCall((prev) =>
           prev ? { ...prev, state: "ended" } : prev
         );
@@ -584,6 +599,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
 
       call.on("error", (err) => {
+        if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
         console.error("[Twilio Call Error]", err);
         setActiveCall(null);
         callRef.current = null;
@@ -611,12 +627,25 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const line = phoneLines.find((l) => l.id === selectedLineId);
+      let line = phoneLines.find((l) => l.id === selectedLineId);
       if (!line) return;
 
-      // Default caller ID = the rep's selected line.
+      // Caller line must match the destination's country, otherwise a rep with
+      // (say) both a UK and a US number assigned would randomly dial UK leads
+      // from a US caller ID. Prefer the rep's own same-country line, then any
+      // active same-country org line; only fall back to the selected line.
+      const destCountry = countryOf(cleanTo);
+      if (destCountry !== "other" && countryOf(line.number) !== destCountry) {
+        const better =
+          phoneLines.find((l) => l.status === "active" && l.assignedTo === userId && countryOf(l.number) === destCountry) ||
+          phoneLines.find((l) => l.status === "active" && countryOf(l.number) === destCountry);
+        if (better) line = better;
+      }
+
+      // Default caller ID = the chosen (country-matched) line.
       let callerId = line.number.replace(/[^\d+]/g, "");
       let fromNumber = line.number;
+      let usedLineId = line.id;
 
       // Local presence: ask the server for an owned number matching the lead's
       // state. Match-only + best-effort — any failure keeps the selected line.
@@ -626,6 +655,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           if (resolved.source === "match" && resolved.callerId) {
             callerId = resolved.callerId.replace(/[^\d+]/g, "");
             fromNumber = resolved.callerId;
+            if (resolved.lineId) usedLineId = resolved.lineId;
           } else if (
             resolved.usUncovered && resolved.canProvision && resolved.stateName && resolved.areaCode &&
             !meta?.viaDialer
@@ -645,6 +675,17 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       setLastEndedCall(null);
       dialingRef.current = true;
 
+      // Self-healing watchdog: if a dial never produces a live call object
+      // (silent failure), reset the guards so the "Next call" button works
+      // again WITHOUT needing a page refresh.
+      if (watchdogRef.current) clearTimeout(watchdogRef.current);
+      watchdogRef.current = setTimeout(() => {
+        if (dialingRef.current && !callRef.current) {
+          dialingRef.current = false;
+          setActiveCall(null);
+        }
+      }, 20000);
+
       try {
         const call = await deviceRef.current.connect({
           params: {
@@ -656,9 +697,10 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         callRef.current = call;
         // Pass the numbers we already know — see bindCallEvents for why we
         // can't rely on call.parameters for outbound.
-        bindCallEvents(call, "outbound", meta, { to: cleanTo, from: fromNumber });
+        bindCallEvents(call, "outbound", meta, { to: cleanTo, from: fromNumber, lineId: usedLineId });
       } catch (err) {
         dialingRef.current = false;
+        if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
         console.error("[Twilio] Connect failed:", err);
       }
     },

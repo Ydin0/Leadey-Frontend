@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Loader2, Plus, Check, Clock, CalendarClock, Trash2, ArrowUpRight,
-  History, Bell,
+  History, Bell, ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTeamMembers } from "@/hooks/use-team-members";
@@ -133,17 +133,12 @@ export function TasksInbox({ categoryFilter }: { categoryFilter?: TaskCategory }
     <div className="flex-1 flex flex-col rounded-[14px] border border-border-subtle bg-surface overflow-hidden min-h-0">
       {/* Toolbar */}
       <div className="flex items-center gap-2 flex-wrap px-3 py-2.5 border-b border-border-subtle shrink-0">
-        <select
+        <AssigneeDropdown
           value={assignee}
-          onChange={(e) => setAssignee(e.target.value)}
-          className="bg-section border border-border-subtle rounded-[8px] px-2.5 py-1.5 text-[11px] font-medium text-ink-secondary focus:outline-none"
-        >
-          <option value="mine">My {isReminders ? "reminders" : "tasks"}</option>
-          <option value="all">Everyone</option>
-          {members.map((m) => (
-            <option key={m.id} value={m.id}>{m.name}</option>
-          ))}
-        </select>
+          onChange={setAssignee}
+          members={members}
+          mineLabel={`My ${isReminders ? "reminders" : "tasks"}`}
+        />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -315,6 +310,70 @@ function TaskRow({
           <Trash2 size={13} />
         </button>
       </div>
+    </div>
+  );
+}
+
+/** Leadey-styled assignee picker (My tasks / Everyone / each member). Replaces
+ *  the browser-default <select> so the dropdown matches the app's design. */
+function AssigneeDropdown({ value, onChange, members, mineLabel }: {
+  value: string;
+  onChange: (v: string) => void;
+  members: { id: string; name: string }[];
+  mineLabel: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  const options = [
+    { value: "mine", label: mineLabel },
+    { value: "all", label: "Everyone" },
+    ...members.map((m) => ({ value: m.id, label: m.name })),
+  ];
+  const current = options.find((o) => o.value === value) ?? options[0];
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 bg-section border border-border-subtle rounded-[8px] pl-2.5 pr-2 py-1.5 text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+      >
+        <span className="max-w-[140px] truncate">{current.label}</span>
+        <ChevronDown size={12} className={cn("text-ink-muted transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-30 w-[200px] max-h-[300px] overflow-y-auto bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+          {options.map((o) => {
+            const sel = o.value === value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => { onChange(o.value); setOpen(false); }}
+                className={cn(
+                  "w-full flex items-center gap-2 px-3 py-1.5 text-[12px] text-left transition-colors",
+                  sel ? "bg-hover text-ink font-medium" : "text-ink-secondary hover:bg-hover",
+                )}
+              >
+                <span className="w-3.5 shrink-0">{sel && <Check size={12} className="text-signal-blue-text" strokeWidth={3} />}</span>
+                <span className="truncate">{o.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

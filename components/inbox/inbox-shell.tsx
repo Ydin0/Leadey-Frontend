@@ -16,17 +16,20 @@ import { getInboxCounts, type InboxCounts } from "@/lib/api/inbox";
 
 type TabKey = "primary" | "emails" | "calls" | "messages" | "tasks" | "reminders" | "potential";
 
-const TABS: { key: TabKey; label: string; icon: typeof Mail; count?: keyof InboxCounts }[] = [
-  { key: "primary", label: "Primary", icon: InboxIcon, count: "total" },
-  { key: "emails", label: "Emails", icon: Mail },
-  { key: "calls", label: "Calls", icon: Phone, count: "calls" },
-  { key: "messages", label: "Messages", icon: MessageSquare, count: "messages" },
-  { key: "tasks", label: "Tasks", icon: ListChecks, count: "tasks" },
-  { key: "reminders", label: "Reminders", icon: Bell, count: "reminders" },
-  { key: "potential", label: "Potential Contacts", icon: UserPlus, count: "potential" },
+// `ready: false` tabs are hidden until their data source is production-ready
+// (e.g. Emails is still mock-backed). Flip the flag to surface a tab.
+const TABS: { key: TabKey; label: string; icon: typeof Mail; count?: keyof InboxCounts; ready: boolean }[] = [
+  { key: "primary", label: "Primary", icon: InboxIcon, count: "total", ready: true },
+  { key: "emails", label: "Emails", icon: Mail, ready: false },
+  { key: "calls", label: "Calls", icon: Phone, count: "calls", ready: true },
+  { key: "messages", label: "Messages", icon: MessageSquare, count: "messages", ready: true },
+  { key: "tasks", label: "Tasks", icon: ListChecks, count: "tasks", ready: true },
+  { key: "reminders", label: "Reminders", icon: Bell, count: "reminders", ready: true },
+  { key: "potential", label: "Potential Contacts", icon: UserPlus, count: "potential", ready: true },
 ];
 
-const VALID = new Set<TabKey>(TABS.map((t) => t.key));
+const VISIBLE_TABS = TABS.filter((t) => t.ready);
+const VALID = new Set<TabKey>(VISIBLE_TABS.map((t) => t.key));
 
 export function InboxShell() {
   const router = useRouter();
@@ -53,7 +56,7 @@ export function InboxShell() {
 
       {/* Tab bar */}
       <div className="flex items-center gap-1 mb-3 border-b border-border-subtle overflow-x-auto shrink-0">
-        {TABS.map((t) => {
+        {VISIBLE_TABS.map((t) => {
           const Icon = t.icon;
           const on = tab === t.key;
           const n = t.count && counts ? counts[t.count] : 0;
