@@ -31,3 +31,24 @@ export async function getSmsThread(funnelId: string, leadId: string): Promise<Sm
     `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/sms`,
   );
 }
+
+/** An org-wide SMS conversation grouped by the counterparty phone number. */
+export interface SmsThread {
+  key: string;
+  phone: string;
+  leadId: string | null;
+  funnelId: string | null;
+  contactName: string | null;
+  company: string | null;
+  lastBody: string;
+  lastDirection: "inbound" | "outbound";
+  lastAt: string;
+  inboundCount: number;
+  total: number;
+  needsReply: boolean;
+}
+
+/** All SMS conversations across the org, latest first (incl. unmatched). */
+export async function getSmsThreads(): Promise<SmsThread[]> {
+  return apiRequest<SmsThread[]>("/sms/threads");
+}

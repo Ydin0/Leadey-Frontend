@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navGroups } from "@/lib/mock-data";
 import { useSidebarFunnels } from "@/hooks/use-sidebar-funnels";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { getInboxCounts } from "@/lib/api/inbox";
 import { LeadeyMark, LeadeyWordmark } from "@/components/brand/leadey-mark";
 import type { NavItem } from "@/lib/types";
 
@@ -15,6 +17,17 @@ export function Sidebar() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const pathname = usePathname();
   const { items: funnelItems } = useSidebarFunnels();
+  const isAuthReady = useAuthReady();
+  const [inboxCount, setInboxCount] = useState(0);
+
+  useEffect(() => {
+    if (!isAuthReady) return;
+    let cancelled = false;
+    const tick = () => getInboxCounts().then((c) => { if (!cancelled) setInboxCount(c.total); }).catch(() => {});
+    tick();
+    const t = setInterval(tick, 60_000); // keep the badge fresh
+    return () => { cancelled = true; clearInterval(t); };
+  }, [isAuthReady]);
 
   const toggleGroup = useCallback((id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -84,6 +97,7 @@ export function Sidebar() {
             {group.items.map((item) => {
               const isActive = isItemActive(item);
               const Icon = item.icon;
+              const badge = item.id === "inbox" ? (inboxCount || undefined) : item.badge;
               const children = item.dynamicChildren ? funnelItems : item.children ?? [];
               const hasChildren = children.length > 0;
               // Auto-open when inside the section; otherwise honor manual toggle.
@@ -113,12 +127,12 @@ export function Sidebar() {
                       >
                         {item.label}
                       </span>
-                      {item.badge && expanded && (
+                      {badge && expanded && (
                         <span className="ml-auto text-[10px] font-medium bg-signal-red text-signal-red-text rounded-full px-1.5 py-0.5 leading-none shrink-0">
-                          {item.badge}
+                          {badge}
                         </span>
                       )}
-                      {item.badge && !expanded && (
+                      {badge && !expanded && (
                         <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-signal-red-text" />
                       )}
                       {item.comingSoon && expanded && (
