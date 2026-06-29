@@ -34,7 +34,7 @@ export function MessagesInbox() {
           </div>
         ) : (
           threads.map((t) => (
-            <div key={t.key} className="group flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors">
+            <div key={t.key} className="group relative flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors">
               <span className={cn("flex items-center justify-center w-8 h-8 rounded-full shrink-0",
                 t.needsReply ? "bg-signal-green/15 text-signal-green-text" : "bg-section text-ink-muted")}>
                 <MessageSquare size={14} />
@@ -50,12 +50,12 @@ export function MessagesInbox() {
                   {t.lastDirection === "inbound" ? "" : "You: "}{t.lastBody || "—"}
                 </div>
               </div>
-              <span className="text-[10.5px] text-ink-faint shrink-0">{formatRelativeTime(new Date(t.lastAt))}</span>
+              <span className="text-[10.5px] text-ink-faint shrink-0 w-16 text-right">{formatRelativeTime(new Date(t.lastAt))}</span>
               {t.leadId && t.funnelId && (
                 <button
                   onClick={() => router.push(`/dashboard/funnels/${t.funnelId}/leads/${t.leadId}`)}
                   title="Open lead"
-                  className="p-1.5 rounded-md text-ink-faint hover:text-ink hover:bg-hover shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-ink-faint hover:text-ink hover:bg-hover opacity-0 group-hover:opacity-100 transition-opacity bg-surface"
                 >
                   <ArrowUpRight size={13} />
                 </button>

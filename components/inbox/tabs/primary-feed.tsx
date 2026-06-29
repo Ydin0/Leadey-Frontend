@@ -66,7 +66,7 @@ export function PrimaryFeed() {
                   <div className="text-[12.5px] text-ink truncate">{item.title}</div>
                   <div className="text-[10.5px] text-ink-muted truncate">{item.subtitle}</div>
                 </div>
-                <span className="text-[10.5px] text-ink-faint shrink-0">{formatRelativeTime(new Date(item.time))}</span>
+                <span className="text-[10.5px] text-ink-faint shrink-0 w-16 text-right">{formatRelativeTime(new Date(item.time))}</span>
                 <ArrowUpRight size={13} className="text-ink-faint shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
             );

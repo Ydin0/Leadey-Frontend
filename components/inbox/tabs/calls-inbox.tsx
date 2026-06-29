@@ -39,7 +39,7 @@ export function CallsInbox() {
           records.map((c) => {
             const connected = c.disposition === "completed" && c.duration > 0;
             return (
-              <div key={c.id} className="group flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors">
+              <div key={c.id} className="group relative flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors">
                 <span className={cn("flex items-center justify-center w-8 h-8 rounded-full shrink-0",
                   connected ? "bg-signal-green/15 text-signal-green-text" : "bg-signal-red/15 text-signal-red-text")}>
                   <PhoneIncoming size={14} />
@@ -51,8 +51,8 @@ export function CallsInbox() {
                     {c.companyName ? ` · ${c.companyName}` : ""}
                   </div>
                 </div>
-                <span className="text-[10.5px] text-ink-faint shrink-0">{formatRelativeTime(new Date(c.timestamp))}</span>
-                <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-[10.5px] text-ink-faint shrink-0 w-16 text-right">{formatRelativeTime(new Date(c.timestamp))}</span>
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-surface pl-3">
                   <button
                     onClick={() => void startCall(c.from, { contactName: c.contactName || undefined })}
                     title="Call back"
