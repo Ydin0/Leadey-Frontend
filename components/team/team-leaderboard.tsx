@@ -5,7 +5,7 @@ import { Avatar } from "./team-shared";
 import { Sparkline, Meter, attColor } from "./charts";
 import { DeltaPill } from "./team-shared";
 import {
-  CH_IDS, CH_MAP, attainment, prevRange, sliceRange, sumSlice, bucketed, fmtTalkTime,
+  CH_IDS, CH_MAP, attainment, prevRange, sliceRange, sumSlice, bucketed, fmtTalkTime, connectRate,
   type ChannelId, type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -34,6 +34,8 @@ export function TeamLeaderboard({ range, podium, onPickRep }: {
     if (rankBy === "volume") return y.a.got.total - x.a.got.total;
     if (rankBy === "talkTime") return y.a.got.talkTime - x.a.got.talkTime;
     if (rankBy === "meetings") return y.a.got.meetings - x.a.got.meetings;
+    if (rankBy === "connectRate") return connectRate(y.a.got) - connectRate(x.a.got);
+    if (rankBy === "voicemail") return y.a.got.voicemailCalls - x.a.got.voicemailCalls;
     return y.a.got[rankBy as ChannelId] - x.a.got[rankBy as ChannelId];
   });
 
@@ -42,10 +44,12 @@ export function TeamLeaderboard({ range, podium, onPickRep }: {
     if (rankBy === "volume") return r.a.got.total.toLocaleString();
     if (rankBy === "talkTime") return fmtTalkTime(r.a.got.talkTime);
     if (rankBy === "meetings") return r.a.got.meetings.toLocaleString();
+    if (rankBy === "connectRate") return Math.round(connectRate(r.a.got) * 100) + "%";
+    if (rankBy === "voicemail") return r.a.got.voicemailCalls.toLocaleString();
     return r.a.got[rankBy as ChannelId].toLocaleString();
   };
 
-  const rankOpts: [string, string][] = [["attainment", "Attainment %"], ["volume", "Total volume"], ["meetings", "Opportunities"], ["talkTime", "Talk time"], ...CH_IDS.map((c) => [c, CH_MAP[c].label] as [string, string])];
+  const rankOpts: [string, string][] = [["attainment", "Attainment %"], ["volume", "Total volume"], ["connectRate", "Connect rate"], ["meetings", "Opportunities"], ["talkTime", "Talk time"], ["voicemail", "Voicemails"], ...CH_IDS.map((c) => [c, CH_MAP[c].label] as [string, string])];
   const medalCol = ["#E8C45C", "#C2CBE0", "#C58B5C"];
 
   return (
@@ -96,6 +100,8 @@ export function TeamLeaderboard({ range, podium, onPickRep }: {
               <th style={{ textAlign: "right" }}>SMS</th>
               <th style={{ textAlign: "right" }}>LinkedIn</th>
               <th style={{ textAlign: "right" }}>Total</th>
+              <th style={{ textAlign: "right" }}>Connect</th>
+              <th style={{ textAlign: "right" }}>VM</th>
               <th style={{ textAlign: "right" }}>Opps</th>
               <th style={{ textAlign: "right" }}>Talk time</th>
               <th style={{ width: 150 }}>Attainment</th>
@@ -126,6 +132,8 @@ export function TeamLeaderboard({ range, podium, onPickRep }: {
                   <td key={ch} style={{ textAlign: "right", color: rankBy === ch ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === ch ? 600 : 400 }}>{r.a.got[ch].toLocaleString()}</td>
                 ))}
                 <td style={{ textAlign: "right", fontWeight: 600 }}>{r.a.got.total.toLocaleString()}</td>
+                <td style={{ textAlign: "right", color: rankBy === "connectRate" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "connectRate" ? 600 : 400 }}>{Math.round(connectRate(r.a.got) * 100)}%</td>
+                <td style={{ textAlign: "right", color: rankBy === "voicemail" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "voicemail" ? 600 : 400 }}>{r.a.got.voicemailCalls.toLocaleString()}</td>
                 <td style={{ textAlign: "right", color: rankBy === "meetings" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "meetings" ? 600 : 400 }}>{r.a.got.meetings.toLocaleString()}</td>
                 <td style={{ textAlign: "right", color: rankBy === "talkTime" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "talkTime" ? 600 : 400 }}>{fmtTalkTime(r.a.got.talkTime)}</td>
                 <td>

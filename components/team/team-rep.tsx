@@ -4,7 +4,7 @@ import { Icon } from "./icon";
 import { Avatar, StatusDot, Panel, ChannelLegend } from "./team-shared";
 import { TrendChart, Ring, Meter, attColor } from "./charts";
 import {
-  CH_IDS, CH_MAP, attainment, bucketed, workingDays, sliceRange, fmtTalkTime,
+  CH_IDS, CH_MAP, attainment, bucketed, workingDays, sliceRange, fmtTalkTime, connectRate,
   type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -25,11 +25,12 @@ export function TeamRep({ memberId, range, rangeLabel, trendMode, onEdit }: {
   // [label, display value, icon] — talk time + avg call length are formatted durations.
   const summary: [string, string, string][] = [
     ["Talk time", fmtTalkTime(tot.talkTime), "clock"],
-    ["Avg call length", tot.calls ? fmtTalkTime(tot.talkTime / tot.calls) : "—", "phone-call"],
+    ["Avg call length", tot.connectedCalls ? fmtTalkTime(tot.talkTime / tot.connectedCalls) : "—", "phone-call"],
+    ["Connect rate", `${Math.round(connectRate(tot) * 100)}%`, "phone-call"],
+    ["Voicemails", tot.voicemailCalls.toLocaleString(), "message-square"],
     ["Opportunities created", tot.meetings.toLocaleString(), "briefcase"],
     ["Replies", tot.replies.toLocaleString(), "message-square"],
     ["Avg / working day", Math.round(tot.total / workingDays(sliceRange(m.series, range))).toLocaleString(), "activity"],
-    ["Daily KPI total", CH_IDS.reduce((s, ch) => s + m.targets[ch], 0).toLocaleString(), "target"],
   ];
 
   return (

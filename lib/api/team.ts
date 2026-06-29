@@ -22,6 +22,10 @@ export async function getTeamKpiConfig(): Promise<TeamKpiConfig> {
 export interface TeamAnalyticsDay {
   date: string;
   calls: number;
+  /** Calls a person picked up (talk time > 0, not voicemail). */
+  connectedCalls: number;
+  /** Calls that reached voicemail. */
+  voicemailCalls: number;
   /** Total time on calls that day, in seconds (sum of call_records.duration). */
   talkTime: number;
   emails: number;

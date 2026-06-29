@@ -35,6 +35,10 @@ export interface DayRec {
    *  so it stays correct regardless of the viewer's timezone. */
   dayKey: string;
   calls: number;
+  /** Calls a person picked up (talk time > 0, not voicemail). */
+  connectedCalls: number;
+  /** Calls that reached voicemail. */
+  voicemailCalls: number;
   /** Seconds spent on calls that day (sum of call durations). */
   talkTime: number;
   emails: number;
@@ -66,6 +70,10 @@ export interface TimeWindow {
 
 export interface Totals {
   calls: number;
+  /** Calls a person picked up (not voicemail). */
+  connectedCalls: number;
+  /** Calls that reached voicemail. */
+  voicemailCalls: number;
   /** Seconds spent on calls (sum of call durations). */
   talkTime: number;
   emails: number;
@@ -103,6 +111,8 @@ const DAY_MS = 86400000;
 export interface ApiDayRec {
   date: string;
   calls: number;
+  connectedCalls?: number;
+  voicemailCalls?: number;
   talkTime: number;
   emails: number;
   sms: number;
@@ -130,6 +140,8 @@ export function hydrateSeries(api: ApiDayRec[]): DayRec[] {
       ts: date.getTime(),
       dayKey: r.date.slice(0, 10), // backend ISO is UTC-midnight → its date part
       calls: r.calls || 0,
+      connectedCalls: r.connectedCalls || 0,
+      voicemailCalls: r.voicemailCalls || 0,
       talkTime: r.talkTime || 0,
       emails: r.emails || 0,
       sms: r.sms || 0,
@@ -149,7 +161,7 @@ export function emptySeries(): DayRec[] {
   const days: DayRec[] = [];
   for (let i = 0; i < DAYS; i++) {
     const date = new Date(start.getTime() - (DAYS - 1 - i) * DAY_MS);
-    days.push({ date, ts: date.getTime(), dayKey: localDayKey(date), calls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 });
+    days.push({ date, ts: date.getTime(), dayKey: localDayKey(date), calls: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 });
   }
   return days;
 }
@@ -235,14 +247,14 @@ export function workingDays(slice: DayRec[]): number {
 }
 
 export function sumSlice(slice: DayRec[]): Totals {
-  const out: Totals = { calls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
+  const out: Totals = { calls: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
   slice.forEach((d) => { (Object.keys(out) as (keyof Totals)[]).forEach((k) => { out[k] += d[k] || 0; }); });
   return out;
 }
 
 export function targetFor(member: Member, range: DayRange): Totals {
   const wd = Math.max(1, workingDays(sliceRange(member.series, range)));
-  const t = { calls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 } as Totals;
+  const t = { calls: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 } as Totals;
   CH_IDS.forEach((ch) => { t[ch] = member.targets[ch] * wd; });
   t.total = CH_IDS.reduce((a, ch) => a + t[ch], 0);
   return t;
@@ -270,6 +282,10 @@ export interface Bucketed {
   talk: number[];
   /** Opportunities created per bucket — for the opportunities sparkline. */
   meetings: number[];
+  /** Connected (human pickup) calls per bucket. */
+  connected: number[];
+  /** Voicemail-bound calls per bucket. */
+  voicemail: number[];
 }
 export function bucketed(members: Member | Member[], range: DayRange): Bucketed {
   const list = Array.isArray(members) ? members : [members];
@@ -284,9 +300,11 @@ export function bucketed(members: Member | Member[], range: DayRange): Bucketed 
     CH_IDS.forEach((ch) => (series[ch] = groups.map(() => 0)));
     const talk = groups.map(() => 0);
     const meetings = groups.map(() => 0);
-    groups.forEach(([a, b], gi) => slices.forEach((s) => { for (let i = a; i < b; i++) { CH_IDS.forEach((ch) => (series[ch][gi] += s[i][ch] || 0)); talk[gi] += s[i].talkTime || 0; meetings[gi] += s[i].meetings || 0; } }));
+    const connected = groups.map(() => 0);
+    const voicemail = groups.map(() => 0);
+    groups.forEach(([a, b], gi) => slices.forEach((s) => { for (let i = a; i < b; i++) { CH_IDS.forEach((ch) => (series[ch][gi] += s[i][ch] || 0)); talk[gi] += s[i].talkTime || 0; meetings[gi] += s[i].meetings || 0; connected[gi] += s[i].connectedCalls || 0; voicemail[gi] += s[i].voicemailCalls || 0; } }));
     const totals = labels.map((_, i) => CH_IDS.reduce((a, ch) => a + series[ch][i], 0));
-    return { labels, series, totals, talk, meetings };
+    return { labels, series, totals, talk, meetings, connected, voicemail };
   }
 
   const ref = slices[0] ?? [];
@@ -295,9 +313,11 @@ export function bucketed(members: Member | Member[], range: DayRange): Bucketed 
   CH_IDS.forEach((ch) => (series[ch] = ref.map(() => 0)));
   const talk = ref.map(() => 0);
   const meetings = ref.map(() => 0);
-  slices.forEach((s) => s.forEach((d, i) => { CH_IDS.forEach((ch) => (series[ch][i] += d[ch] || 0)); talk[i] += d.talkTime || 0; meetings[i] += d.meetings || 0; }));
+  const connected = ref.map(() => 0);
+  const voicemail = ref.map(() => 0);
+  slices.forEach((s) => s.forEach((d, i) => { CH_IDS.forEach((ch) => (series[ch][i] += d[ch] || 0)); talk[i] += d.talkTime || 0; meetings[i] += d.meetings || 0; connected[i] += d.connectedCalls || 0; voicemail[i] += d.voicemailCalls || 0; }));
   const totals = labels.map((_, i) => CH_IDS.reduce((a, ch) => a + series[ch][i], 0));
-  return { labels, series, totals, talk, meetings };
+  return { labels, series, totals, talk, meetings, connected, voicemail };
 }
 
 export interface TeamTotals {
@@ -306,7 +326,7 @@ export interface TeamTotals {
   delta: Record<keyof Totals, number>;
 }
 export function teamTotals(members: Member[], range: DayRange): TeamTotals {
-  const cur: Totals = { calls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
+  const cur: Totals = { calls: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
   const prev: Totals = { ...cur };
   const pr = prevRange(range);
   members.forEach((m) => {
@@ -331,6 +351,28 @@ export function meetingsSparkFor(members: Member[], range: DayRange): number[] {
 /** Per-bucket talk-time series (seconds) for the talk-time stat-card sparkline. */
 export function talkSparkFor(members: Member[], range: DayRange): number[] {
   return bucketed(members, range).talk;
+}
+
+/** Connect rate = share of dials where a person actually picked up (excludes
+ *  voicemail and unanswered). Returned as a 0..1 fraction. */
+export function connectRate(t: Totals): number {
+  return t.calls > 0 ? t.connectedCalls / t.calls : 0;
+}
+
+/** Per-bucket connect-rate series (%) for the connect-rate stat-card sparkline. */
+export function connectRateSparkFor(members: Member[], range: DayRange): number[] {
+  const b = bucketed(members, range);
+  return b.connected.map((c, i) => (b.totals[i] ? Math.round((c / Math.max(1, sumCalls(b, i))) * 100) : 0));
+}
+
+/** Total dials in a bucket (the calls channel only, not all touches). */
+function sumCalls(b: Bucketed, i: number): number {
+  return b.series.calls?.[i] ?? 0;
+}
+
+/** Per-bucket voicemail-count series for the voicemail stat-card sparkline. */
+export function voicemailSparkFor(members: Member[], range: DayRange): number[] {
+  return bucketed(members, range).voicemail;
 }
 
 /** Format a talk-time duration (seconds) compactly: "2h 14m" / "47m" / "38s". */

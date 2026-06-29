@@ -5,6 +5,7 @@ import { StatCard, MetricCard, Panel, ChannelLegend, Avatar, DeltaPill, POD_COLO
 import { TrendChart, Donut, Ring, Meter, attColor } from "./charts";
 import {
   CH_IDS, CH_MAP, teamTotals, bucketed, attainment, sparkFor, talkSparkFor, meetingsSparkFor, fmtTalkTime,
+  connectRate, connectRateSparkFor, voicemailSparkFor,
   type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -14,6 +15,9 @@ import { useTeamData } from "@/lib/team/team-data-context";
 const TALK_COLOR = "#E0A878";
 // Opportunities created — the headline conversion metric (signal green).
 const OPP_COLOR = "#6FBEA8";
+// Connect rate — human pickups (teal). Voicemail — machine reaches (muted slate).
+const CONNECT_COLOR = "#5FB6C9";
+const VM_COLOR = "#9AA3C4";
 
 export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
   range: DayRange; rangeLabel: string; trendMode: "area" | "bars"; onPickRep: (id: string) => void;
@@ -73,6 +77,22 @@ export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
           value={tot.cur.meetings.toLocaleString()}
           delta={tot.delta.meetings}
           spark={meetingsSparkFor(members, range)}
+        />
+        <MetricCard
+          label="Connect rate"
+          icon="phone-call"
+          color={CONNECT_COLOR}
+          value={`${Math.round(connectRate(tot.cur) * 100)}%`}
+          delta={connectRate(tot.prev) ? (connectRate(tot.cur) - connectRate(tot.prev)) / connectRate(tot.prev) : 0}
+          spark={connectRateSparkFor(members, range)}
+        />
+        <MetricCard
+          label="Voicemails"
+          icon="message-square"
+          color={VM_COLOR}
+          value={tot.cur.voicemailCalls.toLocaleString()}
+          delta={tot.delta.voicemailCalls}
+          spark={voicemailSparkFor(members, range)}
         />
       </div>
 
