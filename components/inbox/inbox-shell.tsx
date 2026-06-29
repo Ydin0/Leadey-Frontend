@@ -20,7 +20,7 @@ type TabKey = "primary" | "calls" | "messages" | "tasks" | "reminders" | "potent
 // it must not ship with the placeholder mock threads.
 const TABS: { key: TabKey; label: string; icon: typeof Mail; count?: keyof InboxCounts }[] = [
   { key: "primary", label: "Primary", icon: InboxIcon, count: "total" },
-  { key: "calls", label: "Calls", icon: Phone, count: "calls" },
+  { key: "calls", label: "Missed Calls", icon: Phone, count: "calls" },
   { key: "messages", label: "Messages", icon: MessageSquare, count: "messages" },
   { key: "tasks", label: "Tasks", icon: ListChecks, count: "tasks" },
   { key: "reminders", label: "Reminders", icon: Bell, count: "reminders" },

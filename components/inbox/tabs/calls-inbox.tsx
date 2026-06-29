@@ -18,8 +18,10 @@ export function CallsInbox() {
 
   useEffect(() => {
     let cancelled = false;
-    getCallRecords({ direction: "inbound", limit: 50 })
-      .then((r) => { if (!cancelled) setRecords(r.data); })
+    // Only MISSED inbound calls belong in the inbox (not connected ones, not
+    // outbound). Fetch inbound and keep the unanswered ones.
+    getCallRecords({ direction: "inbound", limit: 100 })
+      .then((r) => { if (!cancelled) setRecords(r.data.filter((c) => c.disposition !== "completed")); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
@@ -33,11 +35,11 @@ export function CallsInbox() {
         ) : records.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2 text-center px-6">
             <PhoneIncoming size={20} className="text-ink-faint" />
-            <p className="text-[12px] text-ink-muted">No inbound calls yet.</p>
+            <p className="text-[12px] text-ink-muted">No missed calls. You&apos;re all caught up.</p>
           </div>
         ) : (
           records.map((c) => {
-            const connected = c.disposition === "completed" && c.duration > 0;
+            const connected = false; // this tab only shows missed calls
             return (
               <div key={c.id} className="group relative flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors">
                 <span className={cn("flex items-center justify-center w-8 h-8 rounded-full shrink-0",
