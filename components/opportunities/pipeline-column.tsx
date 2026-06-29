@@ -11,6 +11,7 @@ interface PipelineColumnProps {
   opportunities: Opportunity[];
   resolveCompanyName?: (opp: Opportunity) => string | null;
   resolveOwnerInitials?: (opp: Opportunity) => string | null;
+  onEdit?: (oppId: string) => void;
 }
 
 /** Stage column on the kanban. Acts as a droppable surface; the cards
@@ -21,6 +22,7 @@ export function PipelineColumn({
   opportunities,
   resolveCompanyName,
   resolveOwnerInitials,
+  onEdit,
 }: PipelineColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `stage:${stage.id}`,
@@ -75,6 +77,7 @@ export function PipelineColumn({
                 stage={stage}
                 companyName={resolveCompanyName?.(opp)}
                 ownerInitials={resolveOwnerInitials?.(opp)}
+                onEdit={onEdit}
               />
             ))
           )}

@@ -23,6 +23,7 @@ interface PipelineBoardProps {
   onMove: (oppId: string, toStageId: string) => Promise<void> | void;
   resolveCompanyName?: (opp: Opportunity) => string | null;
   resolveOwnerInitials?: (opp: Opportunity) => string | null;
+  onEdit?: (oppId: string) => void;
 }
 
 /** The kanban surface. One column per stage, opportunities grouped by
@@ -34,6 +35,7 @@ export function PipelineBoard({
   onMove,
   resolveCompanyName,
   resolveOwnerInitials,
+  onEdit,
 }: PipelineBoardProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -97,6 +99,7 @@ export function PipelineBoard({
             opportunities={byStage.get(stage.id) || []}
             resolveCompanyName={resolveCompanyName}
             resolveOwnerInitials={resolveOwnerInitials}
+            onEdit={onEdit}
           />
         ))}
       </div>

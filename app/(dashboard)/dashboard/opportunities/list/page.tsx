@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, LayoutGrid, List, Loader2 } from "lucide-react";
+import { ArrowLeft, LayoutGrid, List, Loader2, Pencil } from "lucide-react";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import {
   Table,
@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { EditOpportunityModal } from "@/components/opportunities/edit-opportunity-modal";
 import { listPipelines, listOpportunities } from "@/lib/api/opportunities";
 import { formatCurrency, formatRelativeTime } from "@/lib/utils";
 import type { Opportunity, Pipeline, PipelineStage } from "@/lib/types/opportunity";
@@ -22,6 +23,7 @@ export default function OpportunitiesListPage() {
   const [opps, setOpps] = useState<Opportunity[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editingOppId, setEditingOppId] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -107,6 +109,7 @@ export default function OpportunitiesListPage() {
                 <TableHead className="w-[100px] text-right">Prob.</TableHead>
                 <TableHead className="w-[120px]">Close date</TableHead>
                 <TableHead className="w-[100px]">Updated</TableHead>
+                <TableHead className="w-[44px]" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -115,7 +118,7 @@ export default function OpportunitiesListPage() {
                 const pipeline = pipelineById.get(opp.pipelineId);
                 const probability = opp.probabilityOverride ?? stage?.defaultProbability ?? 50;
                 return (
-                  <TableRow key={opp.id}>
+                  <TableRow key={opp.id} className="group">
                     <TableCell className="overflow-hidden">
                       <Link
                         href={
@@ -159,12 +162,31 @@ export default function OpportunitiesListPage() {
                         {formatRelativeTime(opp.updatedAt)}
                       </span>
                     </TableCell>
+                    <TableCell>
+                      <button
+                        type="button"
+                        onClick={() => setEditingOppId(opp.id)}
+                        title="Edit opportunity"
+                        className="flex items-center justify-center w-7 h-7 rounded-md text-ink-faint opacity-0 group-hover:opacity-100 hover:text-ink hover:bg-hover transition-opacity"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    </TableCell>
                   </TableRow>
                 );
               })}
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {editingOppId && (
+        <EditOpportunityModal
+          opportunityId={editingOppId}
+          onClose={() => setEditingOppId(null)}
+          onSaved={() => { setEditingOppId(null); void reload(); }}
+          onDeleted={() => { setEditingOppId(null); void reload(); }}
+        />
       )}
     </div>
   );

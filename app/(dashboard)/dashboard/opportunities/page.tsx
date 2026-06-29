@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Loader2, LayoutGrid, List, AlertCircle } from "lucide-react";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { PipelineBoard } from "@/components/opportunities/pipeline-board";
+import { EditOpportunityModal } from "@/components/opportunities/edit-opportunity-modal";
 import { PipelineTabs } from "@/components/opportunities/pipeline-tabs";
 import { PipelineStatsBar } from "@/components/opportunities/pipeline-stats-bar";
 import { OpportunityFilters } from "@/components/opportunities/opportunity-filters";
@@ -29,6 +30,8 @@ export default function OpportunitiesPage() {
   // Selected owner ids to filter by; empty = all owners.
   const [ownerFilter, setOwnerFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  // The opportunity being edited inline from the board (hover → pencil).
+  const [editingOppId, setEditingOppId] = useState<string | null>(null);
 
   // Resolve each deal's owner to their initials so the card shows a colour-coded
   // rep avatar (gradient keyed by ownerId).
@@ -183,6 +186,16 @@ export default function OpportunitiesPage() {
           opportunities={opportunities}
           onMove={handleMove}
           resolveOwnerInitials={resolveOwnerInitials}
+          onEdit={setEditingOppId}
+        />
+      )}
+
+      {editingOppId && (
+        <EditOpportunityModal
+          opportunityId={editingOppId}
+          onClose={() => setEditingOppId(null)}
+          onSaved={() => { setEditingOppId(null); void reload(); }}
+          onDeleted={() => { setEditingOppId(null); void reload(); }}
         />
       )}
     </div>

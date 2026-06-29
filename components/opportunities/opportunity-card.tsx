@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Calendar, Building2 } from "lucide-react";
+import { Calendar, Building2, Pencil } from "lucide-react";
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { cn, formatCurrency, formatRelativeTime } from "@/lib/utils";
 import type { Opportunity, PipelineStage } from "@/lib/types/opportunity";
@@ -18,6 +18,8 @@ interface OpportunityCardProps {
   /** Render flag used by the DragOverlay clone so it can drop its
    *  pointer-events / animation hooks. */
   isOverlay?: boolean;
+  /** Open the full edit modal for this opportunity (hover affordance). */
+  onEdit?: (oppId: string) => void;
 }
 
 export function OpportunityCard({
@@ -26,6 +28,7 @@ export function OpportunityCard({
   companyName,
   ownerInitials,
   isOverlay,
+  onEdit,
 }: OpportunityCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: opp.id, data: { type: "opportunity", opp } });
@@ -54,10 +57,27 @@ export function OpportunityCard({
       {...attributes}
       {...listeners}
       className={cn(
-        "card-brand bg-surface rounded-[10px] p-3 cursor-grab active:cursor-grabbing select-none",
+        "group relative card-brand bg-surface rounded-[10px] p-3 cursor-grab active:cursor-grabbing select-none",
         isOverlay && "shadow-xl rotate-[1.5deg]",
       )}
     >
+      {onEdit && !isOverlay && (
+        <button
+          type="button"
+          // Stop the pointerdown from starting a drag, and the click from
+          // following the card's Link — just open the edit modal in place.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onEdit(opp.id);
+          }}
+          title="Edit opportunity"
+          className="absolute top-1.5 right-1.5 z-10 flex items-center justify-center w-6 h-6 rounded-md bg-surface border border-border-subtle text-ink-muted opacity-0 group-hover:opacity-100 hover:text-ink hover:bg-hover transition-opacity shadow-sm"
+        >
+          <Pencil size={11} />
+        </button>
+      )}
       <Link
         href={href}
         className="block"
