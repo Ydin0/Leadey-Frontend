@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { LeadTask, TaskCategory } from "./lead-tasks";
+import type { LeadTask } from "./lead-tasks";
 
 export type TaskGroup = "overdue" | "today" | "upcoming" | "done";
 
@@ -15,7 +15,7 @@ export interface InboxTask extends LeadTask {
 export interface TaskFilters {
   /** A member's Clerk id, "mine" (default), or "all" (admins/managers only). */
   assigneeId?: string | "mine" | "all";
-  category?: TaskCategory;
+  category?: string;
   status?: "open" | "done" | "all";
   search?: string;
 }
@@ -34,7 +34,7 @@ export async function getTasks(filters: TaskFilters = {}): Promise<InboxTask[]> 
 /** Create a task/reminder from the Inbox. Lead is optional (standalone). */
 export async function createTask(data: {
   label: string;
-  category?: TaskCategory;
+  category?: string;
   dueAt?: string | null;
   assigneeId?: string | null;
   leadId?: string | null;

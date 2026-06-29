@@ -34,7 +34,14 @@ export function MessagesInbox() {
           </div>
         ) : (
           threads.map((t) => (
-            <div key={t.key} className="group relative flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors">
+            <div
+              key={t.key}
+              onClick={() => { if (t.leadId && t.funnelId) router.push(`/dashboard/funnels/${t.funnelId}/leads/${t.leadId}`); }}
+              className={cn(
+                "group relative flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors",
+                t.leadId && t.funnelId ? "cursor-pointer" : "",
+              )}
+            >
               <span className={cn("flex items-center justify-center w-8 h-8 rounded-full shrink-0",
                 t.needsReply ? "bg-signal-green/15 text-signal-green-text" : "bg-section text-ink-muted")}>
                 <MessageSquare size={14} />

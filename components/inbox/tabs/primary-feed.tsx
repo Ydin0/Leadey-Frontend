@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Loader2, ListChecks, Bell, PhoneIncoming, MessageSquare, ArrowUpRight, Sparkles } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { getPrimaryFeed, type PrimaryItem, type PrimaryItemType } from "@/lib/api/inbox";
-import { useCallContext } from "@/components/calling/call-context";
 
 const META: Record<PrimaryItemType, { icon: typeof Bell; cls: string }> = {
   task: { icon: ListChecks, cls: "bg-signal-blue/15 text-signal-blue-text" },
@@ -17,7 +16,6 @@ const META: Record<PrimaryItemType, { icon: typeof Bell; cls: string }> = {
 /** Primary tab — one chronological "needs attention" feed across channels. */
 export function PrimaryFeed() {
   const router = useRouter();
-  const { startCall } = useCallContext();
   const [items, setItems] = useState<PrimaryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,10 +29,10 @@ export function PrimaryFeed() {
   }, []);
 
   function open(item: PrimaryItem) {
+    // Always go to the lead profile — never auto-dial. Items without a matched
+    // lead (unknown caller/texter) live in Potential Contacts instead.
     if (item.leadId && item.funnelId) {
       router.push(`/dashboard/funnels/${item.funnelId}/leads/${item.leadId}`);
-    } else if (item.phone && (item.type === "call" || item.type === "sms")) {
-      void startCall(item.phone);
     }
   }
 

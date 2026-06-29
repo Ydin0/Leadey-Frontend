@@ -9,15 +9,12 @@ import {
 import { cn } from "@/lib/utils";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { getTasks, createTask, type InboxTask, type TaskGroup } from "@/lib/api/tasks";
-import { updateLeadTask, deleteLeadTask, type TaskCategory } from "@/lib/api/lead-tasks";
-
-const CATEGORY_META: Record<TaskCategory, { label: string; cls: string }> = {
-  follow_up: { label: "Follow up", cls: "bg-signal-blue/15 text-signal-blue-text" },
-  call_back: { label: "Call back", cls: "bg-signal-green/15 text-signal-green-text" },
-  email: { label: "Email", cls: "bg-signal-slate/20 text-signal-slate-text" },
-  reminder: { label: "Reminder", cls: "bg-amber-500/15 text-amber-600 dark:text-amber-400" },
-  general: { label: "Task", cls: "bg-section text-ink-muted" },
-};
+import { updateLeadTask, deleteLeadTask } from "@/lib/api/lead-tasks";
+import { useTaskCategories } from "@/lib/hooks/use-task-categories";
+import {
+  CATEGORY_CHIP_CLASS, CATEGORY_DOT_CLASS, type TaskCategoryDef,
+} from "@/lib/api/task-categories";
+import { DateTimePicker } from "@/components/shared/date-time-picker";
 
 const SECTIONS: { key: TaskGroup; label: string; urgent?: boolean }[] = [
   { key: "overdue", label: "Past · overdue", urgent: true },
@@ -34,9 +31,10 @@ function fmtDue(dueAt: string | null): string {
 
 /** Tasks + Reminders tab. When `categoryFilter` is set (e.g. "reminder") the
  *  list + composer are locked to that category — that's the Reminders tab. */
-export function TasksInbox({ categoryFilter }: { categoryFilter?: TaskCategory }) {
+export function TasksInbox({ categoryFilter }: { categoryFilter?: string }) {
   const router = useRouter();
   const { members } = useTeamMembers();
+  const { categories } = useTaskCategories();
   const [tasks, setTasks] = useState<InboxTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [assignee, setAssignee] = useState<string>("mine"); // "mine" | "all" | memberId
@@ -46,8 +44,8 @@ export function TasksInbox({ categoryFilter }: { categoryFilter?: TaskCategory }
 
   // Composer
   const [newLabel, setNewLabel] = useState("");
-  const [newCategory, setNewCategory] = useState<TaskCategory>(categoryFilter ?? "follow_up");
-  const [newDue, setNewDue] = useState("");
+  const [newCategory, setNewCategory] = useState<string>(categoryFilter ?? "follow_up");
+  const [newDue, setNewDue] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
@@ -88,10 +86,10 @@ export function TasksInbox({ categoryFilter }: { categoryFilter?: TaskCategory }
     }
   }
 
-  async function reschedule(t: InboxTask, value: string) {
+  async function reschedule(t: InboxTask, iso: string | null) {
     setBusy(t.id);
     try {
-      await updateLeadTask(t.id, { dueAt: value ? new Date(value).toISOString() : null });
+      await updateLeadTask(t.id, { dueAt: iso });
       setRescheduling(null);
       await load();
     } finally {
@@ -117,10 +115,10 @@ export function TasksInbox({ categoryFilter }: { categoryFilter?: TaskCategory }
       await createTask({
         label,
         category: categoryFilter ?? newCategory,
-        dueAt: newDue ? new Date(newDue).toISOString() : null,
+        dueAt: newDue,
       });
       setNewLabel("");
-      setNewDue("");
+      setNewDue(null);
       await load();
     } finally {
       setAdding(false);
@@ -158,22 +156,9 @@ export function TasksInbox({ categoryFilter }: { categoryFilter?: TaskCategory }
           className="flex-1 bg-transparent text-[12px] text-ink placeholder:text-ink-faint focus:outline-none"
         />
         {!categoryFilter && (
-          <select
-            value={newCategory}
-            onChange={(e) => setNewCategory(e.target.value as TaskCategory)}
-            className="bg-surface border border-border-subtle rounded-[6px] px-2 py-1 text-[10.5px] text-ink-secondary focus:outline-none"
-          >
-            {(Object.keys(CATEGORY_META) as TaskCategory[]).map((c) => (
-              <option key={c} value={c}>{CATEGORY_META[c].label}</option>
-            ))}
-          </select>
+          <CategorySelect value={newCategory} categories={categories} onChange={setNewCategory} />
         )}
-        <input
-          type="datetime-local"
-          value={newDue}
-          onChange={(e) => setNewDue(e.target.value)}
-          className="bg-surface border border-border-subtle rounded-[6px] px-2 py-1 text-[10.5px] text-ink-secondary focus:outline-none"
-        />
+        <DateTimePicker value={newDue} onChange={setNewDue} placeholder="When?" />
         <button
           onClick={() => void add()}
           disabled={adding || !newLabel.trim()}
@@ -217,6 +202,7 @@ export function TasksInbox({ categoryFilter }: { categoryFilter?: TaskCategory }
                   <TaskRow
                     key={t.id}
                     task={t}
+                    categories={categories}
                     busy={busy === t.id}
                     rescheduling={rescheduling === t.id}
                     onToggleDone={() => void toggleDone(t)}
@@ -240,18 +226,21 @@ export function TasksInbox({ categoryFilter }: { categoryFilter?: TaskCategory }
 }
 
 function TaskRow({
-  task: t, busy, rescheduling, onToggleDone, onStartReschedule, onReschedule, onOpenLead, onDelete,
+  task: t, categories, busy, rescheduling, onToggleDone, onStartReschedule, onReschedule, onOpenLead, onDelete,
 }: {
   task: InboxTask;
+  categories: TaskCategoryDef[];
   busy: boolean;
   rescheduling: boolean;
   onToggleDone: () => void;
   onStartReschedule: () => void;
-  onReschedule: (value: string) => void;
+  onReschedule: (iso: string | null) => void;
   onOpenLead?: () => void;
   onDelete: () => void;
 }) {
-  const cat = CATEGORY_META[t.category] ?? CATEGORY_META.general;
+  const def = categories.find((c) => c.key === t.category);
+  const catLabel = def?.label ?? t.category.replace(/_/g, " ");
+  const catCls = CATEGORY_CHIP_CLASS[def?.color ?? "slate"];
   return (
     <div className="group flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors">
       <button
@@ -269,7 +258,7 @@ function TaskRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className={cn("text-[12.5px] truncate", t.done ? "text-ink-faint line-through" : "text-ink")}>{t.label}</span>
-          <span className={cn("text-[9px] font-medium uppercase tracking-wide rounded-full px-1.5 py-0.5 shrink-0", cat.cls)}>{cat.label}</span>
+          <span className={cn("text-[9px] font-medium uppercase tracking-wide rounded-full px-1.5 py-0.5 shrink-0", catCls)}>{catLabel}</span>
         </div>
         <div className="flex items-center gap-2 mt-0.5 text-[10.5px] text-ink-muted">
           {(t.leadName || t.company) && (
@@ -278,13 +267,9 @@ function TaskRow({
           {t.assigneeName && <span className="text-ink-faint">· {t.assigneeName}</span>}
         </div>
         {rescheduling && (
-          <input
-            type="datetime-local"
-            autoFocus
-            defaultValue={t.dueAt ? toLocalInput(t.dueAt) : ""}
-            onChange={(e) => onReschedule(e.target.value)}
-            className="mt-1.5 bg-surface border border-border-default rounded-[6px] px-2 py-1 text-[11px] text-ink focus:outline-none"
-          />
+          <div className="mt-1.5">
+            <DateTimePicker value={t.dueAt} onChange={onReschedule} placeholder="Reschedule" />
+          </div>
         )}
       </div>
 
@@ -378,9 +363,48 @@ function AssigneeDropdown({ value, onChange, members, mineLabel }: {
   );
 }
 
-/** ISO string → value for <input type="datetime-local"> in local time. */
-function toLocalInput(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** Leadey-styled task-category picker with colour dots (no native <select>). */
+function CategorySelect({ value, categories, onChange }: {
+  value: string;
+  categories: TaskCategoryDef[];
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open]);
+  const current = categories.find((c) => c.key === value) ?? categories[0];
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-1.5 bg-surface border border-border-subtle rounded-[6px] px-2 py-1.5 text-[10.5px] text-ink-secondary hover:bg-hover"
+      >
+        <span className={cn("w-2 h-2 rounded-full", CATEGORY_DOT_CLASS[current?.color ?? "slate"])} />
+        <span className="whitespace-nowrap">{current?.label ?? "Task"}</span>
+        <ChevronDown size={11} className={cn("text-ink-muted transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 w-[160px] bg-surface rounded-[8px] border border-border-subtle shadow-lg py-1">
+          {categories.map((c) => (
+            <button
+              key={c.key}
+              type="button"
+              onClick={() => { onChange(c.key); setOpen(false); }}
+              className={cn("w-full flex items-center gap-2 px-2.5 py-1.5 text-[11.5px] text-left transition-colors",
+                c.key === value ? "bg-hover text-ink font-medium" : "text-ink-secondary hover:bg-hover")}
+            >
+              <span className={cn("w-2 h-2 rounded-full shrink-0", CATEGORY_DOT_CLASS[c.color])} />
+              <span className="truncate">{c.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
