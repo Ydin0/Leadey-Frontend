@@ -72,6 +72,16 @@ export async function updateMemberRole(userId: string, role: string): Promise<{ 
   });
 }
 
+export async function updateMember(
+  userId: string,
+  updates: { firstName?: string; lastName?: string },
+): Promise<{ id: string; firstName: string | null; lastName: string | null }> {
+  return apiRequest(`/team/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+}
+
 export async function removeMember(userId: string): Promise<void> {
   await apiRequest(`/team/${userId}`, { method: "DELETE" });
 }

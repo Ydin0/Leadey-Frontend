@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Mail, Loader2, X, ChevronDown, UserPlus, Clock, Trash2, AlertTriangle } from "lucide-react";
+import { Users, Mail, Loader2, X, ChevronDown, UserPlus, Clock, Trash2, AlertTriangle, Pencil } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -14,6 +14,7 @@ import {
   getPendingInvitations,
   revokeInvitation,
   updateMemberRole,
+  updateMember,
   removeMember,
 } from "@/lib/api/team";
 import type { TeamMember, PendingInvitation, SeatUsage } from "@/lib/types/team";
@@ -60,6 +61,44 @@ export function TeamSection() {
   const [removing, setRemoving] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<TeamMember | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+
+  // Edit member
+  const [editMember, setEditMember] = useState<TeamMember | null>(null);
+  const [editFirstName, setEditFirstName] = useState("");
+  const [editLastName, setEditLastName] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  function openEdit(member: TeamMember) {
+    setEditMember(member);
+    setEditFirstName(member.firstName || "");
+    setEditLastName(member.lastName || "");
+    setEditError(null);
+  }
+
+  async function handleSaveEdit() {
+    if (!editMember) return;
+    setSavingEdit(true);
+    setEditError(null);
+    try {
+      const updated = await updateMember(editMember.id, {
+        firstName: editFirstName.trim(),
+        lastName: editLastName.trim(),
+      });
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.id === editMember.id
+            ? { ...m, firstName: updated.firstName, lastName: updated.lastName }
+            : m,
+        ),
+      );
+      setEditMember(null);
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Failed to save changes");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
 
   const loadData = useCallback(async () => {
     try {
@@ -268,6 +307,15 @@ export function TeamSection() {
                   )}
                 </div>
 
+                {/* Edit */}
+                <button
+                  onClick={() => openEdit(member)}
+                  className="p-1.5 rounded-md text-ink-faint hover:text-ink hover:bg-hover transition-colors"
+                  title="Edit member"
+                >
+                  <Pencil size={12} />
+                </button>
+
                 {/* Remove */}
                 {member.id === user?.id ? (
                   <span
@@ -408,6 +456,67 @@ export function TeamSection() {
               >
                 {removing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                 Remove member
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit member modal */}
+      {editMember && (
+        <Modal onClose={() => (savingEdit ? null : setEditMember(null))} maxWidth={460}>
+          <ModalHeader
+            title="Edit member"
+            onClose={() => (savingEdit ? null : setEditMember(null))}
+          />
+          <div className="p-[18px]">
+            <p className="text-[11.5px] text-ink-muted mb-4">
+              Correct this member&apos;s name. Their email is their sign-in identity and
+              can&apos;t be changed here.
+            </p>
+
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <input
+                type="text"
+                autoFocus
+                value={editFirstName}
+                onChange={(e) => setEditFirstName(e.target.value)}
+                placeholder="First name"
+                className="px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+              />
+              <input
+                type="text"
+                value={editLastName}
+                onChange={(e) => setEditLastName(e.target.value)}
+                placeholder="Last name"
+                className="px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 px-3 py-2 rounded-[8px] bg-section/50 border border-border-subtle">
+              <Mail size={12} className="text-ink-faint shrink-0" />
+              <span className="text-[12px] text-ink-muted">{editMember.email}</span>
+            </div>
+
+            {editError && (
+              <p className="text-[11.5px] text-signal-red-text mt-3">{editError}</p>
+            )}
+
+            <div className="flex items-center justify-end gap-2 mt-5">
+              <button
+                onClick={() => setEditMember(null)}
+                disabled={savingEdit}
+                className="px-4 py-2 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                disabled={savingEdit || (!editFirstName.trim() && !editLastName.trim())}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {savingEdit ? <Loader2 size={12} className="animate-spin" /> : <Pencil size={12} />}
+                Save changes
               </button>
             </div>
           </div>

@@ -26,7 +26,8 @@ export default function OpportunitiesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [ownerFilter, setOwnerFilter] = useState<string | "all">("all");
+  // Selected owner ids to filter by; empty = all owners.
+  const [ownerFilter, setOwnerFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Resolve each deal's owner to their initials so the card shows a colour-coded
@@ -74,7 +75,7 @@ export default function OpportunitiesPage() {
     try {
       const result = await listOpportunities({
         pipelineId: activePipelineId,
-        ownerId: ownerFilter === "all" ? undefined : ownerFilter,
+        ownerId: ownerFilter.length > 0 ? ownerFilter.join(",") : undefined,
         q: searchQuery.trim() || undefined,
         summary: true,
       });
