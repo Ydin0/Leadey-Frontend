@@ -15,6 +15,7 @@ import {
   Users,
   UsersRound,
   GraduationCap,
+  Inbox,
 } from "lucide-react";
 import type {
   NavItem,
@@ -43,7 +44,10 @@ import type {
 export const navGroups: NavGroup[] = [
   {
     label: "Overview",
-    items: [{ id: "cockpit", label: "Cockpit", icon: LayoutDashboard, href: "/dashboard" }],
+    items: [
+      { id: "cockpit", label: "Cockpit", icon: LayoutDashboard, href: "/dashboard" },
+      { id: "inbox", label: "Inbox", icon: Inbox, href: "/dashboard/inbox" },
+    ],
   },
   {
     label: "Outreach",
