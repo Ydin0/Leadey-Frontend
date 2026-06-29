@@ -6,7 +6,6 @@ import {
   Inbox as InboxIcon, Mail, Phone, MessageSquare, ListChecks, Bell, UserPlus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { EmailInbox } from "./tabs/email-inbox";
 import { TasksInbox } from "./tabs/tasks-inbox";
 import { CallsInbox } from "./tabs/calls-inbox";
 import { MessagesInbox } from "./tabs/messages-inbox";
@@ -14,22 +13,22 @@ import { PrimaryFeed } from "./tabs/primary-feed";
 import { PotentialContactsInbox } from "./tabs/potential-contacts-inbox";
 import { getInboxCounts, type InboxCounts } from "@/lib/api/inbox";
 
-type TabKey = "primary" | "emails" | "calls" | "messages" | "tasks" | "reminders" | "potential";
+type TabKey = "primary" | "calls" | "messages" | "tasks" | "reminders" | "potential";
 
-// `ready: false` tabs are hidden until their data source is production-ready
-// (e.g. Emails is still mock-backed). Flip the flag to surface a tab.
-const TABS: { key: TabKey; label: string; icon: typeof Mail; count?: keyof InboxCounts; ready: boolean }[] = [
-  { key: "primary", label: "Primary", icon: InboxIcon, count: "total", ready: true },
-  { key: "emails", label: "Emails", icon: Mail, ready: false },
-  { key: "calls", label: "Calls", icon: Phone, count: "calls", ready: true },
-  { key: "messages", label: "Messages", icon: MessageSquare, count: "messages", ready: true },
-  { key: "tasks", label: "Tasks", icon: ListChecks, count: "tasks", ready: true },
-  { key: "reminders", label: "Reminders", icon: Bell, count: "reminders", ready: true },
-  { key: "potential", label: "Potential Contacts", icon: UserPlus, count: "potential", ready: true },
+// Every tab here is backed by LIVE org data (no mock/hardcoded content). The
+// Emails tab is intentionally omitted until a real email backend is wired up —
+// it must not ship with the placeholder mock threads.
+const TABS: { key: TabKey; label: string; icon: typeof Mail; count?: keyof InboxCounts }[] = [
+  { key: "primary", label: "Primary", icon: InboxIcon, count: "total" },
+  { key: "calls", label: "Calls", icon: Phone, count: "calls" },
+  { key: "messages", label: "Messages", icon: MessageSquare, count: "messages" },
+  { key: "tasks", label: "Tasks", icon: ListChecks, count: "tasks" },
+  { key: "reminders", label: "Reminders", icon: Bell, count: "reminders" },
+  { key: "potential", label: "Potential Contacts", icon: UserPlus, count: "potential" },
 ];
 
-const VISIBLE_TABS = TABS.filter((t) => t.ready);
-const VALID = new Set<TabKey>(VISIBLE_TABS.map((t) => t.key));
+const VISIBLE_TABS = TABS;
+const VALID = new Set<TabKey>(TABS.map((t) => t.key));
 
 export function InboxShell() {
   const router = useRouter();
@@ -87,8 +86,6 @@ export function InboxShell() {
       {/* Active tab */}
       {tab === "primary" ? (
         <PrimaryFeed />
-      ) : tab === "emails" ? (
-        <EmailInbox />
       ) : tab === "calls" ? (
         <CallsInbox />
       ) : tab === "messages" ? (
