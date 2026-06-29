@@ -8,7 +8,7 @@ import type { Pipeline } from "@/lib/types/opportunity";
 
 interface ConvertToOpportunityModalProps {
   leadId: string;
-  /** Pre-fill the opportunity name from the lead's company/name. */
+  /** The opportunity name — fixed to the lead's name (shown read-only). */
   defaultName?: string;
   onClose: () => void;
   /** Called after a successful conversion with the new opportunity id. */
@@ -30,7 +30,8 @@ export function ConvertToOpportunityModal({
 
   const [pipelineId, setPipelineId] = useState<string>("");
   const [stageId, setStageId] = useState<string>("");
-  const [name, setName] = useState(defaultName);
+  // The opportunity is always named after the lead — fixed, not editable.
+  const name = defaultName;
   const [value, setValue] = useState<string>("");
   const [expectedCloseDate, setExpectedCloseDate] = useState<string>("");
   const [ownerId, setOwnerId] = useState<string>("");
@@ -129,14 +130,13 @@ export function ConvertToOpportunityModal({
           </div>
         ) : (
           <div className="px-5 py-4 space-y-3">
-            <Field label="Name *">
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Acme — Annual subscription"
-                className={inputClass}
-              />
+            <Field label="Opportunity name">
+              <div
+                className={`${inputClass} flex items-center text-ink-muted cursor-not-allowed select-none`}
+                title="The opportunity is named after the lead and can't be changed"
+              >
+                {name || "—"}
+              </div>
             </Field>
 
             <div className="grid grid-cols-2 gap-3">

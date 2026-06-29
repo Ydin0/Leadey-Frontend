@@ -678,7 +678,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
       {showConvert && (
         <ConvertToOpportunityModal
           leadId={currentLead.id}
-          defaultName={`${currentLead.company} — Opportunity`}
+          defaultName={currentLead.name || currentLead.company}
           onClose={() => setShowConvert(false)}
           onConverted={() => onLeadsChanged?.()}
         />

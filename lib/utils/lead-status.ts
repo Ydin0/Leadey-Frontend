@@ -46,6 +46,17 @@ export const BUILTIN_STATUS_OPTIONS: LeadStatusOption[] = [
 
 const BUILTIN_BY_KEY = new Map(BUILTIN_STATUS_OPTIONS.map((o) => [o.key, o]));
 
+/** Turn a free-text label into a stable status key — must match the backend's
+ *  slugifyStatusKey so the frontend can predict the key a new custom status
+ *  will get (used when sending the display order). */
+export function slugifyStatusKey(label: string): string {
+  return (label || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 function resolve(
   status: string,
   options?: LeadStatusOption[],
