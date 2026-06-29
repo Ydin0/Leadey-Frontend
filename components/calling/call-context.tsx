@@ -68,7 +68,7 @@ async function fetchTwilioToken(clerkToken: string | null): Promise<string> {
 }
 
 export function CallProvider({ children }: { children: React.ReactNode }) {
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const isAuthReady = useAuthReady();
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [phoneLines, setPhoneLines] = useState<PhoneLine[]>([]);
@@ -131,8 +131,15 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
         setPhoneLines(lines);
         setCallHistory(recordsResult.data);
-        const firstActive = lines.find((l) => l.status === "active");
-        if (firstActive) setSelectedLineId(firstActive.id);
+        // Default to the rep's OWN assigned line so each person dials from (and
+        // receives callbacks on) their own number. Falling back to the first
+        // active line made the whole team dial from one shared number, which
+        // mis-routed callbacks and caused concurrency drops on that number.
+        const mine = userId
+          ? lines.find((l) => l.status === "active" && l.assignedTo === userId)
+          : undefined;
+        const pick = mine || lines.find((l) => l.status === "active");
+        if (pick) setSelectedLineId(pick.id);
       } catch (err) {
         console.error("[CallProvider] Failed to load phone data:", err);
       } finally {
