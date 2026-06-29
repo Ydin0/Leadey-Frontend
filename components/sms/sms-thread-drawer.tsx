@@ -12,6 +12,16 @@ import type { PhoneLine } from "@/lib/types/calling";
 import type { Template } from "@/lib/types/template";
 import { SlideOver } from "@/components/shared/slide-over";
 
+/** Rough dial-country of a number — so we text a UK lead from a UK number and a
+ *  US lead from a US number (Twilio rejects mismatched From/To combinations). */
+function phoneCountry(num: string | null | undefined): "us" | "uk" | "other" {
+  const raw = (num || "").replace(/[^\d+]/g, "");
+  const d = raw.replace(/\D/g, "");
+  if (raw.startsWith("+44") || d.startsWith("44") || /^07\d{9}$/.test(d)) return "uk";
+  if (raw.startsWith("+1") || (d.length === 11 && d.startsWith("1")) || (!raw.startsWith("+") && d.length === 10)) return "us";
+  return "other";
+}
+
 interface SmsThreadDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -55,6 +65,7 @@ export function SmsThreadDrawer({
     setLoading(true);
     setError(null);
     setBody("");
+    setFromLineId(""); // re-pick a country-matched From line for this lead
     getSmsThread(funnelId, leadId)
       .then((m) => !cancelled && setMessages(m))
       .catch(() => !cancelled && setError("Couldn't load the conversation."))
@@ -65,7 +76,13 @@ export function SmsThreadDrawer({
         if (cancelled) return;
         const active = ls.filter((l) => l.status === "active");
         setLines(active);
-        setFromLineId((prev) => prev || active[0]?.id || "");
+        // Default the "From" number to one whose country matches the recipient,
+        // so a UK lead is texted from a UK number (Twilio rejects e.g. US→UK).
+        const destCountry = phoneCountry(leadPhone);
+        const match = destCountry !== "other"
+          ? active.find((l) => phoneCountry(l.number) === destCountry)
+          : undefined;
+        setFromLineId((prev) => prev || match?.id || active[0]?.id || "");
       })
       .catch(() => {});
     listTemplates("sms").then((t) => !cancelled && setTemplates(t)).catch(() => {});
