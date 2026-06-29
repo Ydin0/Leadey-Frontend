@@ -176,7 +176,10 @@ export function AssistantWidget() {
         title="Leadey Assistant"
         aria-label="Open Leadey Assistant"
         className={cn(
-          "fixed bottom-6 right-6 z-[60] flex items-center justify-center w-[52px] h-[52px] rounded-full shadow-xl transition-all hover:scale-105",
+          // z-40 keeps the launcher BELOW drawers/modals (z-50+) so it can never
+          // cover their controls (e.g. the SMS composer's Send button). When no
+          // overlay is open it's still the top-most thing in its corner.
+          "fixed bottom-6 right-6 z-40 flex items-center justify-center w-[52px] h-[52px] rounded-full shadow-xl transition-all hover:scale-105",
           open ? "bg-ink text-on-ink" : "bg-accent text-on-ink",
         )}
       >
