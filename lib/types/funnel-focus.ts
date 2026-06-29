@@ -36,9 +36,11 @@ export interface FunnelLeadContact {
 
 export interface FunnelLeadActivity {
   id: string;
-  type: "call" | "email_sent" | "email_opened" | "linkedin" | "note" | "status_change" | "import" | "opportunity" | "sms_sent" | "sms_received";
+  type: "call" | "email_sent" | "email_opened" | "linkedin" | "note" | "status_change" | "import" | "opportunity" | "sms_sent" | "sms_received" | "meeting_scheduled" | "meeting_canceled";
   summary: string;
   detail?: string;
+  /** Calendly meeting join/booking link, for meeting_* activities. */
+  meetingUrl?: string | null;
   timestamp: Date;
   userInitials: string;
   /** The team member who performed this activity (when known). */

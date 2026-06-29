@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Settings, Phone, Mail, MailOpen, Linkedin, FileText, Package, Trophy, MessageSquare } from "lucide-react";
+import { Search, Settings, Phone, Mail, MailOpen, Linkedin, FileText, Package, Trophy, MessageSquare, CalendarCheck, CalendarX } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { FunnelLeadActivity } from "@/lib/types/funnel-focus";
 
@@ -25,6 +25,8 @@ const activityIcon: Record<FunnelLeadActivity["type"], typeof Phone> = {
   opportunity: Trophy,
   sms_sent: MessageSquare,
   sms_received: MessageSquare,
+  meeting_scheduled: CalendarCheck,
+  meeting_canceled: CalendarX,
 };
 
 interface LeadActivityTimelineProps {

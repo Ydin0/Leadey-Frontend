@@ -21,6 +21,8 @@ import {
   Loader2,
   Filter,
   X,
+  CalendarCheck,
+  CalendarX,
   type LucideIcon,
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -70,6 +72,8 @@ const TYPE_META: Record<string, KindMeta> = {
   opportunity: { icon: Trophy, tint: "bg-signal-green", fg: "text-signal-green-text" },
   sms_sent: { icon: MessageSquare, tint: "bg-signal-green", fg: "text-signal-green-text" },
   sms_received: { icon: MessageSquare, tint: "bg-signal-green", fg: "text-signal-green-text" },
+  meeting_scheduled: { icon: CalendarCheck, tint: "bg-signal-blue", fg: "text-signal-blue-text" },
+  meeting_canceled: { icon: CalendarX, tint: "bg-signal-red", fg: "text-signal-red-text" },
 };
 
 type FeedItem =
@@ -261,6 +265,12 @@ function ActivityCard({
         <div className="min-w-0">
           <p className="text-[12.5px] text-ink leading-snug whitespace-pre-wrap">{a.summary}</p>
           {a.detail && <p className="text-[11.5px] text-ink-muted mt-1 leading-relaxed">{a.detail}</p>}
+          {a.type === "meeting_scheduled" && a.meetingUrl && (
+            <a href={a.meetingUrl} target="_blank" rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[11px] font-medium text-signal-blue-text hover:underline mt-1">
+              Join meeting <ChevronRight size={11} />
+            </a>
+          )}
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
           {showContact && a.contactName && (

@@ -74,6 +74,14 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
       } else if (e.type === "note") {
         type = "note";
         summary = (e.meta?.text as string) || "Note";
+      } else if (e.type === "meeting_scheduled" || e.type === "meeting_canceled") {
+        type = e.type;
+        const title = (e.meta?.title as string) || "Meeting";
+        const start = e.meta?.startTime ? new Date(e.meta.startTime as string) : null;
+        summary = e.type === "meeting_canceled" ? `Meeting canceled — ${title}` : `Meeting booked — ${title}`;
+        detail = start
+          ? start.toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
+          : "";
       } else if (e.type === "converted") {
         type = "opportunity";
         summary = "Converted to an opportunity";
@@ -87,11 +95,13 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
 
       const userId = (e.meta?.userId as string) || null;
       const userName = (e.meta?.userName as string) || null;
+      const meetingUrl = (e.meta?.joinUrl as string) || null;
 
       return {
         id: e.id,
         type,
         summary,
+        meetingUrl,
         detail: detail || undefined,
         timestamp: e.timestamp,
         userInitials: "",

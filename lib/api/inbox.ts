@@ -23,11 +23,14 @@ export interface PrimaryItem {
 }
 
 export interface PotentialContact {
-  phone: string;
+  phone: string | null;
+  email: string | null;
+  name: string | null;
   lastAt: string;
   calls: number;
   texts: number;
-  name: string | null;
+  meetings: number;
+  source: "phone" | "calendly";
 }
 
 export async function getInboxCounts(): Promise<InboxCounts> {
@@ -43,7 +46,8 @@ export async function getPotentialContacts(): Promise<PotentialContact[]> {
 }
 
 export async function convertPotentialContact(data: {
-  phone: string;
+  phone?: string;
+  email?: string;
   name?: string;
   funnelId: string;
 }): Promise<{ leadId: string; funnelId: string }> {

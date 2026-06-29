@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, UserPlus, PhoneCall, PhoneIncoming, MessageSquare } from "lucide-react";
+import { Loader2, UserPlus, PhoneCall, PhoneIncoming, MessageSquare, Calendar } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import { getPotentialContacts, convertPotentialContact, type PotentialContact } from "@/lib/api/inbox";
 import { listFunnels } from "@/lib/api/funnels";
@@ -42,30 +42,41 @@ export function PotentialContactsInbox() {
             <p className="text-[12px] text-ink-muted">No unknown contacts — everyone who reached out is in your CRM.</p>
           </div>
         ) : (
-          contacts.map((c) => (
-            <div key={c.phone} className="group flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors">
+          contacts.map((c) => {
+            const handle = c.phone || c.email || "?";
+            return (
+            <div key={handle} className="group flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors">
               <span className="flex items-center justify-center w-8 h-8 rounded-full bg-section text-ink-muted shrink-0 text-[11px] font-semibold">
-                {(c.name || c.phone).slice(0, 2).toUpperCase()}
+                {(c.name || handle).slice(0, 2).toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <div className="text-[12.5px] text-ink truncate">{c.name || c.phone}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[12.5px] text-ink truncate">{c.name || handle}</span>
+                  {c.source === "calendly" && (
+                    <span className="text-[9px] font-medium uppercase tracking-wide rounded-full px-1.5 py-0.5 bg-signal-blue/15 text-signal-blue-text shrink-0">Calendly</span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 text-[10.5px] text-ink-muted">
-                  {c.name && <span className="truncate">{c.phone}</span>}
+                  {c.name && <span className="truncate">{c.phone || c.email}</span>}
                   {c.calls > 0 && <span className="flex items-center gap-0.5"><PhoneIncoming size={10} />{c.calls}</span>}
                   {c.texts > 0 && <span className="flex items-center gap-0.5"><MessageSquare size={10} />{c.texts}</span>}
+                  {c.meetings > 0 && <span className="flex items-center gap-0.5"><Calendar size={10} />{c.meetings}</span>}
                 </div>
               </div>
               <span className="text-[10.5px] text-ink-faint shrink-0">{formatRelativeTime(new Date(c.lastAt))}</span>
               <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                <button onClick={() => void startCall(c.phone, { contactName: c.name || undefined })} title="Call back" className="p-1.5 rounded-md text-ink-faint hover:text-signal-green-text hover:bg-signal-green/10">
-                  <PhoneCall size={13} />
-                </button>
+                {c.phone && (
+                  <button onClick={() => void startCall(c.phone!, { contactName: c.name || undefined })} title="Call back" className="p-1.5 rounded-md text-ink-faint hover:text-signal-green-text hover:bg-signal-green/10">
+                    <PhoneCall size={13} />
+                  </button>
+                )}
                 <button onClick={() => setConverting(c)} title="Add as lead" className="flex items-center gap-1 px-2.5 py-1 rounded-[14px] bg-ink text-on-ink text-[10.5px] font-medium hover:opacity-90">
                   <UserPlus size={11} /> Add as lead
                 </button>
               </div>
             </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -105,7 +116,12 @@ function ConvertModal({ contact, onClose, onConverted }: {
     setSaving(true);
     setError(null);
     try {
-      await convertPotentialContact({ phone: contact.phone, name: name.trim() || undefined, funnelId });
+      await convertPotentialContact({
+        phone: contact.phone || undefined,
+        email: contact.email || undefined,
+        name: name.trim() || undefined,
+        funnelId,
+      });
       onConverted();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add lead");
@@ -118,11 +134,11 @@ function ConvertModal({ contact, onClose, onConverted }: {
       <ModalHeader title="Add as lead" onClose={() => (saving ? null : onClose())} />
       <div className="p-[18px] space-y-3">
         <p className="text-[11.5px] text-ink-muted">
-          Create a lead for <span className="font-medium text-ink">{contact.phone}</span> and link their inbound calls/texts.
+          Create a lead for <span className="font-medium text-ink">{contact.phone || contact.email}</span> and link their inbound activity.
         </p>
         <div>
           <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Name</label>
-          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={contact.phone}
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder={contact.phone || contact.email || ""}
             className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink focus:outline-none focus:border-border-default" />
         </div>
         <div>
