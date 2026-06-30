@@ -5,7 +5,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { X, MessageSquare, Loader2, Send, ChevronDown, Check, CheckCheck, FileText } from "lucide-react";
 import { cn, formatRelativeTime, formatPhoneIntl } from "@/lib/utils";
 import { useTeamMembers } from "@/hooks/use-team-members";
-import { getSmsThread, sendSms, type SmsMessage } from "@/lib/api/sms";
+import { getSmsThread, getSmsThreadByPhone, sendSms, type SmsMessage } from "@/lib/api/sms";
 import { getPhoneLines } from "@/lib/api/phone-lines";
 import { listTemplates } from "@/lib/api/templates";
 import { renderPersonalized, type PersonalizationLead } from "@/lib/utils/personalize";
@@ -26,8 +26,10 @@ function phoneCountry(num: string | null | undefined): "us" | "uk" | "other" {
 interface SmsThreadDrawerProps {
   open: boolean;
   onClose: () => void;
-  funnelId: string;
-  leadId: string;
+  /** When linked to a lead, the thread loads & sends via funnel+lead. When null
+   *  (e.g. an unmatched inbox number), the thread loads read-only by phone. */
+  funnelId?: string | null;
+  leadId?: string | null;
   leadName: string;
   leadPhone: string | null;
   /** Lead fields for personalizing template variables ({{first_name}}, etc.). */
@@ -59,6 +61,8 @@ export function SmsThreadDrawer({
   const endRef = useRef<HTMLDivElement>(null);
 
   const personalize = (text: string) => renderPersonalized(text, lead || { name: leadName });
+  /** Sending requires a linked lead; unmatched numbers are view-only. */
+  const canSend = !!(funnelId && leadId);
 
   useEffect(() => {
     if (!open) return;
@@ -67,7 +71,12 @@ export function SmsThreadDrawer({
     setError(null);
     setBody("");
     setFromLineId(""); // re-pick a country-matched From line for this lead
-    getSmsThread(funnelId, leadId)
+    const load = funnelId && leadId
+      ? getSmsThread(funnelId, leadId)
+      : leadPhone
+        ? getSmsThreadByPhone(leadPhone)
+        : Promise.resolve([] as SmsMessage[]);
+    load
       .then((m) => !cancelled && setMessages(m))
       .catch(() => !cancelled && setError("Couldn't load the conversation."))
       .finally(() => !cancelled && setLoading(false));
@@ -88,7 +97,7 @@ export function SmsThreadDrawer({
       .catch(() => {});
     listTemplates("sms").then((t) => !cancelled && setTemplates(t)).catch(() => {});
     return () => { cancelled = true; };
-  }, [open, funnelId, leadId]);
+  }, [open, funnelId, leadId, leadPhone]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
@@ -98,7 +107,7 @@ export function SmsThreadDrawer({
 
   async function handleSend() {
     const text = body.trim();
-    if (!text || sending) return;
+    if (!text || sending || !funnelId || !leadId) return;
     setSending(true);
     setError(null);
     try {
@@ -141,6 +150,7 @@ export function SmsThreadDrawer({
         </div>
 
         {/* Send-from selector — admins can text from any active number. */}
+        {canSend && (
         <div className="mt-3 flex items-center gap-2">
           <span className="text-[10px] uppercase tracking-wider text-ink-faint font-medium">From</span>
           <div className="relative flex-1 min-w-0">
@@ -160,6 +170,7 @@ export function SmsThreadDrawer({
             <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
           </div>
         </div>
+        )}
       </div>
 
       {/* Thread */}
@@ -206,7 +217,15 @@ export function SmsThreadDrawer({
         <div ref={endRef} />
       </div>
 
-      {/* Composer */}
+      {/* View-only footer when the number isn't linked to a lead. */}
+      {!canSend ? (
+        <div className="shrink-0 border-t border-border-subtle px-4 py-3 bg-surface">
+          <p className="text-[11px] text-ink-muted text-center">
+            This number isn’t linked to a lead — add them as a lead to reply.
+          </p>
+        </div>
+      ) : (
+      /* Composer */
       <div className="shrink-0 border-t border-border-subtle p-3 bg-surface">
         {error && <p className="text-[11px] text-signal-red-text mb-2 px-1">{error}</p>}
 
@@ -274,6 +293,7 @@ export function SmsThreadDrawer({
           </span>
         </div>
       </div>
+      )}
     </SlideOver>
   );
 }

@@ -32,6 +32,12 @@ export async function getSmsThread(funnelId: string, leadId: string): Promise<Sm
   );
 }
 
+/** The full SMS conversation with a counterparty number (matched on the last 10
+ *  digits), oldest first. For inbox rows that aren't linked to a lead. */
+export async function getSmsThreadByPhone(phone: string): Promise<SmsMessage[]> {
+  return apiRequest<SmsMessage[]>(`/sms/thread-by-phone?phone=${encodeURIComponent(phone)}`);
+}
+
 /** An org-wide SMS conversation grouped by the counterparty phone number. */
 export interface SmsThread {
   key: string;

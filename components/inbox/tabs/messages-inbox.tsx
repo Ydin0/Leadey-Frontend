@@ -1,17 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, MessageSquare, ArrowUpRight } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { getSmsThreads, type SmsThread } from "@/lib/api/sms";
+import { SmsThreadDrawer } from "@/components/sms/sms-thread-drawer";
 
 /** Messages tab — every SMS conversation across the org, newest first, with the
- *  ones awaiting a reply flagged. */
+ *  ones awaiting a reply flagged. Clicking a row opens a WhatsApp-style chat. */
 export function MessagesInbox() {
   const router = useRouter();
   const [threads, setThreads] = useState<SmsThread[]>([]);
   const [loading, setLoading] = useState(true);
+  const [active, setActive] = useState<SmsThread | null>(null);
+
+  const refresh = useCallback(() => {
+    return getSmsThreads().then(setThreads).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,11 +42,8 @@ export function MessagesInbox() {
           threads.map((t) => (
             <div
               key={t.key}
-              onClick={() => { if (t.leadId && t.funnelId) router.push(`/dashboard/funnels/${t.funnelId}/leads/${t.leadId}`); }}
-              className={cn(
-                "group relative flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors",
-                t.leadId && t.funnelId ? "cursor-pointer" : "",
-              )}
+              onClick={() => setActive(t)}
+              className="group relative flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors cursor-pointer"
             >
               <span className={cn("flex items-center justify-center w-8 h-8 rounded-full shrink-0",
                 t.needsReply ? "bg-signal-green/15 text-signal-green-text" : "bg-section text-ink-muted")}>
@@ -60,7 +63,7 @@ export function MessagesInbox() {
               <span className="text-[10.5px] text-ink-faint shrink-0 w-16 text-right">{formatRelativeTime(new Date(t.lastAt))}</span>
               {t.leadId && t.funnelId && (
                 <button
-                  onClick={() => router.push(`/dashboard/funnels/${t.funnelId}/leads/${t.leadId}`)}
+                  onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/funnels/${t.funnelId}/leads/${t.leadId}`); }}
                   title="Open lead"
                   className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-md text-ink-faint hover:text-ink hover:bg-hover opacity-0 group-hover:opacity-100 transition-opacity bg-surface"
                 >
@@ -71,6 +74,16 @@ export function MessagesInbox() {
           ))
         )}
       </div>
+
+      <SmsThreadDrawer
+        open={!!active}
+        onClose={() => setActive(null)}
+        funnelId={active?.funnelId ?? null}
+        leadId={active?.leadId ?? null}
+        leadName={active?.contactName || active?.phone || "Conversation"}
+        leadPhone={active?.phone ?? null}
+        onSent={refresh}
+      />
     </div>
   );
 }
