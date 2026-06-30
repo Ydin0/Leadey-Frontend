@@ -1,8 +1,16 @@
 "use client";
 
-import { Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Trash2, X, Loader2, BookmarkPlus, Check } from "lucide-react";
 import type { Workflow, WorkflowNode, WorkflowSettings, WorkflowStatus } from "@/lib/types/workflow";
 import { NativeSelect } from "@/components/ui/native-select";
+import { VariablePicker } from "./variable-picker";
+import { listEmailAccounts } from "@/lib/api/email-accounts";
+import type { EmailAccount } from "@/lib/types/email-accounts";
+import { getPhoneLines } from "@/lib/api/phone-lines";
+import type { PhoneLine } from "@/lib/types/calling";
+import { listTemplates, createTemplate } from "@/lib/api/templates";
+import type { Template } from "@/lib/types/template";
 import { NODE_TYPES } from "./node-types";
 
 const lab = "block text-[10px] uppercase tracking-wider text-ink-muted font-medium mt-4 mb-1.5";
@@ -58,21 +66,9 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProp
         <input className={inp} value={v("sub")} onChange={(e) => set({ sub: e.target.value })} placeholder="Optional note" />
       </>)}
 
-      {node.type === "email" && (<>
-        <label className={lab}>From</label>
-        <input className={inp} value={v("from")} onChange={(e) => set({ from: e.target.value })} placeholder="connected mailbox (e.g. you@co.com)" />
-        <label className={lab}>Subject</label>
-        <input className={inp} value={v("subject")} onChange={(e) => set({ subject: e.target.value })} placeholder="Quick question, {firstName}" />
-        <label className={lab}>Body</label>
-        <textarea className={area} value={v("body")} onChange={(e) => set({ body: e.target.value })} />
-        <p className="text-[11px] text-ink-faint mt-1.5">Use {"{firstName}"}, {"{company}"} for personalization.</p>
-      </>)}
+      {node.type === "email" && <EmailStepForm d={d} set={set} />}
 
-      {node.type === "sms" && (<>
-        <label className={lab}>Message</label>
-        <textarea className={area} value={v("message")} onChange={(e) => set({ message: e.target.value })} />
-        <p className="text-[11px] text-ink-faint mt-1.5">{v("message").length} chars · {Math.max(1, Math.ceil(v("message").length / 160))} segment(s)</p>
-      </>)}
+      {node.type === "sms" && <SmsStepForm d={d} set={set} />}
 
       {node.type === "linkedin" && (<>
         <label className={lab}>Action</label>
@@ -234,5 +230,141 @@ function SettingsPanel({ workflow, onRename, onStatus, onSettings }: InspectorPr
       </div>
       <p className="text-[11.5px] text-ink-faint leading-relaxed mt-4">Select any step on the canvas to configure it. Drag a port to connect steps.</p>
     </div>
+  );
+}
+
+// ─── Email / SMS step forms (From, template, variables, save-as-template) ──
+
+function FieldHeader({ label, picker }: { label: string; picker?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between mt-4 mb-1.5">
+      <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">{label}</span>
+      {picker}
+    </div>
+  );
+}
+
+function SaveTemplateRow({ subject, body, channel, onSaved }: { subject?: string; body: string; channel: "email" | "sms"; onSaved: (t: Template) => void }) {
+  const [show, setShow] = useState(false);
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  async function save() {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    try {
+      const t = await createTemplate({ name: name.trim(), channel, subject, body });
+      onSaved(t);
+      setShow(false); setName(""); setDone(true); setTimeout(() => setDone(false), 2500);
+    } finally { setSaving(false); }
+  }
+  if (show) {
+    return (
+      <div className="flex items-center gap-1.5 mt-3">
+        <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Template name"
+          className="flex-1 px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
+        <button onClick={() => void save()} disabled={saving || !name.trim()} className="px-3 py-2 rounded-[8px] bg-ink text-on-ink text-[11px] font-medium disabled:opacity-50">
+          {saving ? <Loader2 size={12} className="animate-spin" /> : "Save"}
+        </button>
+        <button onClick={() => setShow(false)} className="px-2 py-2 text-ink-muted text-[11px]">Cancel</button>
+      </div>
+    );
+  }
+  return (
+    <button onClick={() => setShow(true)} className="flex items-center gap-1.5 mt-3 text-[11px] font-medium text-ink-muted hover:text-ink-secondary">
+      {done ? <><Check size={12} className="text-signal-green-text" /> Saved as template</> : <><BookmarkPlus size={12} /> Save as template</>}
+    </button>
+  );
+}
+
+function EmailStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Record<string, unknown>) => void }) {
+  const v = (k: string) => (d[k] != null ? String(d[k]) : "");
+  const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [tplId, setTplId] = useState("");
+  const subjectRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    listEmailAccounts().then(setAccounts).catch(() => {});
+    listTemplates("email").then(setTemplates).catch(() => {});
+  }, []);
+
+  function applyTemplate(id: string) {
+    setTplId(id);
+    const t = templates.find((x) => x.id === id);
+    if (t) set({ subject: t.subject || "", body: t.body || "" });
+  }
+
+  return (
+    <>
+      <label className={lab}>From</label>
+      <NativeSelect className={inp} value={v("accountId")} onChange={(e) => {
+        const id = e.target.value; const acc = accounts.find((a) => a.id === id);
+        set({ accountId: id, from: acc?.email || "" });
+      }}>
+        <option value="">Default mailbox</option>
+        {accounts.map((a) => <option key={a.id} value={a.id}>{a.fromName ? `${a.fromName} · ${a.email}` : a.email}</option>)}
+      </NativeSelect>
+      {accounts.length === 0 && <p className="text-[11px] text-ink-faint mt-1.5">No mailbox connected — add one in Settings → Email.</p>}
+
+      <label className={lab}>Template</label>
+      <NativeSelect className={inp} value={tplId} onChange={(e) => applyTemplate(e.target.value)}>
+        <option value="">Start from scratch…</option>
+        {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+      </NativeSelect>
+
+      <FieldHeader label="Subject" picker={<VariablePicker targetRef={subjectRef} value={v("subject")} onChange={(val) => set({ subject: val })} />} />
+      <input ref={subjectRef} className={inp} value={v("subject")} onChange={(e) => set({ subject: e.target.value })} placeholder="Quick question, {{first_name}}" />
+
+      <FieldHeader label="Body" picker={<VariablePicker targetRef={bodyRef} value={v("body")} onChange={(val) => set({ body: val })} />} />
+      <textarea ref={bodyRef} className={area} value={v("body")} onChange={(e) => set({ body: e.target.value })} />
+
+      <SaveTemplateRow channel="email" subject={v("subject")} body={v("body")} onSaved={(t) => setTemplates((p) => [t, ...p])} />
+      <p className="text-[11px] text-ink-faint mt-3">Use {"{{first_name}}"}, {"{{company}}"} or any custom field for personalization.</p>
+    </>
+  );
+}
+
+function SmsStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Record<string, unknown>) => void }) {
+  const v = (k: string) => (d[k] != null ? String(d[k]) : "");
+  const [lines, setLines] = useState<PhoneLine[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [tplId, setTplId] = useState("");
+  const msgRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    getPhoneLines().then((ls) => setLines(ls.filter((l) => l.status === "active"))).catch(() => {});
+    listTemplates("sms").then(setTemplates).catch(() => {});
+  }, []);
+
+  function applyTemplate(id: string) {
+    setTplId(id);
+    const t = templates.find((x) => x.id === id);
+    if (t) set({ message: t.body || "" });
+  }
+  const msg = v("message");
+
+  return (
+    <>
+      <label className={lab}>From number</label>
+      <NativeSelect className={inp} value={v("lineId")} onChange={(e) => set({ lineId: e.target.value })}>
+        <option value="">Auto (match recipient country)</option>
+        {lines.map((l) => <option key={l.id} value={l.id}>{l.friendlyName ? `${l.friendlyName} · ${l.number}` : l.number}</option>)}
+      </NativeSelect>
+      {lines.length === 0 && <p className="text-[11px] text-ink-faint mt-1.5">No active phone line available.</p>}
+
+      <label className={lab}>Template</label>
+      <NativeSelect className={inp} value={tplId} onChange={(e) => applyTemplate(e.target.value)}>
+        <option value="">Start from scratch…</option>
+        {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+      </NativeSelect>
+
+      <FieldHeader label="Message" picker={<VariablePicker targetRef={msgRef} value={msg} onChange={(val) => set({ message: val })} />} />
+      <textarea ref={msgRef} className={area} value={msg} onChange={(e) => set({ message: e.target.value })} />
+      <p className="text-[11px] text-ink-faint mt-1.5">{msg.length} chars · {Math.max(1, Math.ceil(msg.length / 160))} segment(s) · use {"{{first_name}}"} or custom fields.</p>
+
+      <SaveTemplateRow channel="sms" body={msg} onSaved={(t) => setTemplates((p) => [t, ...p])} />
+    </>
   );
 }
