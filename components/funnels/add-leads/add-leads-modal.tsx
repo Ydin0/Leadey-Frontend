@@ -18,12 +18,14 @@ const sources = [
 
 interface AddLeadsModalProps {
   funnelId: string;
+  /** Open directly into a specific source flow (from the Add Leads dropdown). */
+  initialSource?: Exclude<SourceType, null>;
   onClose: () => void;
   onLeadsImported?: () => void;
 }
 
-export function AddLeadsModal({ funnelId, onClose, onLeadsImported }: AddLeadsModalProps) {
-  const [activeSource, setActiveSource] = useState<SourceType>(null);
+export function AddLeadsModal({ funnelId, initialSource, onClose, onLeadsImported }: AddLeadsModalProps) {
+  const [activeSource, setActiveSource] = useState<SourceType>(initialSource ?? null);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

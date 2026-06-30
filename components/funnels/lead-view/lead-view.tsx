@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LeadActionBar } from "./lead-action-bar";
-import { LeadDetailsColumn } from "./lead-details-column";
+import { LeadDetailsColumn, type EditableCustomField, type CompanyInfoPatch } from "./lead-details-column";
 import { LeadTimeline } from "./lead-timeline";
 import { LeadStepTracker } from "@/components/funnels/focus/lead-step-tracker";
 import { FocusCallControls } from "@/components/funnels/focus/focus-call-controls";
@@ -12,7 +12,8 @@ import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
 import { SmsThreadDrawer } from "@/components/sms/sms-thread-drawer";
 import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
-import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc, updateLeadContact, type ContactEditPatch } from "@/lib/api/funnels";
+import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc, updateLeadContact, updateLeadCompanyInfo, setLeadCustomFieldValues, createLeadInFunnel, type ContactEditPatch } from "@/lib/api/funnels";
+import { useCustomFields } from "@/lib/hooks/use-custom-fields";
 import { getCallRecords } from "@/lib/api/phone-lines";
 import { getLeadEmailThread, type LeadEmailMessage } from "@/lib/api/email";
 import type { EmailReplyMode } from "./email-activity-card";
@@ -53,6 +54,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   const funnelId = funnel.id;
   const router = useRouter();
   const { statuses } = useLeadStatuses();
+  const { fields: customFieldDefs } = useCustomFields();
   const { startCall, lastEndedCall } = useCallContext();
   const { pauseForEngagement } = useDialerContext();
 
@@ -265,21 +267,32 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
       industry: l.companyIndustry || "",
       employeeCount: l.companyEmployeeCount ?? 0,
       linkedinUrl: l.companyLinkedin || null,
+      annualRevenue: l.companyAnnualRevenue || null,
     };
   }, [companyFirstLead, currentLead]);
 
-  const realCustomFields = useMemo<FunnelLeadCustomField[]>(() => {
+  // Org-defined custom fields, merged with this lead's values so empty fields
+  // still appear (and can be filled in). Carries the key needed to persist.
+  const editableCustomFields = useMemo<EditableCustomField[]>(() => {
+    const l = currentLead;
+    if (!l) return [];
+    const byKey = new Map((l.customFields ?? []).map((f) => [f.key, f]));
+    return customFieldDefs.map((def) => ({
+      key: def.key,
+      label: def.label,
+      value: byKey.get(def.key)?.value ?? "",
+      fieldType: def.fieldType,
+      options: def.options,
+      isLink: def.fieldType === "url",
+    }));
+  }, [currentLead, customFieldDefs]);
+
+  // Read-only system fields shown beneath the editable ones (company LinkedIn /
+  // revenue now live in the editable About section).
+  const readOnlyFields = useMemo<FunnelLeadCustomField[]>(() => {
     const l = currentLead;
     if (!l) return [];
     const fields: FunnelLeadCustomField[] = [];
-    // Org-defined custom fields (from Settings → Custom Fields) come first.
-    if (Array.isArray(l.customFields)) {
-      for (const f of l.customFields) {
-        if (f.value) fields.push({ label: f.label, value: f.value, isLink: f.isLink });
-      }
-    }
-    if (l.companyLinkedin) fields.push({ label: "Company LinkedIn", value: l.companyLinkedin, isLink: true });
-    if (l.companyAnnualRevenue) fields.push({ label: "Annual Revenue", value: l.companyAnnualRevenue });
     if (l.source) fields.push({ label: "Lead Source", value: l.source });
     if (l.notes) {
       for (const [k, v] of Object.entries(l.notes)) {
@@ -496,6 +509,28 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     });
   }, [funnelId, onLeadPatch]);
 
+  // Save company / About info — fans out to every contact at this company in
+  // the funnel (handled server-side). Reload so the change shows everywhere.
+  const handleCompanySave = useCallback(async (patch: CompanyInfoPatch) => {
+    if (!currentLead) return;
+    await updateLeadCompanyInfo(funnelId, currentLead.id, patch);
+    onLeadsChanged?.();
+  }, [funnelId, currentLead, onLeadsChanged]);
+
+  // Save this lead's custom-field values (keyed by field key).
+  const handleCustomFieldsSave = useCallback(async (values: Record<string, string>) => {
+    if (!currentLead) return;
+    await setLeadCustomFieldValues(funnelId, currentLead.id, values);
+    onLeadsChanged?.();
+  }, [funnelId, currentLead, onLeadsChanged]);
+
+  // Add another contact at this company (a sibling lead row).
+  const handleAddContact = useCallback(async (name: string) => {
+    if (!currentLead) return;
+    await createLeadInFunnel(funnelId, { name, company: currentLead.company });
+    onLeadsChanged?.();
+  }, [funnelId, currentLead, onLeadsChanged]);
+
   if (!currentLead) {
     return (
       <div className="rounded-[14px] border border-border-subtle bg-surface p-6">
@@ -565,7 +600,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
             leadId={currentLead.id}
             company={realCompany}
             contacts={companyContacts}
-            customFields={realCustomFields}
+            customFields={readOnlyFields}
+            editableCustomFields={editableCustomFields}
             opportunityId={currentLead.opportunityId ?? null}
             onConvert={() => { pauseForEngagement(); setShowConvert(true); }}
             onOpportunityChanged={() => onLeadsChanged?.()}
@@ -573,6 +609,9 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
             onEmail={(email) => { pauseForEngagement(); setReplyPrefill({ to: email, subject: "", body: "" }); setShowComposer(true); }}
             onDnc={handleDnc}
             onContactSave={handleContactSave}
+            onCompanySave={handleCompanySave}
+            onCustomFieldsSave={handleCustomFieldsSave}
+            onAddContact={handleAddContact}
             activeContactId={contactFilter}
             onContactSelect={toggleContactFilter}
             leads={leads}

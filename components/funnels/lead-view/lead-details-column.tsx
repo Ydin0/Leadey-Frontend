@@ -19,6 +19,9 @@ import {
   ChevronRight,
   Linkedin,
   Filter,
+  Plus,
+  X,
+  DollarSign,
 } from "lucide-react";
 import { cn, formatPhoneIntl } from "@/lib/utils";
 import { localTimeFromPhone } from "@/lib/utils/lead-timezone";
@@ -36,15 +39,44 @@ import { LeadOpportunitySection } from "./lead-opportunity-section";
 import { LeadLeadsList } from "./lead-leads-list";
 import { LeadHiringRolesSection } from "./lead-hiring-roles-section";
 
+/** Patch shape for the editable About section (keys match the backend route). */
+export type CompanyInfoPatch = Partial<{
+  companyDomain: string;
+  companyIndustry: string;
+  companyEmployeeCount: number | string;
+  companyLocation: string;
+  companyDescription: string;
+  companyLinkedin: string;
+  companyAnnualRevenue: string;
+}>;
+
+/** An org-defined custom field merged with this lead's value, for inline edit. */
+export interface EditableCustomField {
+  key: string;
+  label: string;
+  value: string;
+  fieldType: "text" | "number" | "date" | "url" | "select";
+  options: string[];
+  isLink: boolean;
+}
+
 interface LeadDetailsColumnProps {
   funnelId: string;
   leadId: string;
   company: FunnelLeadCompany | null;
   contacts: FunnelLeadContact[];
   customFields: FunnelLeadCustomField[];
+  /** Org-defined custom fields with this lead's values (editable). */
+  editableCustomFields?: EditableCustomField[];
   opportunityId: string | null;
   onConvert: () => void;
   onOpportunityChanged: () => void;
+  /** Save edited company / About info (fans out to all same-company contacts). */
+  onCompanySave?: (patch: CompanyInfoPatch) => Promise<void>;
+  /** Save edited custom-field values (keyed by field key). */
+  onCustomFieldsSave?: (values: Record<string, string>) => Promise<void>;
+  /** Add another contact at this company. */
+  onAddContact?: (name: string) => Promise<void>;
   onCall: (phone: string, name: string) => void;
   /** Opens the in-app email composer addressed to this contact. */
   onEmail: (email: string, name: string) => void;
@@ -348,15 +380,294 @@ function DetailRow({ icon: Icon, muted, children }: { icon: typeof Phone; muted?
   );
 }
 
+const fieldInputClass =
+  "w-full bg-surface border border-border-subtle rounded-md px-2 py-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default";
+
+type CompanyDraft = {
+  domain: string; industry: string; employeeCount: string;
+  location: string; description: string; linkedinUrl: string; annualRevenue: string;
+};
+
+function makeCompanyDraft(c: FunnelLeadCompany | null): CompanyDraft {
+  return {
+    domain: c?.domain || "",
+    industry: c?.industry || "",
+    employeeCount: c?.employeeCount ? String(c.employeeCount) : "",
+    location: c?.address || "",
+    description: c?.description || "",
+    linkedinUrl: c?.linkedinUrl || "",
+    annualRevenue: c?.annualRevenue || "",
+  };
+}
+
+/** About / company-info panel — read-only by default, with inline edit when a
+ *  save handler is provided. Edits fan out to all contacts at this company. */
+function AboutSection({ company, onSave }: { company: FunnelLeadCompany | null; onSave?: (patch: CompanyInfoPatch) => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<CompanyDraft>(() => makeCompanyDraft(company));
+
+  function start() { setDraft(makeCompanyDraft(company)); setError(null); setEditing(true); }
+
+  async function save() {
+    if (!onSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave({
+        companyDomain: draft.domain.trim(),
+        companyIndustry: draft.industry.trim(),
+        companyEmployeeCount: draft.employeeCount.trim(),
+        companyLocation: draft.location.trim(),
+        companyDescription: draft.description.trim(),
+        companyLinkedin: draft.linkedinUrl.trim(),
+        companyAnnualRevenue: draft.annualRevenue.trim(),
+      });
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const hasAny = !!(company?.address || company?.domain || company?.industry || company?.description || company?.linkedinUrl || company?.annualRevenue);
+
+  return (
+    <Section
+      icon={Info}
+      title="About"
+      actions={onSave && !editing ? <MiniBtn icon={Pencil} title="Edit company info" onClick={start} /> : undefined}
+    >
+      {editing ? (
+        <div className="flex flex-col gap-1.5 pl-1">
+          <Labeled label="Website / domain"><input value={draft.domain} onChange={(e) => setDraft({ ...draft, domain: e.target.value })} placeholder="acme.com" className={fieldInputClass} /></Labeled>
+          <Labeled label="Industry"><input value={draft.industry} onChange={(e) => setDraft({ ...draft, industry: e.target.value })} placeholder="e.g. SaaS" className={fieldInputClass} /></Labeled>
+          <Labeled label="Employees"><input value={draft.employeeCount} onChange={(e) => setDraft({ ...draft, employeeCount: e.target.value.replace(/[^0-9]/g, "") })} inputMode="numeric" placeholder="e.g. 250" className={fieldInputClass} /></Labeled>
+          <Labeled label="Annual revenue"><input value={draft.annualRevenue} onChange={(e) => setDraft({ ...draft, annualRevenue: e.target.value })} placeholder="e.g. $10M" className={fieldInputClass} /></Labeled>
+          <Labeled label="Location"><input value={draft.location} onChange={(e) => setDraft({ ...draft, location: e.target.value })} placeholder="e.g. London, UK" className={fieldInputClass} /></Labeled>
+          <Labeled label="Company LinkedIn"><input value={draft.linkedinUrl} onChange={(e) => setDraft({ ...draft, linkedinUrl: e.target.value })} placeholder="linkedin.com/company/…" className={fieldInputClass} /></Labeled>
+          <Labeled label="Description"><textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} rows={3} placeholder="What does this company do?" className={cn(fieldInputClass, "resize-none")} /></Labeled>
+          {error && <p className="text-[10.5px] text-signal-red-text mt-0.5">{error}</p>}
+          <div className="flex items-center justify-end gap-1.5 mt-1">
+            <button onClick={() => setEditing(false)} disabled={saving} className="px-2.5 py-1 rounded-full text-[11px] text-ink-muted hover:bg-hover disabled:opacity-50">Cancel</button>
+            <button onClick={() => void save()} disabled={saving} className="flex items-center gap-1 px-3 py-1 rounded-full bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 disabled:opacity-50">
+              {saving ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />} Save
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2.5 pl-1">
+          {company?.address && (
+            <div className="flex items-start gap-2">
+              <MapPin size={13} className="text-ink-faint mt-0.5 shrink-0" />
+              <span className="text-[12.5px] text-ink-secondary">{company.address}</span>
+            </div>
+          )}
+          {company?.domain && (
+            <div className="flex items-center gap-2">
+              <LinkIcon size={13} className="text-ink-faint shrink-0" />
+              <a href={company.website || `https://${company.domain}`} target="_blank" rel="noreferrer" className="text-[12.5px] text-accent hover:underline truncate">{company.domain}</a>
+            </div>
+          )}
+          {company?.industry && (
+            <div className="flex items-center gap-2">
+              <Building2 size={13} className="text-ink-faint shrink-0" />
+              <span className="text-[12.5px] text-ink-secondary">
+                {company.industry}
+                {company.employeeCount ? ` · ${company.employeeCount.toLocaleString()} employees` : ""}
+              </span>
+            </div>
+          )}
+          {company?.annualRevenue && (
+            <div className="flex items-center gap-2">
+              <DollarSign size={13} className="text-ink-faint shrink-0" />
+              <span className="text-[12.5px] text-ink-secondary">{company.annualRevenue}</span>
+            </div>
+          )}
+          {company?.linkedinUrl && (
+            <div className="flex items-center gap-2">
+              <Linkedin size={13} className="text-ink-faint shrink-0" />
+              <a href={company.linkedinUrl.startsWith("http") ? company.linkedinUrl : `https://${company.linkedinUrl}`} target="_blank" rel="noreferrer" className="text-[12.5px] text-accent hover:underline truncate">Company LinkedIn</a>
+            </div>
+          )}
+          {company?.description ? (
+            <div className="flex items-start gap-2">
+              <AlignLeft size={13} className="text-ink-faint mt-0.5 shrink-0" />
+              <p className="text-[12.5px] text-ink-secondary leading-relaxed">{company.description}</p>
+            </div>
+          ) : (
+            !hasAny && <p className="text-[12px] text-ink-faint">No company details yet{onSave ? " — click the pencil to add them." : "."}</p>
+          )}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+function Labeled({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+/** Custom-fields panel — editable org-defined fields plus read-only system
+ *  fields (Lead Source, notes). */
+function CustomFieldsSection({
+  fields,
+  readOnly,
+  onSave,
+}: {
+  fields: EditableCustomField[];
+  readOnly: FunnelLeadCustomField[];
+  onSave?: (values: Record<string, string>) => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+
+  const editable = !!onSave && fields.length > 0;
+  const filled = fields.filter((f) => f.value);
+  const visibleCount = filled.length + readOnly.length;
+
+  function start() {
+    const d: Record<string, string> = {};
+    for (const f of fields) d[f.key] = f.value;
+    setDraft(d);
+    setError(null);
+    setEditing(true);
+  }
+
+  async function save() {
+    if (!onSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(draft);
+      setEditing(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (visibleCount === 0 && !editable) return null;
+
+  return (
+    <Section
+      icon={List}
+      title="Custom fields"
+      count={visibleCount || null}
+      actions={editable && !editing ? <MiniBtn icon={Pencil} title="Edit custom fields" onClick={start} /> : undefined}
+    >
+      {editing ? (
+        <div className="flex flex-col gap-1.5 pl-1">
+          {fields.map((f) => (
+            <Labeled key={f.key} label={f.label}>
+              {f.fieldType === "select" ? (
+                <select value={draft[f.key] ?? ""} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} className={fieldInputClass}>
+                  <option value="">—</option>
+                  {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              ) : (
+                <input
+                  type={f.fieldType === "date" ? "date" : f.fieldType === "number" ? "number" : "text"}
+                  value={draft[f.key] ?? ""}
+                  onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })}
+                  placeholder={f.isLink ? "https://…" : ""}
+                  className={fieldInputClass}
+                />
+              )}
+            </Labeled>
+          ))}
+          {error && <p className="text-[10.5px] text-signal-red-text mt-0.5">{error}</p>}
+          <div className="flex items-center justify-end gap-1.5 mt-1">
+            <button onClick={() => setEditing(false)} disabled={saving} className="px-2.5 py-1 rounded-full text-[11px] text-ink-muted hover:bg-hover disabled:opacity-50">Cancel</button>
+            <button onClick={() => void save()} disabled={saving} className="flex items-center gap-1 px-3 py-1 rounded-full bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 disabled:opacity-50">
+              {saving ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />} Save
+            </button>
+          </div>
+        </div>
+      ) : visibleCount === 0 ? (
+        <p className="text-[12px] text-ink-faint px-1">No custom fields set{editable ? " — click the pencil to add values." : "."}</p>
+      ) : (
+        <div className="flex flex-col gap-0.5">
+          {[...filled.map((f) => ({ label: f.label, value: f.value, isLink: f.isLink })), ...readOnly].map((f, i) => (
+            <div key={i} className="flex items-start gap-2.5 py-1.5 px-1">
+              <span className="text-[11.5px] text-ink-muted w-[116px] shrink-0">{f.label}</span>
+              {f.isLink ? (
+                <a href={f.value.startsWith("http") ? f.value : `https://${f.value}`} target="_blank" rel="noreferrer" className="text-[11.5px] text-accent hover:underline truncate min-w-0">{f.value}</a>
+              ) : (
+                <span className="text-[11.5px] text-ink truncate min-w-0">{f.value}</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
+  );
+}
+
+/** Inline "add another contact" form shown under the Contacts section. */
+function AddContactInline({ onAdd, onCancel }: { onAdd: (name: string) => Promise<void>; onCancel: () => void }) {
+  const [name, setName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!name.trim() || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onAdd(name.trim());
+      setName("");
+      onCancel();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add contact");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border-subtle bg-section/40 p-2.5 mt-1">
+      <input
+        autoFocus
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") void submit(); if (e.key === "Escape") onCancel(); }}
+        placeholder="Contact full name"
+        className={fieldInputClass}
+      />
+      {error && <p className="text-[10.5px] text-signal-red-text mt-1.5">{error}</p>}
+      <div className="flex items-center justify-end gap-1.5 mt-2">
+        <button onClick={onCancel} disabled={saving} className="px-2.5 py-1 rounded-full text-[11px] text-ink-muted hover:bg-hover disabled:opacity-50">Cancel</button>
+        <button onClick={() => void submit()} disabled={saving || !name.trim()} className="flex items-center gap-1 px-3 py-1 rounded-full bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 disabled:opacity-50">
+          {saving ? <Loader2 size={10} className="animate-spin" /> : <Plus size={10} />} Add
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function LeadDetailsColumn({
   funnelId,
   leadId,
   company,
   contacts,
   customFields,
+  editableCustomFields,
   opportunityId,
   onConvert,
   onOpportunityChanged,
+  onCompanySave,
+  onCustomFieldsSave,
+  onAddContact,
   onCall,
   onEmail,
   onDnc,
@@ -369,6 +680,7 @@ export function LeadDetailsColumn({
   seedHiringRoles,
 }: LeadDetailsColumnProps) {
   const [tab, setTab] = useState<"details" | "leads">("details");
+  const [addingContact, setAddingContact] = useState(false);
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -397,51 +709,8 @@ export function LeadDetailsColumn({
         <div className="flex-1 overflow-y-auto -mx-1 px-1">
           {stepTracker && <div className="pt-3">{stepTracker}</div>}
 
-          {/* About */}
-          <Section icon={Info} title="About">
-            <div className="flex flex-col gap-2.5 pl-1">
-              {company?.address && (
-                <div className="flex items-start gap-2">
-                  <MapPin size={13} className="text-ink-faint mt-0.5 shrink-0" />
-                  <span className="text-[12.5px] text-ink-secondary">{company.address}</span>
-                </div>
-              )}
-              {company?.domain && (
-                <div className="flex items-center gap-2">
-                  <LinkIcon size={13} className="text-ink-faint shrink-0" />
-                  <a
-                    href={company.website || `https://${company.domain}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-[12.5px] text-accent hover:underline truncate"
-                  >
-                    {company.domain}
-                  </a>
-                </div>
-              )}
-              {company?.industry && (
-                <div className="flex items-center gap-2">
-                  <Building2 size={13} className="text-ink-faint shrink-0" />
-                  <span className="text-[12.5px] text-ink-secondary">
-                    {company.industry}
-                    {company.employeeCount ? ` · ${company.employeeCount.toLocaleString()} employees` : ""}
-                  </span>
-                </div>
-              )}
-              {company?.description ? (
-                <div className="flex items-start gap-2">
-                  <AlignLeft size={13} className="text-ink-faint mt-0.5 shrink-0" />
-                  <p className="text-[12.5px] text-ink-secondary leading-relaxed">{company.description}</p>
-                </div>
-              ) : (
-                !company?.address &&
-                !company?.domain &&
-                !company?.industry && (
-                  <p className="text-[12px] text-ink-faint">No company details available.</p>
-                )
-              )}
-            </div>
-          </Section>
+          {/* About — editable company info (fans out to all same-company contacts) */}
+          <AboutSection company={company} onSave={onCompanySave} />
 
           {/* Tasks (real) */}
           <LeadTasksSection funnelId={funnelId} leadId={leadId} />
@@ -454,7 +723,12 @@ export function LeadDetailsColumn({
           />
 
           {/* Contacts */}
-          <Section icon={Users} title="Contacts" count={contacts.length}>
+          <Section
+            icon={Users}
+            title="Contacts"
+            count={contacts.length}
+            actions={onAddContact ? <MiniBtn icon={Plus} title="Add contact" onClick={() => setAddingContact(true)} /> : undefined}
+          >
             <div className="flex flex-col">
               {contacts.length ? (
                 contacts.map((c) => (
@@ -471,7 +745,10 @@ export function LeadDetailsColumn({
                   />
                 ))
               ) : (
-                <p className="text-[12px] text-ink-faint px-1">No other contacts at this company.</p>
+                !addingContact && <p className="text-[12px] text-ink-faint px-1">No other contacts at this company.</p>
+              )}
+              {onAddContact && addingContact && (
+                <AddContactInline onAdd={onAddContact} onCancel={() => setAddingContact(false)} />
               )}
             </div>
           </Section>
@@ -479,30 +756,12 @@ export function LeadDetailsColumn({
           {/* Hiring roles — full CRUD (title, salary, location, seniority, …) */}
           <LeadHiringRolesSection funnelId={funnelId} leadId={leadId} seedRoles={seedHiringRoles} />
 
-          {/* Custom fields */}
-          {customFields.length > 0 && (
-            <Section icon={List} title="Custom fields" count={customFields.length}>
-              <div className="flex flex-col gap-0.5">
-                {customFields.map((f, i) => (
-                  <div key={i} className="flex items-start gap-2.5 py-1.5 px-1">
-                    <span className="text-[11.5px] text-ink-muted w-[116px] shrink-0">{f.label}</span>
-                    {f.isLink ? (
-                      <a
-                        href={f.value.startsWith("http") ? f.value : `https://${f.value}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11.5px] text-accent hover:underline truncate min-w-0"
-                      >
-                        {f.value}
-                      </a>
-                    ) : (
-                      <span className="text-[11.5px] text-ink truncate min-w-0">{f.value}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </Section>
-          )}
+          {/* Custom fields — editable org-defined values + read-only system fields */}
+          <CustomFieldsSection
+            fields={editableCustomFields ?? []}
+            readOnly={customFields}
+            onSave={onCustomFieldsSave}
+          />
 
           <div className="h-6" />
         </div>

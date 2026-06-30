@@ -21,6 +21,7 @@ export interface FunnelLeadCompany {
   industry: string;
   employeeCount: number;
   linkedinUrl: string | null;
+  annualRevenue?: string | null;
 }
 
 export interface FunnelLeadContact {

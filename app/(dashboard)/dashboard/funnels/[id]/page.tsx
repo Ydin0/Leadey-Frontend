@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pencil, UserPlus, Play, Pause, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Play, Pause, Trash2 } from "lucide-react";
 
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { FunnelStatusBadge } from "@/components/funnels/funnel-status-badge";
@@ -19,6 +19,8 @@ import { CockpitView } from "@/components/funnels/cockpit/cockpit-view";
 import { AnalyticsView } from "@/components/funnels/analytics/analytics-view";
 import { EmailPerformancePanel } from "@/components/funnels/email-performance-panel";
 import { AddLeadsModal } from "@/components/funnels/add-leads/add-leads-modal";
+import { AddLeadsButton, type AddLeadsSource } from "@/components/funnels/add-leads/add-leads-button";
+import { NewLeadModal } from "@/components/funnels/add-leads/new-lead-modal";
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
 import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
 import { getFunnelById, updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
@@ -42,6 +44,8 @@ export default function FunnelDetailPage() {
 
   const [activeTab, setActiveTab] = useState<FunnelTab>("leads");
   const [showAddLeads, setShowAddLeads] = useState(false);
+  const [addLeadsSource, setAddLeadsSource] = useState<AddLeadsSource | undefined>(undefined);
+  const [showNewLead, setShowNewLead] = useState(false);
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   // Full funnel (with per-lead events) — lazily loaded only when the Cockpit or
   // Analytics tab needs it, so the default Leads view stays fast.
@@ -264,13 +268,10 @@ export default function FunnelDetailPage() {
               <Pencil size={12} strokeWidth={2} />
               Edit
             </button>
-            <button
-              onClick={() => setShowAddLeads(true)}
-              className="flex items-center gap-1.5 px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
-            >
-              <UserPlus size={12} strokeWidth={2} />
-              Add Leads
-            </button>
+            <AddLeadsButton
+              onIndividual={() => setShowNewLead(true)}
+              onSource={(source) => { setAddLeadsSource(source); setShowAddLeads(true); }}
+            />
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="p-1.5 rounded-md text-ink-muted hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
@@ -345,12 +346,25 @@ export default function FunnelDetailPage() {
         </div>
       )}
 
-      {/* Add Leads Modal */}
+      {/* Add Leads Modal (bulk import sources) */}
       {showAddLeads && (
         <AddLeadsModal
           funnelId={funnel.id}
-          onClose={() => setShowAddLeads(false)}
+          initialSource={addLeadsSource}
+          onClose={() => { setShowAddLeads(false); setAddLeadsSource(undefined); }}
           onLeadsImported={() => void loadFunnel()}
+        />
+      )}
+
+      {/* Individual contact — quick create then open the new profile */}
+      {showNewLead && (
+        <NewLeadModal
+          funnelId={funnel.id}
+          onClose={() => setShowNewLead(false)}
+          onCreated={(leadId) => {
+            setShowNewLead(false);
+            router.push(`/dashboard/funnels/${funnel.id}/leads/${leadId}`);
+          }}
         />
       )}
 

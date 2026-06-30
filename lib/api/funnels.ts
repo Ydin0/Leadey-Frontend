@@ -374,6 +374,52 @@ export async function updateLeadContact(
   return apiRequest(path, { method: "PATCH", body: JSON.stringify(patch) });
 }
 
+/** Create a single lead in a campaign (the "Individual contact" / "Add contact"
+ *  flow). Only name + company are required; the rest is filled on the profile.
+ *  Returns the new lead id so the caller can open its profile. */
+export async function createLeadInFunnel(
+  funnelId: string,
+  data: { name: string; company: string; title?: string; email?: string; phone?: string; linkedinUrl?: string },
+): Promise<{ leadId: string }> {
+  return apiRequest(`/funnels/${encodeURIComponent(funnelId)}/leads`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/** Edit a lead's company/About info (fans out to all contacts at that company). */
+export async function updateLeadCompanyInfo(
+  funnelId: string,
+  leadId: string,
+  patch: Partial<{
+    company: string;
+    companyDomain: string;
+    companyIndustry: string;
+    companyEmployeeCount: number | string;
+    companyLocation: string;
+    companyDescription: string;
+    companyLinkedin: string;
+    companyAnnualRevenue: string;
+  }>,
+): Promise<void> {
+  await apiRequest(`/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/company`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
+/** Set a lead's custom-field values (keyed by field key; "" clears the value). */
+export async function setLeadCustomFieldValues(
+  funnelId: string,
+  leadId: string,
+  values: Record<string, string>,
+): Promise<void> {
+  await apiRequest(`/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/custom-fields`, {
+    method: "PATCH",
+    body: JSON.stringify({ values }),
+  });
+}
+
 /** Persist the campaign's shared lead filters (stored in funnels.config so the
  *  filtered view is the same for every rep and survives a refresh). */
 export async function saveLeadFilters(
