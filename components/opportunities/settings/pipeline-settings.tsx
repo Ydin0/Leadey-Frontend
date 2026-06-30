@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Loader2, Plus, Trash2, Save } from "lucide-react";
+import { Loader2, Plus, Trash2, GripVertical } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   listPipelines,
   createPipeline,
@@ -11,6 +12,7 @@ import {
   updateStage,
   createStage,
   deleteStage,
+  reorderStages,
 } from "@/lib/api/opportunities";
 import type { Pipeline, PipelineStage, StageType } from "@/lib/types/opportunity";
 
@@ -133,6 +135,24 @@ function PipelineCard({ pipeline, onReload, onDelete }: PipelineCardProps) {
   const [newStageLabel, setNewStageLabel] = useState("");
   const [name, setName] = useState(pipeline.name);
 
+  const dragIndex = useRef<number | null>(null);
+  const [dragOver, setDragOver] = useState<number | null>(null);
+
+  // Drag-to-reorder stages — reflect locally, then persist the new order.
+  async function moveStage(from: number, to: number) {
+    if (from === to || from < 0 || to < 0) return;
+    const next = [...stages];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setStages(next);
+    try {
+      await reorderStages(pipeline.id, next.map((s) => s.id));
+    } catch (err: any) {
+      alert(err?.message || "Failed to reorder stages");
+      onReload();
+    }
+  }
+
   useEffect(() => {
     setStages(pipeline.stages);
   }, [pipeline.stages]);
@@ -226,17 +246,37 @@ function PipelineCard({ pipeline, onReload, onDelete }: PipelineCardProps) {
       </div>
 
       <div className="rounded-[10px] border border-border-subtle overflow-hidden">
-        <div className="grid grid-cols-[1fr_120px_100px_36px] gap-2 px-3 py-2 bg-section text-[10px] uppercase tracking-wider text-ink-muted font-medium">
+        <div className="grid grid-cols-[24px_1fr_120px_100px_36px] gap-2 px-3 py-2 bg-section text-[10px] uppercase tracking-wider text-ink-muted font-medium">
+          <span />
           <span>Label</span>
           <span>Type</span>
           <span>Probability</span>
           <span />
         </div>
-        {stages.map((s) => (
+        {stages.map((s, i) => (
           <div
             key={s.id}
-            className="grid grid-cols-[1fr_120px_100px_36px] gap-2 px-3 py-2 border-t border-border-subtle items-center"
+            onDragOver={(e) => { e.preventDefault(); if (dragOver !== i) setDragOver(i); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (dragIndex.current !== null) void moveStage(dragIndex.current, i);
+              dragIndex.current = null;
+              setDragOver(null);
+            }}
+            className={cn(
+              "grid grid-cols-[24px_1fr_120px_100px_36px] gap-2 px-3 py-2 border-t items-center transition-colors",
+              dragOver === i ? "border-signal-blue-text/50 bg-signal-blue/10" : "border-border-subtle",
+            )}
           >
+            <span
+              draggable
+              onDragStart={() => { dragIndex.current = i; }}
+              onDragEnd={() => { dragIndex.current = null; setDragOver(null); }}
+              className="cursor-grab active:cursor-grabbing text-ink-faint hover:text-ink-muted flex items-center justify-center"
+              title="Drag to reorder"
+            >
+              <GripVertical size={14} />
+            </span>
             <input
               value={s.label}
               onChange={(e) => patchLocal(s.id, { label: e.target.value })}
