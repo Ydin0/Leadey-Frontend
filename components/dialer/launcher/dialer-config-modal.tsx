@@ -23,9 +23,8 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
   const [excludeDoNotCall, setExcludeDoNotCall] = useState(true);
   const [excludeClosed, setExcludeClosed] = useState(true);
   const [excludeRecentlyCalled, setExcludeRecentlyCalled] = useState(true);
-  const [recentlyCalledDays, setRecentlyCalledDays] = useState(2);
+  const [recentlyCalledHours, setRecentlyCalledHours] = useState(24);
   const [respectTimezone, setRespectTimezone] = useState(false);
-  const [maxAttempts, setMaxAttempts] = useState<number | null>(3);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -51,9 +50,8 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
           excludeDoNotCall,
           excludeClosed,
           excludeRecentlyCalled,
-          recentlyCalledDays,
+          recentlyCalledHours,
           respectTimezone,
-          maxAttempts,
         },
       });
       // Local-presence pre-flight — one consolidated buy prompt for uncovered
@@ -185,16 +183,19 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
           />
           {excludeRecentlyCalled && (
             <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-[8px] bg-section ml-7">
-              <p className="text-[12px] font-medium text-ink">Recently-called window</p>
+              <p className="text-[12px] font-medium text-ink">Don&apos;t call anyone called in the last</p>
               <select
-                value={recentlyCalledDays}
-                onChange={(e) => setRecentlyCalledDays(Number(e.target.value))}
+                value={recentlyCalledHours}
+                onChange={(e) => setRecentlyCalledHours(Number(e.target.value))}
                 className="px-2 py-1 rounded-[6px] bg-surface text-[12px] text-ink border border-border-subtle outline-none focus:border-border-default"
               >
-                <option value={1}>1 day</option>
-                <option value={2}>2 days</option>
-                <option value={3}>3 days</option>
-                <option value={7}>7 days</option>
+                <option value={2}>2 hours</option>
+                <option value={3}>3 hours</option>
+                <option value={4}>4 hours</option>
+                <option value={6}>6 hours</option>
+                <option value={12}>12 hours</option>
+                <option value={24}>24 hours</option>
+                <option value={48}>48 hours</option>
               </select>
             </div>
           )}
@@ -205,21 +206,6 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
             value={respectTimezone}
             onChange={setRespectTimezone}
           />
-
-          <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-[8px] bg-section">
-            <div>
-              <p className="text-[12px] font-medium text-ink">Max attempts per contact (last 24h)</p>
-              <p className="text-[10px] text-ink-muted">Empty = no limit</p>
-            </div>
-            <input
-              type="number"
-              value={maxAttempts ?? ""}
-              min={1}
-              max={10}
-              onChange={(e) => setMaxAttempts(e.target.value === "" ? null : Number(e.target.value))}
-              className="w-16 px-2 py-1 rounded-[6px] bg-surface text-[12px] text-ink border border-border-subtle text-center outline-none focus:border-border-default"
-            />
-          </div>
 
           {error && (
             <div className="rounded-[8px] bg-signal-red/10 border border-signal-red-text/20 px-3 py-2.5">

@@ -37,12 +37,11 @@ export type DialerSessionStatus = "active" | "paused" | "completed" | "abandoned
 export interface DialerSessionFilters {
   excludeDoNotCall: boolean;
   excludeRecentlyCalled: boolean;
-  /** Don't re-queue anyone called within the last N days. */
-  recentlyCalledDays: number;
+  /** Don't re-queue anyone called within the last N HOURS. */
+  recentlyCalledHours: number;
   /** Skip leads in a terminal status (Not Interested, DNC, Qualified, …). */
   excludeClosed: boolean;
   respectTimezone: boolean;
-  maxAttempts: number | null;
 }
 
 export interface DialerSession {

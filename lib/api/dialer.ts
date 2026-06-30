@@ -115,7 +115,7 @@ export async function createSession(params: {
   funnelStepId?: string;
   funnelId?: string;
   filters?: Partial<DialerSessionFilters>;
-}): Promise<{ session: DialerSession; excluded: { dnc: number; recent: number; attempts: number; timezone: number } }> {
+}): Promise<{ session: DialerSession; current: DialerQueueItem | null; excluded: { dnc: number; recent: number; timezone: number } }> {
   return apiRequest("/dialer/sessions", {
     method: "POST",
     body: JSON.stringify(params),
