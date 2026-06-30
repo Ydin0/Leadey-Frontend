@@ -31,8 +31,24 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
   const [busy, setBusy] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [boxH, setBoxH] = useState(560);
 
   const active = workflows?.find((w) => w.id === activeId) ?? null;
+
+  // Size the builder to fill exactly to the viewport bottom (no page scroll /
+  // blank space below it), measuring its real top offset rather than guessing.
+  useEffect(() => {
+    function measure() {
+      const el = rootRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top;
+      setBoxH(Math.max(480, window.innerHeight - top - 24));
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [activeId, workflows]);
 
   // Load the campaign's workflows.
   useEffect(() => {
@@ -168,7 +184,7 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
         : "bg-section text-ink-muted";
 
   return (
-    <div className="flex rounded-[14px] border border-border-subtle bg-surface overflow-hidden" style={{ height: "calc(100vh - 18rem)", minHeight: 520 }}>
+    <div ref={rootRef} className="flex rounded-[14px] border border-border-subtle bg-surface overflow-hidden" style={{ height: boxH }}>
       {/* PALETTE */}
       <div className="w-[210px] shrink-0 border-r border-border-subtle overflow-y-auto p-3.5">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint mb-1">Building blocks</div>
