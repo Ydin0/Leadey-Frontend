@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  Mail, Loader2, Plus, Trash2, Star, Server, CheckCircle2, AlertCircle, X, Calendar,
+  Mail, Loader2, Plus, Trash2, Star, Server, CheckCircle2, AlertCircle, X, Calendar, RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuthReady } from "@/components/providers/auth-token-sync";
 import {
   listEmailAccounts, startEmailOAuth, connectSmtpAccount,
   setDefaultEmailAccount, disconnectEmailAccount,
@@ -20,20 +21,25 @@ const PROVIDER_LABEL: Record<string, string> = { gmail: "Gmail", outlook: "Outlo
 const CAL_PROVIDER_LABEL: Record<string, string> = { google: "Google Calendar", microsoft: "Outlook Calendar" };
 
 export function EmailAccountsSection() {
+  const isAuthReady = useAuthReady();
   const searchParams = useSearchParams();
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
   const [loading, setLoading] = useState(true);
+  const [emailError, setEmailError] = useState(false);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [showSmtp, setShowSmtp] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [cal, setCal] = useState<CalendarAccountsResult | null>(null);
+  const [calLoaded, setCalLoaded] = useState(false);
+  const [calError, setCalError] = useState(false);
   const [calConnecting, setCalConnecting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       setAccounts(await listEmailAccounts());
+      setEmailError(false);
     } catch {
-      // leave prior state
+      setEmailError(true);
     } finally {
       setLoading(false);
     }
@@ -42,23 +48,31 @@ export function EmailAccountsSection() {
   const loadCal = useCallback(async () => {
     try {
       setCal(await listCalendarAccounts());
+      setCalError(false);
     } catch {
-      // leave prior state
+      setCalError(true);
+    } finally {
+      setCalLoaded(true);
     }
   }, []);
 
-  useEffect(() => { void load(); void loadCal(); }, [load, loadCal]);
+  // Wait for the org-scoped auth token before hitting org-scoped endpoints —
+  // otherwise, right after the OAuth redirect, these fire before the token is
+  // ready and 403, leaving the lists empty/stuck. Re-runs once auth is ready.
+  useEffect(() => {
+    if (!isAuthReady) return;
+    void load();
+    void loadCal();
+  }, [isAuthReady, load, loadCal]);
 
   // Surface the OAuth round-trip result and clean the URL.
   useEffect(() => {
     if (searchParams.get("connected")) {
       setToast({ type: "success", text: "Email account connected." });
-      void load();
     } else if (searchParams.get("error")) {
       setToast({ type: "error", text: `Couldn't connect: ${searchParams.get("error")}` });
     } else if (searchParams.get("calendar_connected")) {
       setToast({ type: "success", text: "Calendar connected." });
-      void loadCal();
     } else if (searchParams.get("calendar_error")) {
       setToast({ type: "error", text: `Couldn't connect calendar: ${searchParams.get("calendar_error")}` });
     }
@@ -150,6 +164,8 @@ export function EmailAccountsSection() {
           <div className="flex items-center gap-2 text-[11px] text-ink-muted py-4">
             <Loader2 size={13} className="animate-spin" /> Loading accounts…
           </div>
+        ) : emailError && accounts.length === 0 ? (
+          <LoadErrorBox label="Couldn't load your email accounts." onRetry={() => void load()} />
         ) : accounts.length === 0 ? (
           <div className="rounded-[10px] border border-dashed border-border-default bg-section/30 px-4 py-6 text-center">
             <Mail size={20} className="text-ink-faint mx-auto mb-2" strokeWidth={1.5} />
@@ -222,10 +238,12 @@ export function EmailAccountsSection() {
           />
         </div>
 
-        {!cal ? (
+        {!calLoaded ? (
           <div className="flex items-center gap-2 text-[11px] text-ink-muted py-4">
             <Loader2 size={13} className="animate-spin" /> Loading calendars…
           </div>
+        ) : calError || !cal ? (
+          <LoadErrorBox label="Couldn't load your calendars." onRetry={() => { setCalLoaded(false); void loadCal(); }} />
         ) : cal.accounts.length === 0 ? (
           <div className="rounded-[10px] border border-dashed border-border-default bg-section/30 px-4 py-6 text-center">
             <Calendar size={20} className="text-ink-faint mx-auto mb-2" strokeWidth={1.5} />
@@ -267,6 +285,23 @@ export function EmailAccountsSection() {
           onConnected={() => { setShowSmtp(false); setToast({ type: "success", text: "SMTP account connected." }); void load(); }}
         />
       )}
+    </div>
+  );
+}
+
+function LoadErrorBox({ label, onRetry }: { label: string; onRetry: () => void }) {
+  return (
+    <div className="rounded-[10px] border border-signal-red-text/20 bg-signal-red/10 px-4 py-4 flex items-center justify-between gap-3">
+      <div className="flex items-center gap-2 min-w-0">
+        <AlertCircle size={14} className="text-signal-red-text shrink-0" />
+        <p className="text-[11.5px] text-signal-red-text truncate">{label} Make sure the right workspace is selected, then retry.</p>
+      </div>
+      <button
+        onClick={onRetry}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-[16px] bg-surface border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors shrink-0"
+      >
+        <RefreshCw size={12} /> Retry
+      </button>
     </div>
   );
 }
