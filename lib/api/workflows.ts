@@ -39,3 +39,15 @@ export async function updateWorkflow(
 export async function deleteWorkflow(funnelId: string, workflowId: string): Promise<void> {
   await apiRequest(`${base(funnelId)}/${encodeURIComponent(workflowId)}`, { method: "DELETE" });
 }
+
+/** Manually enroll specific leads into a workflow (it must be active to run). */
+export async function enrollLeads(
+  funnelId: string,
+  workflowId: string,
+  leadIds: string[],
+): Promise<{ enrolled: number }> {
+  return apiRequest<{ enrolled: number }>(`${base(funnelId)}/${encodeURIComponent(workflowId)}/enroll`, {
+    method: "POST",
+    body: JSON.stringify({ leadIds }),
+  });
+}
