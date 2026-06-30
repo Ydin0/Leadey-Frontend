@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 
@@ -35,11 +35,32 @@ export default function LeadViewPage() {
     if (saved) setSortBy(saved as LeadSortKey);
   }, []);
 
-  // Keep the lead order identical to the campaign table / Leads tab.
-  const sortedLeads = useMemo(
-    () => (funnel ? sortLeads(funnel.leads, sortBy) : []),
-    [funnel, sortBy],
-  );
+  // Frozen navigation order for the focus session. The order is fixed when the
+  // funnel first loads (and rebuilt only when the sort key changes); editing a
+  // lead's status updates its DATA but must NOT yank it to a new position under
+  // the rep — otherwise changing a status on lead 1/62 instantly drops it to
+  // 62/62 and breaks prev/next. New leads are appended, removed ones dropped.
+  // Leaving the focus view and returning remounts this page, which re-sorts.
+  const orderRef = useRef<{ sort: LeadSortKey | null; ids: string[] }>({ sort: null, ids: [] });
+  const sortedLeads = useMemo(() => {
+    if (!funnel) return [] as FunnelLead[];
+    const byId = new Map(funnel.leads.map((l) => [l.id, l]));
+    const o = orderRef.current;
+    if (o.sort !== sortBy || o.ids.length === 0) {
+      // Cold load or the rep changed the sort → take a fresh ordering.
+      o.sort = sortBy;
+      o.ids = sortLeads(funnel.leads, sortBy).map((l) => l.id);
+    } else {
+      // Preserve the existing positions; append any new leads (freshly sorted)
+      // and drop any that no longer exist.
+      const known = new Set(o.ids);
+      const appended = sortLeads(funnel.leads, sortBy)
+        .filter((l) => !known.has(l.id))
+        .map((l) => l.id);
+      o.ids = [...o.ids.filter((id) => byId.has(id)), ...appended];
+    }
+    return o.ids.map((id) => byId.get(id)).filter(Boolean) as FunnelLead[];
+  }, [funnel, sortBy]);
 
   const loadFunnel = useCallback(async () => {
     if (!funnelId) {
