@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Loader2, Building2 } from "lucide-react";
 import { useWorkspaces } from "@/lib/hooks/use-workspaces";
 
@@ -16,6 +17,12 @@ export function CreateWorkspaceModal({ onClose }: CreateWorkspaceModalProps) {
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Portal to <body> so the overlay escapes the header's containing block
+  // (the chrome bar's backdrop-filter would otherwise pin `fixed` to its 56px
+  // height, clipping the modal at the top of the screen).
+  useEffect(() => setMounted(true), []);
 
   const valid = name.trim().length > 1;
 
@@ -32,7 +39,9 @@ export function CreateWorkspaceModal({ onClose }: CreateWorkspaceModalProps) {
     }
   }
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 px-4" onClick={onClose}>
       <div className="relative bg-surface rounded-[14px] border border-border-subtle shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
@@ -71,6 +80,7 @@ export function CreateWorkspaceModal({ onClose }: CreateWorkspaceModalProps) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
