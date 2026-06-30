@@ -3,16 +3,21 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  Mail, Loader2, Plus, Trash2, Star, Server, CheckCircle2, AlertCircle, X,
+  Mail, Loader2, Plus, Trash2, Star, Server, CheckCircle2, AlertCircle, X, Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   listEmailAccounts, startEmailOAuth, connectSmtpAccount,
   setDefaultEmailAccount, disconnectEmailAccount,
 } from "@/lib/api/email-accounts";
+import {
+  listCalendarAccounts, startCalendarOAuth, disconnectCalendarAccount,
+} from "@/lib/api/calendar";
 import type { EmailAccount } from "@/lib/types/email-accounts";
+import type { CalendarAccount, CalendarAccountsResult } from "@/lib/types/calendar";
 
 const PROVIDER_LABEL: Record<string, string> = { gmail: "Gmail", outlook: "Outlook", smtp: "SMTP" };
+const CAL_PROVIDER_LABEL: Record<string, string> = { google: "Google Calendar", microsoft: "Outlook Calendar" };
 
 export function EmailAccountsSection() {
   const searchParams = useSearchParams();
@@ -21,6 +26,8 @@ export function EmailAccountsSection() {
   const [connecting, setConnecting] = useState<string | null>(null);
   const [showSmtp, setShowSmtp] = useState(false);
   const [toast, setToast] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [cal, setCal] = useState<CalendarAccountsResult | null>(null);
+  const [calConnecting, setCalConnecting] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -32,7 +39,15 @@ export function EmailAccountsSection() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  const loadCal = useCallback(async () => {
+    try {
+      setCal(await listCalendarAccounts());
+    } catch {
+      // leave prior state
+    }
+  }, []);
+
+  useEffect(() => { void load(); void loadCal(); }, [load, loadCal]);
 
   // Surface the OAuth round-trip result and clean the URL.
   useEffect(() => {
@@ -41,8 +56,13 @@ export function EmailAccountsSection() {
       void load();
     } else if (searchParams.get("error")) {
       setToast({ type: "error", text: `Couldn't connect: ${searchParams.get("error")}` });
+    } else if (searchParams.get("calendar_connected")) {
+      setToast({ type: "success", text: "Calendar connected." });
+      void loadCal();
+    } else if (searchParams.get("calendar_error")) {
+      setToast({ type: "error", text: `Couldn't connect calendar: ${searchParams.get("calendar_error")}` });
     }
-    if (searchParams.get("connected") || searchParams.get("error")) {
+    if (["connected", "error", "calendar_connected", "calendar_error"].some((k) => searchParams.get(k))) {
       window.history.replaceState(null, "", "/dashboard/settings?tab=email-accounts");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -58,6 +78,23 @@ export function EmailAccountsSection() {
       setToast({ type: "error", text: err instanceof Error ? err.message : "Could not start connection" });
     }
   }, []);
+
+  const connectCalendar = useCallback(async (provider: "google" | "microsoft") => {
+    setCalConnecting(provider);
+    try {
+      const url = await startCalendarOAuth(provider);
+      window.location.href = url;
+    } catch (err) {
+      setCalConnecting(null);
+      setToast({ type: "error", text: err instanceof Error ? err.message : "Could not start calendar connection" });
+    }
+  }, []);
+
+  async function disconnectCal(id: string) {
+    if (!confirm("Disconnect this calendar? Upcoming meetings from it will stop showing on lead profiles.")) return;
+    setCal((prev) => (prev ? { ...prev, accounts: prev.accounts.filter((a) => a.id !== id) } : prev));
+    try { await disconnectCalendarAccount(id); } catch { void loadCal(); }
+  }
 
   async function makeDefault(id: string) {
     setAccounts((prev) => prev.map((a) => ({ ...a, isDefault: a.id === id })));
@@ -159,6 +196,71 @@ export function EmailAccountsSection() {
         )}
       </section>
 
+      {/* Calendars — connect Google/Outlook calendar so upcoming meetings appear on lead profiles */}
+      <section className="bg-surface rounded-[14px] border border-border-subtle p-4">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h3 className="text-[13px] font-semibold text-ink">Calendars</h3>
+            <p className="text-[11px] text-ink-muted mt-0.5">
+              Connect your Google or Outlook calendar. We detect meetings with your leads and show them on the lead&apos;s profile.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <ConnectButton
+            label="Connect Google Calendar"
+            busy={calConnecting === "google"}
+            disabled={cal ? !cal.platformConfigured.google : false}
+            onClick={() => void connectCalendar("google")}
+          />
+          <ConnectButton
+            label="Connect Outlook Calendar"
+            busy={calConnecting === "microsoft"}
+            disabled={cal ? !cal.platformConfigured.microsoft : false}
+            onClick={() => void connectCalendar("microsoft")}
+          />
+        </div>
+
+        {!cal ? (
+          <div className="flex items-center gap-2 text-[11px] text-ink-muted py-4">
+            <Loader2 size={13} className="animate-spin" /> Loading calendars…
+          </div>
+        ) : cal.accounts.length === 0 ? (
+          <div className="rounded-[10px] border border-dashed border-border-default bg-section/30 px-4 py-6 text-center">
+            <Calendar size={20} className="text-ink-faint mx-auto mb-2" strokeWidth={1.5} />
+            <p className="text-[12px] text-ink-muted">No calendars connected yet.</p>
+            <p className="text-[11px] text-ink-faint mt-0.5">Connect one above to see upcoming meetings on lead profiles.</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {cal.accounts.map((a: CalendarAccount) => (
+              <div key={a.id} className="flex items-center gap-3 px-3 py-2.5 rounded-[10px] border border-border-subtle bg-section/30">
+                <span className="flex items-center justify-center w-8 h-8 rounded-full bg-signal-blue/15 text-signal-blue-text shrink-0">
+                  <Calendar size={14} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[12px] font-medium text-ink truncate">{a.email}</p>
+                  <p className="text-[10px] text-ink-muted">
+                    {CAL_PROVIDER_LABEL[a.provider] || a.provider}
+                    {a.status !== "active" ? ` · ${a.status}` : ""}
+                  </p>
+                </div>
+                <span className={cn(
+                  "text-[10px] font-medium rounded-full px-2 py-0.5",
+                  a.status === "active" ? "bg-signal-green text-signal-green-text" : "bg-signal-red/15 text-signal-red-text",
+                )}>
+                  {a.status === "active" ? "Connected" : a.status}
+                </span>
+                <button onClick={() => void disconnectCal(a.id)} title="Disconnect" className="p-1.5 rounded-md text-ink-muted hover:bg-signal-red/10 hover:text-signal-red-text transition-colors">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
       {showSmtp && (
         <SmtpConnectModal
           onClose={() => setShowSmtp(false)}
@@ -169,12 +271,13 @@ export function EmailAccountsSection() {
   );
 }
 
-function ConnectButton({ label, busy, onClick }: { label: string; busy: boolean; onClick: () => void }) {
+function ConnectButton({ label, busy, disabled, onClick }: { label: string; busy: boolean; disabled?: boolean; onClick: () => void }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      disabled={busy}
+      disabled={busy || disabled}
+      title={disabled ? "Not configured on the server yet" : undefined}
       className="flex items-center gap-1.5 px-4 py-1.5 rounded-[16px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-50"
     >
       {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}

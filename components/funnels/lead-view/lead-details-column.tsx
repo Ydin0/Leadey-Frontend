@@ -36,6 +36,7 @@ import type {
 import type { LeadStatusOption } from "@/lib/utils/lead-status";
 import { Section, MiniBtn } from "./lead-section";
 import { LeadTasksSection } from "./lead-tasks-section";
+import { LeadUpcomingMeetingsSection } from "./lead-upcoming-meetings-section";
 import { LeadOpportunitySection } from "./lead-opportunity-section";
 import { LeadLeadsList } from "./lead-leads-list";
 import { LeadHiringRolesSection } from "./lead-hiring-roles-section";
@@ -715,6 +716,9 @@ export function LeadDetailsColumn({
 
           {/* Tasks (real) */}
           <LeadTasksSection funnelId={funnelId} leadId={leadId} />
+
+          {/* Upcoming meetings (connected calendars + Calendly) */}
+          <LeadUpcomingMeetingsSection funnelId={funnelId} leadId={leadId} />
 
           {/* Opportunities */}
           <LeadOpportunitySection
