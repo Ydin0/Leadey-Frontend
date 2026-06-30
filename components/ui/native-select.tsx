@@ -15,17 +15,22 @@ import { cn } from "@/lib/utils";
  */
 type Opt = { value: string; label: React.ReactNode; disabled?: boolean };
 
-function collectOptions(children: React.ReactNode): Opt[] {
-  const out: Opt[] = [];
+/** A flat render list that preserves <optgroup> labels as section headers. */
+type Item = { kind: "header"; label: React.ReactNode } | (Opt & { kind: "option" });
+
+function collectItems(children: React.ReactNode): Item[] {
+  const out: Item[] = [];
   React.Children.forEach(children, (child) => {
     if (!React.isValidElement(child)) return;
     if (child.type === "option") {
       const p = child.props as { value?: unknown; children?: React.ReactNode; disabled?: boolean };
-      out.push({ value: String(p.value ?? ""), label: p.children ?? String(p.value ?? ""), disabled: p.disabled });
-    } else if (child.type === "optgroup" || child.type === React.Fragment) {
-      // Recurse into <optgroup> and <>…</> wrappers so grouped/conditional
-      // options are still collected.
-      out.push(...collectOptions((child.props as { children?: React.ReactNode }).children));
+      out.push({ kind: "option", value: String(p.value ?? ""), label: p.children ?? String(p.value ?? ""), disabled: p.disabled });
+    } else if (child.type === "optgroup") {
+      const p = child.props as { label?: React.ReactNode; children?: React.ReactNode };
+      if (p.label) out.push({ kind: "header", label: p.label });
+      out.push(...collectItems(p.children));
+    } else if (child.type === React.Fragment) {
+      out.push(...collectItems((child.props as { children?: React.ReactNode }).children));
     }
   });
   return out;
@@ -39,7 +44,8 @@ export function NativeSelect({
   disabled,
   ...rest
 }: React.ComponentProps<"select">) {
-  const options = React.useMemo(() => collectOptions(children), [children]);
+  const items = React.useMemo(() => collectItems(children), [children]);
+  const options = React.useMemo(() => items.filter((i): i is Opt & { kind: "option" } => i.kind === "option"), [items]);
   const current = value !== undefined ? String(value) : undefined;
   const selected = options.find((o) => o.value === current);
 
@@ -120,23 +126,30 @@ export function NativeSelect({
           className="fixed z-[200] max-h-[300px] overflow-y-auto rounded-[10px] border border-border-subtle bg-surface shadow-xl shadow-black/20 py-1"
           style={{ left: rect.left, width: rect.width, ...(rect.below ? { top: rect.top } : { bottom: window.innerHeight - rect.top }) }}
         >
-          {options.map((o, i) => {
-            const active = o.value === current;
+          {items.map((it, i) => {
+            if (it.kind === "header") {
+              return (
+                <div key={`h-${i}`} className="px-3 pt-2.5 pb-1 text-[9.5px] font-bold uppercase tracking-wider text-ink-faint first:pt-1">
+                  {it.label}
+                </div>
+              );
+            }
+            const active = it.value === current;
             return (
               <button
-                key={`${o.value}-${i}`}
+                key={`${it.value}-${i}`}
                 type="button"
-                disabled={o.disabled}
-                onClick={() => pick(o.value)}
+                disabled={it.disabled}
+                onClick={() => pick(it.value)}
                 role="option"
                 aria-selected={active}
                 className={cn(
                   "flex items-center gap-2 w-full px-3 py-1.5 text-left text-[12px] transition-colors",
-                  o.disabled ? "text-ink-faint cursor-not-allowed" : "text-ink-secondary hover:bg-hover hover:text-ink",
+                  it.disabled ? "text-ink-faint cursor-not-allowed" : "text-ink-secondary hover:bg-hover hover:text-ink",
                   active && "text-ink",
                 )}
               >
-                <span className="flex-1 min-w-0 truncate">{o.label}</span>
+                <span className="flex-1 min-w-0 truncate">{it.label}</span>
                 {active && <Check size={13} className="text-accent shrink-0" />}
               </button>
             );
