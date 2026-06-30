@@ -20,6 +20,7 @@ import { AnalyticsView } from "@/components/funnels/analytics/analytics-view";
 import { EmailPerformancePanel } from "@/components/funnels/email-performance-panel";
 import { AddLeadsModal } from "@/components/funnels/add-leads/add-leads-modal";
 import { AddLeadsButton, type AddLeadsSource } from "@/components/funnels/add-leads/add-leads-button";
+import { WorkflowsView } from "@/components/funnels/workflows/workflows-view";
 import { NewLeadModal } from "@/components/funnels/add-leads/new-lead-modal";
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
 import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
@@ -344,6 +345,10 @@ export default function FunnelDetailPage() {
             <EmailPerformancePanel funnelId={funnel.id} />
           </div>
         </div>
+      )}
+
+      {activeTab === "workflows" && (
+        <WorkflowsView funnelId={funnel.id} />
       )}
 
       {/* Add Leads Modal (bulk import sources) */}
