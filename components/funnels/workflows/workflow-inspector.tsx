@@ -11,6 +11,7 @@ import { getPhoneLines } from "@/lib/api/phone-lines";
 import type { PhoneLine } from "@/lib/types/calling";
 import { listTemplates, createTemplate } from "@/lib/api/templates";
 import type { Template } from "@/lib/types/template";
+import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { NODE_TYPES } from "./node-types";
 
 const lab = "block text-[10px] uppercase tracking-wider text-ink-muted font-medium mt-4 mb-1.5";
@@ -53,18 +54,7 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProp
         <button onClick={onDeselect} className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-faint bg-section hover:bg-hover"><X size={14} /></button>
       </div>
 
-      {node.type === "trigger" && (<>
-        <label className={lab}>Enroll leads when</label>
-        <NativeSelect className={inp} value={v("label")} onChange={(e) => set({ label: e.target.value })}>
-          <option value="Lead enters campaign">Lead enters this campaign</option>
-          <option value="Status changes">Lead status changes</option>
-          <option value="Tag added">A tag is added</option>
-          <option value="Reply received">A reply is received</option>
-          <option value="Manually added">Manually added by a rep</option>
-        </NativeSelect>
-        <label className={lab}>Description</label>
-        <input className={inp} value={v("sub")} onChange={(e) => set({ sub: e.target.value })} placeholder="Optional note" />
-      </>)}
+      {node.type === "trigger" && <TriggerForm d={d} set={set} v={v} />}
 
       {node.type === "email" && <EmailStepForm d={d} set={set} />}
 
@@ -365,6 +355,54 @@ function SmsStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Reco
       <p className="text-[11px] text-ink-faint mt-1.5">{msg.length} chars · {Math.max(1, Math.ceil(msg.length / 160))} segment(s) · use {"{{first_name}}"} or custom fields.</p>
 
       <SaveTemplateRow channel="sms" body={msg} onSaved={(t) => setTemplates((p) => [t, ...p])} />
+    </>
+  );
+}
+
+// ─── Trigger form (enrollment condition + per-trigger config) ──────────────
+
+function TriggerForm({ d, set, v }: { d: Record<string, unknown>; set: (patch: Record<string, unknown>) => void; v: (k: string) => string }) {
+  const { statuses } = useLeadStatuses();
+  const label = v("label") || "Lead enters campaign";
+  return (
+    <>
+      <label className={lab}>Enroll leads when</label>
+      <NativeSelect className={inp} value={label} onChange={(e) => set({ label: e.target.value })}>
+        <option value="Lead enters campaign">Lead enters this campaign</option>
+        <option value="Status changes">Lead status changes</option>
+        <option value="Tag added">A tag is added</option>
+        <option value="Reply received">A reply is received</option>
+        <option value="Meeting booked">A meeting is booked</option>
+        <option value="Manually added">Manually added by a rep</option>
+      </NativeSelect>
+
+      {label === "Status changes" && (<>
+        <label className={lab}>Status changes to</label>
+        <NativeSelect className={inp} value={v("statusTo")} onChange={(e) => set({ statusTo: e.target.value })}>
+          <option value="">Any status</option>
+          {statuses.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
+        </NativeSelect>
+        <p className="text-[11px] text-ink-faint mt-1.5">Only enrolls when the lead&apos;s status changes to this (or any).</p>
+      </>)}
+
+      {label === "Tag added" && (<>
+        <label className={lab}>Tag</label>
+        <input className={inp} value={v("tag")} onChange={(e) => set({ tag: e.target.value })} placeholder="Any tag" />
+        <p className="text-[11px] text-ink-faint mt-1.5">Leave blank to enroll when any tag is added.</p>
+      </>)}
+
+      {label === "Reply received" && (
+        <p className="text-[11px] text-ink-faint mt-2">Enrolls when the lead replies by email or SMS.</p>
+      )}
+      {label === "Meeting booked" && (
+        <p className="text-[11px] text-ink-faint mt-2">Enrolls when a Calendly meeting is booked for the lead.</p>
+      )}
+      {label === "Manually added" && (
+        <p className="text-[11px] text-ink-faint mt-2">Enroll leads by hand from the campaign / lead view.</p>
+      )}
+
+      <label className={lab}>Description</label>
+      <input className={inp} value={v("sub")} onChange={(e) => set({ sub: e.target.value })} placeholder="Optional note" />
     </>
   );
 }
