@@ -42,7 +42,7 @@ export function CreateWorkspaceModal({ onClose }: CreateWorkspaceModalProps) {
   if (!mounted) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-ink/50 px-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4" onClick={onClose}>
       <div className="relative bg-surface rounded-[14px] border border-border-subtle shadow-xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
           <div className="flex items-center gap-2">

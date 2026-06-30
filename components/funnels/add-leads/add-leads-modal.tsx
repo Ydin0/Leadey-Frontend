@@ -30,7 +30,8 @@ export function AddLeadsModal({ funnelId, initialSource, onClose, onLeadsImporte
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-ink/50" onClick={onClose} />
+      {/* Dark scrim — bg-ink is WHITE in dark mode, so use a fixed dark tint. */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       {/* Modal */}
       <div className="relative bg-surface rounded-[14px] border border-border-subtle shadow-xl w-full max-w-4xl max-h-[88vh] overflow-y-auto mx-4">

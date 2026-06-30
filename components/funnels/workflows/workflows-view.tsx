@@ -36,15 +36,14 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
 
   const active = workflows?.find((w) => w.id === activeId) ?? null;
 
-  // Fill the builder all the way to the viewport bottom (it goes full-bleed
-  // with -mx-6/-mb-6 to cancel the page's p-6, so there's no gap or scroll).
-  // Measure the real top offset rather than guessing.
+  // Size the builder to fill to just above the viewport bottom (keeps the
+  // rounded card look with a little breathing room), measuring its real top.
   useEffect(() => {
     function measure() {
       const el = rootRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top;
-      setBoxH(Math.max(480, window.innerHeight - top));
+      setBoxH(Math.max(480, window.innerHeight - top - 24));
     }
     measure();
     const raf = requestAnimationFrame(measure); // re-measure after layout settles
@@ -186,7 +185,7 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
         : "bg-section text-ink-muted";
 
   return (
-    <div ref={rootRef} className="flex -mx-6 -mb-6 border-t border-border-subtle bg-surface overflow-hidden" style={{ height: boxH }}>
+    <div ref={rootRef} className="flex rounded-[14px] border border-border-subtle bg-surface overflow-hidden" style={{ height: boxH }}>
       {/* PALETTE */}
       <div className="w-[210px] shrink-0 border-r border-border-subtle overflow-y-auto p-3.5">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-faint mb-1">Building blocks</div>

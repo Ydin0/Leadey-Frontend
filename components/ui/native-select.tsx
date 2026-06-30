@@ -66,16 +66,22 @@ export function NativeSelect({
       setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
-    const reposition = () => setOpen(false); // close on scroll/resize to avoid drift
+    // Close when an ANCESTOR scrolls (the popup is fixed-positioned and would
+    // drift) — but NOT when the user scrolls inside the popup's own list.
+    const onScroll = (e: Event) => {
+      if (popRef.current && popRef.current.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const onResize = () => setOpen(false);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    window.addEventListener("resize", reposition);
-    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("resize", onResize);
+    window.addEventListener("scroll", onScroll, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("resize", reposition);
-      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", onResize);
+      window.removeEventListener("scroll", onScroll, true);
     };
   }, [open, place]);
 

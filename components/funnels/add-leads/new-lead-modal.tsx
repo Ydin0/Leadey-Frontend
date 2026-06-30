@@ -38,7 +38,7 @@ export function NewLeadModal({ funnelId, defaultCompany, lockCompany, onClose, o
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/50" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div className="relative bg-surface rounded-[14px] border border-border-subtle shadow-xl w-full max-w-lg mx-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-border-subtle">
           <h2 className="text-[15px] font-semibold text-ink">New Lead</h2>
