@@ -50,6 +50,11 @@ export async function listEnrollmentRuns(funnelId: string, workflowId: string, e
   return apiRequest<WorkflowStepRun[]>(`${base(funnelId)}/${encodeURIComponent(workflowId)}/enrollments/${encodeURIComponent(enrollmentId)}/runs`);
 }
 
+/** Re-run a finished/failed enrollment (reactivates it for the next tick). */
+export async function retryEnrollment(funnelId: string, workflowId: string, enrollmentId: string): Promise<void> {
+  await apiRequest(`${base(funnelId)}/${encodeURIComponent(workflowId)}/enrollments/${encodeURIComponent(enrollmentId)}/retry`, { method: "POST" });
+}
+
 /** Manually enroll specific leads into a workflow (it must be active to run). */
 export async function enrollLeads(
   funnelId: string,

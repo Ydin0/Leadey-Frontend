@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, RefreshCw, ChevronRight, AlertCircle, Clock, CheckCircle2, LogOut, Circle, X } from "lucide-react";
+import { Loader2, RefreshCw, ChevronRight, AlertCircle, Clock, CheckCircle2, LogOut, Circle, X, RotateCcw } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
-import { listEnrollments, listEnrollmentRuns } from "@/lib/api/workflows";
+import { listEnrollments, listEnrollmentRuns, retryEnrollment } from "@/lib/api/workflows";
 import type { Workflow, WorkflowEnrollment, WorkflowStepRun } from "@/lib/types/workflow";
 import { NODE_TYPES, nodeSummary } from "./node-types";
 
@@ -40,7 +40,19 @@ export function WorkflowActivity({ funnelId, workflow, onClose }: { funnelId: st
   const [rows, setRows] = useState<WorkflowEnrollment[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [retrying, setRetrying] = useState<string | null>(null);
   const labels = useNodeLabels(workflow);
+
+  async function retry(id: string) {
+    if (retrying) return;
+    setRetrying(id);
+    try {
+      await retryEnrollment(funnelId, workflow.id, id);
+      load();
+    } finally {
+      setRetrying(null);
+    }
+  }
 
   const load = () => {
     setLoading(true);
@@ -94,7 +106,7 @@ export function WorkflowActivity({ funnelId, workflow, onClose }: { funnelId: st
             const open = expanded === e.id;
             return (
               <div key={e.id} className="border-b border-border-subtle">
-                <button onClick={() => setExpanded(open ? null : e.id)} className="flex items-center gap-3 w-full px-5 py-3 hover:bg-hover/40 text-left">
+                <div onClick={() => setExpanded(open ? null : e.id)} className="flex items-center gap-3 w-full px-5 py-3 hover:bg-hover/40 text-left cursor-pointer">
                   <ChevronRight size={14} className={cn("text-ink-faint shrink-0 transition-transform", open && "rotate-90")} />
                   <div className="flex-1 min-w-0">
                     <div className="text-[12.5px] font-medium text-ink truncate">{e.lead.name}{e.lead.company ? <span className="text-ink-muted font-normal"> · {e.lead.company}</span> : null}</div>
@@ -106,7 +118,18 @@ export function WorkflowActivity({ funnelId, workflow, onClose }: { funnelId: st
                     <span className={cn("inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full", meta.cls)}><StatusIcon size={10} /> {meta.label}</span>
                     {e.status === "active" && <div className="text-[10px] text-ink-faint mt-1">{nextRunLabel(e)}</div>}
                   </div>
-                </button>
+                  {e.status !== "active" && (
+                    <button
+                      onClick={(ev) => { ev.stopPropagation(); void retry(e.id); }}
+                      disabled={!!retrying}
+                      title="Re-run this lead through the workflow"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-[7px] bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover hover:text-ink transition-colors shrink-0 disabled:opacity-50"
+                    >
+                      {retrying === e.id ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                      Retry
+                    </button>
+                  )}
+                </div>
                 {e.status === "failed" && e.lastError && (
                   <div className="mx-5 mb-2 -mt-1 flex items-start gap-1.5 rounded-[8px] bg-signal-red/10 border border-signal-red-text/20 px-2.5 py-1.5">
                     <AlertCircle size={12} className="text-signal-red-text shrink-0 mt-0.5" />
