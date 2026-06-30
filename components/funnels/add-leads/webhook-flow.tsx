@@ -10,6 +10,8 @@ import type { Funnel } from "@/lib/types/funnel";
 /** Standard lead fields a payload key can map to. */
 const STANDARD_TARGETS: { value: string; label: string }[] = [
   { value: "name", label: "Name" },
+  { value: "firstName", label: "First name" },
+  { value: "lastName", label: "Last name" },
   { value: "email", label: "Email" },
   { value: "company", label: "Company" },
   { value: "title", label: "Title" },
@@ -17,7 +19,15 @@ const STANDARD_TARGETS: { value: string; label: string }[] = [
   { value: "linkedinUrl", label: "LinkedIn URL" },
 ];
 
-type MappingRow = { payloadKey: string; target: string };
+/** Sentinel target meaning "create a brand-new custom field for this key". */
+const NEW_CUSTOM = "__new_custom__";
+
+/** Mirror of the backend slugifyFieldKey so the custom key we send matches. */
+function slugifyKey(label: string): string {
+  return label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+type MappingRow = { payloadKey: string; target: string; newLabel?: string };
 
 export function WebhookFlow({
   funnelId,
@@ -26,7 +36,7 @@ export function WebhookFlow({
   funnelId: string;
   onDone: () => void;
 }) {
-  const { fields: customFields } = useCustomFields();
+  const { fields: customFields, reload: reloadCustomFields } = useCustomFields();
   const [funnel, setFunnel] = useState<Funnel | null>(null);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<MappingRow[]>([]);
@@ -67,6 +77,7 @@ export function WebhookFlow({
         value: `custom:${f.key}`,
         label: `${f.label} (custom)`,
       })),
+      { value: NEW_CUSTOM, label: "➕ New custom field…" },
     ],
     [customFields],
   );
@@ -100,6 +111,9 @@ export function WebhookFlow({
       );
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      // The backend auto-creates any newly-mapped custom field — refresh the
+      // list so it shows as a normal option (with its label) next time.
+      void reloadCustomFields();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update webhook");
     } finally {
@@ -111,7 +125,16 @@ export function WebhookFlow({
     const fieldMap: Record<string, string> = {};
     for (const row of rows) {
       const k = row.payloadKey.trim();
-      if (k && row.target) fieldMap[k] = row.target;
+      if (!k) continue;
+      // A "new custom field" row resolves to custom:<slug-of-the-typed-name>;
+      // the backend provisions the definition on save.
+      let target = row.target;
+      if (target === NEW_CUSTOM) {
+        const slug = slugifyKey(row.newLabel || row.payloadKey);
+        if (!slug) continue;
+        target = `custom:${slug}`;
+      }
+      if (target) fieldMap[k] = target;
     }
     void patch({ fieldMap });
   }
@@ -130,7 +153,7 @@ export function WebhookFlow({
   const exampleKeys =
     rows.length > 0
       ? rows.map((r) => r.payloadKey).filter(Boolean)
-      : ["name", "email", "company", "title"];
+      : ["first_name", "last_name", "email", "phone_number", "company_name", "job_title"];
   const payloadExample = `{\n${exampleKeys
     .map((k) => `  "${k}": "…"`)
     .join(",\n")}\n}`;
@@ -186,6 +209,8 @@ export function WebhookFlow({
         <p className="text-[10px] text-ink-faint mt-1.5">
           Send a <span className="font-medium">POST</span> with a JSON body. The
           token authenticates the request — rotating it invalidates the old URL.
+          Works with Zapier → Facebook Lead Ads: map your form fields (including
+          custom questions) to the keys below.
         </p>
       </div>
 
@@ -232,6 +257,18 @@ export function WebhookFlow({
                   </option>
                 ))}
               </select>
+              {row.target === NEW_CUSTOM && (
+                <input
+                  value={row.newLabel ?? ""}
+                  onChange={(e) =>
+                    setRows((prev) =>
+                      prev.map((r, j) => (j === i ? { ...r, newLabel: e.target.value } : r)),
+                    )
+                  }
+                  placeholder="new field name"
+                  className="flex-1 px-2 py-1.5 rounded-[6px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+                />
+              )}
               <button
                 onClick={() => setRows((prev) => prev.filter((_, j) => j !== i))}
                 className="p-1.5 rounded-md text-ink-faint hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
