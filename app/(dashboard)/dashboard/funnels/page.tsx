@@ -377,37 +377,7 @@ export default function FunnelsPage() {
             <>
               <div className="w-px h-[22px] bg-border-subtle" />
               <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium whitespace-nowrap">Assigned rep</span>
-              <div className="flex items-center gap-[7px] flex-wrap">
-                {repUniverse.map((r) => {
-                  const selected = reps.includes(r.id);
-                  const dimmed = reps.length > 0 && !selected;
-                  return (
-                    <button
-                      key={r.id}
-                      onClick={() => toggleRep(r.id)}
-                      title={`${r.name} · ${r.count} campaign${r.count === 1 ? "" : "s"}`}
-                      className={cn(
-                        "inline-flex items-center gap-[7px] rounded-full pl-1 pr-2.5 py-1 border transition-all",
-                        selected
-                          ? "bg-section border-border-default text-ink"
-                          : "bg-transparent border-border-subtle text-ink-secondary hover:border-border-default",
-                        dimmed && "opacity-40",
-                      )}
-                    >
-                      <MemberAvatar id={r.id} name={r.name} className="w-[22px] h-[22px] text-[9px]" />
-                      <span className="text-[12px] whitespace-nowrap">{r.name}</span>
-                    </button>
-                  );
-                })}
-                {reps.length > 0 && (
-                  <button
-                    onClick={() => setReps([])}
-                    className="inline-flex items-center gap-1.5 text-[11px] text-ink-muted px-2 py-1.5 rounded-full hover:text-ink-secondary transition-colors"
-                  >
-                    <X size={12} /> Clear
-                  </button>
-                )}
-              </div>
+              <RepFilterDropdown reps={reps} universe={repUniverse} onToggle={toggleRep} onClear={() => setReps([])} />
             </>
           )}
         </div>
@@ -601,6 +571,124 @@ export default function FunnelsPage() {
               </Link>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Leadey-styled multi-select for the "Assigned rep" filter — replaces the row
+ *  of rep pills that got crowded with large teams. */
+function RepFilterDropdown({ reps, universe, onToggle, onClear }: {
+  reps: string[];
+  universe: { id: string; name: string; count: number }[];
+  onToggle: (id: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  const selectedSet = new Set(reps);
+  const label =
+    reps.length === 0 ? "All reps"
+    : reps.length === 1 ? (universe.find((u) => u.id === reps[0])?.name ?? "1 rep")
+    : `${reps.length} reps`;
+  const filtered = q.trim()
+    ? universe.filter((u) => u.name.toLowerCase().includes(q.trim().toLowerCase()))
+    : universe;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full pl-3 pr-2 py-1.5 border text-[12px] font-medium transition-colors",
+          reps.length > 0
+            ? "bg-section border-border-default text-ink"
+            : "bg-transparent border-border-subtle text-ink-secondary hover:border-border-default",
+        )}
+      >
+        <span className="max-w-[160px] truncate">{label}</span>
+        {reps.length > 0 && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onClear(); } }}
+            className="-mr-0.5 p-0.5 rounded-full hover:bg-hover"
+            title="Clear rep filter"
+          >
+            <X size={11} />
+          </span>
+        )}
+        <ChevronDown size={13} className={cn("text-ink-muted transition-transform", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-30 w-[260px] bg-surface rounded-[12px] border border-border-subtle shadow-lg overflow-hidden">
+          {universe.length > 6 && (
+            <div className="p-2 border-b border-border-subtle">
+              <div className="flex items-center gap-2 bg-section rounded-[8px] px-2.5 py-1.5">
+                <Search size={12} className="text-ink-faint shrink-0" />
+                <input
+                  autoFocus
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                  placeholder="Find a rep…"
+                  className="bg-transparent text-[11.5px] text-ink outline-none w-full placeholder:text-ink-faint"
+                />
+              </div>
+            </div>
+          )}
+          <div className="max-h-[300px] overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <p className="px-3 py-2 text-[11px] text-ink-muted">No reps found.</p>
+            ) : (
+              filtered.map((r) => {
+                const checked = selectedSet.has(r.id);
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => onToggle(r.id)}
+                    className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-hover transition-colors text-left"
+                  >
+                    <span className={cn(
+                      "w-4 h-4 rounded-[5px] border flex items-center justify-center shrink-0 transition-colors",
+                      checked ? "bg-signal-blue-text border-signal-blue-text" : "border-border-default bg-section",
+                    )}>
+                      {checked && <Check size={11} className="text-on-ink" strokeWidth={3} />}
+                    </span>
+                    <MemberAvatar id={r.id} name={r.name} className="w-[22px] h-[22px] text-[9px]" />
+                    <span className="text-[12px] text-ink truncate flex-1">{r.name}</span>
+                    <span className="text-[10.5px] text-ink-faint shrink-0">{r.count}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+          {reps.length > 0 && (
+            <div className="p-2 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={onClear}
+                className="w-full text-[11px] font-medium text-ink-muted hover:text-ink-secondary py-1 transition-colors"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
