@@ -10,12 +10,14 @@ import { OrganizationSection } from "./organization-section";
 import { LeadStatusesSection } from "./lead-statuses-section";
 import { TaskCategoriesSection } from "./task-categories-section";
 import { CustomFieldsSection } from "./custom-fields-section";
+import { ApiKeysSection } from "./api-keys-section";
 import {
   Bell,
   Briefcase,
   Building2,
   Coins,
   CreditCard,
+  Key,
   Linkedin,
   ListChecks,
   ListPlus,
@@ -63,6 +65,7 @@ type SettingsTab =
   | "billing"
   | "credits"
   | "notifications"
+  | "api-keys"
   | "integrations";
 
 const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
@@ -82,6 +85,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "credits", label: "Credits", icon: Coins },
   { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "api-keys", label: "API Keys", icon: Key },
   { id: "integrations", label: "Integrations", icon: PlugZap },
 ];
 
@@ -202,6 +206,7 @@ const VALID_TABS: SettingsTab[] = [
   "billing",
   "credits",
   "notifications",
+  "api-keys",
   "integrations",
 ];
 
@@ -425,6 +430,8 @@ export function SettingsShell() {
               </div>
             </SettingCard>
           )}
+
+          {activeTab === "api-keys" && <ApiKeysSection />}
 
           {activeTab === "integrations" && (
             <SettingCard
