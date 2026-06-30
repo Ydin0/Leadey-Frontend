@@ -158,11 +158,12 @@ export function ConvertToOpportunityModal({
                   onChange={(e) => setStageId(e.target.value)}
                   className={inputClass}
                 >
-                  {activePipeline?.stages
-                    .filter((s) => s.type === "open")
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>{s.label}</option>
-                    ))}
+                  {activePipeline?.stages.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.label}
+                      {s.type !== "open" ? ` (${s.type})` : ""}
+                    </option>
+                  ))}
                 </NativeSelect>
               </Field>
             </div>
