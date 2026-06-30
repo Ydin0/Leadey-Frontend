@@ -53,6 +53,31 @@ export interface WorkflowStats {
   enrolled: number;
   active: number;
   completed: number;
+  exited?: number;
+  failed?: number;
+}
+
+export type EnrollmentStatus = "active" | "completed" | "exited" | "failed";
+
+export interface WorkflowEnrollment {
+  id: string;
+  status: EnrollmentStatus;
+  currentNodeId: string | null;
+  nextRunAt: string | null;
+  waitingFor: string | null;
+  lastError: string | null;
+  enteredAt: string;
+  completedAt: string | null;
+  lead: { id: string; name: string; company: string; email: string };
+}
+
+export interface WorkflowStepRun {
+  id: string;
+  nodeId: string;
+  type: string;
+  status: "done" | "failed" | "skipped";
+  detail: Record<string, unknown>;
+  ranAt: string;
 }
 
 export interface Workflow {

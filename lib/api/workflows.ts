@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { Workflow, WorkflowGraph, WorkflowSettings, WorkflowStatus } from "@/lib/types/workflow";
+import type { Workflow, WorkflowGraph, WorkflowSettings, WorkflowStatus, WorkflowEnrollment, WorkflowStepRun } from "@/lib/types/workflow";
 
 const base = (funnelId: string) => `/funnels/${encodeURIComponent(funnelId)}/workflows`;
 
@@ -38,6 +38,16 @@ export async function updateWorkflow(
 
 export async function deleteWorkflow(funnelId: string, workflowId: string): Promise<void> {
   await apiRequest(`${base(funnelId)}/${encodeURIComponent(workflowId)}`, { method: "DELETE" });
+}
+
+/** The activity view: leads that have run through the workflow. */
+export async function listEnrollments(funnelId: string, workflowId: string): Promise<WorkflowEnrollment[]> {
+  return apiRequest<WorkflowEnrollment[]>(`${base(funnelId)}/${encodeURIComponent(workflowId)}/enrollments`);
+}
+
+/** Per-step log for one enrollment (incl. failure detail). */
+export async function listEnrollmentRuns(funnelId: string, workflowId: string, enrollmentId: string): Promise<WorkflowStepRun[]> {
+  return apiRequest<WorkflowStepRun[]>(`${base(funnelId)}/${encodeURIComponent(workflowId)}/enrollments/${encodeURIComponent(enrollmentId)}/runs`);
 }
 
 /** Manually enroll specific leads into a workflow (it must be active to run). */

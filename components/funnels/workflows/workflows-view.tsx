@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Loader2, Plus, ChevronDown, Check, ZoomIn, ZoomOut, Maximize, Save, Play, Pause, Workflow as WorkflowIcon, Trash2,
+  Loader2, Plus, ChevronDown, Check, ZoomIn, ZoomOut, Maximize, Save, Play, Pause, Workflow as WorkflowIcon, Trash2, ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -13,6 +13,8 @@ import type { Workflow, WorkflowGraph, WorkflowNode, WorkflowNodeType, WorkflowS
 import { NODE_TYPES, PALETTE_GROUPS, NODE_W, NODE_H } from "./node-types";
 import { WorkflowCanvas, type CanvasView } from "./workflow-canvas";
 import { WorkflowInspector } from "./workflow-inspector";
+import { WorkflowActivity } from "./workflow-activity";
+import { SlideOver } from "@/components/shared/slide-over";
 
 function newId(p: string) { return p + Math.random().toString(36).slice(2, 8); }
 
@@ -30,6 +32,7 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
   const [saving, setSaving] = useState(false);
   const [busy, setBusy] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
   const switcherRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const [boxH, setBoxH] = useState(560);
@@ -232,11 +235,15 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
             )}
           </div>
           <span className={cn("text-[10px] font-semibold capitalize px-2.5 py-1 rounded-full", statusPill)}>{status}</span>
-          <div className="flex items-center gap-3 text-[11.5px] text-ink-muted ml-1">
+          <button onClick={() => setShowActivity(true)} title="View activity" className="flex items-center gap-3 text-[11.5px] text-ink-muted ml-1 px-2 py-1 rounded-[8px] hover:bg-hover transition-colors">
             <span><strong className="text-ink font-semibold">{liveStats.enrolled}</strong> enrolled</span>
             <span><strong className="text-ink font-semibold">{liveStats.active}</strong> in progress</span>
             <span><strong className="text-ink font-semibold">{liveStats.completed}</strong> completed</span>
-          </div>
+            {(liveStats.failed ?? 0) > 0 && <span className="text-signal-red-text"><strong className="font-semibold">{liveStats.failed}</strong> failed</span>}
+          </button>
+          <button onClick={() => setShowActivity(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-[9px] bg-section border border-border-subtle text-[12px] font-medium text-ink-secondary hover:bg-hover transition-colors">
+            <ListChecks size={13} /> Activity
+          </button>
           <div className="flex-1" />
           <div className="flex items-center bg-section border border-border-subtle rounded-[9px] overflow-hidden">
             <button onClick={() => setView((v) => ({ ...v, scale: Math.max(0.4, v.scale - 0.1) }))} className="w-8 h-8 flex items-center justify-center text-ink-muted hover:text-ink"><ZoomOut size={14} /></button>
@@ -269,6 +276,10 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
           onSettings={(patch) => { setSettings((s) => ({ ...s, ...patch })); setDirty(true); }}
         />
       </div>
+
+      <SlideOver open={showActivity} onClose={() => setShowActivity(false)} width="max-w-xl" panelClassName="bg-surface flex flex-col">
+        <WorkflowActivity funnelId={funnelId} workflow={{ ...active, graph }} onClose={() => setShowActivity(false)} />
+      </SlideOver>
     </div>
   );
 }
