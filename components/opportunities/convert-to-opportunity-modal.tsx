@@ -9,7 +9,7 @@ import type { Pipeline } from "@/lib/types/opportunity";
 
 interface ConvertToOpportunityModalProps {
   leadId: string;
-  /** The opportunity name — fixed to the lead's name (shown read-only). */
+  /** The opportunity name — the company name (shown read-only). */
   defaultName?: string;
   onClose: () => void;
   /** Called after a successful conversion with the new opportunity id. */
@@ -31,7 +31,7 @@ export function ConvertToOpportunityModal({
 
   const [pipelineId, setPipelineId] = useState<string>("");
   const [stageId, setStageId] = useState<string>("");
-  // The opportunity is always named after the lead — fixed, not editable.
+  // The opportunity is always named after the company — fixed, not editable.
   const name = defaultName;
   const [value, setValue] = useState<string>("");
   const [expectedCloseDate, setExpectedCloseDate] = useState<string>("");
@@ -134,7 +134,7 @@ export function ConvertToOpportunityModal({
             <Field label="Opportunity name">
               <div
                 className={`${inputClass} flex items-center text-ink-muted cursor-not-allowed select-none`}
-                title="The opportunity is named after the lead and can't be changed"
+                title="The opportunity is named after the company and can't be changed"
               >
                 {name || "—"}
               </div>

@@ -161,7 +161,7 @@ function LeadActionMenu({
       {showConvert && (
         <ConvertToOpportunityModal
           leadId={lead.id}
-          defaultName={lead.name || lead.company}
+          defaultName={lead.company || lead.name}
           onClose={() => setShowConvert(false)}
           onConverted={() => onAdvanced?.()}
         />
