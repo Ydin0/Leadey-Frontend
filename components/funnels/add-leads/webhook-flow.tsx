@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Copy, Check, Webhook, Loader2, Plus, Trash2, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getFunnelById, updateFunnelWebhook } from "@/lib/api/funnels";
@@ -239,7 +240,7 @@ export function WebhookFlow({
                 className="flex-1 px-2 py-1.5 rounded-[6px] bg-section border border-border-subtle text-[12px] text-ink font-mono placeholder:text-ink-faint focus:outline-none focus:border-border-default"
               />
               <span className="text-ink-faint text-[12px]">→</span>
-              <select
+              <NativeSelect
                 value={row.target}
                 onChange={(e) =>
                   setRows((prev) =>
@@ -256,7 +257,7 @@ export function WebhookFlow({
                     {t.label}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
               {row.target === NEW_CUSTOM && (
                 <input
                   value={row.newLabel ?? ""}

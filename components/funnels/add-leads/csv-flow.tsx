@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import {
   AlertCircle, Check, FileSpreadsheet, Loader2, Upload, ArrowLeft, ArrowRight,
   Users, Building2, Globe, Linkedin, X as XIcon, CheckCircle2, AlertTriangle,
@@ -283,7 +284,7 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <FieldKind field={m.mappedField} />
-                      <select
+                      <NativeSelect
                         value={m.mappedField}
                         onChange={(e) => {
                           const next = e.target.value as MappedField;
@@ -302,7 +303,7 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
                         <optgroup label="Lead">{LEAD_FIELDS.map((o) => <option key={o} value={o}>{o.replace("Lead ", "")}{REQUIRED.includes(o) ? " *" : ""}</option>)}</optgroup>
                         <optgroup label="Company">{COMPANY_FIELDS.map((o) => <option key={o} value={o}>{o.replace("Company ", "")}{REQUIRED.includes(o) ? " *" : ""}</option>)}</optgroup>
                         <optgroup label="Other">{OTHER_FIELDS.map((o) => <option key={o} value={o}>{o === "--- Skip ---" ? "Skip column" : o}</option>)}</optgroup>
-                      </select>
+                      </NativeSelect>
                     </div>
                   </td>
                 </tr>

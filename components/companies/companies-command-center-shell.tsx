@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import Image from "next/image";
 import {
   AlertTriangle,
@@ -449,7 +450,7 @@ export function CompaniesCommandCenterShell() {
             />
           </label>
 
-          <select
+          <NativeSelect
             value={ownerFilter}
             onChange={(event) => setOwnerFilterValue(event.target.value)}
             className="w-full rounded-[10px] border border-border-subtle bg-section/50 px-3 py-2 text-[12px] text-ink outline-none"
@@ -460,9 +461,9 @@ export function CompaniesCommandCenterShell() {
                 {owner.name}
               </option>
             ))}
-          </select>
+          </NativeSelect>
 
-          <select
+          <NativeSelect
             value={sortBy}
             onChange={(event) => setSortValue(event.target.value as SortKey)}
             className="w-full rounded-[10px] border border-border-subtle bg-section/50 px-3 py-2 text-[12px] text-ink outline-none"
@@ -472,7 +473,7 @@ export function CompaniesCommandCenterShell() {
                 Sort by {option.label}
               </option>
             ))}
-          </select>
+          </NativeSelect>
 
           <div className="rounded-[10px] border border-border-subtle bg-section/40 px-3 py-2 text-[11px] text-ink-muted">
             Showing {sorted.length} of {data.overview.totalCompanies} companies

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { X, MessageSquare, Loader2, Send, ChevronDown, Check, CheckCheck, FileText } from "lucide-react";
 import { cn, formatRelativeTime, formatPhoneIntl } from "@/lib/utils";
 import { useTeamMembers } from "@/hooks/use-team-members";
@@ -143,7 +144,7 @@ export function SmsThreadDrawer({
         <div className="mt-3 flex items-center gap-2">
           <span className="text-[10px] uppercase tracking-wider text-ink-faint font-medium">From</span>
           <div className="relative flex-1 min-w-0">
-            <select
+            <NativeSelect
               value={fromLineId}
               onChange={(e) => setFromLineId(e.target.value)}
               disabled={lines.length === 0}
@@ -155,7 +156,7 @@ export function SmsThreadDrawer({
                   {l.number}{l.assignedToName ? ` · ${l.assignedToName}` : l.friendlyName ? ` · ${l.friendlyName}` : ""}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
             <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
           </div>
         </div>

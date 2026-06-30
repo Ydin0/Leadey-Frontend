@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Loader2, Plus, Trash2, Lock } from "lucide-react";
 import { useCustomFields } from "@/lib/hooks/use-custom-fields";
 import { saveCustomFields } from "@/lib/api/custom-fields";
@@ -218,7 +219,7 @@ export function CustomFieldsSection() {
                     placeholder="Field name…"
                     className="flex-1 px-2 py-1.5 rounded-[6px] bg-surface border border-border-subtle text-[12px] text-ink focus:outline-none focus:border-border-default"
                   />
-                  <select
+                  <NativeSelect
                     value={f.fieldType}
                     onChange={(e) =>
                       updateField(i, { fieldType: e.target.value as CustomFieldType })
@@ -230,7 +231,7 @@ export function CustomFieldsSection() {
                         {t.label}
                       </option>
                     ))}
-                  </select>
+                  </NativeSelect>
                   <label className="flex items-center gap-1.5 text-[11px] text-ink-secondary cursor-pointer shrink-0">
                     <input
                       type="checkbox"
@@ -271,7 +272,7 @@ export function CustomFieldsSection() {
             placeholder="New field name…"
             className="flex-1 px-2 py-1.5 rounded-[6px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
           />
-          <select
+          <NativeSelect
             value={adding.fieldType}
             onChange={(e) =>
               setAdding((p) => ({ ...p, fieldType: e.target.value as CustomFieldType }))
@@ -283,7 +284,7 @@ export function CustomFieldsSection() {
                 {t.label}
               </option>
             ))}
-          </select>
+          </NativeSelect>
           <button
             onClick={addField}
             disabled={!adding.label.trim()}

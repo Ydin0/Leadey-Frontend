@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Loader2, Plus, Trash2 } from "lucide-react";
 import {
   getDispositions,
@@ -131,7 +132,7 @@ export function DispositionLibraryEditor() {
               />
               <span className="text-[10px] font-mono text-ink-muted truncate">{d.slug}{d.isSystem && " · system"}</span>
             </div>
-            <select
+            <NativeSelect
               value={d.outcomeBucket}
               onChange={(e) => handleField(d.id, "outcomeBucket", e.target.value)}
               className="text-[11px] text-ink bg-section rounded-[6px] px-2 py-1 outline-none"
@@ -139,8 +140,8 @@ export function DispositionLibraryEditor() {
               {BUCKET_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
-            </select>
-            <select
+            </NativeSelect>
+            <NativeSelect
               value={d.funnelAction}
               onChange={(e) => handleField(d.id, "funnelAction", e.target.value)}
               className="text-[11px] text-ink bg-section rounded-[6px] px-2 py-1 outline-none"
@@ -148,7 +149,7 @@ export function DispositionLibraryEditor() {
               {ACTION_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
-            </select>
+            </NativeSelect>
             <input
               type="number"
               min={0}

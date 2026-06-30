@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Loader2, X, Briefcase, Trash2 } from "lucide-react";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import {
@@ -172,21 +173,21 @@ export function EditOpportunityModal({
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Pipeline">
-                <select value={pipelineId} onChange={(e) => handlePipelineChange(e.target.value)} className={inputClass}>
+                <NativeSelect value={pipelineId} onChange={(e) => handlePipelineChange(e.target.value)} className={inputClass}>
                   {pipelines.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
-                </select>
+                </NativeSelect>
               </Field>
               <Field label="Stage">
-                <select value={stageId} onChange={(e) => setStageId(e.target.value)} className={inputClass}>
+                <NativeSelect value={stageId} onChange={(e) => setStageId(e.target.value)} className={inputClass}>
                   {activePipeline?.stages.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.label}
                       {s.type !== "open" ? ` (${s.type})` : ""}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </Field>
             </div>
 
@@ -225,14 +226,14 @@ export function EditOpportunityModal({
                 />
               </Field>
               <Field label="Owner">
-                <select value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className={inputClass}>
+                <NativeSelect value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className={inputClass}>
                   <option value="">Assign to me</option>
                   {members.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </Field>
             </div>
 

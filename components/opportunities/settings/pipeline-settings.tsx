@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Loader2, Plus, Trash2, Save } from "lucide-react";
 import {
   listPipelines,
@@ -242,7 +243,7 @@ function PipelineCard({ pipeline, onReload, onDelete }: PipelineCardProps) {
               onBlur={() => saveStage(s)}
               className="text-[12px] text-ink bg-transparent outline-none border-b border-transparent focus:border-border-default"
             />
-            <select
+            <NativeSelect
               value={s.type}
               onChange={(e) => {
                 const next = { ...s, type: e.target.value as StageType };
@@ -254,7 +255,7 @@ function PipelineCard({ pipeline, onReload, onDelete }: PipelineCardProps) {
               {STAGE_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
-            </select>
+            </NativeSelect>
             <input
               type="number"
               min={0}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, CalendarClock, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -189,7 +190,7 @@ export function DateTimePicker({
   );
 }
 
-/** Tiny styled numeric dropdown (hour / minute) — no native <select>. */
+/** Tiny styled numeric dropdown (hour / minute) — no native <NativeSelect>. */
 function MiniSelect({ value, options, format, onChange }: {
   value: number; options: number[]; format: (n: number) => string; onChange: (v: number) => void;
 }) {

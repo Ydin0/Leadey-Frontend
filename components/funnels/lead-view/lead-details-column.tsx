@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import {
   Info,
   Users,
@@ -571,10 +572,10 @@ function CustomFieldsSection({
           {fields.map((f) => (
             <Labeled key={f.key} label={f.label}>
               {f.fieldType === "select" ? (
-                <select value={draft[f.key] ?? ""} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} className={fieldInputClass}>
+                <NativeSelect value={draft[f.key] ?? ""} onChange={(e) => setDraft({ ...draft, [f.key]: e.target.value })} className={fieldInputClass}>
                   <option value="">—</option>
                   {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
+                </NativeSelect>
               ) : (
                 <input
                   type={f.fieldType === "date" ? "date" : f.fieldType === "number" ? "number" : "text"}

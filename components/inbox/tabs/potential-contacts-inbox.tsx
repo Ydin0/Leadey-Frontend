@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Loader2, UserPlus, PhoneCall, PhoneIncoming, MessageSquare, Calendar } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
 import { getPotentialContacts, convertPotentialContact, type PotentialContact } from "@/lib/api/inbox";
@@ -143,10 +144,10 @@ function ConvertModal({ contact, onClose, onConverted }: {
         </div>
         <div>
           <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Campaign</label>
-          <select value={funnelId} onChange={(e) => setFunnelId(e.target.value)}
+          <NativeSelect value={funnelId} onChange={(e) => setFunnelId(e.target.value)}
             className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink focus:outline-none focus:border-border-default">
             {funnels.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
+          </NativeSelect>
         </div>
         {error && <p className="text-[11.5px] text-signal-red-text">{error}</p>}
         <div className="flex items-center justify-end gap-2 pt-1">

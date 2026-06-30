@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Loader2, X, Briefcase } from "lucide-react";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { convertLead, listPipelines } from "@/lib/api/opportunities";
@@ -141,7 +142,7 @@ export function ConvertToOpportunityModal({
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Pipeline">
-                <select
+                <NativeSelect
                   value={pipelineId}
                   onChange={(e) => setPipelineId(e.target.value)}
                   className={inputClass}
@@ -149,10 +150,10 @@ export function ConvertToOpportunityModal({
                   {pipelines.map((p) => (
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
-                </select>
+                </NativeSelect>
               </Field>
               <Field label="Stage">
-                <select
+                <NativeSelect
                   value={stageId}
                   onChange={(e) => setStageId(e.target.value)}
                   className={inputClass}
@@ -162,7 +163,7 @@ export function ConvertToOpportunityModal({
                     .map((s) => (
                       <option key={s.id} value={s.id}>{s.label}</option>
                     ))}
-                </select>
+                </NativeSelect>
               </Field>
             </div>
 
@@ -189,7 +190,7 @@ export function ConvertToOpportunityModal({
             </div>
 
             <Field label="Owner">
-              <select
+              <NativeSelect
                 value={ownerId}
                 onChange={(e) => setOwnerId(e.target.value)}
                 className={inputClass}
@@ -198,7 +199,7 @@ export function ConvertToOpportunityModal({
                 {members.map((m) => (
                   <option key={m.id} value={m.id}>{m.name}</option>
                 ))}
-              </select>
+              </NativeSelect>
             </Field>
 
             <Field label="Notes">

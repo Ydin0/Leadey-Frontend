@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Icon } from "@/components/team/icon";
 import { OfferLogo } from "./kb-shared";
 import { TYPES, type LessonType, type Lesson, type Offer, type LinkItem, type ArticleBlock, type FaqItem, type QuizQuestion } from "@/lib/types/kb";
@@ -70,8 +71,8 @@ export function OfferModal({ initial, onClose, onSave }: {
       <div><label className="lbl">Offer name</label><input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="Acme Analytics" autoFocus /></div>
       <div><label className="lbl">Tagline</label><input className="field" value={tagline} onChange={(e) => setTagline(e.target.value)} placeholder="What it is, in one line." /></div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div><label className="lbl">Category</label><select className="field" value={cat} onChange={(e) => setCat(e.target.value)}>{KB_CATS.map((c) => <option key={c}>{c}</option>)}</select></div>
-        <div><label className="lbl">Level</label><select className="field" value={level} onChange={(e) => setLevel(e.target.value)}>{["New", "Core offer", "Required"].map((c) => <option key={c}>{c}</option>)}</select></div>
+        <div><label className="lbl">Category</label><NativeSelect className="field" value={cat} onChange={(e) => setCat(e.target.value)}>{KB_CATS.map((c) => <option key={c}>{c}</option>)}</NativeSelect></div>
+        <div><label className="lbl">Level</label><NativeSelect className="field" value={level} onChange={(e) => setLevel(e.target.value)}>{["New", "Core offer", "Required"].map((c) => <option key={c}>{c}</option>)}</NativeSelect></div>
       </div>
       <div><label className="lbl">About</label><textarea className="field" rows={3} value={about} onChange={(e) => setAbout(e.target.value)} placeholder="A short description of this offer for reps." style={{ resize: "vertical" }} /></div>
     </ModalShell>

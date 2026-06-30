@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { useRouter } from "next/navigation";
 import {
   Loader2, Plus, Check, Clock, CalendarClock, Trash2, ArrowUpRight,
@@ -300,7 +301,7 @@ function TaskRow({
 }
 
 /** Leadey-styled assignee picker (My tasks / Everyone / each member). Replaces
- *  the browser-default <select> so the dropdown matches the app's design. */
+ *  the browser-default <NativeSelect> so the dropdown matches the app's design. */
 function AssigneeDropdown({ value, onChange, members, mineLabel }: {
   value: string;
   onChange: (v: string) => void;
@@ -363,7 +364,7 @@ function AssigneeDropdown({ value, onChange, members, mineLabel }: {
   );
 }
 
-/** Leadey-styled task-category picker with colour dots (no native <select>). */
+/** Leadey-styled task-category picker with colour dots (no native <NativeSelect>). */
 function CategorySelect({ value, categories, onChange }: {
   value: string;
   categories: TaskCategoryDef[];

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Headphones, Loader2, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -311,7 +312,7 @@ export default function RecordingsPage() {
             <div>
               <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Call duration</p>
               <div className="flex items-center gap-2">
-                <select
+                <NativeSelect
                   value={durMode}
                   onChange={(e) => setDurMode(e.target.value as typeof durMode)}
                   className="bg-section border border-border-subtle rounded-[8px] px-2 py-1.5 text-[11px] text-ink focus:outline-none focus:border-border-default"
@@ -319,7 +320,7 @@ export default function RecordingsPage() {
                   <option value="any">Any length</option>
                   <option value="more">More than</option>
                   <option value="less">Less than</option>
-                </select>
+                </NativeSelect>
                 {durMode !== "any" && (
                   <div className="flex items-center gap-1.5 flex-1">
                     <input

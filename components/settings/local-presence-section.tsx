@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Loader2, MapPin, Plus, Check, Lock, ShieldCheck } from "lucide-react";
 import { cn, formatPhoneIntl } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -123,12 +124,12 @@ export function LocalPresenceSection() {
             className="w-28 px-2.5 py-1.5 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink focus:outline-none focus:border-border-default disabled:opacity-60" />
         </Field>
         <Field label="Who can buy numbers" hint="New local numbers are a recurring cost — restrict purchasing to admins, or allow any rep.">
-          <select disabled={!isAdmin} value={config.whoCanProvision}
+          <NativeSelect disabled={!isAdmin} value={config.whoCanProvision}
             onChange={(e) => patch({ whoCanProvision: e.target.value as "admin" | "anyone" })}
             className="px-2.5 py-1.5 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink focus:outline-none focus:border-border-default disabled:opacity-60">
             <option value="admin">Admins only</option>
             <option value="anyone">Anyone</option>
-          </select>
+          </NativeSelect>
         </Field>
         {error && <p className="text-[11px] text-signal-red-text">{error}</p>}
       </div>

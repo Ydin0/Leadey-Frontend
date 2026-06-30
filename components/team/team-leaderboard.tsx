@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Avatar } from "./team-shared";
 import { Sparkline, Meter, attColor } from "./charts";
 import { DeltaPill } from "./team-shared";
@@ -57,9 +58,9 @@ export function TeamLeaderboard({ range, podium, onPickRep }: {
       <div className="between" style={{ flexWrap: "wrap", gap: 12 }}>
         <div className="row" style={{ gap: 8 }}>
           <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>Rank by</span>
-          <select className="field" style={{ width: "auto", padding: "7px 10px", fontSize: 12 }} value={rankBy} onChange={(e) => setRankBy(e.target.value)}>
+          <NativeSelect className="field" style={{ width: "auto", padding: "7px 10px", fontSize: 12 }} value={rankBy} onChange={(e) => setRankBy(e.target.value)}>
             {rankOpts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
+          </NativeSelect>
         </div>
         <div className="seg" style={{ flexWrap: "wrap" }}>
           {[["all", "All departments"], ...departments.map((d) => [d.name, d.name] as [string, string])].map(([v, l]) => (

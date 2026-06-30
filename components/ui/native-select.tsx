@@ -1,35 +1,145 @@
+"use client";
+
 import * as React from "react";
-import { ChevronDown } from "lucide-react";
+import { createPortal } from "react-dom";
+import { ChevronDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Native `<select>` with platform default chevron stripped and replaced
- * with a Lucide ChevronDown. Use the same className conventions as the
- * existing inputs (rounded-[10px], bg-section, etc.).
- *
- * Standard <select> props are forwarded directly. Children are <option>s.
+ * A Leadey-styled single-select dropdown that is a drop-in replacement for a
+ * native `<select>` — same props (`value`, `onChange`, `disabled`, `className`)
+ * and `<option>` children — but renders a branded popup (portaled to <body> so
+ * it escapes overflow/transform containers) instead of the OS menu. `onChange`
+ * receives a minimal synthetic event so existing `e.target.value` call sites
+ * keep working unchanged.
  */
+type Opt = { value: string; label: React.ReactNode; disabled?: boolean };
+
+function collectOptions(children: React.ReactNode): Opt[] {
+  const out: Opt[] = [];
+  React.Children.forEach(children, (child) => {
+    if (!React.isValidElement(child)) return;
+    if (child.type === "option") {
+      const p = child.props as { value?: unknown; children?: React.ReactNode; disabled?: boolean };
+      out.push({ value: String(p.value ?? ""), label: p.children ?? String(p.value ?? ""), disabled: p.disabled });
+    } else if (child.type === "optgroup" || child.type === React.Fragment) {
+      // Recurse into <optgroup> and <>…</> wrappers so grouped/conditional
+      // options are still collected.
+      out.push(...collectOptions((child.props as { children?: React.ReactNode }).children));
+    }
+  });
+  return out;
+}
+
 export function NativeSelect({
   className,
   children,
-  ...props
+  value,
+  onChange,
+  disabled,
+  ...rest
 }: React.ComponentProps<"select">) {
+  const options = React.useMemo(() => collectOptions(children), [children]);
+  const current = value !== undefined ? String(value) : undefined;
+  const selected = options.find((o) => o.value === current);
+
+  const [open, setOpen] = React.useState(false);
+  const [mounted, setMounted] = React.useState(false);
+  const [rect, setRect] = React.useState<{ left: number; top: number; width: number; below: boolean } | null>(null);
+  const btnRef = React.useRef<HTMLButtonElement>(null);
+  const popRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => setMounted(true), []);
+
+  const place = React.useCallback(() => {
+    const r = btnRef.current?.getBoundingClientRect();
+    if (!r) return;
+    const below = r.bottom + 280 < window.innerHeight || r.top < 300;
+    setRect({ left: r.left, top: below ? r.bottom + 4 : r.top - 4, width: r.width, below });
+  }, []);
+
+  React.useEffect(() => {
+    if (!open) return;
+    place();
+    const onDown = (e: MouseEvent) => {
+      if (popRef.current?.contains(e.target as Node) || btnRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    const reposition = () => setOpen(false); // close on scroll/resize to avoid drift
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", reposition);
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [open, place]);
+
+  function pick(v: string) {
+    setOpen(false);
+    if (v === current) return;
+    onChange?.({ target: { value: v } } as unknown as React.ChangeEvent<HTMLSelectElement>);
+  }
+
   return (
-    <div className="relative">
-      <select
-        {...props}
+    <>
+      <button
+        type="button"
+        ref={btnRef}
+        disabled={disabled}
+        onClick={() => !disabled && setOpen((o) => !o)}
         className={cn(
-          "w-full appearance-none px-3 py-2 pr-9 rounded-[10px] bg-section text-[12px] text-ink outline-none border border-border-subtle focus:border-signal-blue-text/30 cursor-pointer",
+          "relative w-full appearance-none flex items-center gap-2 px-3 py-2 pr-9 rounded-[10px] bg-section text-[12px] text-ink text-left outline-none border border-border-subtle cursor-pointer transition-colors",
+          open ? "border-border-default" : "hover:border-border-default",
+          disabled && "opacity-50 cursor-not-allowed",
           className,
         )}
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
-        {children}
-      </select>
-      <ChevronDown
-        size={14}
-        strokeWidth={1.8}
-        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none"
-      />
-    </div>
+        <span className={cn("truncate", selected ? "text-ink" : "text-ink-faint")}>
+          {selected ? selected.label : (options[0]?.label ?? "")}
+        </span>
+        <ChevronDown size={14} strokeWidth={1.8} className={cn("absolute right-3 top-1/2 -translate-y-1/2 text-ink-muted transition-transform", open && "rotate-180")} />
+      </button>
+
+      {mounted && open && rect && createPortal(
+        <div
+          ref={popRef}
+          role="listbox"
+          className="fixed z-[200] max-h-[300px] overflow-y-auto rounded-[10px] border border-border-subtle bg-surface shadow-xl shadow-black/20 py-1"
+          style={{ left: rect.left, width: rect.width, ...(rect.below ? { top: rect.top } : { bottom: window.innerHeight - rect.top }) }}
+        >
+          {options.map((o, i) => {
+            const active = o.value === current;
+            return (
+              <button
+                key={`${o.value}-${i}`}
+                type="button"
+                disabled={o.disabled}
+                onClick={() => pick(o.value)}
+                role="option"
+                aria-selected={active}
+                className={cn(
+                  "flex items-center gap-2 w-full px-3 py-1.5 text-left text-[12px] transition-colors",
+                  o.disabled ? "text-ink-faint cursor-not-allowed" : "text-ink-secondary hover:bg-hover hover:text-ink",
+                  active && "text-ink",
+                )}
+              >
+                <span className="flex-1 min-w-0 truncate">{o.label}</span>
+                {active && <Check size={13} className="text-accent shrink-0" />}
+              </button>
+            );
+          })}
+        </div>,
+        document.body,
+      )}
+
+      {rest.name ? <input type="hidden" name={rest.name} value={current ?? ""} readOnly /> : null}
+    </>
   );
 }

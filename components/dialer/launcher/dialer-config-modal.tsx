@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { X, Loader2, ShieldCheck, UserCheck, Clock, Calendar, AlertCircle, Play } from "lucide-react";
 import { createSession, getActiveSession, endSession } from "@/lib/api/dialer";
 import { useDialerContext } from "@/components/dialer/context/dialer-context";
@@ -184,7 +185,7 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
           {excludeRecentlyCalled && (
             <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-[8px] bg-section ml-7">
               <p className="text-[12px] font-medium text-ink">Don&apos;t call anyone called in the last</p>
-              <select
+              <NativeSelect
                 value={recentlyCalledHours}
                 onChange={(e) => setRecentlyCalledHours(Number(e.target.value))}
                 className="px-2 py-1 rounded-[6px] bg-surface text-[12px] text-ink border border-border-subtle outline-none focus:border-border-default"
@@ -196,7 +197,7 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
                 <option value={12}>12 hours</option>
                 <option value={24}>24 hours</option>
                 <option value={48}>48 hours</option>
-              </select>
+              </NativeSelect>
             </div>
           )}
           <FilterRow

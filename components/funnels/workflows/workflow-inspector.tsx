@@ -2,6 +2,7 @@
 
 import { Trash2, X } from "lucide-react";
 import type { Workflow, WorkflowNode, WorkflowSettings, WorkflowStatus } from "@/lib/types/workflow";
+import { NativeSelect } from "@/components/ui/native-select";
 import { NODE_TYPES } from "./node-types";
 
 const lab = "block text-[10px] uppercase tracking-wider text-ink-muted font-medium mt-4 mb-1.5";
@@ -46,13 +47,13 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProp
 
       {node.type === "trigger" && (<>
         <label className={lab}>Enroll leads when</label>
-        <select className={inp} value={v("label")} onChange={(e) => set({ label: e.target.value })}>
+        <NativeSelect className={inp} value={v("label")} onChange={(e) => set({ label: e.target.value })}>
           <option value="Lead enters campaign">Lead enters this campaign</option>
           <option value="Status changes">Lead status changes</option>
           <option value="Tag added">A tag is added</option>
           <option value="Reply received">A reply is received</option>
           <option value="Manually added">Manually added by a rep</option>
-        </select>
+        </NativeSelect>
         <label className={lab}>Description</label>
         <input className={inp} value={v("sub")} onChange={(e) => set({ sub: e.target.value })} placeholder="Optional note" />
       </>)}
@@ -75,12 +76,12 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProp
 
       {node.type === "linkedin" && (<>
         <label className={lab}>Action</label>
-        <select className={inp} value={v("ltype")} onChange={(e) => set({ ltype: e.target.value })}>
+        <NativeSelect className={inp} value={v("ltype")} onChange={(e) => set({ ltype: e.target.value })}>
           <option value="connection">Connection request</option>
           <option value="message">Direct message</option>
           <option value="inmail">InMail</option>
           <option value="visit">Profile visit</option>
-        </select>
+        </NativeSelect>
         <label className={lab}>Message</label>
         <textarea className={area} value={v("message")} onChange={(e) => set({ message: e.target.value })} />
         <p className="text-[11px] text-ink-faint mt-1.5">Creates an assigned task for a rep to action.</p>
@@ -97,25 +98,25 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProp
         <label className={lab}>Wait duration</label>
         <div className="flex gap-2">
           <input type="number" className={inp + " w-20"} value={v("amount")} onChange={(e) => set({ amount: Number(e.target.value) })} />
-          <select className={inp + " flex-1"} value={v("unit")} onChange={(e) => set({ unit: e.target.value })}>
+          <NativeSelect className={inp + " flex-1"} value={v("unit")} onChange={(e) => set({ unit: e.target.value })}>
             <option value="minutes">minutes</option><option value="hours">hours</option><option value="days">days</option><option value="weeks">weeks</option>
-          </select>
+          </NativeSelect>
         </div>
         <p className="text-[11px] text-ink-faint mt-2">Continues to the next step after the delay.</p>
       </>)}
 
       {node.type === "waitevent" && (<>
         <label className={lab}>Wait until</label>
-        <select className={inp} value={v("event")} onChange={(e) => set({ event: e.target.value })}>
+        <NativeSelect className={inp} value={v("event")} onChange={(e) => set({ event: e.target.value })}>
           <option value="email_opened">Email is opened</option><option value="link_clicked">Link is clicked</option>
           <option value="replied">Lead replies</option><option value="meeting_booked">Meeting is booked</option>
-        </select>
+        </NativeSelect>
         <label className={lab}>Timeout after</label>
         <div className="flex gap-2">
           <input type="number" className={inp + " w-20"} value={v("amount")} onChange={(e) => set({ amount: Number(e.target.value) })} />
-          <select className={inp + " flex-1"} value={v("unit")} onChange={(e) => set({ unit: e.target.value })}>
+          <NativeSelect className={inp + " flex-1"} value={v("unit")} onChange={(e) => set({ unit: e.target.value })}>
             <option value="hours">hours</option><option value="days">days</option><option value="weeks">weeks</option>
-          </select>
+          </NativeSelect>
         </div>
       </>)}
 
@@ -123,10 +124,10 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProp
         <label className={lab}>Label</label>
         <input className={inp} value={v("label")} onChange={(e) => set({ label: e.target.value })} />
         <label className={lab}>Branch when</label>
-        <select className={inp} value={v("field")} onChange={(e) => set({ field: e.target.value })}>
+        <NativeSelect className={inp} value={v("field")} onChange={(e) => set({ field: e.target.value })}>
           <option value="replied">Lead has replied</option><option value="opened">Email was opened</option>
           <option value="clicked">A link was clicked</option><option value="status">Status equals…</option><option value="has_tag">Has tag…</option>
-        </select>
+        </NativeSelect>
         <div className="bg-section rounded-[9px] p-3 mt-3 text-[12px] text-ink-muted leading-relaxed">Matching leads take the <strong className="text-signal-green-text">Yes</strong> branch; everyone else takes <strong className="text-signal-red-text">No</strong>.</div>
       </>)}
 
@@ -138,14 +139,14 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProp
 
       {node.type === "status" && (<>
         <label className={lab}>Set lead status to</label>
-        <select className={inp} value={v("to")} onChange={(e) => set({ to: e.target.value })}>
+        <NativeSelect className={inp} value={v("to")} onChange={(e) => set({ to: e.target.value })}>
           {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
+        </NativeSelect>
       </>)}
 
       {node.type === "tag" && (<>
         <label className={lab}>Action</label>
-        <select className={inp} value={v("mode")} onChange={(e) => set({ mode: e.target.value })}><option value="add">Add tag</option><option value="remove">Remove tag</option></select>
+        <NativeSelect className={inp} value={v("mode")} onChange={(e) => set({ mode: e.target.value })}><option value="add">Add tag</option><option value="remove">Remove tag</option></NativeSelect>
         <label className={lab}>Tag</label>
         <input className={inp} value={v("tag")} onChange={(e) => set({ tag: e.target.value })} />
       </>)}
@@ -154,20 +155,20 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProp
         <label className={lab}>Field</label>
         <input className={inp} value={v("field")} onChange={(e) => set({ field: e.target.value })} />
         <label className={lab}>Operation</label>
-        <select className={inp} value={v("op")} onChange={(e) => set({ op: e.target.value })}><option value="set">Set to</option><option value="increase">Increase by</option><option value="decrease">Decrease by</option><option value="clear">Clear</option></select>
+        <NativeSelect className={inp} value={v("op")} onChange={(e) => set({ op: e.target.value })}><option value="set">Set to</option><option value="increase">Increase by</option><option value="decrease">Decrease by</option><option value="clear">Clear</option></NativeSelect>
         <label className={lab}>Value</label>
         <input className={inp} value={v("value")} onChange={(e) => set({ value: e.target.value })} />
       </>)}
 
       {node.type === "assign" && (<>
         <label className={lab}>Assign owner</label>
-        <select className={inp} value={v("owner")} onChange={(e) => set({ owner: e.target.value })}><option value="Round robin">Round robin (team)</option><option value="me">Me</option></select>
+        <NativeSelect className={inp} value={v("owner")} onChange={(e) => set({ owner: e.target.value })}><option value="Round robin">Round robin (team)</option><option value="me">Me</option></NativeSelect>
         <p className="text-[11px] text-ink-faint mt-2">Round robin rotates across this campaign&apos;s members.</p>
       </>)}
 
       {node.type === "webhook" && (<>
         <label className={lab}>Method</label>
-        <select className={inp} value={v("method")} onChange={(e) => set({ method: e.target.value })}><option value="POST">POST</option><option value="PUT">PUT</option><option value="GET">GET</option></select>
+        <NativeSelect className={inp} value={v("method")} onChange={(e) => set({ method: e.target.value })}><option value="POST">POST</option><option value="PUT">PUT</option><option value="GET">GET</option></NativeSelect>
         <label className={lab}>Endpoint URL</label>
         <input className={inp} value={v("url")} onChange={(e) => set({ url: e.target.value })} placeholder="https://…" />
       </>)}

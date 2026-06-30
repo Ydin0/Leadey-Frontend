@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { Icon } from "./icon";
 import { Avatar, StatusDot } from "./team-shared";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -99,15 +100,15 @@ export function MemberModal({ mode, member, seatUsage, onClose, onSave }: {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                 <div>
                   <label className="lbl">Role</label>
-                  <select className="field" value={role} onChange={(e) => pickRole(e.target.value)}>
+                  <NativeSelect className="field" value={role} onChange={(e) => pickRole(e.target.value)}>
                     {Object.keys(ROLE_TARGETS).map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
+                  </NativeSelect>
                 </div>
                 <div>
                   <label className="lbl">Department</label>
-                  <select className="field" value={pod} onChange={(e) => setPod(e.target.value)}>
+                  <NativeSelect className="field" value={pod} onChange={(e) => setPod(e.target.value)}>
                     {departments.map((d) => <option key={d.name} value={d.name}>{d.name}</option>)}
-                  </select>
+                  </NativeSelect>
                 </div>
               </div>
             </>

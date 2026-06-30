@@ -317,7 +317,7 @@ export function TeamSection() {
                 {/* Department dropdown */}
                 {departments.length > 0 && (
                   <div className="relative flex items-center">
-                    <select
+                    <NativeSelect
                       value={deptByEmail[(member.email || "").toLowerCase()] || ""}
                       onChange={(e) => handleDeptChange(member.email, e.target.value)}
                       disabled={savingDept === (member.email || "").toLowerCase()}
@@ -328,7 +328,7 @@ export function TeamSection() {
                       {departments.map((d) => (
                         <option key={d.name} value={d.name}>{d.name}</option>
                       ))}
-                    </select>
+                    </NativeSelect>
                     <ChevronDown size={10} className="absolute right-2 pointer-events-none text-ink-muted" />
                   </div>
                 )}

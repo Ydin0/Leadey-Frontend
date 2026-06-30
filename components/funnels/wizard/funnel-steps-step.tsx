@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import Link from "next/link";
 import { Plus, X, Mail, Linkedin, Phone, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -255,7 +256,7 @@ function TemplatePicker({
   return (
     <div>
       <label className="text-[10px] text-ink-muted block mb-1">Start from a saved template</label>
-      <select
+      <NativeSelect
         value=""
         onChange={(e) => {
           const t = templates.find((x) => x.id === e.target.value);
@@ -268,7 +269,7 @@ function TemplatePicker({
         {templates.map((t) => (
           <option key={t.id} value={t.id}>{t.name}</option>
         ))}
-      </select>
+      </NativeSelect>
     </div>
   );
 }

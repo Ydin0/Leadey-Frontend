@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { NativeSelect } from "@/components/ui/native-select";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft, Play, Pencil, Loader2, Sparkles, FolderInput, EyeOff, X,
@@ -1039,7 +1040,7 @@ function CompaniesTab({
         )}
         <div className="ml-auto flex items-center gap-2">
           {/* Sort by */}
-          <select
+          <NativeSelect
             value={sortField ? `${sortField}:${sortAsc ? "asc" : "desc"}` : ""}
             onChange={(e) => {
               const v = e.target.value;
@@ -1059,7 +1060,7 @@ function CompaniesTab({
             <option value="employeeCount:desc">Largest (employees)</option>
             <option value="employeeCount:asc">Smallest (employees)</option>
             <option value="jobCount:desc">Most jobs</option>
-          </select>
+          </NativeSelect>
           <button
             onClick={handleExportCompanies}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] text-[11px] font-medium bg-surface text-ink border border-border-subtle hover:bg-hover transition-colors"
