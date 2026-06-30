@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth, useOrganizationList } from "@clerk/nextjs";
 
 export interface Workspace {
@@ -24,6 +24,18 @@ export function useWorkspaces() {
     userMemberships: { infinite: true },
   });
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
+
+  // Clerk caches the membership list, so a workspace the user was just removed
+  // from can linger in the switcher. Revalidate when the tab regains focus so a
+  // revoked workspace drops off (the backend already denies its data via the
+  // org-membership guard — this keeps the UI honest too).
+  const revalidateRef = useRef<(() => void) | undefined>(undefined);
+  revalidateRef.current = userMemberships?.revalidate;
+  useEffect(() => {
+    const onFocus = () => revalidateRef.current?.();
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   const workspaces = useMemo<Workspace[]>(() => {
     const data = userMemberships?.data ?? [];
