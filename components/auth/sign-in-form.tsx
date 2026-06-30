@@ -128,16 +128,23 @@ export function SignInForm() {
         if (result.status === "complete") {
           await setActive({ session: result.createdSessionId });
 
-          // Set the active organization so backend auth works
+          // Decide where to land based on how many workspaces the user is in:
+          //   0 → straight to the dashboard (AuthTokenSync handles the no-org case)
+          //   1 → activate it and go to the dashboard (single-workspace UX unchanged)
+          //  >1 → let the user choose on the workspace picker (don't pre-activate)
           const memberships = await clerk.user?.getOrganizationMemberships();
-          if (memberships && memberships.data.length > 0) {
-            await setActive({
-              session: result.createdSessionId,
-              organization: memberships.data[0].organization.id,
-            });
+          const count = memberships?.data.length ?? 0;
+          if (count > 1) {
+            router.push("/select-workspace");
+          } else {
+            if (count === 1) {
+              await setActive({
+                session: result.createdSessionId,
+                organization: memberships!.data[0].organization.id,
+              });
+            }
+            router.push("/dashboard");
           }
-
-          router.push("/dashboard");
         }
       } catch (err) {
         if (isClerkAPIResponseError(err)) {

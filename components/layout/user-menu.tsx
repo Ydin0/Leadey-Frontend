@@ -6,9 +6,11 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import {
   UserCircle2, Building2, Users, CreditCard, Bell, Sun, Moon, Monitor,
-  LogOut, ChevronRight, Settings,
+  LogOut, ChevronRight, Settings, Check, Loader2,
 } from "lucide-react";
 import { MemberAvatar } from "@/components/shared/member-avatar";
+import { OrgAvatar } from "@/components/shared/org-avatar";
+import { useWorkspaces, roleLabel } from "@/lib/hooks/use-workspaces";
 import { cn } from "@/lib/utils";
 
 interface MenuLink {
@@ -40,6 +42,10 @@ export function UserMenu() {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
   const { theme, setTheme } = useTheme();
+  const { workspaces, switchTo, switchingTo } = useWorkspaces();
+
+  const activeWorkspace = workspaces.find((w) => w.isActive) ?? null;
+  const otherWorkspaces = workspaces.filter((w) => !w.isActive);
 
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -107,6 +113,48 @@ export function UserMenu() {
               {email && <p className="text-[11px] text-ink-muted truncate">{email}</p>}
             </div>
           </div>
+
+          {/* Workspace switcher */}
+          {activeWorkspace && (
+            <div className="px-3 py-2.5 border-b border-border-subtle">
+              <span className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-2">
+                {otherWorkspaces.length > 0 ? "Workspaces" : "Workspace"}
+              </span>
+              <div className="flex flex-col gap-0.5">
+                {/* Active workspace */}
+                <div className="flex items-center gap-2.5 rounded-[9px] px-2 py-1.5 bg-section">
+                  <OrgAvatar id={activeWorkspace.id} name={activeWorkspace.name} imageUrl={activeWorkspace.imageUrl} size="sm" />
+                  <div className="min-w-0 grow">
+                    <p className="text-[12.5px] font-medium text-ink truncate">{activeWorkspace.name}</p>
+                    <p className="text-[10px] text-ink-muted">{roleLabel(activeWorkspace.role)} · Current</p>
+                  </div>
+                  <Check size={14} className="text-accent shrink-0" />
+                </div>
+                {/* Other workspaces — click to switch */}
+                {otherWorkspaces.map((w) => {
+                  const busy = switchingTo === w.id;
+                  return (
+                    <button
+                      key={w.id}
+                      role="menuitem"
+                      disabled={!!switchingTo}
+                      onClick={() => void switchTo(w.id)}
+                      className="group flex items-center gap-2.5 rounded-[9px] px-2 py-1.5 hover:bg-hover transition-colors text-left disabled:opacity-60"
+                    >
+                      <OrgAvatar id={w.id} name={w.name} imageUrl={w.imageUrl} size="sm" />
+                      <div className="min-w-0 grow">
+                        <p className="text-[12.5px] font-medium text-ink-secondary group-hover:text-ink truncate">{w.name}</p>
+                        <p className="text-[10px] text-ink-muted">{roleLabel(w.role)}</p>
+                      </div>
+                      {busy
+                        ? <Loader2 size={13} className="text-ink-muted animate-spin shrink-0" />
+                        : <ChevronRight size={13} className="text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Quick links */}
           <div className="p-1.5">
