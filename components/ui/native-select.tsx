@@ -57,6 +57,21 @@ export function NativeSelect({
 
   React.useEffect(() => setMounted(true), []);
 
+  // The popup is portaled to <body>, so a pointer-down on an option would
+  // otherwise register as an "outside click" for any parent popover/modal that
+  // closes on document mousedown (the Filter builder, smart views, sort menus,
+  // etc. — all use `document.addEventListener("mousedown")` + ref.contains()).
+  // Stop mousedown/pointerdown from bubbling to document so those handlers
+  // never fire. We deliberately do NOT stop `click`, so React's delegated
+  // onClick still selects the option. Element is destroyed on close → no leak.
+  const attachPop = React.useCallback((el: HTMLDivElement | null) => {
+    popRef.current = el;
+    if (!el) return;
+    const stop = (e: Event) => e.stopPropagation();
+    el.addEventListener("mousedown", stop);
+    el.addEventListener("pointerdown", stop);
+  }, []);
+
   const place = React.useCallback(() => {
     const r = btnRef.current?.getBoundingClientRect();
     if (!r) return;
@@ -121,7 +136,7 @@ export function NativeSelect({
 
       {mounted && open && rect && createPortal(
         <div
-          ref={popRef}
+          ref={attachPop}
           role="listbox"
           className="fixed z-[200] max-h-[300px] overflow-y-auto rounded-[10px] border border-border-subtle bg-surface shadow-xl shadow-black/20 py-1"
           style={{ left: rect.left, width: rect.width, ...(rect.below ? { top: rect.top } : { bottom: window.innerHeight - rect.top }) }}
