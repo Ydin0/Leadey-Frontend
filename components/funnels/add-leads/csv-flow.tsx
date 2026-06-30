@@ -267,9 +267,9 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
           {fileName} · {csvRows.length.toLocaleString()} rows · match each column to a lead or company field.
         </p>
 
-        <div className="bg-surface rounded-[14px] border border-border-subtle overflow-hidden mb-3 max-h-[52vh] overflow-y-auto">
+        <div className="bg-surface rounded-[14px] border border-border-subtle mb-3">
           <table className="w-full table-fixed">
-            <thead className="sticky top-0 bg-section/95 backdrop-blur z-10">
+            <thead className="bg-section/95">
               <tr className="border-b border-border-subtle">
                 <th className="text-left text-[10px] uppercase tracking-wider text-ink-muted font-medium px-3 py-2 w-[32%]">CSV column</th>
                 <th className="text-left text-[10px] uppercase tracking-wider text-ink-muted font-medium px-3 py-2 w-[30%]">Sample</th>
