@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser, useClerk } from "@clerk/nextjs";
-import { ChevronRight, Loader2, LogOut } from "lucide-react";
+import { ChevronRight, Loader2, LogOut, Plus } from "lucide-react";
 import { OrgAvatar } from "@/components/shared/org-avatar";
+import { CreateWorkspaceModal } from "@/components/layout/create-workspace-modal";
 import { useWorkspaces, roleLabel } from "@/lib/hooks/use-workspaces";
 
 /** First-login workspace chooser — shown after sign-in when the user belongs to
@@ -15,6 +16,7 @@ export default function SelectWorkspacePage() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const { workspaces, isLoaded, switchTo, switchingTo } = useWorkspaces();
+  const [showCreate, setShowCreate] = useState(false);
 
   const email = user?.primaryEmailAddress?.emailAddress ?? "";
 
@@ -68,6 +70,20 @@ export default function SelectWorkspacePage() {
                 </button>
               );
             })}
+            {/* Create a brand-new workspace */}
+            <button
+              disabled={!!switchingTo}
+              onClick={() => setShowCreate(true)}
+              className="group flex items-center gap-3 w-full rounded-[12px] border border-dashed border-border-default hover:bg-hover px-3.5 py-3 text-left transition-colors disabled:opacity-60"
+            >
+              <span className="flex items-center justify-center w-11 h-11 rounded-[11px] bg-section text-ink-muted group-hover:text-ink-secondary shrink-0">
+                <Plus size={18} />
+              </span>
+              <div className="min-w-0 grow">
+                <p className="text-[14px] font-medium text-ink">Create a new workspace</p>
+                <p className="text-[11.5px] text-ink-muted">Start a fresh organization</p>
+              </div>
+            </button>
           </div>
         )}
       </div>
@@ -81,6 +97,8 @@ export default function SelectWorkspacePage() {
           <LogOut size={12} /> Sign out
         </button>
       </div>
+
+      {showCreate && <CreateWorkspaceModal onClose={() => setShowCreate(false)} />}
     </div>
   );
 }

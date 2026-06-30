@@ -52,11 +52,10 @@ interface OrgAvatarProps {
  *  workspace from the circular person avatar (MemberAvatar). */
 export function OrgAvatar({ id, name, imageUrl, size = "md", className }: OrgAvatarProps) {
   const sizeCls = SIZES[size] ?? SIZES.md;
-  // Clerk serves a generated default initials image when none is uploaded; only
-  // use the image when it's a real logo (an uploaded file URL), else our tile.
-  const hasLogo = !!imageUrl && /\.(png|jpe?g|gif|webp|svg)/i.test(imageUrl);
-
-  if (hasLogo) {
+  // Callers pass imageUrl only when the org actually has an uploaded logo
+  // (Clerk's `hasImage`); otherwise we render the gradient initials tile. Clerk
+  // logo URLs (img.clerk.com/…) have no file extension, so we don't sniff one.
+  if (imageUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
       <img

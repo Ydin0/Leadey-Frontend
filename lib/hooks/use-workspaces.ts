@@ -20,7 +20,7 @@ export interface Workspace {
  *  state (funnel cache, credits/dialer/scraper providers) bleeds across orgs. */
 export function useWorkspaces() {
   const { orgId } = useAuth();
-  const { userMemberships, setActive, isLoaded } = useOrganizationList({
+  const { userMemberships, setActive, createOrganization, isLoaded } = useOrganizationList({
     userMemberships: { infinite: true },
   });
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
@@ -31,7 +31,9 @@ export function useWorkspaces() {
       .map((m) => ({
         id: m.organization.id,
         name: m.organization.name,
-        imageUrl: m.organization.imageUrl ?? null,
+        // Only surface a real uploaded logo — otherwise OrgAvatar draws the
+        // gradient initials tile.
+        imageUrl: m.organization.hasImage ? m.organization.imageUrl : null,
         role: m.role,
         membersCount: (m.organization.membersCount as number | undefined) ?? null,
         isActive: m.organization.id === orgId,
@@ -52,7 +54,17 @@ export function useWorkspaces() {
     }
   }
 
-  return { workspaces, activeOrgId: orgId ?? null, isLoaded, switchTo, switchingTo };
+  /** Create a new workspace, make it active, and land on its settings so the
+   *  owner can finish setup (logo, country, billing). Throws on failure so the
+   *  caller can surface it. */
+  async function createWorkspace(name: string) {
+    if (!createOrganization || !setActive) throw new Error("Not ready");
+    const org = await createOrganization({ name });
+    await setActive({ organization: org.id });
+    window.location.assign("/dashboard/settings?tab=organization");
+  }
+
+  return { workspaces, activeOrgId: orgId ?? null, isLoaded, switchTo, switchingTo, createWorkspace };
 }
 
 /** Friendly label for a Clerk role string. */

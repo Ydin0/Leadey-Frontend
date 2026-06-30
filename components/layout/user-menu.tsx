@@ -6,10 +6,11 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import { useTheme } from "next-themes";
 import {
   UserCircle2, Building2, Users, CreditCard, Bell, Sun, Moon, Monitor,
-  LogOut, ChevronRight, Settings, Check, Loader2,
+  LogOut, ChevronRight, Settings, Check, Loader2, Plus,
 } from "lucide-react";
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { OrgAvatar } from "@/components/shared/org-avatar";
+import { CreateWorkspaceModal } from "@/components/layout/create-workspace-modal";
 import { useWorkspaces, roleLabel } from "@/lib/hooks/use-workspaces";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +50,7 @@ export function UserMenu() {
 
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => setMounted(true), []);
@@ -152,6 +154,18 @@ export function UserMenu() {
                     </button>
                   );
                 })}
+                {/* Create a new workspace */}
+                <button
+                  role="menuitem"
+                  disabled={!!switchingTo}
+                  onClick={() => { setOpen(false); setShowCreate(true); }}
+                  className="group flex items-center gap-2.5 rounded-[9px] px-2 py-1.5 hover:bg-hover transition-colors text-left disabled:opacity-60"
+                >
+                  <span className="flex items-center justify-center w-7 h-7 rounded-[7px] border border-dashed border-border-default text-ink-muted group-hover:text-ink-secondary shrink-0">
+                    <Plus size={14} />
+                  </span>
+                  <span className="text-[12.5px] font-medium text-ink-secondary group-hover:text-ink">Create workspace</span>
+                </button>
               </div>
             </div>
           )}
@@ -218,6 +232,8 @@ export function UserMenu() {
           </div>
         </div>
       )}
+
+      {showCreate && <CreateWorkspaceModal onClose={() => setShowCreate(false)} />}
     </div>
   );
 }
