@@ -604,9 +604,9 @@ function CustomFieldsSection({
             <div key={i} className="flex items-start gap-2.5 py-1.5 px-1">
               <span className="text-[11.5px] text-ink-muted w-[116px] shrink-0">{f.label}</span>
               {f.isLink ? (
-                <a href={f.value.startsWith("http") ? f.value : `https://${f.value}`} target="_blank" rel="noreferrer" className="text-[11.5px] text-accent hover:underline truncate min-w-0">{f.value}</a>
+                <a href={f.value.startsWith("http") ? f.value : `https://${f.value}`} target="_blank" rel="noreferrer" className="text-[11.5px] text-accent hover:underline min-w-0 break-all">{f.value}</a>
               ) : (
-                <span className="text-[11.5px] text-ink truncate min-w-0">{f.value}</span>
+                <span className="text-[11.5px] text-ink min-w-0 break-words whitespace-pre-wrap">{f.value}</span>
               )}
             </div>
           ))}
