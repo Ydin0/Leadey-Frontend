@@ -4,19 +4,21 @@ import { useCallback, useRef, useState } from "react";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
   AlertCircle, Check, FileSpreadsheet, Loader2, Upload, ArrowLeft, ArrowRight,
-  Users, Building2, Globe, Linkedin, X as XIcon, CheckCircle2, AlertTriangle,
+  Users, Building2, Globe, Linkedin, Tag, X as XIcon, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   importCsvLeads, type CsvColumnMapping, type CsvGroupBy, type ImportCsvResult,
 } from "@/lib/api/funnels";
+import { useCustomFields } from "@/lib/hooks/use-custom-fields";
 
 // ── Field vocabulary (grouped, Close-style) ──────────────────────────────
 const LEAD_FIELDS = ["Lead Name", "Lead First Name", "Lead Last Name", "Lead Email", "Lead Title", "Lead Phone", "Lead LinkedIn"] as const;
 const COMPANY_FIELDS = ["Company Name", "Company Domain", "Company LinkedIn", "Company Industry", "Company Location", "Company Size", "Company Description", "Company Annual Revenue", "Company Hiring Roles"] as const;
 const OTHER_FIELDS = ["Notes", "--- Skip ---"] as const;
 const ALL_FIELDS = [...LEAD_FIELDS, ...COMPANY_FIELDS, ...OTHER_FIELDS];
-type MappedField = (typeof ALL_FIELDS)[number];
+/** A standard field label, or a custom field as `custom:<key>`. */
+type MappedField = string;
 const REQUIRED: MappedField[] = ["Lead Name", "Company Name"];
 
 /** Fields that may map from more than one CSV column. Everything else is a
@@ -102,6 +104,7 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
   funnelId: string; onDone: () => void; onImported?: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const { fields: customFields } = useCustomFields();
   const [step, setStep] = useState<Step>("upload");
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -264,7 +267,7 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
         <h3 className="text-[14px] font-semibold text-ink mb-1">Map your columns</h3>
         <p className="text-[11px] text-ink-muted mb-3">
           <FileSpreadsheet size={12} className="inline mr-1" />
-          {fileName} · {csvRows.length.toLocaleString()} rows · match each column to a lead or company field.
+          {fileName} · {csvRows.length.toLocaleString()} rows · map each column to any lead, company{customFields.length > 0 ? ", or custom" : ""} field.
         </p>
 
         <div className="bg-surface rounded-[14px] border border-border-subtle mb-3">
@@ -302,6 +305,11 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
                       >
                         <optgroup label="Lead">{LEAD_FIELDS.map((o) => <option key={o} value={o}>{o.replace("Lead ", "")}{REQUIRED.includes(o) ? " *" : ""}</option>)}</optgroup>
                         <optgroup label="Company">{COMPANY_FIELDS.map((o) => <option key={o} value={o}>{o.replace("Company ", "")}{REQUIRED.includes(o) ? " *" : ""}</option>)}</optgroup>
+                        {customFields.length > 0 && (
+                          <optgroup label="Custom fields">
+                            {customFields.map((f) => <option key={f.key} value={`custom:${f.key}`}>{f.label}</option>)}
+                          </optgroup>
+                        )}
                         <optgroup label="Other">{OTHER_FIELDS.map((o) => <option key={o} value={o}>{o === "--- Skip ---" ? "Skip column" : o}</option>)}</optgroup>
                       </NativeSelect>
                     </div>
@@ -425,6 +433,7 @@ function ErrorBox({ error }: { error: string }) {
 }
 
 function FieldKind({ field }: { field: MappedField }) {
+  if (field.startsWith("custom:")) return <Tag size={12} className="text-signal-slate-text shrink-0" />;
   if ((LEAD_FIELDS as readonly string[]).includes(field)) return <Users size={12} className="text-signal-green-text shrink-0" />;
   if ((COMPANY_FIELDS as readonly string[]).includes(field)) return <Building2 size={12} className="text-signal-blue-text shrink-0" />;
   if (field === "Notes") return <FileSpreadsheet size={12} className="text-ink-muted shrink-0" />;
