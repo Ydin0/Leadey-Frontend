@@ -35,6 +35,11 @@ export async function updatePipeline(
   });
 }
 
+/** Duplicate a pipeline and its stages (not its opportunities). */
+export async function duplicatePipeline(id: string): Promise<Pipeline> {
+  return apiRequest<Pipeline>(`/pipelines/${id}/duplicate`, { method: "POST" });
+}
+
 export interface DeletePipelineOptions {
   /** What to do with the pipeline's opportunities. Omit when the pipeline is empty. */
   strategy?: "move" | "delete";

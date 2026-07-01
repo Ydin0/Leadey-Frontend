@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NativeSelect } from "@/components/ui/native-select";
-import { AlertTriangle, ArrowRightLeft, Loader2, Plus, Trash2, GripVertical } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Copy, Loader2, Plus, Trash2, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Modal, ModalHeader } from "@/components/email/modal";
 import {
@@ -10,6 +10,7 @@ import {
   createPipeline,
   updatePipeline,
   deletePipeline,
+  duplicatePipeline,
   updateStage,
   createStage,
   deleteStage,
@@ -31,6 +32,7 @@ export function PipelineSettings() {
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Pipeline | null>(null);
+  const [duplicateTarget, setDuplicateTarget] = useState<Pipeline | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -68,6 +70,13 @@ export function PipelineSettings() {
     // Errors propagate to the modal so it can show them inline.
     await deletePipeline(deleteTarget.id, options);
     setDeleteTarget(null);
+    await reload();
+  }
+
+  async function handleConfirmDuplicate() {
+    if (!duplicateTarget) return;
+    await duplicatePipeline(duplicateTarget.id);
+    setDuplicateTarget(null);
     await reload();
   }
 
@@ -119,6 +128,7 @@ export function PipelineSettings() {
           pipeline={p}
           onReload={reload}
           onRequestDelete={() => setDeleteTarget(p)}
+          onRequestDuplicate={() => setDuplicateTarget(p)}
         />
       ))}
 
@@ -130,6 +140,14 @@ export function PipelineSettings() {
           onConfirm={handleConfirmDelete}
         />
       )}
+
+      {duplicateTarget && (
+        <DuplicatePipelineModal
+          pipeline={duplicateTarget}
+          onCancel={() => setDuplicateTarget(null)}
+          onConfirm={handleConfirmDuplicate}
+        />
+      )}
     </div>
   );
 }
@@ -138,9 +156,10 @@ interface PipelineCardProps {
   pipeline: Pipeline;
   onReload: () => Promise<void>;
   onRequestDelete: () => void;
+  onRequestDuplicate: () => void;
 }
 
-function PipelineCard({ pipeline, onReload, onRequestDelete }: PipelineCardProps) {
+function PipelineCard({ pipeline, onReload, onRequestDelete, onRequestDuplicate }: PipelineCardProps) {
   const [stages, setStages] = useState<PipelineStage[]>(pipeline.stages);
   const [adding, setAdding] = useState(false);
   const [newStageLabel, setNewStageLabel] = useState("");
@@ -244,16 +263,26 @@ function PipelineCard({ pipeline, onReload, onRequestDelete }: PipelineCardProps
             <span className="block text-[10px] uppercase tracking-wider text-ink-faint">Default</span>
           )}
         </div>
-        {!pipeline.isDefault && (
+        <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={onRequestDelete}
-            className="text-ink-faint hover:text-signal-red-text p-1.5 rounded hover:bg-signal-red/10"
-            title="Delete pipeline"
+            onClick={onRequestDuplicate}
+            className="text-ink-faint hover:text-ink p-1.5 rounded hover:bg-hover"
+            title="Duplicate pipeline"
           >
-            <Trash2 size={13} />
+            <Copy size={13} />
           </button>
-        )}
+          {!pipeline.isDefault && (
+            <button
+              type="button"
+              onClick={onRequestDelete}
+              className="text-ink-faint hover:text-signal-red-text p-1.5 rounded hover:bg-signal-red/10"
+              title="Delete pipeline"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="rounded-[10px] border border-border-subtle overflow-hidden">
@@ -571,6 +600,69 @@ function DeletePipelineModal({
           >
             {busy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
             {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+interface DuplicatePipelineModalProps {
+  pipeline: Pipeline;
+  onCancel: () => void;
+  onConfirm: () => Promise<void>;
+}
+
+function DuplicatePipelineModal({ pipeline, onCancel, onConfirm }: DuplicatePipelineModalProps) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const stageCount = pipeline.stages.length;
+
+  async function confirm() {
+    setBusy(true);
+    setErr(null);
+    try {
+      await onConfirm();
+      // On success the parent unmounts this modal.
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to duplicate pipeline");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Modal onClose={() => !busy && onCancel()} maxWidth={440}>
+      <ModalHeader title="Duplicate pipeline" onClose={() => !busy && onCancel()} />
+      <div className="p-[18px]">
+        <p className="text-[12.5px] text-ink-secondary">
+          Are you sure you want to duplicate{" "}
+          <span className="font-medium text-ink">{pipeline.name}</span>? This creates a copy
+          named <span className="font-medium text-ink">{pipeline.name} (copy)</span> with the
+          same {stageCount} {stageCount === 1 ? "stage" : "stages"}.
+        </p>
+        <p className="text-[11.5px] text-ink-muted mt-2">
+          Opportunities aren&apos;t copied — the new pipeline starts empty.
+        </p>
+
+        {err && <p className="mt-3 text-[11.5px] text-signal-red-text">{err}</p>}
+
+        <div className="flex items-center justify-end gap-2 mt-5">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            className="px-4 py-2 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={busy}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-50"
+          >
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <Copy size={12} />}
+            Duplicate pipeline
           </button>
         </div>
       </div>
