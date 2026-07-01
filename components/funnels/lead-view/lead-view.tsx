@@ -517,6 +517,13 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     onLeadsChanged?.();
   }, [funnelId, currentLead, onLeadsChanged]);
 
+  // Rename the company (fans out to every contact at this company).
+  const handleRenameCompany = useCallback(async (name: string) => {
+    if (!currentLead) return;
+    await updateLeadCompanyInfo(funnelId, currentLead.id, { company: name });
+    onLeadsChanged?.();
+  }, [funnelId, currentLead, onLeadsChanged]);
+
   // Save this lead's custom-field values (keyed by field key).
   const handleCustomFieldsSave = useCallback(async (values: Record<string, string>) => {
     if (!currentLead) return;
@@ -583,6 +590,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         statuses={statuses}
         doNotCall={currentLead.doNotCall}
         onStatusChange={handleStatusChange}
+        onRenameCompany={handleRenameCompany}
         onNote={() => { pauseForEngagement(); setNoteOpen(true); }}
         onEmail={() => { pauseForEngagement(); setShowComposer(true); }}
         onSms={() => { pauseForEngagement(); setShowSms(true); }}

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, GitFork, FileText, Mail, Phone, MessageSquare } from "lucide-react";
+import { ArrowLeft, ChevronDown, GitFork, FileText, Mail, Phone, MessageSquare, Pencil, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { FunnelStatusBadge } from "@/components/funnels/funnel-status-badge";
@@ -19,6 +19,8 @@ interface LeadActionBarProps {
   statuses: LeadStatusOption[];
   doNotCall?: boolean;
   onStatusChange: (status: string) => void;
+  /** Rename the company (fans out to every contact at this company). */
+  onRenameCompany?: (name: string) => Promise<void>;
   onNote: () => void;
   onEmail: () => void;
   onSms: () => void;
@@ -35,6 +37,7 @@ export function LeadActionBar({
   statuses,
   doNotCall,
   onStatusChange,
+  onRenameCompany,
   onNote,
   onEmail,
   onSms,
@@ -42,6 +45,33 @@ export function LeadActionBar({
 }: LeadActionBarProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Inline company-name rename (hover the title → pencil → edit).
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(companyName);
+  const [savingName, setSavingName] = useState(false);
+  const savingRef = useRef(false);
+  const cancelRef = useRef(false);
+
+  async function saveName() {
+    if (savingRef.current) return;
+    const next = nameDraft.trim();
+    if (!onRenameCompany || !next || next === companyName) {
+      setEditingName(false);
+      return;
+    }
+    savingRef.current = true;
+    setSavingName(true);
+    try {
+      await onRenameCompany(next);
+      setEditingName(false);
+    } catch {
+      /* keep editing so the user can retry */
+    } finally {
+      savingRef.current = false;
+      setSavingName(false);
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -68,9 +98,42 @@ export function LeadActionBar({
         <CompanyAvatar name={companyName} size="lg" domain={companyDomain} />
 
         <div className="flex-1 min-w-0">
-          <h1 className="text-[18px] font-semibold text-ink tracking-[-0.01em] truncate">
-            {companyName}
-          </h1>
+          {editingName ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                autoFocus
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); void saveName(); }
+                  else if (e.key === "Escape") { cancelRef.current = true; setEditingName(false); }
+                }}
+                onBlur={() => {
+                  if (cancelRef.current) { cancelRef.current = false; return; }
+                  void saveName();
+                }}
+                disabled={savingName}
+                className="text-[18px] font-semibold text-ink tracking-[-0.01em] bg-section border border-border-default rounded-[8px] px-2 py-0.5 outline-none focus:border-signal-blue-text/50 min-w-[220px] max-w-full disabled:opacity-60"
+              />
+              {savingName && <Loader2 size={14} className="animate-spin text-ink-muted shrink-0" />}
+            </div>
+          ) : (
+            <div className="group inline-flex items-center gap-1.5 min-w-0 max-w-full">
+              <h1 className="text-[18px] font-semibold text-ink tracking-[-0.01em] truncate">
+                {companyName}
+              </h1>
+              {onRenameCompany && (
+                <button
+                  type="button"
+                  onClick={() => { setNameDraft(companyName); setEditingName(true); }}
+                  title="Rename company"
+                  className="opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity text-ink-faint hover:text-ink p-1 rounded-md hover:bg-hover shrink-0"
+                >
+                  <Pencil size={13} strokeWidth={1.5} />
+                </button>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2 mt-1">
             {/* Lead status — editable */}
             <div className="relative" ref={ref}>
