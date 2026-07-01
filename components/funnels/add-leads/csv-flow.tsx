@@ -4,11 +4,12 @@ import { useCallback, useRef, useState } from "react";
 import { NativeSelect } from "@/components/ui/native-select";
 import {
   AlertCircle, Check, FileSpreadsheet, Loader2, Upload, ArrowLeft, ArrowRight,
-  Users, Building2, Globe, Linkedin, Tag, X as XIcon, CheckCircle2, AlertTriangle,
+  Users, Building2, Globe, Linkedin, Tag, Sparkles, X as XIcon, CheckCircle2, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  importCsvLeads, type CsvColumnMapping, type CsvGroupBy, type ImportCsvResult,
+  importCsvLeads, enrichCampaignCompanies,
+  type CsvColumnMapping, type CsvGroupBy, type ImportCsvResult, type EnrichCompaniesResult,
 } from "@/lib/api/funnels";
 import { useCustomFields } from "@/lib/hooks/use-custom-fields";
 
@@ -117,6 +118,9 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
   const [isImporting, setIsImporting] = useState(false);
   const importingRef = useRef(false);
   const [result, setResult] = useState<ImportCsvResult | null>(null);
+  const [enrichCompanies, setEnrichCompanies] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<EnrichCompaniesResult | null>(null);
 
   const ingestFile = useCallback((file: File) => {
     setError(null);
@@ -182,16 +186,21 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
   // A mapped "Lead First Name" satisfies the name requirement — the backend
   // composes the full name from first + last when no full-name column is mapped.
   const hasNameSource = mappedSet.has("Lead Name") || mappedSet.has("Lead First Name");
-  const missingRequired = REQUIRED.filter(
-    (f) => !mappedSet.has(f) && !(f === "Lead Name" && hasNameSource),
-  );
+  // With Magic Enrich on, an Email column is all that's required — name and
+  // company are derived from the email domain and filled by enrichment.
+  const missingRequired = enrichCompanies
+    ? mappedSet.has("Lead Email")
+      ? []
+      : ["Lead Email"]
+    : REQUIRED.filter((f) => !mappedSet.has(f) && !(f === "Lead Name" && hasNameSource));
   const canProceed = missingRequired.length === 0;
+  const prettyField = (f: string) => f.replace("Lead ", "").replace("Company ", "");
 
   const loadReview = useCallback(async (gb: CsvGroupBy) => {
     setLoadingReview(true);
     setError(null);
     try {
-      const r = await importCsvLeads(funnelId, { fileName, mappings: mappingPayload(), rows: payloadRows(), groupBy: gb, dryRun: true });
+      const r = await importCsvLeads(funnelId, { fileName, mappings: mappingPayload(), rows: payloadRows(), groupBy: gb, dryRun: true, enrichCompanies });
       setReview(r);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not preview import");
@@ -221,9 +230,21 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
     setError(null);
     setIsImporting(true);
     try {
-      const r = await importCsvLeads(funnelId, { fileName, mappings: mappingPayload(), rows: payloadRows(), groupBy });
+      const r = await importCsvLeads(funnelId, { fileName, mappings: mappingPayload(), rows: payloadRows(), groupBy, enrichCompanies });
       setResult(r);
       setStep("done");
+      // Kick off company enrichment for the freshly-imported leads. A failure
+      // here shouldn't fail the import — the leads are already saved.
+      if (enrichCompanies && r.addedLeadIds && r.addedLeadIds.length > 0) {
+        setEnriching(true);
+        try {
+          setEnrichResult(await enrichCampaignCompanies(funnelId, r.addedLeadIds));
+        } catch {
+          /* enrichment is best-effort */
+        } finally {
+          setEnriching(false);
+        }
+      }
       onImported?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to import CSV");
@@ -269,6 +290,26 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
           <FileSpreadsheet size={12} className="inline mr-1" />
           {fileName} · {csvRows.length.toLocaleString()} rows · map each column to any lead, company{customFields.length > 0 ? ", or custom" : ""} field.
         </p>
+
+        <label className="flex items-start gap-2.5 mb-3 p-3 rounded-[12px] border border-border-subtle bg-section/40 cursor-pointer hover:bg-section/60 transition-colors">
+          <input
+            type="checkbox"
+            checked={enrichCompanies}
+            onChange={(e) => setEnrichCompanies(e.target.checked)}
+            className="mt-0.5 accent-signal-blue-text"
+          />
+          <span>
+            <span className="flex items-center gap-1.5 text-[12px] font-medium text-ink">
+              <Sparkles size={13} className="text-signal-slate-text" />
+              Magic enrich company data from email domain
+            </span>
+            <span className="block text-[11px] text-ink-muted mt-0.5">
+              Look up company name, industry, size, revenue and more from each lead&apos;s email domain.
+              Only an <span className="font-medium text-ink-secondary">Email</span> column is required —
+              missing names/companies are filled automatically. Costs <span className="font-medium text-ink-secondary">3 credits per company found</span>.
+            </span>
+          </span>
+        </label>
 
         <div className="bg-surface rounded-[14px] border border-border-subtle mb-3">
           <table className="w-full table-fixed">
@@ -323,7 +364,7 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
         {missingRequired.length > 0 && (
           <div className="mb-3 rounded-[10px] border border-signal-blue-text/25 bg-signal-blue/10 px-3 py-2 flex items-center gap-2">
             <AlertCircle size={13} className="text-signal-blue-text" />
-            <p className="text-[11px] text-signal-blue-text">Map a column to {missingRequired.join(" and ")} to continue.</p>
+            <p className="text-[11px] text-signal-blue-text">Map a column to {missingRequired.map(prettyField).join(" and ")} to continue.</p>
           </div>
         )}
         {error && <ErrorBox error={error} />}
@@ -416,6 +457,24 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
         {!!result?.duplicateLeads && <span>{result.duplicateLeads} duplicate{result.duplicateLeads === 1 ? "" : "s"} skipped</span>}
         {!!result?.invalidRows && <span>{result.invalidRows} invalid row{result.invalidRows === 1 ? "" : "s"} skipped</span>}
       </div>
+
+      {enrichCompanies && (
+        <div className="mb-5 inline-flex items-center gap-2 px-3 py-2 rounded-[10px] bg-signal-slate/10 border border-signal-slate-text/20 text-[11px] text-signal-slate-text">
+          <Sparkles size={13} />
+          {enriching ? (
+            <><Loader2 size={12} className="animate-spin" /> Enriching company data…</>
+          ) : enrichResult ? (
+            <span>
+              Enriched {enrichResult.companiesEnriched} compan{enrichResult.companiesEnriched === 1 ? "y" : "ies"} ·
+              {" "}{enrichResult.leadsUpdated} lead{enrichResult.leadsUpdated === 1 ? "" : "s"} updated ·
+              {" "}{enrichResult.creditsCharged} credit{enrichResult.creditsCharged === 1 ? "" : "s"} used
+              {enrichResult.capped ? " · some domains not run (credit/size cap)" : ""}
+            </span>
+          ) : (
+            <span>No companies could be enriched from the email domains.</span>
+          )}
+        </div>
+      )}
       <div>
         <button onClick={onDone} className="px-5 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors">Done</button>
       </div>

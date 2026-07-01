@@ -304,6 +304,29 @@ export interface ImportCsvPayload {
   groupBy?: CsvGroupBy;
   /** When true, validate + return the review preview without writing. */
   dryRun?: boolean;
+  /** When true, a row identified only by email is valid (name/company are
+   *  derived from the email domain and filled by company enrichment). */
+  enrichCompanies?: boolean;
+}
+
+export interface EnrichCompaniesResult {
+  domainsQueried: number;
+  companiesEnriched: number;
+  leadsUpdated: number;
+  creditsCharged: number;
+  capped: boolean;
+}
+
+/** Enrich company data (name + firmographics) for leads by their email/company
+ *  domain via TheirStack. Charges credits per company resolved. */
+export async function enrichCampaignCompanies(
+  funnelId: string,
+  leadIds?: string[],
+): Promise<EnrichCompaniesResult> {
+  return apiRequest<EnrichCompaniesResult>(
+    `/funnels/${encodeURIComponent(funnelId)}/enrich-companies`,
+    { method: "POST", body: JSON.stringify({ leadIds }) },
+  );
 }
 
 export interface ImportCsvResult {
