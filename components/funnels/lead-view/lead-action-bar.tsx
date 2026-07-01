@@ -147,6 +147,20 @@ export function LeadActionBar({
               </button>
               {open && (
                 <div className="absolute left-0 top-full mt-1 z-50 min-w-[170px] max-h-[320px] overflow-y-auto bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+                  {/* Reopen — pulls the lead out of a terminal state (e.g. an
+                      auto-"completed" one) and back into the working queue. */}
+                  {status !== "pending" && (
+                    <button
+                      onClick={() => {
+                        onStatusChange("pending");
+                        setOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover transition-colors flex items-center gap-2 text-ink-secondary"
+                    >
+                      <span className="w-1.5 h-1.5 rounded-full bg-ink-faint" />
+                      Pending (reopen)
+                    </button>
+                  )}
                   {statuses.map((s) => (
                     <button
                       key={s.key}

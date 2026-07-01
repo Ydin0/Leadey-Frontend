@@ -36,10 +36,8 @@ export function FunnelWizardShell() {
       setError("Campaign name is required.");
       return;
     }
-    if (funnelSteps.length === 0) {
-      setError("Add at least one sequence step.");
-      return;
-    }
+    // Sequence steps are optional — a campaign with no steps is a manual
+    // campaign (no auto-advancing; leads are worked via calls + statuses).
 
     setError(null);
     setIsCreating(true);

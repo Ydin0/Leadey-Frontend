@@ -7,14 +7,14 @@ import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { useRowLimit } from "@/lib/hooks/use-row-limit";
-import { advanceLead, enrichJobPosts, saveLeadFilters } from "@/lib/api/funnels";
+import { advanceLead, updateLeadStatus, enrichJobPosts, saveLeadFilters } from "@/lib/api/funnels";
 import { useCredits } from "@/components/providers/credits-provider";
 import { FilterBuilder } from "@/components/filters/filter-builder";
 import { SmartViewBar } from "@/components/filters/smart-view-bar";
 import { EMPTY_FILTER, customFieldsToFilterFields, type FilterGroup, type FilterFieldDef } from "@/lib/types/lead-filter";
 import { matchesFilter } from "@/lib/utils/eval-lead-filter";
 import { listCustomFields } from "@/lib/api/custom-fields";
-import { isTerminalStatus } from "@/lib/utils/lead-status";
+import { isTerminalStatus, getStatusDotClass, type LeadStatusOption } from "@/lib/utils/lead-status";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { computeActivityCounts } from "@/lib/utils/lead-activity";
 import { useCallContext } from "@/components/calling/call-context";
@@ -47,6 +47,10 @@ interface FunnelLeadTableProps {
 const PAGE_SIZE = 25;
 
 function ProgressDots({ current, total }: { current: number; total: number }) {
+  // Sequence-less campaign — there is no step progress to show.
+  if (total <= 0) {
+    return <span className="text-[10px] text-ink-faint">&mdash;</span>;
+  }
   return (
     <div className="flex items-center gap-1">
       {Array.from({ length: total }).map((_, i) => (
@@ -63,20 +67,15 @@ function ProgressDots({ current, total }: { current: number; total: number }) {
   );
 }
 
-const actionOptions: { outcome: string; label: string }[] = [
-  { outcome: "contacted", label: "Mark Contacted" },
-  { outcome: "no_answer", label: "Mark No Answer" },
-  { outcome: "interested", label: "Mark Interested" },
-  { outcome: "bounced", label: "Mark Bounced" },
-];
-
 function LeadActionMenu({
   lead,
   funnelId,
+  statuses,
   onAdvanced,
 }: {
   lead: FunnelLead;
   funnelId: string;
+  statuses: LeadStatusOption[];
   onAdvanced?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -93,10 +92,13 @@ function LeadActionMenu({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
-  const handleAdvance = useCallback(async (outcome: string) => {
+  // Status changes go through the status endpoint (accepts every org status
+  // plus "pending") — the previous menu posted statuses to the ADVANCE
+  // endpoint, which rejects them, so the actions silently did nothing.
+  const handleSetStatus = useCallback(async (status: string) => {
     setLoading(true);
     try {
-      await advanceLead(funnelId, lead.id, outcome);
+      await updateLeadStatus(funnelId, lead.id, status);
       onAdvanced?.();
     } catch {
       // silently fail
@@ -118,10 +120,6 @@ function LeadActionMenu({
         <Briefcase size={10} /> Opp
       </Link>
     );
-  }
-
-  if (isTerminalStatus(lead.status)) {
-    return <span className="text-[10px] text-ink-faint">&mdash;</span>;
   }
 
   return (
@@ -146,14 +144,27 @@ function LeadActionMenu({
             <Briefcase size={11} /> Convert to Opportunity
           </button>
           <div className="my-1 border-t border-border-subtle" />
-          {actionOptions.map((opt) => (
+          {/* Reopen a lead the sequence (or a rep) closed — e.g. auto-"completed"
+              leads users previously couldn't change back. */}
+          {lead.status !== "pending" && (
             <button
-              key={opt.outcome}
-              onClick={(e) => { e.stopPropagation(); void handleAdvance(opt.outcome); }}
+              onClick={(e) => { e.stopPropagation(); void handleSetStatus("pending"); }}
               disabled={loading}
-              className="w-full text-left px-3 py-1.5 text-[11px] text-ink-secondary hover:bg-hover hover:text-ink transition-colors disabled:opacity-50"
+              className="w-full text-left px-3 py-1.5 text-[11px] text-ink-secondary hover:bg-hover hover:text-ink transition-colors disabled:opacity-50 flex items-center gap-1.5"
             >
-              {opt.label}
+              <span className="w-1.5 h-1.5 rounded-full bg-ink-faint" />
+              Reopen (back to Pending)
+            </button>
+          )}
+          {statuses.filter((s) => s.key !== lead.status).map((s) => (
+            <button
+              key={s.key}
+              onClick={(e) => { e.stopPropagation(); void handleSetStatus(s.key); }}
+              disabled={loading}
+              className="w-full text-left px-3 py-1.5 text-[11px] text-ink-secondary hover:bg-hover hover:text-ink transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            >
+              <span className={cn("w-1.5 h-1.5 rounded-full", getStatusDotClass(s.key, statuses))} />
+              Mark {s.label}
             </button>
           ))}
         </div>
@@ -407,7 +418,15 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
 
   const dynamicOptions = useMemo(
     () => ({
-      status: statuses.map((s) => ({ value: s.key, label: s.label })),
+      // Always offer the operational statuses leads actually hold, even when
+      // the org has hidden them from its display list — otherwise leads the
+      // sequence moved to "completed" (or fresh "pending" leads) become
+      // impossible to filter for.
+      status: [
+        ...(statuses.some((s) => s.key === "pending") ? [] : [{ value: "pending", label: "Pending" }]),
+        ...statuses.map((s) => ({ value: s.key, label: s.label })),
+        ...(statuses.some((s) => s.key === "completed") ? [] : [{ value: "completed", label: "Completed" }]),
+      ],
       source: sourceOptions.map((s) => ({ value: s, label: s })),
       industry: industryOptions.map((s) => ({ value: s, label: s })),
       location: locationOptions.map((s) => ({ value: s, label: s })),
@@ -837,7 +856,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                                       <Linkedin size={12} strokeWidth={1.5} />
                                     </button>
                                   )}
-                                  <LeadActionMenu lead={lead} funnelId={funnelId} onAdvanced={onLeadAdvanced} />
+                                  <LeadActionMenu lead={lead} funnelId={funnelId} statuses={statuses} onAdvanced={onLeadAdvanced} />
                                 </div>
                               </div>
                             </TableCell>
@@ -921,7 +940,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                             <Linkedin size={13} strokeWidth={1.5} />
                           </button>
                         )}
-                        <LeadActionMenu lead={lead} funnelId={funnelId} onAdvanced={onLeadAdvanced} />
+                        <LeadActionMenu lead={lead} funnelId={funnelId} statuses={statuses} onAdvanced={onLeadAdvanced} />
                       </div>
                     </TableCell>
                   </TableRow>

@@ -737,7 +737,7 @@ export function CreateCampaignWizard({ mode = "create", funnel }: CreateCampaign
                     })}
                     {s.steps.length === 0 && (
                       <div className="rounded-[14px] border border-dashed border-border-default bg-surface px-4 py-8 text-center text-[12px] text-ink-muted">
-                        No steps yet — add your first outreach step below.
+                        No steps — this campaign runs without a sequence. Leads stay workable and are never auto-completed. Add steps below if you want automated outreach.
                       </div>
                     )}
                   </div>
