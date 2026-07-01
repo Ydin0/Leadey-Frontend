@@ -459,20 +459,22 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
       </div>
 
       {enrichCompanies && (
-        <div className="mb-5 inline-flex items-center gap-2 px-3 py-2 rounded-[10px] bg-signal-slate/10 border border-signal-slate-text/20 text-[11px] text-signal-slate-text">
-          <Sparkles size={13} />
-          {enriching ? (
-            <><Loader2 size={12} className="animate-spin" /> Enriching company data…</>
-          ) : enrichResult ? (
-            <span>
-              Enriched {enrichResult.companiesEnriched} compan{enrichResult.companiesEnriched === 1 ? "y" : "ies"} ·
-              {" "}{enrichResult.leadsUpdated} lead{enrichResult.leadsUpdated === 1 ? "" : "s"} updated ·
-              {" "}{enrichResult.creditsCharged} credit{enrichResult.creditsCharged === 1 ? "" : "s"} used
-              {enrichResult.capped ? " · some domains not run (credit/size cap)" : ""}
-            </span>
-          ) : (
-            <span>No companies could be enriched from the email domains.</span>
-          )}
+        <div className="flex justify-center mb-5">
+          <div className="inline-flex items-center gap-2 px-3 py-2 rounded-[10px] bg-signal-slate/10 border border-signal-slate-text/20 text-[11px] text-signal-slate-text">
+            {enriching ? <Loader2 size={13} className="animate-spin shrink-0" /> : <Sparkles size={13} className="shrink-0" />}
+            {enriching ? (
+              <span>Enriching company data…</span>
+            ) : enrichResult ? (
+              <span>
+                Enriched {enrichResult.companiesEnriched} compan{enrichResult.companiesEnriched === 1 ? "y" : "ies"} ·{" "}
+                {enrichResult.leadsUpdated} lead{enrichResult.leadsUpdated === 1 ? "" : "s"} updated ·{" "}
+                {enrichResult.creditsCharged} credit{enrichResult.creditsCharged === 1 ? "" : "s"} used
+                {enrichResult.capped ? " · some domains not run (credit/size cap)" : ""}
+              </span>
+            ) : (
+              <span>No companies could be enriched from the email domains.</span>
+            )}
+          </div>
         </div>
       )}
       <div>
