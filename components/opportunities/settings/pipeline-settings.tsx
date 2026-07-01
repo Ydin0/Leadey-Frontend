@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Loader2, Plus, Trash2, GripVertical } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Loader2, Plus, Trash2, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Modal, ModalHeader } from "@/components/email/modal";
 import {
   listPipelines,
   createPipeline,
@@ -13,6 +14,7 @@ import {
   createStage,
   deleteStage,
   reorderStages,
+  type DeletePipelineOptions,
 } from "@/lib/api/opportunities";
 import type { Pipeline, PipelineStage, StageType } from "@/lib/types/opportunity";
 
@@ -28,6 +30,7 @@ export function PipelineSettings() {
   const [error, setError] = useState<string | null>(null);
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Pipeline | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -60,13 +63,12 @@ export function PipelineSettings() {
     }
   }
 
-  async function handleDeletePipeline(id: string) {
-    try {
-      await deletePipeline(id);
-      await reload();
-    } catch (err: any) {
-      setError(err?.message || "Failed to delete pipeline");
-    }
+  async function handleConfirmDelete(options: DeletePipelineOptions) {
+    if (!deleteTarget) return;
+    // Errors propagate to the modal so it can show them inline.
+    await deletePipeline(deleteTarget.id, options);
+    setDeleteTarget(null);
+    await reload();
   }
 
   if (loading) {
@@ -116,9 +118,18 @@ export function PipelineSettings() {
           key={p.id}
           pipeline={p}
           onReload={reload}
-          onDelete={() => handleDeletePipeline(p.id)}
+          onRequestDelete={() => setDeleteTarget(p)}
         />
       ))}
+
+      {deleteTarget && (
+        <DeletePipelineModal
+          pipeline={deleteTarget}
+          otherPipelines={pipelines.filter((p) => p.id !== deleteTarget.id)}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
     </div>
   );
 }
@@ -126,10 +137,10 @@ export function PipelineSettings() {
 interface PipelineCardProps {
   pipeline: Pipeline;
   onReload: () => Promise<void>;
-  onDelete: () => Promise<void>;
+  onRequestDelete: () => void;
 }
 
-function PipelineCard({ pipeline, onReload, onDelete }: PipelineCardProps) {
+function PipelineCard({ pipeline, onReload, onRequestDelete }: PipelineCardProps) {
   const [stages, setStages] = useState<PipelineStage[]>(pipeline.stages);
   const [adding, setAdding] = useState(false);
   const [newStageLabel, setNewStageLabel] = useState("");
@@ -236,7 +247,7 @@ function PipelineCard({ pipeline, onReload, onDelete }: PipelineCardProps) {
         {!pipeline.isDefault && (
           <button
             type="button"
-            onClick={onDelete}
+            onClick={onRequestDelete}
             className="text-ink-faint hover:text-signal-red-text p-1.5 rounded hover:bg-signal-red/10"
             title="Delete pipeline"
           >
@@ -334,5 +345,235 @@ function PipelineCard({ pipeline, onReload, onDelete }: PipelineCardProps) {
         </button>
       </div>
     </div>
+  );
+}
+
+interface DeletePipelineModalProps {
+  pipeline: Pipeline;
+  otherPipelines: Pipeline[];
+  onCancel: () => void;
+  onConfirm: (options: DeletePipelineOptions) => Promise<void>;
+}
+
+function DeletePipelineModal({
+  pipeline,
+  otherPipelines,
+  onCancel,
+  onConfirm,
+}: DeletePipelineModalProps) {
+  const oppCount = pipeline.opportunityCount ?? 0;
+  const canMove = otherPipelines.length > 0;
+
+  const [strategy, setStrategy] = useState<"move" | "delete">(
+    canMove ? "move" : "delete",
+  );
+  const [targetPipelineId, setTargetPipelineId] = useState(otherPipelines[0]?.id ?? "");
+  const targetPipeline = useMemo(
+    () => otherPipelines.find((p) => p.id === targetPipelineId) ?? null,
+    [otherPipelines, targetPipelineId],
+  );
+  const firstStageId = (p: Pipeline | null) =>
+    p?.stages.find((s) => s.type === "open")?.id ?? p?.stages[0]?.id ?? "";
+  const [targetStageId, setTargetStageId] = useState(firstStageId(targetPipeline));
+
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Reset the stage selection whenever the target pipeline changes.
+  useEffect(() => {
+    setTargetStageId(firstStageId(targetPipeline));
+  }, [targetPipeline]);
+
+  const moveInvalid = strategy === "move" && (!targetPipelineId || !targetStageId);
+
+  async function confirm() {
+    setBusy(true);
+    setErr(null);
+    try {
+      if (oppCount === 0) {
+        await onConfirm({});
+      } else if (strategy === "move") {
+        await onConfirm({ strategy: "move", targetPipelineId, targetStageId });
+      } else {
+        await onConfirm({ strategy: "delete" });
+      }
+      // On success the parent unmounts this modal.
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Failed to delete pipeline");
+      setBusy(false);
+    }
+  }
+
+  const stageCount = pipeline.stages.length;
+  const destructive = oppCount === 0 || strategy === "delete";
+  const confirmLabel =
+    oppCount === 0
+      ? "Delete pipeline"
+      : strategy === "move"
+        ? "Move & delete pipeline"
+        : `Delete ${oppCount} ${oppCount === 1 ? "opportunity" : "opportunities"} & pipeline`;
+
+  return (
+    <Modal onClose={() => !busy && onCancel()} maxWidth={480}>
+      <ModalHeader title="Delete pipeline" onClose={() => !busy && onCancel()} />
+      <div className="p-[18px]">
+        <p className="text-[12.5px] text-ink-secondary">
+          Delete <span className="font-medium text-ink">{pipeline.name}</span> and its{" "}
+          {stageCount} {stageCount === 1 ? "stage" : "stages"}? This can&apos;t be undone.
+        </p>
+
+        {oppCount > 0 && (
+          <>
+            <div className="mt-3 flex items-start gap-2 px-3 py-2 rounded-[10px] bg-signal-blue/10 border border-signal-blue-text/20 text-[11.5px] text-signal-blue-text">
+              <AlertTriangle size={13} className="mt-px shrink-0" />
+              <span>
+                This pipeline has{" "}
+                <span className="font-semibold">
+                  {oppCount} {oppCount === 1 ? "opportunity" : "opportunities"}
+                </span>
+                . Choose what happens to {oppCount === 1 ? "it" : "them"} before deleting.
+              </span>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {/* Move option */}
+              <button
+                type="button"
+                disabled={!canMove}
+                onClick={() => setStrategy("move")}
+                className={cn(
+                  "w-full text-left rounded-[10px] border px-3 py-2.5 transition-colors",
+                  !canMove && "opacity-40 cursor-not-allowed",
+                  strategy === "move"
+                    ? "border-signal-blue-text/50 bg-signal-blue/10"
+                    : "border-border-subtle hover:bg-hover",
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "flex items-center justify-center w-4 h-4 rounded-full border shrink-0",
+                      strategy === "move" ? "border-signal-blue-text" : "border-border-default",
+                    )}
+                  >
+                    {strategy === "move" && (
+                      <span className="w-2 h-2 rounded-full bg-signal-blue-text" />
+                    )}
+                  </span>
+                  <ArrowRightLeft size={13} className="text-ink-muted" />
+                  <span className="text-[12px] font-medium text-ink">
+                    Move opportunities to another pipeline
+                  </span>
+                </div>
+                {!canMove && (
+                  <p className="text-[11px] text-ink-faint mt-1 ml-6">
+                    No other pipeline to move them to.
+                  </p>
+                )}
+              </button>
+
+              {strategy === "move" && canMove && (
+                <div className="grid grid-cols-2 gap-2 pl-6">
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1">
+                      Pipeline
+                    </label>
+                    <NativeSelect
+                      value={targetPipelineId}
+                      onChange={(e) => setTargetPipelineId(e.target.value)}
+                      className="w-full text-[12px] text-ink bg-section rounded-[8px] px-2 py-1.5 outline-none border border-border-subtle"
+                    >
+                      {otherPipelines.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1">
+                      Stage
+                    </label>
+                    <NativeSelect
+                      value={targetStageId}
+                      onChange={(e) => setTargetStageId(e.target.value)}
+                      className="w-full text-[12px] text-ink bg-section rounded-[8px] px-2 py-1.5 outline-none border border-border-subtle"
+                    >
+                      {(targetPipeline?.stages ?? []).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.label}
+                          {s.type !== "open" ? ` (${s.type})` : ""}
+                        </option>
+                      ))}
+                    </NativeSelect>
+                  </div>
+                </div>
+              )}
+
+              {/* Delete option */}
+              <button
+                type="button"
+                onClick={() => setStrategy("delete")}
+                className={cn(
+                  "w-full text-left rounded-[10px] border px-3 py-2.5 transition-colors",
+                  strategy === "delete"
+                    ? "border-signal-red-text/50 bg-signal-red/10"
+                    : "border-border-subtle hover:bg-hover",
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "flex items-center justify-center w-4 h-4 rounded-full border shrink-0",
+                      strategy === "delete" ? "border-signal-red-text" : "border-border-default",
+                    )}
+                  >
+                    {strategy === "delete" && (
+                      <span className="w-2 h-2 rounded-full bg-signal-red-text" />
+                    )}
+                  </span>
+                  <Trash2 size={13} className="text-ink-muted" />
+                  <span className="text-[12px] font-medium text-ink">
+                    Delete all {oppCount} {oppCount === 1 ? "opportunity" : "opportunities"}
+                  </span>
+                </div>
+                {strategy === "delete" && (
+                  <p className="text-[11px] text-signal-red-text/80 mt-1 ml-6">
+                    Every opportunity in this pipeline is permanently removed.
+                  </p>
+                )}
+              </button>
+            </div>
+          </>
+        )}
+
+        {err && <p className="mt-3 text-[11.5px] text-signal-red-text">{err}</p>}
+
+        <div className="flex items-center justify-end gap-2 mt-5">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            className="px-4 py-2 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={confirm}
+            disabled={busy || moveInvalid}
+            className={cn(
+              "flex items-center gap-1.5 px-4 py-2 rounded-[20px] text-[11px] font-medium transition-colors disabled:opacity-50",
+              destructive
+                ? "bg-signal-red text-signal-red-text hover:bg-signal-red/80"
+                : "bg-ink text-on-ink hover:bg-ink/90",
+            )}
+          >
+            {busy ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }

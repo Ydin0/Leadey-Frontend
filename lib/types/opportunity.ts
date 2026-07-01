@@ -20,6 +20,8 @@ export interface Pipeline {
   isDefault: boolean;
   sortOrder: number;
   createdAt: string;
+  /** Number of opportunities in this pipeline (all stages). */
+  opportunityCount?: number;
   stages: PipelineStage[];
 }
 

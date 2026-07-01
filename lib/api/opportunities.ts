@@ -35,8 +35,23 @@ export async function updatePipeline(
   });
 }
 
-export async function deletePipeline(id: string): Promise<void> {
-  await apiRequest(`/pipelines/${id}`, { method: "DELETE" });
+export interface DeletePipelineOptions {
+  /** What to do with the pipeline's opportunities. Omit when the pipeline is empty. */
+  strategy?: "move" | "delete";
+  /** Required when strategy is "move" — the pipeline to move opportunities into. */
+  targetPipelineId?: string;
+  /** Required when strategy is "move" — a stage within the target pipeline. */
+  targetStageId?: string;
+}
+
+export async function deletePipeline(
+  id: string,
+  options?: DeletePipelineOptions,
+): Promise<void> {
+  await apiRequest(`/pipelines/${id}`, {
+    method: "DELETE",
+    body: options ? JSON.stringify(options) : undefined,
+  });
 }
 
 // ── Stages ──────────────────────────────────────────────────────────
