@@ -646,6 +646,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
             activities={timelineActivities}
             callRecords={visibleCalls}
             emailMessages={visibleEmails}
+            funnelId={funnelId}
+            leadId={leadId}
             onAddNote={addNote}
             onEditNote={editNote}
             onDeleteNote={deleteNote}

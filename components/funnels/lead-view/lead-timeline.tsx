@@ -36,6 +36,7 @@ import type { FunnelLeadActivity } from "@/lib/types/funnel-focus";
 import type { CallRecord } from "@/lib/types/calling";
 import type { LeadEmailMessage } from "@/lib/api/email";
 import { EmailActivityCard, type EmailReplyMode } from "./email-activity-card";
+import { LeadDocumentsPanel } from "./lead-documents-panel";
 
 /** Who performed an activity — resolved to a display name + a stable id for
  *  the avatar colour. */
@@ -387,6 +388,9 @@ interface LeadTimelineProps {
   activities: FunnelLeadActivity[];
   callRecords: CallRecord[];
   emailMessages?: LeadEmailMessage[];
+  /** Campaign + lead identity — powers the Documents tab. */
+  funnelId: string;
+  leadId: string;
   onAddNote: (text: string) => void;
   onEditNote?: (id: string, text: string) => void;
   onDeleteNote?: (id: string) => void;
@@ -397,10 +401,10 @@ interface LeadTimelineProps {
   onClearFilter?: () => void;
 }
 
-const FILTERS = ["All", "Important", "Conversations", "Notes"] as const;
+const FILTERS = ["All", "Important", "Conversations", "Notes", "Documents"] as const;
 type Filter = (typeof FILTERS)[number];
 
-export function LeadTimeline({ activities, callRecords, emailMessages, onAddNote, onEditNote, onDeleteNote, onReplyEmail, filterContactName, onClearFilter }: LeadTimelineProps) {
+export function LeadTimeline({ activities, callRecords, emailMessages, funnelId, leadId, onAddNote, onEditNote, onDeleteNote, onReplyEmail, filterContactName, onClearFilter }: LeadTimelineProps) {
   const [filter, setFilter] = useState<Filter>("All");
   const { resolveMember } = useTeamMembers();
 
@@ -459,7 +463,7 @@ export function LeadTimeline({ activities, callRecords, emailMessages, onAddNote
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-[920px] mx-auto w-full px-7 pt-5 pb-16">
-        <Composer onAdd={onAddNote} />
+        {filter !== "Documents" && <Composer onAdd={onAddNote} />}
 
         {/* Filters */}
         <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
@@ -499,8 +503,10 @@ export function LeadTimeline({ activities, callRecords, emailMessages, onAddNote
           </div>
         )}
 
-        {/* Feed */}
-        {items.length ? (
+        {/* Documents tab swaps the feed for the upload/list panel */}
+        {filter === "Documents" ? (
+          <LeadDocumentsPanel funnelId={funnelId} leadId={leadId} />
+        ) : items.length ? (
           <div>
             {items.map((item, i) => (
               <TimelineRow
