@@ -16,6 +16,7 @@ import {
   Loader2,
   Pencil,
   Check,
+  Copy,
   Clock,
   ChevronRight,
   Linkedin,
@@ -297,14 +298,14 @@ function ContactRow({
       {/* Expanded per-contact details */}
       {expanded && (
         <div className="ml-[34px] mr-1 mb-2 pb-1 flex flex-col gap-2 text-[12px]">
-          <DetailRow icon={Phone} muted={!c.phone}>
+          <DetailRow icon={Phone} muted={!c.phone} action={c.phone ? <CopyBtn value={c.phone} what="phone number" /> : undefined}>
             {c.phone ? (
               <button onClick={() => onCall(c.phone as string, c.name)} className="text-ink hover:text-accent transition-colors tabular-nums">
                 {formatPhoneIntl(c.phone)}
               </button>
             ) : <span className="text-ink-faint">No phone</span>}
           </DetailRow>
-          <DetailRow icon={Mail} muted={!c.email}>
+          <DetailRow icon={Mail} muted={!c.email} action={c.email ? <CopyBtn value={c.email} what="email" /> : undefined}>
             {c.email ? (
               <button onClick={() => onEmail(c.email as string, c.name)} className="text-ink hover:text-accent transition-colors truncate">
                 {c.email}
@@ -373,12 +374,36 @@ function ContactRow({
   );
 }
 
-function DetailRow({ icon: Icon, muted, children }: { icon: typeof Phone; muted?: boolean; children: ReactNode }) {
+function DetailRow({ icon: Icon, muted, action, children }: { icon: typeof Phone; muted?: boolean; action?: ReactNode; children: ReactNode }) {
   return (
     <div className="flex items-center gap-2 min-w-0">
       <Icon size={13} className={cn("shrink-0", muted ? "text-ink-faint" : "text-ink-muted")} strokeWidth={1.5} />
-      <div className="min-w-0 truncate">{children}</div>
+      <div className="min-w-0 flex-1 truncate">{children}</div>
+      {action && <div className="shrink-0">{action}</div>}
     </div>
+  );
+}
+
+/** Tiny click-to-copy affordance for contact values (phone, email). */
+function CopyBtn({ value, what }: { value: string; what: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      title={copied ? "Copied!" : `Copy ${what}`}
+      onClick={(e) => {
+        e.stopPropagation();
+        void navigator.clipboard.writeText(value);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+      className={cn(
+        "flex items-center justify-center w-[20px] h-[20px] rounded-md transition-colors",
+        copied ? "text-signal-green-text" : "text-ink-faint hover:bg-hover hover:text-ink-secondary",
+      )}
+    >
+      {copied ? <Check size={11} strokeWidth={2} /> : <Copy size={11} strokeWidth={1.5} />}
+    </button>
   );
 }
 
@@ -708,7 +733,9 @@ export function LeadDetailsColumn({
       {tab === "leads" ? (
         <LeadLeadsList leads={leads} funnelId={funnelId} currentLeadId={leadId} statuses={statuses} />
       ) : (
-        <div className="flex-1 overflow-y-auto -mx-1 px-1">
+        // overflow-x-hidden: overflow-y-auto alone implies overflow-x auto,
+        // so one long unbroken value made the whole column scroll sideways.
+        <div className="flex-1 overflow-y-auto overflow-x-hidden -mx-1 px-1">
           {stepTracker && <div className="pt-3">{stepTracker}</div>}
 
           {/* About — editable company info (fans out to all same-company contacts) */}
