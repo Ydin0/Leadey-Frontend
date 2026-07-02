@@ -10,7 +10,10 @@ import {
 } from "react";
 import { useAuth } from "@clerk/nextjs";
 import { Loader2 } from "lucide-react";
-import { Device, Call } from "@twilio/voice-sdk";
+// Type-only import — erased at compile time. The actual SDK (~100KB+) is
+// dynamically imported inside the device-init effect so it stays out of
+// every page's critical path (this provider wraps the whole dashboard).
+import type { Device, Call } from "@twilio/voice-sdk";
 import type {
   ActiveCall,
   CallContextValue,
@@ -101,6 +104,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
   const incomingCallRef = useRef<Call | null>(null);
+  /** Forces an immediate device rebuild — wired up by the init effect and
+   *  used by startCall when it finds the device dead. */
+  const reinitDeviceRef = useRef<() => void>(() => {});
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // SYNCHRONOUS in-flight guard. `activeCall` is React state and lags a tick, so
   // a call that fails instantly (e.g. a bad number) could be re-fired several
@@ -225,14 +231,44 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // ── Initialise Twilio Device ──────────────────
+  // ── Initialise Twilio Device (self-healing) ──────────────────
+  // The device must NEVER stay permanently dead: if init fails (e.g. the
+  // backend was mid-deploy when the tab loaded — exactly what bricked calling
+  // org-wide once), retry with backoff until registration succeeds. Recovery
+  // also runs on unregistration and on fatal device errors.
   useEffect(() => {
     if (!isAuthReady) return;
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempt = 0;
+
+    const scheduleRetry = () => {
+      if (cancelled || retryTimer) return;
+      // Never tear a device down under an active call.
+      if (callRef.current) return;
+      const delay = [2_000, 5_000, 10_000][attempt] ?? 30_000;
+      attempt += 1;
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        void initDevice();
+      }, delay);
+    };
 
     async function initDevice() {
       try {
-        const clerkToken = await getToken();
+        // Tear down any half-dead device from a failed prior attempt.
+        if (deviceRef.current) {
+          try { deviceRef.current.destroy(); } catch { /* already dead */ }
+          deviceRef.current = null;
+        }
+        setDeviceReady(false);
+
+        // Load the SDK lazily — inbound registration still happens within
+        // seconds of auth-ready, but the bundle leaves the critical path.
+        const [{ Device, Call }, clerkToken] = await Promise.all([
+          import("@twilio/voice-sdk"),
+          getToken(),
+        ]);
         const token = await fetchTwilioToken(clerkToken);
         if (cancelled) return;
 
@@ -242,11 +278,26 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         });
 
         device.on("registered", () => {
+          attempt = 0; // healthy again — future failures back off from scratch
           if (!cancelled) setDeviceReady(true);
+        });
+
+        // Losing registration (network blip, expired token after failed
+        // refreshes) means no inbound ringing and dead outbound clicks —
+        // surface it and rebuild.
+        device.on("unregistered", () => {
+          if (cancelled) return;
+          setDeviceReady(false);
+          scheduleRetry();
         });
 
         device.on("error", (err) => {
           console.error("[Twilio Device Error]", err);
+          // Fatal errors leave the device unusable — rebuild it.
+          if (!cancelled && device.state !== "registered") {
+            setDeviceReady(false);
+            scheduleRetry();
+          }
         });
 
         // Handle incoming calls — DON'T auto-answer. Surface a ringing prompt
@@ -290,15 +341,23 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           call.on("error", clearPending);
         });
 
-        // Token refresh — re-register before expiry (45 min)
+        // Token refresh — re-register before expiry (45 min). Retried a few
+        // times: a single failed refresh (backend deploy in progress) used to
+        // let the token lapse and silently kill calling until a page reload.
         device.on("tokenWillExpire", async () => {
-          try {
-            const clerkTk = await getToken();
-            const newToken = await fetchTwilioToken(clerkTk);
-            device.updateToken(newToken);
-          } catch (err) {
-            console.error("[Twilio] Token refresh failed", err);
+          for (let i = 0; i < 3 && !cancelled; i++) {
+            try {
+              const clerkTk = await getToken();
+              const newToken = await fetchTwilioToken(clerkTk);
+              device.updateToken(newToken);
+              return;
+            } catch (err) {
+              console.error(`[Twilio] Token refresh failed (attempt ${i + 1}/3)`, err);
+              await new Promise((r) => setTimeout(r, 3_000 * (i + 1)));
+            }
           }
+          // All refresh attempts failed — the token will expire and the device
+          // will unregister, which triggers the re-init path above.
         });
 
         // Keep the mic/speaker dropdowns live as headsets are plugged/unplugged.
@@ -325,14 +384,29 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         }
         syncAudioDeviceLists();
       } catch (err) {
+        // THE critical path: a failed init (backend briefly unreachable) must
+        // retry, not leave every call button dead until a manual reload.
         console.error("[Twilio] Device init failed:", err);
+        scheduleRetry();
       }
     }
 
     initDevice();
+    // Let startCall force an immediate rebuild when it finds a dead device.
+    reinitDeviceRef.current = () => {
+      if (cancelled || callRef.current) return;
+      attempt = 0;
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+      void initDevice();
+    };
 
     return () => {
       cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+      reinitDeviceRef.current = () => {};
       if (deviceRef.current) {
         deviceRef.current.destroy();
         deviceRef.current = null;
@@ -614,7 +688,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     async (to: string, meta?: CallMeta, opts?: { skipLocalPresence?: boolean }) => {
       if (dialingRef.current || activeCall) return; // synchronous spam guard
       if (!deviceRef.current || !deviceReady) {
-        console.error("[Twilio] Device not ready");
+        // The device died (failed init / lost registration). Kick a rebuild
+        // and TELL the rep — a silent no-op here once read as "calling is
+        // completely broken" org-wide.
+        console.error("[Twilio] Device not ready — reinitializing");
+        reinitDeviceRef.current();
+        alert("The phone connection is re-establishing — please try the call again in a few seconds.");
         return;
       }
 
