@@ -39,6 +39,7 @@ import { Section, MiniBtn } from "./lead-section";
 import { LeadTasksSection } from "./lead-tasks-section";
 import { LeadUpcomingMeetingsSection } from "./lead-upcoming-meetings-section";
 import { LeadOpportunitySection } from "./lead-opportunity-section";
+import { LeadCampaignsSection } from "./lead-campaigns-section";
 import { LeadLeadsList } from "./lead-leads-list";
 import { LeadHiringRolesSection } from "./lead-hiring-roles-section";
 
@@ -756,6 +757,9 @@ export function LeadDetailsColumn({
             onConvert={onConvert}
             onChanged={onOpportunityChanged}
           />
+
+          {/* Campaigns this person is in (add to / remove from) */}
+          <LeadCampaignsSection funnelId={funnelId} leadId={leadId} statuses={statuses} />
 
           {/* Contacts */}
           <Section
