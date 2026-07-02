@@ -83,13 +83,13 @@ export function formatCurrency(
   if (!Number.isFinite(amount)) return "—";
   if (options?.compact) {
     const abs = Math.abs(amount);
+    // 1dp, with a clean whole number when the decimal is zero — $11.5k, $12k.
+    const oneDp = (v: number) => (Math.round(v * 10) / 10).toFixed(1).replace(/\.0$/, "");
     if (abs >= 1_000_000) {
-      const v = amount / 1_000_000;
-      return `${formatCurrencyBase(0, currency)}${(Math.round(v * 10) / 10).toFixed(1)}M`.replace(/0\.0/, "0");
+      return `${formatCurrencyBase(0, currency)}${oneDp(amount / 1_000_000)}M`;
     }
     if (abs >= 1_000) {
-      const v = amount / 1_000;
-      return `${formatCurrencyBase(0, currency)}${Math.round(v)}k`;
+      return `${formatCurrencyBase(0, currency)}${oneDp(amount / 1_000)}k`;
     }
   }
   return new Intl.NumberFormat("en-US", {
