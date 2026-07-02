@@ -487,9 +487,9 @@ function AboutSection({ company, onSave }: { company: FunnelLeadCompany | null; 
       ) : (
         <div className="flex flex-col gap-2.5 pl-1">
           {company?.address && (
-            <div className="flex items-start gap-2">
+            <div className="flex items-start gap-2 min-w-0">
               <MapPin size={13} className="text-ink-faint mt-0.5 shrink-0" />
-              <span className="text-[12.5px] text-ink-secondary">{company.address}</span>
+              <span className="text-[12.5px] text-ink-secondary min-w-0 [overflow-wrap:anywhere]">{company.address}</span>
             </div>
           )}
           {company?.domain && (
@@ -520,9 +520,12 @@ function AboutSection({ company, onSave }: { company: FunnelLeadCompany | null; 
             </div>
           )}
           {company?.description ? (
-            <div className="flex items-start gap-2">
+            <div className="flex items-start gap-2 min-w-0">
               <AlignLeft size={13} className="text-ink-faint mt-0.5 shrink-0" />
-              <p className="text-[12.5px] text-ink-secondary leading-relaxed">{company.description}</p>
+              {/* overflow-wrap:anywhere — imported descriptions can be one giant
+                  unbreakable token (form answers joined with underscores), which
+                  otherwise can't wrap and overflows the column. */}
+              <p className="text-[12.5px] text-ink-secondary leading-relaxed min-w-0 [overflow-wrap:anywhere]">{company.description}</p>
             </div>
           ) : (
             !hasAny && <p className="text-[12px] text-ink-faint">No company details yet{onSave ? " — click the pencil to add them." : "."}</p>
