@@ -88,6 +88,9 @@ export interface FunnelLeadEvent {
 
 export interface FunnelLead {
   id: string;
+  /** Canonical person id (master contact) — the same across every campaign
+   *  this person is enrolled in. Null for legacy rows with no identity. */
+  personId?: string | null;
   name: string;
   /** Explicit first/last name (from CSV import / scraper) for email merge
    *  variables; falls back to splitting `name` when absent. */

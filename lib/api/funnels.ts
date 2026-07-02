@@ -87,6 +87,7 @@ function hydrateLead(raw: ApiFunnelLead): FunnelLead {
 
   return {
     id: asString(raw.id),
+    personId: (raw as { personId?: string | null }).personId ?? null,
     name: asString(raw.name),
     firstName: (raw as { firstName?: string | null }).firstName ?? null,
     lastName: (raw as { lastName?: string | null }).lastName ?? null,
