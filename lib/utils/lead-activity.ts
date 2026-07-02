@@ -20,6 +20,7 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
       let type: FunnelLeadActivity["type"] = "note";
       let summary = "Activity";
       let detail = "";
+      let transition: FunnelLeadActivity["transition"];
 
       if (e.type === "imported") {
         type = "import";
@@ -29,7 +30,29 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
           : "Imported into campaign";
       } else if (e.type === "status_change") {
         type = "status_change";
-        summary = outcome ? `Status changed to ${labelize(outcome)}` : "Status changed";
+        const from = (e.meta?.from as string) || "";
+        if (from && outcome) {
+          // Rendered as "Status changed from [pill] → [pill]".
+          transition = { kind: "lead", from, to: outcome };
+          summary = "Status changed";
+        } else {
+          summary = outcome ? `Status changed to ${labelize(outcome)}` : "Status changed";
+        }
+      } else if (e.type === "opportunity_stage_change") {
+        type = "opportunity";
+        const fromStage = (e.meta?.fromStage as string) || "";
+        const toStage = (e.meta?.toStage as string) || outcome || "";
+        if (fromStage || toStage) {
+          transition = {
+            kind: "opportunity",
+            from: fromStage,
+            to: toStage,
+            fromPipeline: (e.meta?.fromPipeline as string) || null,
+            toPipeline: (e.meta?.toPipeline as string) || null,
+          };
+        }
+        summary = "Opportunity status changed";
+        detail = (e.meta?.oppName as string) || "";
       } else if (e.type === "smartlead_webhook") {
         if (outcome === "opened") { type = "email_opened"; summary = "Email opened"; }
         else if (outcome === "clicked") { type = "email_opened"; summary = "Email link clicked"; }
@@ -101,6 +124,7 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
         id: e.id,
         type,
         summary,
+        transition,
         meetingUrl,
         detail: detail || undefined,
         timestamp: e.timestamp,

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
 import {
   Phone,
   Mail,
@@ -23,6 +24,8 @@ import {
   X,
   CalendarCheck,
   CalendarX,
+  GitFork,
+  ArrowRight,
   type LucideIcon,
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
@@ -32,9 +35,12 @@ import { CallOutcomeSelect } from "@/components/calling/call-outcome-select";
 import { useCallOutcomes } from "@/lib/hooks/use-call-outcomes";
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { useTeamMembers } from "@/hooks/use-team-members";
-import type { FunnelLeadActivity } from "@/lib/types/funnel-focus";
+import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
+import { getStatusDotClass, getStatusLabel, type LeadStatusOption } from "@/lib/utils/lead-status";
+import type { FunnelLeadActivity, ActivityTransition } from "@/lib/types/funnel-focus";
 import type { CallRecord } from "@/lib/types/calling";
 import type { LeadEmailMessage } from "@/lib/api/email";
+import type { TimelineItemMeta } from "@/lib/utils/company-timeline";
 import { EmailActivityCard, type EmailReplyMode } from "./email-activity-card";
 import { LeadDocumentsPanel } from "./lead-documents-panel";
 
@@ -77,10 +83,14 @@ const TYPE_META: Record<string, KindMeta> = {
   meeting_canceled: { icon: CalendarX, tint: "bg-signal-red", fg: "text-signal-red-text" },
 };
 
-type FeedItem =
+type FeedItem = (
   | { id: string; kind: "call"; timestamp: Date; record: CallRecord; actor: Actor | null }
   | { id: string; kind: "email"; timestamp: Date; message: LeadEmailMessage; actor: Actor | null }
-  | { id: string; kind: "activity"; timestamp: Date; activity: FunnelLeadActivity; actor: Actor | null };
+  | { id: string; kind: "activity"; timestamp: Date; activity: FunnelLeadActivity; actor: Actor | null }
+) & {
+  /** Campaign + contact attribution (universal company profile feed only). */
+  meta?: TimelineItemMeta;
+};
 
 function fmtDuration(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
@@ -204,6 +214,60 @@ function CallCard({ record, actor }: { record: CallRecord; actor: Actor | null }
   );
 }
 
+/* ── Transition pills: "changed from [pill] → [pill]" ────────────────── */
+function TransitionPill({ label, dotClass, tone }: { label: string; dotClass?: string; tone?: "slate" }) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide max-w-[200px]",
+        tone === "slate" ? "bg-signal-slate text-signal-slate-text" : "bg-section text-ink-secondary",
+      )}
+      title={label}
+    >
+      {dotClass && <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", dotClass)} />}
+      <span className="truncate">{label}</span>
+    </span>
+  );
+}
+
+/** Lead status changes and opportunity stage moves render as from → to pills
+ *  (opportunity moves show pipeline + stage pairs, like the pipeline board). */
+function TransitionSummary({
+  transition,
+  statusOptions,
+}: {
+  transition: ActivityTransition;
+  statusOptions?: LeadStatusOption[];
+}) {
+  const isOpp = transition.kind === "opportunity";
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap text-[12.5px] text-ink leading-snug">
+      <span>{isOpp ? "Opportunity status changed from" : "Status changed from"}</span>
+      {isOpp ? (
+        <>
+          {transition.fromPipeline && <TransitionPill label={transition.fromPipeline} tone="slate" />}
+          {transition.from && <TransitionPill label={transition.from} />}
+          <ArrowRight size={12} className="text-ink-faint shrink-0" />
+          {transition.toPipeline && <TransitionPill label={transition.toPipeline} tone="slate" />}
+          {transition.to && <TransitionPill label={transition.to} />}
+        </>
+      ) : (
+        <>
+          <TransitionPill
+            label={getStatusLabel(transition.from, statusOptions)}
+            dotClass={getStatusDotClass(transition.from, statusOptions)}
+          />
+          <ArrowRight size={12} className="text-ink-faint shrink-0" />
+          <TransitionPill
+            label={getStatusLabel(transition.to, statusOptions)}
+            dotClass={getStatusDotClass(transition.to, statusOptions)}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ── Generic activity card (notes are editable / deletable) ──────────── */
 function ActivityCard({
   a,
@@ -211,6 +275,7 @@ function ActivityCard({
   onEdit,
   onDelete,
   showContact,
+  statusOptions,
 }: {
   a: FunnelLeadActivity;
   actor: Actor | null;
@@ -218,6 +283,8 @@ function ActivityCard({
   onDelete?: (id: string) => void;
   /** Show which contact this row belongs to (company-wide, unfiltered feed). */
   showContact?: boolean;
+  /** Org lead statuses — label + dot colour for status-transition pills. */
+  statusOptions?: LeadStatusOption[];
 }) {
   const editable = a.type === "note" && (!!onEdit || !!onDelete);
   const [editing, setEditing] = useState(false);
@@ -264,7 +331,11 @@ function ActivityCard({
     <div className="group rounded-xl border border-border-subtle bg-surface p-3.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[12.5px] text-ink leading-snug whitespace-pre-wrap">{a.summary}</p>
+          {a.transition ? (
+            <TransitionSummary transition={a.transition} statusOptions={statusOptions} />
+          ) : (
+            <p className="text-[12.5px] text-ink leading-snug whitespace-pre-wrap">{a.summary}</p>
+          )}
           {a.detail && <p className="text-[11.5px] text-ink-muted mt-1 leading-relaxed">{a.detail}</p>}
           {a.type === "meeting_scheduled" && a.meetingUrl && (
             <a href={a.meetingUrl} target="_blank" rel="noreferrer"
@@ -316,6 +387,7 @@ function TimelineRow({
   onDeleteNote,
   onReplyEmail,
   showContact,
+  statusOptions,
 }: {
   item: FeedItem;
   last: boolean;
@@ -323,12 +395,14 @@ function TimelineRow({
   onDeleteNote?: (id: string) => void;
   onReplyEmail?: (message: LeadEmailMessage, mode: EmailReplyMode) => void;
   showContact?: boolean;
+  statusOptions?: LeadStatusOption[];
 }) {
   const meta =
     item.kind === "email"
       ? { icon: Mail, tint: "bg-signal-blue", fg: "text-signal-blue-text" }
       : TYPE_META[item.kind === "call" ? "call" : item.activity.type] ?? TYPE_META.note;
   const Icon = meta.icon;
+  const attribution = item.meta;
   return (
     <div className="flex gap-3.5 items-stretch">
       <div className="flex flex-col items-center w-7 shrink-0">
@@ -338,12 +412,49 @@ function TimelineRow({
         {!last && <div className="w-px flex-1 bg-border-subtle mt-1" />}
       </div>
       <div className={cn("flex-1 min-w-0", last ? "pb-0" : "pb-4")}>
+        {/* Attribution chips — which contact + which campaign (universal feed).
+            The campaign chip deep-links into the enrollment's lead view. */}
+        {attribution && (attribution.contactName || attribution.funnelName) && (
+          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+            {showContact && attribution.contactName && (
+              <span
+                className="text-[10px] text-ink-muted bg-section rounded-full px-2 py-0.5 truncate max-w-[150px]"
+                title={attribution.contactName}
+              >
+                {attribution.contactName}
+              </span>
+            )}
+            {attribution.funnelName &&
+              (attribution.funnelId && attribution.leadId ? (
+                <Link
+                  href={`/dashboard/funnels/${attribution.funnelId}/leads/${attribution.leadId}`}
+                  className="inline-flex items-center gap-1 text-[10px] font-medium text-signal-slate-text bg-signal-slate rounded-full px-2 py-0.5 hover:opacity-80 transition-opacity truncate max-w-[180px]"
+                  title={`Open in ${attribution.funnelName}`}
+                >
+                  <GitFork size={9} className="shrink-0" />
+                  {attribution.funnelName}
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium text-signal-slate-text bg-signal-slate rounded-full px-2 py-0.5 truncate max-w-[180px]">
+                  <GitFork size={9} className="shrink-0" />
+                  {attribution.funnelName}
+                </span>
+              ))}
+          </div>
+        )}
         {item.kind === "call" ? (
           <CallCard record={item.record} actor={item.actor} />
         ) : item.kind === "email" ? (
           <EmailActivityCard message={item.message} onReply={onReplyEmail} />
         ) : (
-          <ActivityCard a={item.activity} actor={item.actor} onEdit={onEditNote} onDelete={onDeleteNote} showContact={showContact} />
+          <ActivityCard
+            a={item.activity}
+            actor={item.actor}
+            onEdit={onEditNote}
+            onDelete={onDeleteNote}
+            showContact={showContact && !attribution}
+            statusOptions={statusOptions}
+          />
         )}
       </div>
     </div>
@@ -388,9 +499,11 @@ interface LeadTimelineProps {
   activities: FunnelLeadActivity[];
   callRecords: CallRecord[];
   emailMessages?: LeadEmailMessage[];
-  /** Campaign + lead identity — powers the Documents tab. */
-  funnelId: string;
-  leadId: string;
+  /** Campaign + lead identity — powers the Documents tab. Optional: the
+   *  universal company profile has no single enrollment, so it omits both
+   *  and the Documents tab is hidden. */
+  funnelId?: string;
+  leadId?: string;
   onAddNote: (text: string) => void;
   onEditNote?: (id: string, text: string) => void;
   onDeleteNote?: (id: string) => void;
@@ -399,14 +512,30 @@ interface LeadTimelineProps {
   filterContactName?: string | null;
   /** Clear the per-contact quick filter. */
   onClearFilter?: () => void;
+  /** Replaces the built-in note composer (e.g. the universal profile's
+   *  composer with its enrollment selector). */
+  composerSlot?: ReactNode;
+  /** Campaign + contact attribution per underlying record id (activity id,
+   *  CallRecord.id, LeadEmailMessage.id) — renders chips on every row. */
+  itemMeta?: Record<string, TimelineItemMeta>;
+  /** Cursor pagination (universal feed): show a "Load older activity" footer. */
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 const FILTERS = ["All", "Important", "Conversations", "Notes", "Documents"] as const;
 type Filter = (typeof FILTERS)[number];
 
-export function LeadTimeline({ activities, callRecords, emailMessages, funnelId, leadId, onAddNote, onEditNote, onDeleteNote, onReplyEmail, filterContactName, onClearFilter }: LeadTimelineProps) {
+export function LeadTimeline({ activities, callRecords, emailMessages, funnelId, leadId, onAddNote, onEditNote, onDeleteNote, onReplyEmail, filterContactName, onClearFilter, composerSlot, itemMeta, hasMore, loadingMore, onLoadMore }: LeadTimelineProps) {
   const [filter, setFilter] = useState<Filter>("All");
   const { resolveMember } = useTeamMembers();
+  // Fetched once here (not per card) — status-transition pills need the org's
+  // label + colour set.
+  const { statuses: statusOptions } = useLeadStatuses();
+  // Documents live on one campaign enrollment — hidden without one.
+  const hasDocuments = !!funnelId && !!leadId;
+  const visibleFilters = hasDocuments ? FILTERS : FILTERS.filter((f) => f !== "Documents");
 
   const feed = useMemo<FeedItem[]>(() => {
     // Resolve an actor from a user id + optional stored name. The team list
@@ -425,6 +554,7 @@ export function LeadTimeline({ activities, callRecords, emailMessages, funnelId,
       timestamp: new Date(r.timestamp),
       record: r,
       actor: toActor(r.userId, r.userName),
+      meta: itemMeta?.[r.id],
     }));
     // Email events are rendered as rich cards from the real message thread, and
     // calls as the authoritative CallCard (from callRecords) — so drop the
@@ -437,6 +567,7 @@ export function LeadTimeline({ activities, callRecords, emailMessages, funnelId,
         timestamp: a.timestamp,
         activity: a,
         actor: toActor(a.userId, a.userName),
+        meta: itemMeta?.[a.id],
       }));
     const emails: FeedItem[] = (emailMessages || []).map((m) => ({
       id: `em_${m.id}`,
@@ -444,9 +575,10 @@ export function LeadTimeline({ activities, callRecords, emailMessages, funnelId,
       timestamp: new Date(m.createdAt),
       message: m,
       actor: toActor(m.userId, null),
+      meta: itemMeta?.[m.id],
     }));
     return [...calls, ...acts, ...emails].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [activities, callRecords, emailMessages, resolveMember]);
+  }, [activities, callRecords, emailMessages, resolveMember, itemMeta]);
 
   const items = useMemo(() => {
     const conv = new Set(["call", "email", "linkedin", "sms_sent", "sms_received"]);
@@ -462,13 +594,15 @@ export function LeadTimeline({ activities, callRecords, emailMessages, funnelId,
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-[920px] mx-auto w-full px-7 pt-5 pb-16">
-        {filter !== "Documents" && <Composer onAdd={onAddNote} />}
+      {/* Wide cap: the feed should use the available width on large screens
+          instead of pinning to a narrow centered column. */}
+      <div className="max-w-[1480px] mx-auto w-full px-7 pt-5 pb-16">
+        {filter !== "Documents" && (composerSlot ?? <Composer onAdd={onAddNote} />)}
 
         {/* Filters */}
         <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
           <div className="flex items-center gap-1">
-            {FILTERS.map((f) => (
+            {visibleFilters.map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -504,21 +638,34 @@ export function LeadTimeline({ activities, callRecords, emailMessages, funnelId,
         )}
 
         {/* Documents tab swaps the feed for the upload/list panel */}
-        {filter === "Documents" ? (
-          <LeadDocumentsPanel funnelId={funnelId} leadId={leadId} />
+        {filter === "Documents" && hasDocuments ? (
+          <LeadDocumentsPanel funnelId={funnelId!} leadId={leadId!} />
         ) : items.length ? (
           <div>
             {items.map((item, i) => (
               <TimelineRow
                 key={item.id}
                 item={item}
-                last={i === items.length - 1}
+                last={i === items.length - 1 && !hasMore}
                 onEditNote={onEditNote}
                 onDeleteNote={onDeleteNote}
                 onReplyEmail={onReplyEmail}
                 showContact={!filterContactName}
+                statusOptions={statusOptions}
               />
             ))}
+            {hasMore && onLoadMore && (
+              <div className="flex justify-center pt-4">
+                <button
+                  onClick={onLoadMore}
+                  disabled={loadingMore}
+                  className="inline-flex items-center gap-2 px-4 py-1.5 rounded-[20px] border border-border-subtle bg-surface text-[11px] font-medium text-ink-secondary hover:border-border-default disabled:opacity-60 transition-colors"
+                >
+                  {loadingMore && <Loader2 size={12} className="animate-spin" />}
+                  {loadingMore ? "Loading…" : "Load older activity"}
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="rounded-[14px] border border-border-subtle bg-surface p-8 text-center text-[13px] text-ink-muted">

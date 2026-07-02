@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Building2, Loader2, Search, Users, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -178,7 +179,13 @@ export default function CompaniesPage() {
                     <div className="flex items-center gap-2.5">
                       <CompanyAvatar name={company.name} size="md" domain={company.domain || undefined} />
                       <div>
-                        <span className="text-[12px] font-medium text-ink">{company.name}</span>
+                        <Link
+                          href={`/dashboard/companies/${encodeURIComponent(company.id)}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[12px] font-medium text-ink hover:underline"
+                        >
+                          {company.name}
+                        </Link>
                         {company.domain && (
                           <span className="text-[10px] text-ink-faint ml-1.5">{company.domain}</span>
                         )}

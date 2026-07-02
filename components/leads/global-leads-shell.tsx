@@ -361,7 +361,17 @@ function CompaniesTable({ rows }: { rows: LeadCompanyRow[] }) {
                     <div className="flex items-center gap-2.5">
                       <CompanyAvatar name={r.company} size="md" domain={r.domain ?? undefined} />
                       <div>
-                        <span className="text-[12px] font-medium text-ink">{r.company || "—"}</span>
+                        {r.masterCompanyId ? (
+                          <Link
+                            href={`/dashboard/companies/${encodeURIComponent(r.masterCompanyId)}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="text-[12px] font-medium text-ink hover:underline"
+                          >
+                            {r.company || "—"}
+                          </Link>
+                        ) : (
+                          <span className="text-[12px] font-medium text-ink">{r.company || "—"}</span>
+                        )}
                         {r.domain && <div className="text-[10px] text-ink-faint">{r.domain}</div>}
                       </div>
                     </div>

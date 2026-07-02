@@ -116,30 +116,6 @@ export async function getContactProfile(id: string): Promise<ContactProfile> {
   return apiRequest<ContactProfile>(`/contacts/${id}/profile`);
 }
 
-export interface CompanyProfile {
-  company: {
-    id?: string;
-    name: string;
-    domain: string | null;
-    linkedinUrl: string | null;
-    industry?: string | null;
-    employeeCount?: number | null;
-    fundingStage?: string | null;
-    country?: string | null;
-    city?: string | null;
-    logo?: string | null;
-    description?: string | null;
-  };
-  contacts: { id: string; fullName: string | null; title: string | null; linkedinUrl: string | null; email: string | null; phone: string | null; status: string }[];
-  leads: { leadId: string; funnelId: string; name: string; title: string; status: string }[];
-  /** Hiring roles from the company's scraped job posts. */
-  hiringRoles: { id: string; title: string; description: string; salaryRange: string; location: string; postedAgo: string; seniority: string; url: string }[];
-}
-
-export async function getCompanyProfile(key: string): Promise<CompanyProfile> {
-  return apiRequest<CompanyProfile>(`/companies/profile?key=${encodeURIComponent(key)}`);
-}
-
 // ─── Enrichment ─────────────────────────────────────────────────────
 
 export async function enrichContacts(

@@ -38,6 +38,9 @@ export interface LeadCompanyRow {
   status: string;
   callCount: number;
   emailCount: number;
+  /** Canonical company id — deep-links to the universal company profile.
+   *  Null until the company backfill has linked this company's leads. */
+  masterCompanyId: string | null;
 }
 
 export interface LeadsFacets {
