@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { useAuth, useOrganizationList } from "@clerk/nextjs";
+import { useQueryClient } from "@tanstack/react-query";
 import { setAuthToken } from "@/lib/api/client";
 
 const AuthReadyContext = createContext(false);
@@ -23,6 +24,20 @@ export function AuthTokenSync({ children }: { children: React.ReactNode }) {
       userMemberships: { infinite: true },
     });
   const [isReady, setIsReady] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Cached data belongs to ONE org — switching orgs must never render org A's
+  // campaigns/leads under org B. Clear the whole React Query cache when the
+  // active org changes after first settling. (Org switching also hard-
+  // navigates today; this guards any future soft-switch path too.)
+  const prevOrgId = useRef<string | null>(null);
+  useEffect(() => {
+    if (!orgId) return;
+    if (prevOrgId.current && prevOrgId.current !== orgId) {
+      queryClient.clear();
+    }
+    prevOrgId.current = orgId;
+  }, [orgId, queryClient]);
 
   // If no active org, auto-select the first one
   useEffect(() => {

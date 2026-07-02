@@ -7,7 +7,10 @@ import { GitFork, ChevronDown, Plus, X, Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FunnelStatusBadge } from "../funnel-status-badge";
 import { getStatusDotClass, getStatusLabel, type LeadStatusOption } from "@/lib/utils/lead-status";
+import { useQueryClient } from "@tanstack/react-query";
 import { listFunnels } from "@/lib/api/funnels";
+import { qk } from "@/lib/queries/keys";
+import { STALE } from "@/lib/queries/config";
 import {
   listLeadCampaigns, addLeadToCampaign, removeLeadFromCampaign,
   type LeadCampaignMembership,
@@ -60,14 +63,17 @@ export function LeadCampaignsMenu({
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  const qc = useQueryClient();
   const openPicker = useCallback(() => {
     setPickerOpen((v) => !v);
     if (allCampaigns === null) {
-      listFunnels()
+      // Shared funnels cache — usually already warm from the sidebar, so this
+      // resolves without a network request.
+      qc.fetchQuery({ queryKey: qk.funnels, queryFn: listFunnels, staleTime: STALE.LIST })
         .then((fs) => setAllCampaigns(fs.map((f) => ({ id: f.id, name: f.name }))))
         .catch(() => setAllCampaigns([]));
     }
-  }, [allCampaigns]);
+  }, [allCampaigns, qc]);
 
   const candidates = useMemo(() => {
     const memberIds = new Set((memberships ?? []).map((m) => m.funnelId));

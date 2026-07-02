@@ -2,15 +2,27 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LeadActionBar } from "./lead-action-bar";
 import { LeadDetailsColumn, type EditableCustomField, type CompanyInfoPatch } from "./lead-details-column";
 import { LeadTimeline } from "./lead-timeline";
 import { LeadStepTracker } from "@/components/funnels/focus/lead-step-tracker";
 import { FocusCallControls } from "@/components/funnels/focus/focus-call-controls";
-import { EmailComposerDrawer } from "@/components/email/email-composer-drawer";
-import { SmsThreadDrawer } from "@/components/sms/sms-thread-drawer";
-import { ConvertToOpportunityModal } from "@/components/opportunities/convert-to-opportunity-modal";
+// Heavy overlays load on first use, not with the lead view: the email
+// composer alone pulls the whole TipTap editor chain into the chunk.
+const EmailComposerDrawer = dynamic(
+  () => import("@/components/email/email-composer-drawer").then((m) => m.EmailComposerDrawer),
+  { ssr: false },
+);
+const SmsThreadDrawer = dynamic(
+  () => import("@/components/sms/sms-thread-drawer").then((m) => m.SmsThreadDrawer),
+  { ssr: false },
+);
+const ConvertToOpportunityModal = dynamic(
+  () => import("@/components/opportunities/convert-to-opportunity-modal").then((m) => m.ConvertToOpportunityModal),
+  { ssr: false },
+);
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
 import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc, updateLeadContact, updateLeadCompanyInfo, setLeadCustomFieldValues, createLeadInFunnel, type ContactEditPatch } from "@/lib/api/funnels";
 import { useCustomFields } from "@/lib/hooks/use-custom-fields";
@@ -19,6 +31,7 @@ import { getLeadEmailThread, type LeadEmailMessage } from "@/lib/api/email";
 import type { EmailReplyMode } from "./email-activity-card";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
+import { usePrefetchFunnel } from "@/lib/queries/use-prefetch";
 import { useCallContext } from "@/components/calling/call-context";
 import { useDialerContext } from "@/components/dialer/context/dialer-context";
 import type { Funnel, FunnelLead, FunnelStep, FunnelLeadEvent } from "@/lib/types/funnel";
@@ -133,6 +146,23 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     },
     [router, funnelId, leadId],
   );
+
+  // Warm the prev/next leads' data during idle time — hover isn't enough for
+  // arrow-key navigation, so rapid prev/next always hits a warm cache.
+  const prefetchFunnel = usePrefetchFunnel();
+  useEffect(() => {
+    const warm = () => {
+      if (nextId) prefetchFunnel(funnelId, { fullLeadId: nextId });
+      if (prevId) prefetchFunnel(funnelId, { fullLeadId: prevId });
+    };
+    const idle = typeof requestIdleCallback === "function"
+      ? requestIdleCallback(warm, { timeout: 1500 })
+      : setTimeout(warm, 300);
+    return () => {
+      if (typeof cancelIdleCallback === "function" && typeof idle === "number") cancelIdleCallback(idle);
+      else clearTimeout(idle as ReturnType<typeof setTimeout>);
+    };
+  }, [funnelId, prevId, nextId, prefetchFunnel]);
 
   // ── Real call records across ALL company contacts (audio + AI summary) ──
   // Each record is stamped with the contact we fetched it under so the quick
@@ -684,7 +714,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         </div>
       )}
 
-      {/* SMS thread */}
+      {/* SMS thread — mounted (and its chunk loaded) only when opened. */}
+      {showSms && (
       <SmsThreadDrawer
         open={showSms}
         onClose={() => setShowSms(false)}
@@ -701,8 +732,10 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         }}
         onSent={() => onLeadsChanged?.()}
       />
+      )}
 
-      {/* Email composer */}
+      {/* Email composer — mounted only when opened (defers the TipTap chunk). */}
+      {showComposer && (
       <EmailComposerDrawer
         open={showComposer}
         onClose={() => { setShowComposer(false); setReplyPrefill(null); }}
@@ -723,6 +756,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         stepIndex={currentStepDef?.channel === "email" ? effectiveStep - 1 : null}
         onSent={handleEmailSent}
       />
+      )}
 
       {/* Convert modal */}
       {showConvert && (

@@ -8,9 +8,9 @@ import {
   GitFork, Phone, Mail, Linkedin, MessageSquare, ArrowRight, X, SearchX, CheckSquare,
 } from "lucide-react";
 import { MemberAvatar } from "@/components/shared/member-avatar";
-import { listFunnels } from "@/lib/api/funnels";
+import { useFunnels } from "@/lib/queries/use-funnels";
+import { usePrefetchFunnel } from "@/lib/queries/use-prefetch";
 import { useTeamMembers } from "@/hooks/use-team-members";
-import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { cn } from "@/lib/utils";
 import type { Funnel, FunnelChannel, FunnelStatus } from "@/lib/types/funnel";
 
@@ -123,11 +123,18 @@ const LIST_COLS = "minmax(220px,1.4fr) 282px repeat(4,54px) 130px 148px";
 
 export default function FunnelsPage() {
   const router = useRouter();
-  const [funnels, setFunnels] = useState<Funnel[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Shared funnels cache (same entry the sidebar uses) — repeat visits paint
+  // instantly and campaign clicks reuse these rows as placeholders.
+  const { data: funnelsData, isPending, error: funnelsError, refetch } = useFunnels();
+  const prefetchFunnel = usePrefetchFunnel();
+  const funnels = useMemo(() => funnelsData ?? [], [funnelsData]);
+  const loading = isPending;
+  const error = funnelsError
+    ? funnelsError instanceof Error
+      ? funnelsError.message
+      : "Failed to load campaigns"
+    : null;
   const { members: allMembers, resolveMember } = useTeamMembers();
-  const isAuthReady = useAuthReady();
 
   // Filter state
   const [search, setSearch] = useState("");
@@ -138,25 +145,6 @@ export default function FunnelsPage() {
   const [sortOpen, setSortOpen] = useState(false);
   const [view, setView] = useState<"list" | "grid">("list");
   const sortRef = useRef<HTMLDivElement>(null);
-
-  const loadFunnels = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setFunnels(await listFunnels());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load campaigns");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Wait for the org-scoped auth token before fetching — firing too early
-  // (e.g. on a hard browser refresh) makes the request 404 "Not Found".
-  useEffect(() => {
-    if (!isAuthReady) return;
-    void loadFunnels();
-  }, [isAuthReady, loadFunnels]);
 
   // Close the sort menu on outside click.
   useEffect(() => {
@@ -417,7 +405,7 @@ export default function FunnelsPage() {
         <div className="rounded-[14px] border border-signal-red-text/25 bg-signal-red/10 p-5">
           <p className="text-[12px] font-medium text-signal-red-text mb-2">Could not load campaigns</p>
           <p className="text-[11px] text-ink-secondary mb-3">{error}</p>
-          <button onClick={() => void loadFunnels()} className="px-4 py-1.5 rounded-full bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity">
+          <button onClick={() => void refetch()} className="px-4 py-1.5 rounded-full bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity">
             Retry
           </button>
         </div>
@@ -462,6 +450,11 @@ export default function FunnelsPage() {
               <div
                 key={f.id}
                 onClick={() => router.push(`/dashboard/funnels/${f.id}`)}
+                // Warm the route chunk + campaign data before the click.
+                onMouseEnter={() => {
+                  router.prefetch(`/dashboard/funnels/${f.id}`);
+                  prefetchFunnel(f.id);
+                }}
                 className="group grid items-center gap-4 px-5 py-4 border-b border-border-subtle last:border-b-0 cursor-pointer hover:bg-accent/[0.05] transition-colors"
                 style={{ gridTemplateColumns: LIST_COLS }}
               >
@@ -521,6 +514,7 @@ export default function FunnelsPage() {
               <Link
                 key={f.id}
                 href={`/dashboard/funnels/${f.id}`}
+                onMouseEnter={() => prefetchFunnel(f.id)}
                 className="rounded-[14px] border border-border-subtle bg-surface p-[18px] block hover:border-border-default transition-colors"
               >
                 <div className="flex items-start justify-between">

@@ -25,6 +25,8 @@ import type { FunnelLead, FunnelStep } from "@/lib/types/funnel";
 import { LeadSortMenu } from "./lead-sort-menu";
 import { LeadStepFilter } from "./lead-step-filter";
 import { ColumnSettingsDrawer } from "./column-settings-drawer";
+import { usePrefetchFunnel } from "@/lib/queries/use-prefetch";
+import { useActivityCounts } from "@/lib/queries/use-activity-counts";
 import {
   buildLeadColumns, resolveColumns, loadColumnPrefs, saveColumnPrefs,
   type ColumnPrefs, type LeadColumnCtx,
@@ -330,6 +332,7 @@ function MagicEnrichBar({
 }
 
 export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, sortBy, onSortChange, onLeadAdvanced, onLeadClick }: FunnelLeadTableProps) {
+  const prefetchFunnel = usePrefetchFunnel();
   // Close-style query builder. Restored from the campaign config (a FilterGroup);
   // a legacy/other shape falls back to empty.
   const [filterGroup, setFilterGroup] = useState<FilterGroup>(
@@ -386,20 +389,24 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
     onLeadAdvanced?.();
   }, [lastLoggedCall, funnelId, onLeadAdvanced]);
 
-  // Activity counts: prefer the server-computed totals (present even in the
-  // lite leads payload, which omits per-lead events); fall back to deriving them
-  // from events on the full lead view.
+  // Activity counts: the DEFERRED endpoint is authoritative (the payload now
+  // ships zeros so the table paints instantly); fall back to payload counts
+  // (older backend) and finally to deriving from events on the full view.
+  const { data: deferredCounts } = useActivityCounts(funnelId);
   const activityMap = useMemo(() => {
     const map = new Map<string, { calls: number; emails: number }>();
     for (const lead of leads) {
-      if (lead.callCount != null || lead.emailCount != null) {
+      const deferred = deferredCounts?.[lead.id];
+      if (deferred) {
+        map.set(lead.id, deferred);
+      } else if (lead.callCount != null || lead.emailCount != null) {
         map.set(lead.id, { calls: lead.callCount ?? 0, emails: lead.emailCount ?? 0 });
       } else {
         map.set(lead.id, computeActivityCounts(lead.events || []));
       }
     }
     return map;
-  }, [leads]);
+  }, [leads, deferredCounts]);
 
   // Enum option lists for the filter builder (status comes from useLeadStatuses).
   const sourceOptions = useMemo(() => [...new Set(leads.map((l) => l.source).filter(Boolean))].sort(), [leads]);
@@ -595,6 +602,12 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
     if (!onLeadClick) return;
     const absoluteIndex = leads.findIndex((l) => l.id === lead.id);
     if (absoluteIndex !== -1) onLeadClick(absoluteIndex);
+  }
+
+  /** Warm the lead view's data on row hover so the click paints instantly. */
+  function handleRowHover(lead: FunnelLead) {
+    if (!onLeadClick) return;
+    prefetchFunnel(funnelId, { fullLeadId: lead.id });
   }
 
   function handleCall(e: React.MouseEvent, lead: FunnelLead) {
@@ -798,6 +811,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                             key={lead.id}
                             className={cn("bg-section/20", onLeadClick && "cursor-pointer hover:bg-hover/50")}
                             onClick={() => handleRowClick(lead)}
+                            onMouseEnter={() => handleRowHover(lead)}
                           >
                             {/* Lead detail rendered as one clean strip — it isn't
                                 column-aligned to the company's Industry/Employees/
@@ -897,6 +911,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                     key={lead.id}
                     className={cn("group", onLeadClick && "cursor-pointer hover:bg-hover")}
                     onClick={() => handleRowClick(lead)}
+                    onMouseEnter={() => handleRowHover(lead)}
                   >
                     <TableCell className="w-8 px-3">
                       <input

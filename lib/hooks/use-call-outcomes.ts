@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getCallOutcomes, type CallOutcome } from "@/lib/api/call-outcomes";
-import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { useQueryClient } from "@tanstack/react-query";
+import { type CallOutcome } from "@/lib/api/call-outcomes";
+import { useCallOutcomesQuery } from "@/lib/queries/use-org-config";
+import { qk } from "@/lib/queries/keys";
 
 // Close-style defaults — shown instantly before the org's list loads, and as a
 // fallback if the request fails. Mirrors the backend defaults.
@@ -14,27 +15,19 @@ export const DEFAULT_CALL_OUTCOMES: CallOutcome[] = [
   { key: "no_clear_outcome", label: "No Clear Outcome", color: "slate" },
 ];
 
-let cache: CallOutcome[] | null = null;
-let inflight: Promise<CallOutcome[]> | null = null;
-
-/** Loads the org's call-outcome label set (cached across mounts). */
+/** The org's call-outcome label set, served from the shared React Query
+ *  cache (this hook pioneered the module-cache pattern the query layer now
+ *  generalizes platform-wide). */
 export function useCallOutcomes() {
-  const isAuthReady = useAuthReady();
-  const [outcomes, setOutcomes] = useState<CallOutcome[]>(cache ?? DEFAULT_CALL_OUTCOMES);
-  const [loading, setLoading] = useState(!cache);
+  const qc = useQueryClient();
+  const { data, isPending } = useCallOutcomesQuery();
 
-  useEffect(() => {
-    if (!isAuthReady || cache) return;
-    inflight ??= getCallOutcomes().then((list) => {
-      cache = Array.isArray(list) && list.length ? list : DEFAULT_CALL_OUTCOMES;
-      return cache;
-    });
-    let alive = true;
-    inflight
-      .then((list) => { if (alive) { setOutcomes(list); setLoading(false); } })
-      .catch(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, [isAuthReady]);
+  const outcomes: CallOutcome[] =
+    Array.isArray(data) && data.length ? data : DEFAULT_CALL_OUTCOMES;
 
-  return { outcomes, loading, reload: () => { cache = null; inflight = null; } };
+  return {
+    outcomes,
+    loading: isPending,
+    reload: () => void qc.invalidateQueries({ queryKey: qk.callOutcomes }),
+  };
 }

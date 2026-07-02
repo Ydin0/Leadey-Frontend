@@ -10,7 +10,7 @@ import {
   type AppNotification,
 } from "@/lib/api/notifications";
 
-const POLL_MS = 10_000;
+const POLL_MS = 30_000;
 
 export function NotificationDropdown() {
   const router = useRouter();
@@ -33,11 +33,15 @@ export function NotificationDropdown() {
     }
   }, []);
 
-  // Poll for new notifications so the badge stays live.
+  // Poll for new notifications so the badge stays live — but not in hidden
+  // tabs, where the requests are pure waste.
   useEffect(() => {
     if (!isAuthReady) return;
     void load();
-    const id = setInterval(load, POLL_MS);
+    const tick = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    const id = setInterval(tick, POLL_MS);
     return () => clearInterval(id);
   }, [isAuthReady, load]);
 

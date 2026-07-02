@@ -7,6 +7,7 @@ import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { navGroups } from "@/lib/mock-data";
 import { useSidebarFunnels } from "@/hooks/use-sidebar-funnels";
+import { usePrefetchFunnel } from "@/lib/queries/use-prefetch";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getInboxCounts } from "@/lib/api/inbox";
 import { LeadeyMark, LeadeyWordmark } from "@/components/brand/leadey-mark";
@@ -17,6 +18,7 @@ export function Sidebar() {
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const pathname = usePathname();
   const { items: funnelItems } = useSidebarFunnels();
+  const prefetchFunnel = usePrefetchFunnel();
   const isAuthReady = useAuthReady();
   const [inboxCount, setInboxCount] = useState(0);
 
@@ -174,6 +176,10 @@ export function Sidebar() {
                             <Link
                               key={sub.id}
                               href={sub.href}
+                              // Warm the campaign's data cache on hover so the
+                              // click paints instantly (campaign sub-items only).
+                              onMouseEnter={item.dynamicChildren ? () => prefetchFunnel(sub.id) : undefined}
+                              onFocus={item.dynamicChildren ? () => prefetchFunnel(sub.id) : undefined}
                               className={cn(
                                 "flex items-center gap-2 h-7 pl-9 pr-2 rounded-lg transition-colors text-[12px] truncate",
                                 subActive

@@ -1,39 +1,53 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Pencil, Play, Pause, Trash2 } from "lucide-react";
 
-import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { FunnelStatusBadge } from "@/components/funnels/funnel-status-badge";
 import { FunnelStepPipeline } from "@/components/funnels/dashboard/funnel-step-pipeline";
 import { FunnelStatsBar } from "@/components/funnels/dashboard/funnel-stats-bar";
 import { FunnelTabNav, type FunnelTab } from "@/components/funnels/dashboard/funnel-tab-nav";
 
+import dynamic from "next/dynamic";
 import { FunnelLeadTable } from "@/components/funnels/leads/funnel-lead-table";
 import type { FilterGroup } from "@/lib/types/lead-filter";
 import { LeadSortMenu } from "@/components/funnels/leads/lead-sort-menu";
-import { CockpitView } from "@/components/funnels/cockpit/cockpit-view";
-import { AnalyticsView } from "@/components/funnels/analytics/analytics-view";
 import { EmailPerformancePanel } from "@/components/funnels/email-performance-panel";
-import { AddLeadsModal } from "@/components/funnels/add-leads/add-leads-modal";
 import { AddLeadsButton, type AddLeadsSource } from "@/components/funnels/add-leads/add-leads-button";
-import { WorkflowsView } from "@/components/funnels/workflows/workflows-view";
 import { NewLeadModal } from "@/components/funnels/add-leads/new-lead-modal";
+
+// Secondary tab views + the import modal load on demand — the default Leads
+// tab chunk stays lean (the analytics charts and workflow builder are heavy).
+const CockpitView = dynamic(
+  () => import("@/components/funnels/cockpit/cockpit-view").then((m) => m.CockpitView),
+  { ssr: false },
+);
+const AnalyticsView = dynamic(
+  () => import("@/components/funnels/analytics/analytics-view").then((m) => m.AnalyticsView),
+  { ssr: false },
+);
+const WorkflowsView = dynamic(
+  () => import("@/components/funnels/workflows/workflows-view").then((m) => m.WorkflowsView),
+  { ssr: false },
+);
+const AddLeadsModal = dynamic(
+  () => import("@/components/funnels/add-leads/add-leads-modal").then((m) => m.AddLeadsModal),
+  { ssr: false },
+);
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
 import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
-import { getFunnelById, updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
+import { updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
+import { useFunnel } from "@/lib/queries/use-funnel";
+import { patchFunnel, invalidateFunnel } from "@/lib/queries/funnel-cache";
 import { sortLeads, DEFAULT_LEAD_SORT, type LeadSortKey } from "@/lib/utils/sort-leads";
-import type { Funnel, FunnelStatus } from "@/lib/types/funnel";
+import type { FunnelStatus } from "@/lib/types/funnel";
 
 const SORT_STORAGE_KEY = "leadey:campaign-lead-sort";
 
-/** Stale-while-revalidate cache so re-opening a campaign renders instantly
- *  from memory while a fresh copy loads in the background. Lives for the
- *  browser session. */
-const funnelCache = new Map<string, Funnel>();
 /** Org-wide company backfill is expensive — only ever attempt it once per
  *  page session, and never on the critical render path. */
 let backfillAttempted = false;
@@ -41,24 +55,38 @@ let backfillAttempted = false;
 export default function FunnelDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const qc = useQueryClient();
   const funnelId = params.id as string;
 
   const [activeTab, setActiveTab] = useState<FunnelTab>("leads");
   const [showAddLeads, setShowAddLeads] = useState(false);
   const [addLeadsSource, setAddLeadsSource] = useState<AddLeadsSource | undefined>(undefined);
   const [showNewLead, setShowNewLead] = useState(false);
-  const [funnel, setFunnel] = useState<Funnel | null>(null);
-  // Full funnel (with per-lead events) — lazily loaded only when the Cockpit or
-  // Analytics tab needs it, so the default Leads view stays fast.
-  const [fullFunnel, setFullFunnel] = useState<Funnel | null>(null);
-  const fullLoadStartedRef = useRef(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [statusChanging, setStatusChanging] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [sortBy, setSortBy] = useState<LeadSortKey>(DEFAULT_LEAD_SORT);
-  const isAuthReady = useAuthReady();
+
+  // The campaign — served instantly from the shared cache (a previous visit,
+  // the campaigns list, or a hover prefetch) while a fresh copy revalidates in
+  // the background. `isPlaceholderData` means we're painting a stand-in (e.g.
+  // the list row, which has no leads yet).
+  const {
+    data: funnel,
+    isPending,
+    isPlaceholderData,
+    error: funnelError,
+    refetch,
+  } = useFunnel(funnelId, { lite: true });
+
+  // Full funnel (with per-lead events) — lazily loaded only when the Cockpit or
+  // Analytics tab needs it, so the default Leads view stays fast. Until it
+  // lands, the lite variant serves as its placeholder.
+  const { data: fullFunnel, isPlaceholderData: fullIsPlaceholder } = useFunnel(
+    funnelId,
+    {},
+    { enabled: activeTab === "cockpit" || activeTab === "analytics" },
+  );
 
   // Persist the sort preference so the order is stable across navigation.
   useEffect(() => {
@@ -77,107 +105,52 @@ export default function FunnelDetailPage() {
     [funnel, sortBy],
   );
 
-  const loadFunnel = useCallback(async () => {
-    if (!funnelId) return;
-
-    // Instant paint from cache (stale-while-revalidate). Only show the
-    // "Loading…" state when we have nothing cached for this campaign.
-    const cached = funnelCache.get(funnelId);
-    if (cached) {
-      setFunnel(cached);
-      setLoading(false);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
-
-    try {
-      // Lite load — the leads table doesn't need per-lead events / long company
-      // descriptions, so skip them. The Cockpit/Analytics tabs lazily load the
-      // full funnel (with events) when opened.
-      const data = await getFunnelById(funnelId, { lite: true });
-      funnelCache.set(funnelId, data);
-      setFunnel(data);
-      setLoading(false);
-
-      // Backfill missing company data from scraper signals in the BACKGROUND —
-      // never block the render on it (it scans the whole org). Run at most once
-      // per session and only refresh if it actually changed anything.
-      const hasMissingData = data.leads.some((l) => l.company && !l.companyDomain && !l.companyIndustry);
-      if (hasMissingData && !backfillAttempted) {
-        backfillAttempted = true;
-        void backfillCompanyData()
-          .then(async (result) => {
-            if (result.updated > 0) {
-              const refreshed = await getFunnelById(funnelId, { lite: true });
-              funnelCache.set(funnelId, refreshed);
-              setFunnel(refreshed);
-            }
-          })
-          .catch(() => {});
-      }
-    } catch (err) {
-      // Keep showing cached data on a refresh error rather than blanking out.
-      if (!funnelCache.get(funnelId)) {
-        const message = err instanceof Error ? err.message : "Failed to load funnel";
-        setError(message);
-        setFunnel(null);
-      }
-      setLoading(false);
-    }
-  }, [funnelId]);
+  // Backfill missing company data from scraper signals in the BACKGROUND —
+  // never block the render on it (it scans the whole org). Run at most once
+  // per session and only refresh if it actually changed anything.
+  useEffect(() => {
+    if (!funnel || isPlaceholderData || backfillAttempted) return;
+    const hasMissingData = funnel.leads.some((l) => l.company && !l.companyDomain && !l.companyIndustry);
+    if (!hasMissingData) return;
+    backfillAttempted = true;
+    void backfillCompanyData()
+      .then((result) => {
+        if (result.updated > 0) invalidateFunnel(qc, funnelId);
+      })
+      .catch(() => {});
+  }, [funnel, isPlaceholderData, funnelId, qc]);
 
   const handleDelete = useCallback(async () => {
     if (!funnelId) return;
     setDeleting(true);
     try {
       await deleteFunnel(funnelId);
+      qc.removeQueries({ queryKey: ["funnel", funnelId] });
+      void qc.invalidateQueries({ queryKey: ["funnels"] });
       router.push("/dashboard/funnels");
     } catch {
       setDeleting(false);
       setShowDeleteConfirm(false);
     }
-  }, [funnelId, router]);
+  }, [funnelId, router, qc]);
 
   const handleStatusChange = useCallback(async (newStatus: FunnelStatus) => {
     if (!funnelId) return;
     setStatusChanging(true);
     try {
       const updated = await updateFunnelStatus(funnelId, newStatus);
-      setFunnel(updated);
+      // Update every cached variant + the list row (sidebar badge included).
+      patchFunnel(qc, funnelId, updated);
     } catch {
-      // reload to sync state
-      void loadFunnel();
+      invalidateFunnel(qc, funnelId);
     } finally {
       setStatusChanging(false);
     }
-  }, [funnelId, loadFunnel]);
+  }, [funnelId, qc]);
 
-  useEffect(() => {
-    if (!isAuthReady) return;
-    void loadFunnel();
-  }, [isAuthReady, loadFunnel]);
+  const refreshFunnel = useCallback(() => invalidateFunnel(qc, funnelId), [qc, funnelId]);
 
-  // Cockpit + Analytics need per-lead events, which the lite load omits — fetch
-  // the full funnel once, the first time either tab is opened.
-  useEffect(() => {
-    if (activeTab !== "cockpit" && activeTab !== "analytics") return;
-    if (!isAuthReady || !funnelId || fullFunnel || fullLoadStartedRef.current) return;
-    fullLoadStartedRef.current = true;
-    let cancelled = false;
-    void getFunnelById(funnelId)
-      .then((data) => { if (!cancelled) setFullFunnel(data); })
-      .catch(() => { fullLoadStartedRef.current = false; });
-    return () => { cancelled = true; };
-  }, [activeTab, isAuthReady, funnelId, fullFunnel]);
-
-  // Keep the session cache in sync with any local mutation (status change,
-  // edit, lead patch) so navigating away and back shows the latest state.
-  useEffect(() => {
-    if (funnel) funnelCache.set(funnelId, funnel);
-  }, [funnel, funnelId]);
-
-  if (loading) {
+  if (isPending && !funnel) {
     return (
       <div className="rounded-[14px] border border-border-subtle bg-surface p-6">
         <p className="text-[12px] text-ink-muted">Loading funnel...</p>
@@ -185,15 +158,17 @@ export default function FunnelDetailPage() {
     );
   }
 
-  if (error) {
+  if (funnelError && !funnel) {
     return (
       <div className="rounded-[14px] border border-signal-red-text/25 bg-signal-red/10 p-5">
         <p className="text-[12px] font-medium text-signal-red-text mb-2">
           Could not load funnel
         </p>
-        <p className="text-[11px] text-ink-secondary mb-3">{error}</p>
+        <p className="text-[11px] text-ink-secondary mb-3">
+          {funnelError instanceof Error ? funnelError.message : "Failed to load funnel"}
+        </p>
         <button
-          onClick={() => void loadFunnel()}
+          onClick={() => void refetch()}
           className="px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
         >
           Retry
@@ -304,27 +279,37 @@ export default function FunnelDetailPage() {
 
       {/* Tab Content */}
       {activeTab === "leads" && (
-        <FunnelLeadTable
-          leads={sortedLeads}
-          steps={funnel.steps}
-          funnelId={funnel.id}
-          initialFilters={funnel.config?.leadFilters as FilterGroup | undefined}
-          sortBy={sortBy}
-          onSortChange={changeSort}
-          onLeadAdvanced={() => void loadFunnel()}
-          onLeadClick={(index) => {
-            const lead = sortedLeads[index];
-            if (lead) router.push(`/dashboard/funnels/${funnel.id}/leads/${lead.id}`);
-          }}
-        />
+        isPlaceholderData && sortedLeads.length === 0 ? (
+          // Painting from a list-row placeholder (no leads yet) — show row
+          // skeletons instead of a false "no leads" empty state.
+          <div className="rounded-[14px] border border-border-subtle bg-surface p-4 space-y-2.5">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="h-9 rounded-[8px] bg-section animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <FunnelLeadTable
+            leads={sortedLeads}
+            steps={funnel.steps}
+            funnelId={funnel.id}
+            initialFilters={funnel.config?.leadFilters as FilterGroup | undefined}
+            sortBy={sortBy}
+            onSortChange={changeSort}
+            onLeadAdvanced={refreshFunnel}
+            onLeadClick={(index) => {
+              const lead = sortedLeads[index];
+              if (lead) router.push(`/dashboard/funnels/${funnel.id}/leads/${lead.id}`);
+            }}
+          />
+        )
       )}
 
       {activeTab === "cockpit" && (
-        fullFunnel ? (
+        fullFunnel && !(fullIsPlaceholder && !fullFunnel.cockpit) ? (
           <CockpitView
             cockpit={fullFunnel.cockpit}
             funnelId={funnel.id}
-            onActionExecuted={() => { setFullFunnel(null); fullLoadStartedRef.current = false; void loadFunnel(); }}
+            onActionExecuted={refreshFunnel}
           />
         ) : (
           <div className="rounded-[14px] border border-border-subtle bg-surface p-6">
@@ -357,7 +342,7 @@ export default function FunnelDetailPage() {
           funnelId={funnel.id}
           initialSource={addLeadsSource}
           onClose={() => { setShowAddLeads(false); setAddLeadsSource(undefined); }}
-          onLeadsImported={() => void loadFunnel()}
+          onLeadsImported={refreshFunnel}
         />
       )}
 

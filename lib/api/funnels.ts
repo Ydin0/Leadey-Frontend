@@ -249,6 +249,18 @@ export async function getFunnelById(
   return hydrateFunnel(data);
 }
 
+/** Per-lead call/email totals, DEFERRED out of the funnel payload (the
+ *  backend computes them org-wide and caches for 60s). Keyed by leadId;
+ *  leads with zero activity are omitted. */
+export async function getFunnelActivityCounts(
+  funnelId: string,
+): Promise<Record<string, { calls: number; emails: number }>> {
+  const data = await apiRequest<{ counts: Record<string, { calls: number; emails: number }> }>(
+    `/funnels/${encodeURIComponent(funnelId)}/activity-counts`,
+  );
+  return data.counts ?? {};
+}
+
 export interface UpdateFunnelWebhookPayload {
   enabled?: boolean;
   rotateToken?: boolean;

@@ -1,42 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import type { NavSubItem } from "@/lib/types";
-import { listFunnels } from "@/lib/api/funnels";
 import type { FunnelStatus } from "@/lib/types/funnel";
-import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { useFunnels } from "@/lib/queries/use-funnels";
 
+/** Sidebar campaign sub-items — now served from the SHARED funnels cache
+ *  (same entry the campaigns list page and pickers use), which also seeds
+ *  instant campaign-page paint via placeholders. */
 export function useSidebarFunnels() {
-  const [items, setItems] = useState<NavSubItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const isAuthReady = useAuthReady();
+  const { data, isPending } = useFunnels();
 
-  useEffect(() => {
-    if (!isAuthReady) return;
-    let cancelled = false;
+  const items = useMemo<NavSubItem[]>(
+    () =>
+      (data ?? []).map((f) => ({
+        id: f.id,
+        label: f.name,
+        href: `/dashboard/funnels/${f.id}`,
+        status: f.status as FunnelStatus,
+      })),
+    [data],
+  );
 
-    async function load() {
-      try {
-        const funnels = await listFunnels();
-        if (cancelled) return;
-        setItems(
-          funnels.map((f) => ({
-            id: f.id,
-            label: f.name,
-            href: `/dashboard/funnels/${f.id}`,
-            status: f.status as FunnelStatus,
-          }))
-        );
-      } catch {
-        // Silently fail — sidebar still works without sub-items
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    void load();
-    return () => { cancelled = true; };
-  }, [isAuthReady]);
-
-  return { items, loading };
+  return { items, loading: isPending };
 }

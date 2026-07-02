@@ -10,7 +10,8 @@ import { PipelineTabs } from "@/components/opportunities/pipeline-tabs";
 import { PipelineStatsBar } from "@/components/opportunities/pipeline-stats-bar";
 import { OpportunityFilters } from "@/components/opportunities/opportunity-filters";
 import { useTeamMembers } from "@/hooks/use-team-members";
-import { listPipelines, listOpportunities, updateOpportunity } from "@/lib/api/opportunities";
+import { usePipelinesQuery } from "@/lib/queries/use-org-config";
+import { listOpportunities, updateOpportunity } from "@/lib/api/opportunities";
 import type {
   Pipeline,
   Opportunity,
@@ -20,7 +21,11 @@ import type {
 export default function OpportunitiesPage() {
   const isAuthReady = useAuthReady();
 
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  // Shared org-config cache — dashboard home and the opportunities list reuse
+  // the same entry, and it loads in parallel with everything else (the old
+  // version chained pipelines → opportunities as two serial effects).
+  const { data: pipelinesData, error: pipelinesError } = usePipelinesQuery();
+  const pipelines = useMemo<Pipeline[]>(() => pipelinesData ?? [], [pipelinesData]);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [summary, setSummary] = useState<OpportunitySummary | null>(null);
@@ -46,25 +51,18 @@ export default function OpportunitiesPage() {
     [resolveMember],
   );
 
-  // ── Load pipelines once auth is ready ──
+  // ── Default pipeline selection (derived once pipelines resolve) ──
   useEffect(() => {
-    if (!isAuthReady) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const list = await listPipelines();
-        if (cancelled) return;
-        setPipelines(list);
-        const def = list.find((p) => p.isDefault) || list[0] || null;
-        setActivePipelineId(def?.id ?? null);
-      } catch (err: any) {
-        if (!cancelled) setError(err?.message || "Failed to load pipelines");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthReady]);
+    if (!pipelinesData || activePipelineId) return;
+    const def = pipelinesData.find((p) => p.isDefault) || pipelinesData[0] || null;
+    setActivePipelineId(def?.id ?? null);
+  }, [pipelinesData, activePipelineId]);
+
+  useEffect(() => {
+    if (pipelinesError) {
+      setError(pipelinesError instanceof Error ? pipelinesError.message : "Failed to load pipelines");
+    }
+  }, [pipelinesError]);
 
   // ── Load opportunities whenever the filter set changes ──
   const reload = useCallback(async () => {

@@ -7,6 +7,7 @@ import { VersionGate } from "@/components/providers/version-gate";
 import { DialerProvider } from "@/components/dialer/context/dialer-context";
 import { DialerBar } from "@/components/dialer/bar/dialer-bar";
 import { AuthTokenSync } from "@/components/providers/auth-token-sync";
+import { QueryProvider } from "@/components/providers/query-provider";
 import { ScraperRunsProvider } from "@/components/providers/scraper-runs-provider";
 import { CreditsProvider } from "@/components/providers/credits-provider";
 import { ScraperRunsWidget } from "@/components/scrapers/scraper-runs-widget";
@@ -18,6 +19,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
+    <QueryProvider>
     <AuthTokenSync>
       <CreditsProvider>
       <CallProvider>
@@ -53,5 +55,6 @@ export default function DashboardLayout({
       </CallProvider>
       </CreditsProvider>
     </AuthTokenSync>
+    </QueryProvider>
   );
 }
