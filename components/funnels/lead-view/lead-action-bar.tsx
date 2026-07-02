@@ -2,15 +2,16 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, GitFork, FileText, Mail, Phone, MessageSquare, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, FileText, Mail, Phone, MessageSquare, Pencil, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
-import { FunnelStatusBadge } from "@/components/funnels/funnel-status-badge";
+import { LeadCampaignsMenu } from "./lead-campaigns-menu";
 import { getStatusLabel, getStatusDotClass, type LeadStatusOption } from "@/lib/utils/lead-status";
 import type { FunnelStatus } from "@/lib/types/funnel";
 
 interface LeadActionBarProps {
   funnelId: string;
+  leadId: string;
   companyName: string;
   companyDomain?: string;
   campaignName: string;
@@ -29,6 +30,7 @@ interface LeadActionBarProps {
 
 export function LeadActionBar({
   funnelId,
+  leadId,
   companyName,
   companyDomain,
   campaignName,
@@ -183,12 +185,14 @@ export function LeadActionBar({
 
             <span className="text-ink-faint text-[11px]">·</span>
 
-            {/* Campaign + its live status */}
-            <span className="flex items-center gap-1.5 text-[11px] text-ink-muted min-w-0">
-              <GitFork size={11} className="shrink-0" />
-              <span className="truncate">{campaignName}</span>
-            </span>
-            <FunnelStatusBadge status={campaignStatus} />
+            {/* Campaigns this lead is in — current one shown, dropdown manages all */}
+            <LeadCampaignsMenu
+              funnelId={funnelId}
+              leadId={leadId}
+              campaignName={campaignName}
+              campaignStatus={campaignStatus}
+              statuses={statuses}
+            />
 
             {doNotCall && (
               <span className="text-[10px] font-medium rounded-full px-2 py-0.5 bg-signal-red/15 text-signal-red-text">

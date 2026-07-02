@@ -582,6 +582,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     <div className="-m-6 h-[calc(100%+3rem)] flex flex-col bg-page">
       <LeadActionBar
         funnelId={funnelId}
+        leadId={currentLead.id}
         companyName={currentLead.company}
         companyDomain={currentDomain}
         campaignName={funnel.name}
