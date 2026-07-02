@@ -158,7 +158,7 @@ export function SmsThreadDrawer({
               value={fromLineId}
               onChange={(e) => setFromLineId(e.target.value)}
               disabled={lines.length === 0}
-              className="w-full appearance-none bg-section border border-border-subtle rounded-full pl-3 pr-7 py-1.5 text-[11px] font-medium text-ink-secondary focus:outline-none focus:border-signal-blue-text/40 transition-colors disabled:opacity-50 truncate"
+              className="w-full rounded-full pl-3 pr-8 py-1.5 text-[11px] font-medium text-ink-secondary focus:border-signal-blue-text/40 truncate"
             >
               {lines.length === 0 && <option value="">No active numbers</option>}
               {lines.map((l) => (
@@ -167,7 +167,6 @@ export function SmsThreadDrawer({
                 </option>
               ))}
             </NativeSelect>
-            <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
           </div>
         </div>
         )}

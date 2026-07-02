@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Loader2, MessageSquare, ArrowUpRight } from "lucide-react";
-import { cn, formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime, formatPhoneNumber } from "@/lib/utils";
 import { getSmsThreads, type SmsThread } from "@/lib/api/sms";
 import { SmsThreadDrawer } from "@/components/sms/sms-thread-drawer";
+import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 
 /** Messages tab — every SMS conversation across the org, newest first, with the
  *  ones awaiting a reply flagged. Clicking a row opens a WhatsApp-style chat. */
@@ -45,13 +47,29 @@ export function MessagesInbox() {
               onClick={() => setActive(t)}
               className="group relative flex items-center gap-3 px-3 py-2.5 border-b border-border-subtle hover:bg-hover/40 transition-colors cursor-pointer"
             >
-              <span className={cn("flex items-center justify-center w-8 h-8 rounded-full shrink-0",
-                t.needsReply ? "bg-signal-green/15 text-signal-green-text" : "bg-section text-ink-muted")}>
-                <MessageSquare size={14} />
-              </span>
+              {/* Company logo when known, message glyph otherwise */}
+              {t.company ? (
+                <span className="relative shrink-0">
+                  <CompanyAvatar name={t.company} domain={t.companyDomain || undefined} size="lg" />
+                  {t.needsReply && (
+                    <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-signal-green-text border-2 border-surface" />
+                  )}
+                </span>
+              ) : (
+                <span className={cn("flex items-center justify-center w-10 h-10 rounded-full shrink-0",
+                  t.needsReply ? "bg-signal-green/15 text-signal-green-text" : "bg-section text-ink-muted")}>
+                  <MessageSquare size={15} />
+                </span>
+              )}
+
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[12.5px] text-ink truncate">{t.contactName || t.phone}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="text-[12.5px] font-medium text-ink truncate">
+                    {t.contactName || formatPhoneNumber(t.phone)}
+                  </span>
+                  {t.contactName && (
+                    <span className="text-[10.5px] text-ink-muted shrink-0">{formatPhoneNumber(t.phone)}</span>
+                  )}
                   {t.needsReply && (
                     <span className="text-[9px] font-medium uppercase tracking-wide rounded-full px-1.5 py-0.5 bg-signal-green/15 text-signal-green-text shrink-0">Reply</span>
                   )}
@@ -60,6 +78,30 @@ export function MessagesInbox() {
                   {t.lastDirection === "inbound" ? "" : "You: "}{t.lastBody || "—"}
                 </div>
               </div>
+
+              {/* Company identity — links to the universal company profile */}
+              {t.company && (
+                <div
+                  className="hidden sm:flex flex-col items-end shrink-0 max-w-[180px] text-right"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {t.masterCompanyId ? (
+                    <Link
+                      href={`/dashboard/companies/${encodeURIComponent(t.masterCompanyId)}`}
+                      className="text-[11px] font-medium text-ink-secondary hover:text-ink hover:underline truncate max-w-full"
+                      title={t.company}
+                    >
+                      {t.company}
+                    </Link>
+                  ) : (
+                    <span className="text-[11px] font-medium text-ink-secondary truncate max-w-full">{t.company}</span>
+                  )}
+                  {t.companyDomain && (
+                    <span className="text-[10px] text-ink-faint truncate max-w-full">{t.companyDomain}</span>
+                  )}
+                </div>
+              )}
+
               <span className="text-[10.5px] text-ink-faint shrink-0 w-16 text-right">{formatRelativeTime(new Date(t.lastAt))}</span>
               {t.leadId && t.funnelId && (
                 <button

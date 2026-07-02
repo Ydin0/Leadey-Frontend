@@ -46,6 +46,9 @@ export interface SmsThread {
   funnelId: string | null;
   contactName: string | null;
   company: string | null;
+  companyDomain: string | null;
+  /** Canonical company id — deep-links to the universal company profile. */
+  masterCompanyId: string | null;
   lastBody: string;
   lastDirection: "inbound" | "outbound";
   lastAt: string;

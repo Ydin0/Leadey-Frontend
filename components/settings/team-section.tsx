@@ -314,23 +314,21 @@ export function TeamSection() {
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Department dropdown */}
+                {/* Department dropdown — NativeSelect renders its own chevron,
+                    so no overlay icon here (it doubled up). */}
                 {departments.length > 0 && (
-                  <div className="relative flex items-center">
-                    <NativeSelect
-                      value={deptByEmail[(member.email || "").toLowerCase()] || ""}
-                      onChange={(e) => handleDeptChange(member.email, e.target.value)}
-                      disabled={savingDept === (member.email || "").toLowerCase()}
-                      className="appearance-none pl-2.5 pr-6 py-1 rounded-[8px] text-[11px] font-medium bg-section border border-border-subtle text-ink-secondary hover:bg-hover transition-colors focus:outline-none disabled:opacity-50"
-                      title="Department"
-                    >
-                      <option value="">No department</option>
-                      {departments.map((d) => (
-                        <option key={d.name} value={d.name}>{d.name}</option>
-                      ))}
-                    </NativeSelect>
-                    <ChevronDown size={10} className="absolute right-2 pointer-events-none text-ink-muted" />
-                  </div>
+                  <NativeSelect
+                    value={deptByEmail[(member.email || "").toLowerCase()] || ""}
+                    onChange={(e) => handleDeptChange(member.email, e.target.value)}
+                    disabled={savingDept === (member.email || "").toLowerCase()}
+                    className="w-auto pl-2.5 pr-8 py-1 rounded-[8px] text-[11px] font-medium text-ink-secondary hover:bg-hover"
+                    title="Department"
+                  >
+                    <option value="">No department</option>
+                    {departments.map((d) => (
+                      <option key={d.name} value={d.name}>{d.name}</option>
+                    ))}
+                  </NativeSelect>
                 )}
 
                 {/* Role dropdown */}

@@ -158,7 +158,7 @@ export function EmailComposerDrawer({
               <NativeSelect
                 value={fromId}
                 onChange={(e) => setFromId(e.target.value)}
-                className="w-full appearance-none bg-section border border-border-subtle rounded-[8px] pl-3 pr-8 py-2 text-[12px] text-ink focus:outline-none focus:border-border-default"
+                className="w-full rounded-[8px] pl-3 pr-8 py-2 text-[12px] text-ink focus:border-border-default"
               >
                 {accounts.length === 0 && <option value="">No account connected</option>}
                 {accounts.map((a) => (
@@ -167,7 +167,6 @@ export function EmailComposerDrawer({
                   </option>
                 ))}
               </NativeSelect>
-              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-muted pointer-events-none" />
             </div>
             {accounts.length === 0 && (
               <p className="text-[10px] text-signal-red-text mt-1">
