@@ -318,6 +318,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       if (stoppedRef.current) return; // session ended — never place a call
       if (call.activeCall || call.incomingCall) return; // busy or a call is ringing in
       if (item.lead?.doNotCall && !confirmDncCall(item.lead?.name)) return;
+      dialAsapRef.current = false; // this dial satisfies any pending dial-asap
       setCountdown(null);
       setSteppedBack(false); // placing a call clears the "viewing previous" state
       holdNavRef.current = false; // dialing the next lead releases the follow hold
@@ -360,9 +361,31 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
   );
   dialItemRef.current = dialItem;
 
+  // "Dial the next lead the moment the queue advances" — set when the rep
+  // clicks Next Call while the post-call advance is still in flight, consumed
+  // right after refresh lands. Without this, the click used to fall through to
+  // dialItem(currentItem) while currentItem was STILL the lead just called,
+  // re-dialing the same person ("it calls the person I just spoke to").
+  const dialAsapRef = useRef(false);
+
   const startNext = useCallback(() => {
+    // The queue is mid-advance (disposition + next-pick on the server) —
+    // remember the intent and dial the NEW current as soon as it lands.
+    if (advancing) {
+      dialAsapRef.current = true;
+      return;
+    }
+    // This lead was already called and the queue hasn't moved yet (advance
+    // failed, or never fired). "Next" must advance forward — never re-dial.
+    // Explicit re-dials still work: stepping Back sets steppedBack, and the
+    // Call-now click then bypasses this guard.
+    if (currentItem && currentItem.id === lastDialedItemIdRef.current && !steppedBack) {
+      dialAsapRef.current = true;
+      void advanceRef.current();
+      return;
+    }
     dialItem(currentItem);
-  }, [dialItem, currentItem]);
+  }, [dialItem, currentItem, advancing, steppedBack]);
 
   const advance = useCallback(async () => {
     if (!session) return;
@@ -371,10 +394,19 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     try {
       const callRecordId = call.lastEndedCall?.callRecordId || undefined;
       await advanceSession(session.id, { callRecordId });
-      await refresh(session.id);
+      const snapshot = await refresh(session.id);
+      // A "Next Call" click landed while this advance was in flight — dial the
+      // freshly-loaded lead immediately instead of making the rep wait out the
+      // countdown (or worse, letting the click re-dial the previous lead).
+      if (dialAsapRef.current) {
+        dialAsapRef.current = false;
+        void dialItemRef.current(snapshot.current);
+      }
     } catch {
       // Network blip on the POST — re-read to reconcile rather than stick a
-      // raw "Failed to fetch" banner (the advance may have applied).
+      // raw "Failed to fetch" banner (the advance may have applied). Drop any
+      // pending dial-asap: never auto-dial off an unconfirmed queue state.
+      dialAsapRef.current = false;
       await reconcile(session.id);
     } finally {
       setAdvancing(false);
@@ -436,6 +468,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     if (!session) return;
     modeRef.current = "paused"; // synchronous gate — blocks any in-flight tick
     setMode("paused");
+    dialAsapRef.current = false; // a pending Next-Call dial must not fire while paused
     stopCountdown(); // kill the live interval now, not just the displayed number
     if (hangUp && call.activeCall) call.endCall();
     try {
@@ -477,6 +510,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     //  • clear session state so the bar disappears and canAutoDial goes false
     stoppedRef.current = true;
     modeRef.current = "paused";
+    dialAsapRef.current = false;
     stopCountdown();
     if (call.activeCall) call.endCall();
     setSession(null);
