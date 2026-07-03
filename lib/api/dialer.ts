@@ -152,14 +152,20 @@ export async function advanceSession(
   });
 }
 
-/** Tell the server a dial was actually PLACED for this queue item (and, via
- *  the 60s heartbeat, that the call is still live). Refreshes the claim and
- *  the person-level lastCalledAt so other reps can't reach this person
- *  mid-call. Fire-and-forget from callers. */
-export async function dialStarted(sessionId: string, itemId: string): Promise<void> {
-  await apiRequest(`/dialer/sessions/${sessionId}/dial-started`, {
+/** Dial-time signal for a queue item. stage="preflight" (sent BEFORE placing
+ *  the call) re-validates the lead server-side — if another rep called or is
+ *  live on this person since we claimed them, the server skips the item and
+ *  returns blocked:true so the dialer advances instead of double-calling.
+ *  stage="heartbeat" (every 60s during a live call) just refreshes the claim.
+ *  Both also bump person-level lastCalledAt / claimedAt on success. */
+export async function dialStarted(
+  sessionId: string,
+  itemId: string,
+  stage?: "preflight" | "heartbeat",
+): Promise<{ ok: boolean; blocked?: boolean; reason?: string }> {
+  return apiRequest(`/dialer/sessions/${sessionId}/dial-started`, {
     method: "POST",
-    body: JSON.stringify({ itemId }),
+    body: JSON.stringify({ itemId, stage }),
   });
 }
 

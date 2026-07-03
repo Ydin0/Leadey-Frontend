@@ -323,6 +323,35 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       setSteppedBack(false); // placing a call clears the "viewing previous" state
       holdNavRef.current = false; // dialing the next lead releases the follow hold
 
+      // DIAL-TIME server re-validation. Every other guard runs at PICK time —
+      // an item a rep sits on as `current` is never re-vetted, its claim
+      // expires after 3 min, another rep can legitimately take and call the
+      // person, and dialing the stale current would ring them again minutes
+      // later. Preflight blocks that: the server skips the item and we
+      // advance. It also refreshes our claim + person-level lastCalledAt
+      // before the ring. Fail-open on network errors — the pick-time guards
+      // still hold and dialing must never brick on a blip.
+      let preflight: { ok: boolean; blocked?: boolean } = { ok: true };
+      try {
+        preflight = await dialStarted(item.sessionId, item.id, "preflight");
+      } catch {
+        /* older backend or network blip — proceed */
+      }
+      if (stoppedRef.current) return; // rep ended the session mid-preflight
+      if (preflight?.blocked) {
+        // Another rep reached this person since we claimed them. The server
+        // marked the item skipped — load the new current and keep rolling.
+        if (session) {
+          try {
+            const snapshot = await refresh(session.id);
+            void dialItemRef.current(snapshot.current);
+          } catch {
+            await reconcile(session.id);
+          }
+        }
+        return;
+      }
+
       // Follow mode: switch the main screen to the lead being dialled NOW.
       // Never gate this on the dial succeeding — a silently-suppressed dial
       // used to strand the page on the PREVIOUS lead while the queue and the
@@ -342,10 +371,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
 
       if (attempted) {
         lastDialedItemIdRef.current = item.id;
-        // Fire-and-forget: stamp the dial server-side (claim refresh + person-
-        // level lastCalledAt) so other reps can't be served this person while
-        // we're ringing them. Never block or fail the dial on it.
-        void dialStarted(item.sessionId, item.id).catch(() => {});
+        // Claim + lastCalledAt were already stamped by the preflight above.
       } else if (!isRetry) {
         // The dial was suppressed (the previous call's ended state lingering,
         // device re-registering, spam guard). Previously this ALSO marked the
@@ -357,7 +383,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
         }, 1500);
       }
     },
-    [call, followMode, session?.funnelId, navigateToLead],
+    [call, followMode, session, navigateToLead, refresh, reconcile],
   );
   dialItemRef.current = dialItem;
 
@@ -636,7 +662,7 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     if (!heartbeatItem) return;
     const { sessionId, itemId } = heartbeatItem;
     const t = setInterval(() => {
-      void dialStarted(sessionId, itemId).catch(() => {});
+      void dialStarted(sessionId, itemId, "heartbeat").catch(() => {});
     }, HEARTBEAT_MS);
     return () => clearInterval(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
