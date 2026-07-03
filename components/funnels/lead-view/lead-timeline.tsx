@@ -40,9 +40,18 @@ import { getStatusDotClass, getStatusLabel, type LeadStatusOption } from "@/lib/
 import type { FunnelLeadActivity, ActivityTransition } from "@/lib/types/funnel-focus";
 import type { CallRecord } from "@/lib/types/calling";
 import type { LeadEmailMessage } from "@/lib/api/email";
-import type { TimelineItemMeta } from "@/lib/utils/company-timeline";
 import { EmailActivityCard, type EmailReplyMode } from "./email-activity-card";
 import { LeadDocumentsPanel } from "./lead-documents-panel";
+
+/** Per-item campaign/contact attribution (was used by the removed universal
+ *  company timeline; kept for the additive itemMeta prop API). */
+export interface TimelineItemMeta {
+  funnelId: string | null;
+  funnelName: string | null;
+  leadId: string | null;
+  contactId: string | null;
+  contactName: string | null;
+}
 
 /** Who performed an activity — resolved to a display name + a stable id for
  *  the avatar colour. */
