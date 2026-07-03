@@ -2,8 +2,9 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { CircleCheck, Plus, Check, X, Calendar, ChevronDown, User } from "lucide-react";
+import { CircleCheck, Plus, Check, X, ChevronDown, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DateTimePicker } from "@/components/shared/date-time-picker";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { usePermissions } from "@/lib/hooks/use-permissions";
 import { getTeamMembers } from "@/lib/api/team";
@@ -276,15 +277,12 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
               className="w-full bg-transparent text-[12px] text-ink placeholder:text-ink-faint focus:outline-none"
             />
             <div className="flex items-center gap-2 flex-wrap">
-              <label className="flex items-center gap-1.5 text-ink-faint cursor-pointer">
-                <Calendar size={12} />
-                <input
-                  type="datetime-local"
-                  value={due}
-                  onChange={(e) => setDue(e.target.value)}
-                  className="bg-transparent text-[11px] text-ink-secondary focus:outline-none"
-                />
-              </label>
+              {/* Leadey-styled picker — never the browser-default calendar. */}
+              <DateTimePicker
+                value={due || null}
+                onChange={(iso) => setDue(iso ?? "")}
+                placeholder="Due date"
+              />
               {isManager && members.length > 0 && (
                 <AssigneePicker
                   members={members}

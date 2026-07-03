@@ -141,8 +141,11 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     (id: string | null) => {
       if (!id || id === leadId || navLockRef.current) return;
       navLockRef.current = true;
-      // scroll:false keeps the viewport steady so prev/next feels instant.
-      router.push(`/dashboard/funnels/${funnelId}/leads/${id}`, { scroll: false });
+      // Preserve the query (?from=opportunities keeps the back button pointed
+      // at the pipeline across prev/next). scroll:false keeps the viewport
+      // steady so prev/next feels instant.
+      const search = typeof window !== "undefined" ? window.location.search : "";
+      router.push(`/dashboard/funnels/${funnelId}/leads/${id}${search}`, { scroll: false });
     },
     [router, funnelId, leadId],
   );

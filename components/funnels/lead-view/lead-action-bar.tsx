@@ -84,15 +84,28 @@ export function LeadActionBar({
     return () => document.removeEventListener("mousedown", onClick);
   }, [open]);
 
+  // When the rep arrived from the opportunities pipeline (?from=opportunities,
+  // set by the board card / list row links), back returns THERE — not to the
+  // lead's campaign. Read post-mount (not during render) so SSR and hydration
+  // agree; the param survives prev/next because goToLeadId preserves the search.
+  const [backTarget, setBackTarget] = useState<string | null>(null);
+  useEffect(() => {
+    setBackTarget(new URLSearchParams(window.location.search).get("from"));
+  }, []);
+  const back =
+    backTarget === "opportunities"
+      ? { href: "/dashboard/opportunities", label: "Back to Opportunities" }
+      : { href: `/dashboard/funnels/${funnelId}`, label: `Back to ${campaignName}` };
+
   return (
     <div className="border-b border-border-subtle">
       <div className="px-6 pt-4">
         <Link
-          href={`/dashboard/funnels/${funnelId}`}
+          href={back.href}
           className="inline-flex items-center gap-1 text-[11px] text-ink-muted hover:text-ink transition-colors"
         >
           <ArrowLeft size={13} strokeWidth={1.5} />
-          Back to {campaignName}
+          {back.label}
         </Link>
       </div>
 
