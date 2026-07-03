@@ -36,7 +36,10 @@ function ColorPicker({ value, onChange }: { value: CampaignTagColor; onChange: (
         <ChevronDown size={11} className="text-ink-faint" />
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 grid grid-cols-4 gap-1.5 bg-surface rounded-[10px] border border-border-subtle shadow-lg p-2">
+        {/* Fixed 24px columns — grid-cols-4's minmax(0,1fr) tracks collapse to
+            zero width inside an absolutely-positioned shrink-to-fit popover,
+            piling every swatch on top of each other. */}
+        <div className="absolute left-0 top-full mt-1 z-50 grid grid-cols-[repeat(4,24px)] gap-1.5 bg-surface rounded-[10px] border border-border-subtle shadow-lg p-2">
           {TAG_COLOR_ORDER.map((c) => (
             <button
               key={c}
