@@ -23,6 +23,7 @@ import {
   endSession,
   getVoicemailDrops,
   dropVoicemail,
+  dialStarted,
   subscribeToCallEvents,
 } from "@/lib/api/dialer";
 import type {
@@ -340,6 +341,10 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
 
       if (attempted) {
         lastDialedItemIdRef.current = item.id;
+        // Fire-and-forget: stamp the dial server-side (claim refresh + person-
+        // level lastCalledAt) so other reps can't be served this person while
+        // we're ringing them. Never block or fail the dial on it.
+        void dialStarted(item.sessionId, item.id).catch(() => {});
       } else if (!isRetry) {
         // The dial was suppressed (the previous call's ended state lingering,
         // device re-registering, spam guard). Previously this ALSO marked the
@@ -570,6 +575,38 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     prevStateRef.current = state;
     prevDirectionRef.current = direction;
   }, [call.activeCall?.state, call.activeCall?.direction]);
+
+  // ── Claim heartbeat: keep the lead reserved for the true call duration ──
+  // The server claim (CLAIM_TTL = 3 min) is stamped at pick time; countdown +
+  // ring + a real conversation routinely outlast it, at which point the lead
+  // used to drop out of other reps' collision set MID-CALL ("I'm reaching
+  // leads called 1 minute ago"). While OUR outbound call to the current item
+  // is live, re-stamp the claim every 60s (3× margin inside the TTL).
+  // Intentionally NOT gated on session.status === "active": pausing mid-call
+  // keeps the call connected and the rep still owns the lead (the server's
+  // collision set counts paused sessions too). Stops at hangup — the claim
+  // then expires 3 min later, by which time the call record + the completed
+  // queue item carry the recency signal.
+  const HEARTBEAT_MS = 60_000;
+  const callLive =
+    call.activeCall?.direction === "outbound" &&
+    (call.activeCall?.state === "ringing" || call.activeCall?.state === "connected");
+  const heartbeatItem =
+    callLive &&
+    currentItem &&
+    currentItem.id === lastDialedItemIdRef.current &&
+    (currentItem.status === "in_progress" || currentItem.status === "awaiting_disposition")
+      ? { sessionId: currentItem.sessionId, itemId: currentItem.id }
+      : null;
+  useEffect(() => {
+    if (!heartbeatItem) return;
+    const { sessionId, itemId } = heartbeatItem;
+    const t = setInterval(() => {
+      void dialStarted(sessionId, itemId).catch(() => {});
+    }, HEARTBEAT_MS);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heartbeatItem?.sessionId, heartbeatItem?.itemId]);
 
   // ── Countdown engine: auto-dial the current lead ─────────────────
   const startNextRef = useRef(startNext);

@@ -152,6 +152,17 @@ export async function advanceSession(
   });
 }
 
+/** Tell the server a dial was actually PLACED for this queue item (and, via
+ *  the 60s heartbeat, that the call is still live). Refreshes the claim and
+ *  the person-level lastCalledAt so other reps can't reach this person
+ *  mid-call. Fire-and-forget from callers. */
+export async function dialStarted(sessionId: string, itemId: string): Promise<void> {
+  await apiRequest(`/dialer/sessions/${sessionId}/dial-started`, {
+    method: "POST",
+    body: JSON.stringify({ itemId }),
+  });
+}
+
 export async function skipSession(
   id: string,
   reason?: string,
