@@ -8,11 +8,13 @@ import {
   GitFork, Phone, Mail, Linkedin, MessageSquare, ArrowRight, X, SearchX, CheckSquare,
 } from "lucide-react";
 import { MemberAvatar } from "@/components/shared/member-avatar";
+import { TagPillsRow, TagAssignMenu, TAG_COLOR_META } from "@/components/shared/campaign-tag";
 import { useFunnels } from "@/lib/queries/use-funnels";
 import { usePrefetchFunnel } from "@/lib/queries/use-prefetch";
+import { useCampaignTagsQuery } from "@/lib/queries/use-org-config";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { cn } from "@/lib/utils";
-import type { Funnel, FunnelChannel, FunnelStatus } from "@/lib/types/funnel";
+import type { Funnel, FunnelChannel, FunnelStatus, CampaignTagWithCount } from "@/lib/types/funnel";
 
 // ── Channel + status presentation ────────────────────────────────────────────
 const STEP_META: Record<FunnelChannel, { icon: typeof Mail; color: string }> = {
@@ -136,11 +138,15 @@ export default function FunnelsPage() {
     : null;
   const { members: allMembers, resolveMember } = useTeamMembers();
 
+  // Org tag universe (settings-managed, 5-min cache).
+  const { data: orgTags } = useCampaignTagsQuery();
+
   // Filter state
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<FunnelStatus | "all">("all");
   const [channels, setChannels] = useState<FunnelChannel[]>([]);
   const [reps, setReps] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [sort, setSort] = useState<SortKey>("recent");
   const [sortOpen, setSortOpen] = useState(false);
   const [view, setView] = useState<"list" | "grid">("list");
@@ -196,9 +202,10 @@ export default function FunnelsPage() {
       const fChannels = channelsOf(f);
       const matchChannel = channels.length === 0 || channels.some((c) => fChannels.includes(c));
       const matchRep = reps.length === 0 || reps.some((id) => f.members.some((m) => m.teamMemberId === id));
-      return matchSearch && matchChannel && matchRep;
+      const matchTag = tagFilter.length === 0 || tagFilter.some((id) => f.tags.some((t) => t.id === id));
+      return matchSearch && matchChannel && matchRep && matchTag;
     });
-  }, [funnels, search, channels, reps]);
+  }, [funnels, search, channels, reps, tagFilter]);
 
   const statusCount = (id: FunnelStatus | "all") =>
     id === "all" ? baseFiltered.length : baseFiltered.filter((f) => f.status === id).length;
@@ -218,13 +225,16 @@ export default function FunnelsPage() {
     setChannels((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   const toggleRep = (id: string) =>
     setReps((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
-  const clearAll = () => { setSearch(""); setStatus("all"); setChannels([]); setReps([]); };
+  const toggleTagFilter = (id: string) =>
+    setTagFilter((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const clearAll = () => { setSearch(""); setStatus("all"); setChannels([]); setReps([]); setTagFilter([]); };
 
   // Active filter chips
   const chips: { key: string; label: string; onRemove: () => void }[] = [];
   if (status !== "all") chips.push({ key: "status", label: STATUS_META[status].label, onRemove: () => setStatus("all") });
   channels.forEach((c) => chips.push({ key: `ch-${c}`, label: CHANNEL_DEFS.find((d) => d.id === c)?.label ?? c, onRemove: () => toggleChannel(c) }));
   reps.forEach((id) => chips.push({ key: `rep-${id}`, label: repUniverse.find((r) => r.id === id)?.name ?? "Rep", onRemove: () => toggleRep(id) }));
+  tagFilter.forEach((id) => chips.push({ key: `tag-${id}`, label: orgTags?.find((t) => t.id === id)?.name ?? "Tag", onRemove: () => toggleTagFilter(id) }));
   if (search.trim()) chips.push({ key: "q", label: `“${search.trim()}”`, onRemove: () => setSearch("") });
 
   const resultText = visible.length === funnels.length
@@ -368,6 +378,19 @@ export default function FunnelsPage() {
               <RepFilterDropdown reps={reps} universe={repUniverse} onToggle={toggleRep} onClear={() => setReps([])} />
             </>
           )}
+
+          {(orgTags?.length ?? 0) > 0 && (
+            <>
+              <div className="w-px h-[22px] bg-border-subtle" />
+              <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium whitespace-nowrap">Tags</span>
+              <TagFilterDropdown
+                selected={tagFilter}
+                universe={orgTags ?? []}
+                onToggle={toggleTagFilter}
+                onClear={() => setTagFilter([])}
+              />
+            </>
+          )}
         </div>
       </div>
 
@@ -469,6 +492,7 @@ export default function FunnelsPage() {
                       <StatusBadge status={f.status} />
                     </div>
                     <div className="text-[12px] text-ink-muted truncate mt-0.5">{f.description}</div>
+                    <TagPillsRow tags={f.tags} max={3} className="mt-1" />
                   </div>
                 </div>
 
@@ -495,6 +519,11 @@ export default function FunnelsPage() {
 
                 {/* Assigned */}
                 <div className="flex items-center justify-end gap-2">
+                  <TagAssignMenu
+                    funnelId={f.id}
+                    tags={f.tags}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                  />
                   <Facepile reps={fReps} />
                   <ArrowRight size={15} className="text-ink-muted opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
                 </div>
@@ -530,6 +559,8 @@ export default function FunnelsPage() {
                   <StatusBadge status={f.status} />
                 </div>
 
+                {f.tags.length > 0 && <TagPillsRow tags={f.tags} max={4} className="mt-2.5" />}
+
                 <div className="mt-3.5">
                   <StepFlow funnel={f} gap={9} />
                 </div>
@@ -558,6 +589,7 @@ export default function FunnelsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <TagAssignMenu funnelId={f.id} tags={f.tags} />
                     <span className="text-[9px] uppercase tracking-wider text-ink-muted font-medium">Team</span>
                     <Facepile reps={fReps} size="sm" />
                   </div>
@@ -565,6 +597,103 @@ export default function FunnelsPage() {
               </Link>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Multi-select for the tag filter — mirrors RepFilterDropdown, with the
+ *  tag's color dot in place of the avatar and its campaign count. */
+function TagFilterDropdown({ selected, universe, onToggle, onClear }: {
+  selected: string[];
+  universe: CampaignTagWithCount[];
+  onToggle: (id: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDoc(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => { document.removeEventListener("mousedown", onDoc); document.removeEventListener("keydown", onKey); };
+  }, [open]);
+
+  const selectedSet = new Set(selected);
+  const label =
+    selected.length === 0 ? "All tags"
+    : selected.length === 1 ? (universe.find((t) => t.id === selected[0])?.name ?? "1 tag")
+    : `${selected.length} tags`;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-full pl-3 pr-2 py-1.5 border text-[12px] font-medium transition-colors",
+          selected.length > 0
+            ? "bg-section border-border-default text-ink"
+            : "bg-transparent border-border-subtle text-ink-secondary hover:border-border-default",
+        )}
+      >
+        <span className="max-w-[160px] truncate">{label}</span>
+        {selected.length > 0 && (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onClear(); }}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.stopPropagation(); onClear(); } }}
+            className="-mr-0.5 p-0.5 rounded-full hover:bg-hover"
+            title="Clear tag filter"
+          >
+            <X size={11} />
+          </span>
+        )}
+        <ChevronDown size={13} className={cn("text-ink-muted transition-transform", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1.5 z-30 w-[240px] bg-surface rounded-[12px] border border-border-subtle shadow-lg overflow-hidden">
+          <div className="max-h-[300px] overflow-y-auto py-1">
+            {universe.map((t) => {
+              const checked = selectedSet.has(t.id);
+              const meta = TAG_COLOR_META[t.color] ?? TAG_COLOR_META.blue;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => onToggle(t.id)}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 hover:bg-hover transition-colors text-left"
+                >
+                  <span className={cn(
+                    "w-4 h-4 rounded-[5px] border flex items-center justify-center shrink-0 transition-colors",
+                    checked ? "bg-signal-blue-text border-signal-blue-text" : "border-border-default bg-section",
+                  )}>
+                    {checked && <Check size={11} className="text-on-ink" strokeWidth={3} />}
+                  </span>
+                  <span className={cn("w-2 h-2 rounded-full shrink-0", meta.dot)} />
+                  <span className="text-[12px] text-ink truncate flex-1">{t.name}</span>
+                  <span className="text-[10.5px] text-ink-faint shrink-0">{t.campaignCount}</span>
+                </button>
+              );
+            })}
+          </div>
+          {selected.length > 0 && (
+            <div className="p-2 border-t border-border-subtle">
+              <button
+                type="button"
+                onClick={onClear}
+                className="w-full text-[11px] font-medium text-ink-muted hover:text-ink-secondary py-1 transition-colors"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

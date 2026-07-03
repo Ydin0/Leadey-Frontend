@@ -14,6 +14,7 @@ export const mockFunnels: Funnel[] = [
     name: "UK SaaS Q1",
     description: "Multi-touch outbound for UK SaaS decision makers in Q1",
     status: "active",
+    tags: [],
     members: [
       { teamMemberId: "tm_001", role: "owner", addedAt: daysAgo(28) },
       { teamMemberId: "tm_002", role: "contributor", addedAt: daysAgo(25) },
@@ -74,6 +75,7 @@ export const mockFunnels: Funnel[] = [
     name: "Startup MVP",
     description: "Lightweight outreach for early-stage startups exploring outbound",
     status: "active",
+    tags: [],
     members: [
       { teamMemberId: "tm_001", role: "owner", addedAt: daysAgo(14) },
       { teamMemberId: "tm_003", role: "contributor", addedAt: daysAgo(10) },
@@ -126,6 +128,7 @@ export const mockFunnels: Funnel[] = [
     name: "Conference Follow-Up",
     description: "Post-event nurture sequence for SaaStr Annual attendees",
     status: "paused",
+    tags: [],
     members: [
       { teamMemberId: "tm_002", role: "owner", addedAt: daysAgo(42) },
       { teamMemberId: "tm_001", role: "viewer", addedAt: daysAgo(40) },
@@ -170,6 +173,7 @@ export const mockFunnels: Funnel[] = [
     name: "DevOps Hiring",
     description: "Target companies actively hiring DevOps and platform engineers",
     status: "draft",
+    tags: [],
     members: [
       { teamMemberId: "tm_001", role: "owner", addedAt: daysAgo(2) },
     ],

@@ -8,6 +8,7 @@ import { TeamSection } from "./team-section";
 import { ProfileSection } from "./profile-section";
 import { OrganizationSection } from "./organization-section";
 import { LeadStatusesSection } from "./lead-statuses-section";
+import { CampaignTagsSection } from "./campaign-tags-section";
 import { TaskCategoriesSection } from "./task-categories-section";
 import { CustomFieldsSection } from "./custom-fields-section";
 import { ApiKeysSection } from "./api-keys-section";
@@ -53,6 +54,7 @@ type SettingsTab =
   | "organization"
   | "team"
   | "lead-statuses"
+  | "campaign-tags"
   | "task-categories"
   | "custom-fields"
   | "phone-lines"
@@ -73,6 +75,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "organization", label: "Organization", icon: Building2 },
   { id: "team", label: "Team", icon: Users },
   { id: "lead-statuses", label: "Lead Statuses", icon: Tags },
+  { id: "campaign-tags", label: "Campaign Tags", icon: Tags },
   { id: "task-categories", label: "Task Categories", icon: ListChecks },
   { id: "custom-fields", label: "Custom Fields", icon: ListPlus },
   { id: "phone-lines", label: "Phone Lines", icon: Phone },
@@ -194,6 +197,7 @@ const VALID_TABS: SettingsTab[] = [
   "organization",
   "team",
   "lead-statuses",
+  "campaign-tags",
   "task-categories",
   "custom-fields",
   "phone-lines",
@@ -324,6 +328,7 @@ export function SettingsShell() {
           )}
 
           {activeTab === "lead-statuses" && <LeadStatusesSection />}
+          {activeTab === "campaign-tags" && <CampaignTagsSection />}
           {activeTab === "task-categories" && <TaskCategoriesSection />}
 
           {activeTab === "custom-fields" && <CustomFieldsSection />}

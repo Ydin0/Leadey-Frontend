@@ -7,12 +7,29 @@ import type {
   LeadStatus,
   FunnelStatus,
   FunnelStep,
+  CampaignTag,
+  CampaignTagColor,
   CampaignVisibility,
   CampaignAudience,
   CampaignExitConditions,
   CampaignEmailAutomation,
 } from "@/lib/types/funnel";
 import { apiRequest } from "./client";
+
+const TAG_COLOR_KEYS: CampaignTagColor[] = ["blue", "green", "red", "slate", "amber", "violet", "pink", "cyan"];
+
+/** Hydrate a server tags array — unknown colors fall back to blue so a
+ *  future palette addition can never break old clients. */
+export function hydrateCampaignTags(raw: unknown): CampaignTag[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((t: any) => t && typeof t.id === "string" && typeof t.name === "string")
+    .map((t: any) => ({
+      id: t.id,
+      name: t.name,
+      color: TAG_COLOR_KEYS.includes(t.color) ? (t.color as CampaignTagColor) : "blue",
+    }));
+}
 
 type ApiFunnelLead = Omit<FunnelLead, "nextDate"> & {
   nextDate: string;
@@ -216,6 +233,7 @@ function hydrateFunnel(raw: ApiFunnel): Funnel {
           addedAt: parseDate(m.addedAt),
         }))
       : [],
+    tags: hydrateCampaignTags((raw as any).tags),
     webhookToken: (raw as any).webhookToken ?? null,
     webhookEnabled: !!(raw as any).webhookEnabled,
     webhookFieldMap:

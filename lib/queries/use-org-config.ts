@@ -6,6 +6,7 @@ import { listCustomFields } from "@/lib/api/custom-fields";
 import { getLeadStatuses } from "@/lib/api/lead-statuses";
 import { getCallOutcomes } from "@/lib/api/call-outcomes";
 import { listPipelines } from "@/lib/api/opportunities";
+import { getCampaignTags } from "@/lib/api/campaign-tags";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { qk } from "./keys";
 import { STALE } from "./config";
@@ -61,6 +62,16 @@ export function usePipelinesQuery(opts?: { enabled?: boolean }) {
   return useQuery({
     queryKey: qk.pipelines,
     queryFn: listPipelines,
+    staleTime: STALE.ORG_CONFIG,
+    enabled: isAuthReady && (opts?.enabled ?? true),
+  });
+}
+
+export function useCampaignTagsQuery(opts?: { enabled?: boolean }) {
+  const isAuthReady = useAuthReady();
+  return useQuery({
+    queryKey: qk.campaignTags,
+    queryFn: getCampaignTags,
     staleTime: STALE.ORG_CONFIG,
     enabled: isAuthReady && (opts?.enabled ?? true),
   });

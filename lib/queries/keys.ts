@@ -13,4 +13,5 @@ export const qk = {
   leadStatuses: ["lead-statuses"] as const,
   callOutcomes: ["call-outcomes"] as const,
   pipelines: ["pipelines"] as const,
+  campaignTags: ["campaign-tags"] as const,
 };

@@ -47,6 +47,17 @@
   --color-signal-slate: rgba(151, 164, 214, 0.12);
   --color-signal-slate-text: #6B7299;
 
+  /* Extended tag palette — same soft-fill + solid-text convention, used by
+     campaign tags (and available anywhere a wider hue range is needed). */
+  --color-signal-amber: rgba(245, 158, 11, 0.16);
+  --color-signal-amber-text: #C77414;
+  --color-signal-violet: rgba(139, 92, 246, 0.14);
+  --color-signal-violet-text: #7C3AED;
+  --color-signal-pink: rgba(236, 72, 153, 0.14);
+  --color-signal-pink-text: #DB2777;
+  --color-signal-cyan: rgba(6, 182, 212, 0.14);
+  --color-signal-cyan-text: #0891B2;
+
   --color-linkedin: #0A66C2;
 
   /* Typography tokens (referenced by Tailwind utilities + body) */
@@ -97,6 +108,15 @@
   --color-signal-red-text: #FCA5A5;
   --color-signal-slate: rgba(151, 164, 214, 0.12);
   --color-signal-slate-text: #97A4D6;
+
+  --color-signal-amber: rgba(251, 191, 36, 0.18);
+  --color-signal-amber-text: #FCD34D;
+  --color-signal-violet: rgba(167, 139, 250, 0.18);
+  --color-signal-violet-text: #C4B5FD;
+  --color-signal-pink: rgba(244, 114, 182, 0.18);
+  --color-signal-pink-text: #F9A8D4;
+  --color-signal-cyan: rgba(34, 211, 238, 0.18);
+  --color-signal-cyan-text: #67E8F9;
 
   --color-linkedin: #97A4D6;
 }

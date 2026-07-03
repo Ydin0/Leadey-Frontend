@@ -210,6 +210,31 @@ export interface FunnelMember {
   addedAt: Date;
 }
 
+/** Named palette key for campaign tags — rendered theme-aware via the
+ *  signal token pairs (bg-signal-X / text-signal-X-text). */
+export type CampaignTagColor =
+  | "blue"
+  | "green"
+  | "red"
+  | "slate"
+  | "amber"
+  | "violet"
+  | "pink"
+  | "cyan";
+
+/** A tag as it appears ON a campaign. */
+export interface CampaignTag {
+  id: string;
+  name: string;
+  color: CampaignTagColor;
+}
+
+/** A tag row in the org-level manager (settings). */
+export interface CampaignTagWithCount extends CampaignTag {
+  sortOrder: number;
+  campaignCount: number;
+}
+
 export interface Funnel {
   id: string;
   name: string;
@@ -224,6 +249,8 @@ export interface Funnel {
   cockpit: FunnelCockpit;
   analyticsSteps: FunnelAnalyticsStep[];
   members: FunnelMember[];
+  /** Org-level colored tags used to organise/filter campaigns. */
+  tags: CampaignTag[];
   /** Inbound lead-ingestion webhook config. */
   webhookToken?: string | null;
   webhookEnabled?: boolean;
