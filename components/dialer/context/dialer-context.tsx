@@ -291,10 +291,28 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
 
   // ── Actions ──────────────────────────────────────────────────────
 
+  const leadPath = useCallback(
+    (leadId: string) =>
+      session?.funnelId
+        ? `/dashboard/funnels/${session.funnelId}/leads/${leadId}`
+        : null,
+    [session?.funnelId],
+  );
+
+  // Navigate the main screen to a lead's profile (no-op if already there).
+  const navigateToLead = useCallback(
+    (leadId: string) => {
+      const p = leadPath(leadId);
+      if (p && pathname !== p) router.push(p);
+    },
+    [leadPath, pathname, router],
+  );
+
   // Dial a specific queue item now. Shared by the countdown engine, the
   // "Call now" button, and nextNow so they all honour the DNC guard.
+  const dialItemRef = useRef<(item: DialerQueueItem | null, isRetry?: boolean) => Promise<void>>(async () => {});
   const dialItem = useCallback(
-    (item: DialerQueueItem | null) => {
+    async (item: DialerQueueItem | null, isRetry = false) => {
       if (!item) return;
       if (stoppedRef.current) return; // session ended — never place a call
       if (call.activeCall || call.incomingCall) return; // busy or a call is ringing in
@@ -302,17 +320,40 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
       setCountdown(null);
       setSteppedBack(false); // placing a call clears the "viewing previous" state
       holdNavRef.current = false; // dialing the next lead releases the follow hold
-      lastDialedItemIdRef.current = item.id;
-      call.startCall(item.leadPhone, {
+
+      // Follow mode: switch the main screen to the lead being dialled NOW.
+      // Never gate this on the dial succeeding — a silently-suppressed dial
+      // used to strand the page on the PREVIOUS lead while the queue and the
+      // dialer bar had already moved on ("the lead isn't changing over").
+      if (followMode && session?.funnelId) {
+        lastNavLeadRef.current = item.leadId;
+        navigateToLead(item.leadId);
+      }
+
+      const attempted = await call.startCall(item.leadPhone, {
         contactName: item.lead?.name || null,
         companyName: item.lead?.company || null,
         leadId: item.leadId || null,
         // Coverage is handled by the dialer's pre-flight; never prompt mid-run.
         viaDialer: true,
       });
+
+      if (attempted) {
+        lastDialedItemIdRef.current = item.id;
+      } else if (!isRetry) {
+        // The dial was suppressed (the previous call's ended state lingering,
+        // device re-registering, spam guard). Previously this ALSO marked the
+        // item as "already dialled", which disabled auto-dial permanently and
+        // wedged the whole session. Retry once shortly — every guard above is
+        // re-checked — and leave the auto-dial gate untouched.
+        setTimeout(() => {
+          void dialItemRef.current(item, true);
+        }, 1500);
+      }
     },
-    [call],
+    [call, followMode, session?.funnelId, navigateToLead],
   );
+  dialItemRef.current = dialItem;
 
   const startNext = useCallback(() => {
     dialItem(currentItem);
@@ -337,6 +378,9 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
 
   const skip = useCallback(async () => {
     if (!session) return;
+    // Skipping is an explicit "move on" — release the post-call follow hold so
+    // the page tracks the new current lead instead of staying on the old one.
+    holdNavRef.current = false;
     try {
       await skipSession(session.id);
       await refresh(session.id);
@@ -450,23 +494,6 @@ export function DialerProvider({ children }: { children: React.ReactNode }) {
     setUpcoming([]);
     setFollowMode(false);
   }, [stopCountdown]);
-
-  const leadPath = useCallback(
-    (leadId: string) =>
-      session?.funnelId
-        ? `/dashboard/funnels/${session.funnelId}/leads/${leadId}`
-        : null,
-    [session?.funnelId],
-  );
-
-  // Navigate the main screen to a lead's profile (no-op if already there).
-  const navigateToLead = useCallback(
-    (leadId: string) => {
-      const p = leadPath(leadId);
-      if (p && pathname !== p) router.push(p);
-    },
-    [leadPath, pathname, router],
-  );
 
   const persistFollow = useCallback((on: boolean) => {
     try {

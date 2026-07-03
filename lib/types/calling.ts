@@ -249,7 +249,10 @@ export interface CallContextValue {
   callHistory: CallRecord[];
   selectedLineId: string | null;
   setSelectedLineId: (id: string | null) => void;
-  startCall: (to: string, meta?: CallMeta) => void;
+  /** Returns true when a dial was actually attempted; false when it was
+   *  suppressed (busy, invalid number, no line, device not ready) so callers
+   *  like the power dialer can retry instead of silently wedging. */
+  startCall: (to: string, meta?: CallMeta, opts?: { skipLocalPresence?: boolean }) => Promise<boolean>;
   endCall: () => void;
   toggleMute: () => void;
   toggleHold: () => void;

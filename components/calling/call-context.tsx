@@ -685,16 +685,19 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
   // ── Start an outbound call ────────────────────
   const startCall = useCallback(
-    async (to: string, meta?: CallMeta, opts?: { skipLocalPresence?: boolean }) => {
-      if (dialingRef.current || activeCall) return; // synchronous spam guard
+    async (to: string, meta?: CallMeta, opts?: { skipLocalPresence?: boolean }): Promise<boolean> => {
+      if (dialingRef.current || activeCall) return false; // synchronous spam guard
       if (!deviceRef.current || !deviceReady) {
         // The device died (failed init / lost registration). Kick a rebuild
         // and TELL the rep — a silent no-op here once read as "calling is
-        // completely broken" org-wide.
+        // completely broken" org-wide. (The dialer handles its own retry, so
+        // don't interrupt a running session with an alert.)
         console.error("[Twilio] Device not ready — reinitializing");
         reinitDeviceRef.current();
-        alert("The phone connection is re-establishing — please try the call again in a few seconds.");
-        return;
+        if (!meta?.viaDialer) {
+          alert("The phone connection is re-establishing — please try the call again in a few seconds.");
+        }
+        return false;
       }
 
       // Sanitise the destination to a dialable E.164-ish number — strip CSV junk
@@ -703,11 +706,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       const cleanTo = (to || "").replace(/[^\d+]/g, "").replace(/(?!^)\+/g, "");
       if (!/^\+?\d{7,15}$/.test(cleanTo)) {
         console.warn("[Twilio] Skipping dial — invalid number:", to);
-        return;
+        return false;
       }
 
       let line = phoneLines.find((l) => l.id === selectedLineId);
-      if (!line) return;
+      if (!line) return false;
 
       // Caller line must match the destination's country, otherwise a rep with
       // (say) both a UK and a US number assigned would randomly dial UK leads
@@ -742,7 +745,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
             // Manual one-off dial to an uncovered state — offer to buy a local
             // number before dialing (the dialer suppresses this via viaDialer).
             setLocalBuyPrompt({ to: cleanTo, meta, stateName: resolved.stateName, areaCode: resolved.areaCode });
-            return;
+            return false;
           }
         } catch {
           /* keep the selected line */
@@ -781,7 +784,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         dialingRef.current = false;
         if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
         console.error("[Twilio] Connect failed:", err);
+        return false;
       }
+      return true;
     },
     [activeCall, deviceReady, phoneLines, selectedLineId, bindCallEvents]
   );

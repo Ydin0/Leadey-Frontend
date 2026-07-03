@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Play, Pause, Loader2, AlertCircle, Sparkles, ListTree, ArrowRight, Wand2 } from "lucide-react";
+import { Play, Pause, Loader2, AlertCircle, Sparkles, ListTree, ArrowRight, Wand2, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { fetchCallRecordingBlobUrl } from "@/lib/api/phone-lines";
 import type { CallRecord } from "@/lib/types/calling";
@@ -48,6 +48,7 @@ export function CallReview({
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const [tab, setTab] = useState<"summary" | "transcript">(summary ? "summary" : "transcript");
+  const [copied, setCopied] = useState(false);
 
   // Stable colour per speaker id.
   const colorById = useMemo(() => {
@@ -62,6 +63,25 @@ export function CallReview({
     speakers.forEach((s) => (map[s.id] = s.name));
     return map;
   }, [speakers]);
+
+  // One-click transcript export: diarized segments become
+  // "[m:ss] Speaker: text" lines; legacy records copy the plain transcript.
+  const copyTranscript = useCallback(async () => {
+    const text =
+      segments.length > 0
+        ? segments
+            .map((seg) => `[${fmt(seg.start)}] ${nameById[seg.speaker] || `Speaker ${seg.speaker}`}: ${seg.text}`)
+            .join("\n")
+        : record.transcript || "";
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy transcript:", err);
+    }
+  }, [segments, nameById, record.transcript]);
 
   // The currently-playing segment (last segment whose start ≤ currentTime).
   const activeIdx = useMemo(() => {
@@ -215,16 +235,28 @@ export function CallReview({
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 bg-section rounded-full p-[3px] w-fit">
-        {summary && (
-          <button onClick={() => setTab("summary")} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all", tab === "summary" ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink-secondary")}>
-            <Sparkles size={13} /> AI Summary
+      {/* Tabs + copy */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-1 bg-section rounded-full p-[3px] w-fit">
+          {summary && (
+            <button onClick={() => setTab("summary")} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all", tab === "summary" ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink-secondary")}>
+              <Sparkles size={13} /> AI Summary
+            </button>
+          )}
+          <button onClick={() => setTab("transcript")} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all", tab === "transcript" ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink-secondary")}>
+            <ListTree size={13} /> Transcript
+          </button>
+        </div>
+        {(segments.length > 0 || record.transcript) && (
+          <button
+            onClick={() => void copyTranscript()}
+            className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface px-3 py-1.5 text-[11px] font-medium text-ink-secondary hover:border-border-default transition-colors"
+            title="Copy the full transcript to the clipboard"
+          >
+            {copied ? <Check size={12} className="text-signal-green-text" /> : <Copy size={12} />}
+            {copied ? "Copied" : "Copy transcript"}
           </button>
         )}
-        <button onClick={() => setTab("transcript")} className={cn("inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition-all", tab === "transcript" ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink-secondary")}>
-          <ListTree size={13} /> Transcript
-        </button>
       </div>
 
       {tab === "summary" && summary && <SummaryView summary={summary} />}
