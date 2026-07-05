@@ -15,7 +15,12 @@ export interface WhatsappSender {
 }
 
 export interface WhatsappSettings {
+  /** Org-level WABA override (advanced; usually empty). */
   wabaId: string;
+  /** Sender registration is possible — org override OR the platform WABA. */
+  wabaConfigured: boolean;
+  /** The platform WABA is set server-side; the WABA card is hidden entirely. */
+  platformWabaConfigured: boolean;
   sandbox: boolean;
   sandboxNumber: string | null;
 }

@@ -145,11 +145,14 @@ function SenderRow({
 
       {needsCode && (
         <div className="flex items-center gap-1.5 mt-2.5 ml-11">
+          <span className="inline-flex items-center gap-1 text-[10.5px] text-ink-muted shrink-0">
+            <Loader2 size={10} className="animate-spin" /> Verifying automatically…
+          </span>
           <input
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="Verification code (sent by SMS/voice)"
-            className={cn(inputClass, "max-w-[240px]")}
+            placeholder="Or enter the code manually"
+            className={cn(inputClass, "max-w-[220px]")}
           />
           <button
             type="button"
@@ -248,13 +251,23 @@ export function WhatsappSection() {
     listWhatsappSenders().then(setSenders).catch(() => {});
   }, []);
 
+  // While a registration is in flight (verification is normally completed
+  // automatically server-side within seconds), poll so the row flips to
+  // "online" without a manual refresh.
+  const hasPending = senders.some((s) => ["creating", "pending_verification", "verifying", "twilio_review"].includes(s.status));
+  useEffect(() => {
+    if (!hasPending) return;
+    const t = setInterval(reloadSenders, 6000);
+    return () => clearInterval(t);
+  }, [hasPending, reloadSenders]);
+
   // Active lines that don't already have a WhatsApp registration.
   const eligibleLines = useMemo(() => {
     const taken = new Set(senders.map((s) => s.number.replace(/\D/g, "")));
     return lines.filter((l) => l.status === "active" && !taken.has(l.number.replace(/\D/g, "")));
   }, [lines, senders]);
 
-  const wabaSet = !!(settings?.wabaId || "").trim();
+  const wabaSet = !!settings?.wabaConfigured || !!settings?.sandbox;
 
   async function saveWaba() {
     setSavingWaba(true);
@@ -339,37 +352,41 @@ export function WhatsappSection() {
         </div>
       )}
 
-      <Card
-        title="WhatsApp Business Account"
-        description="One-time setup: complete Meta Embedded Signup in the Twilio Console (Messaging → Senders → WhatsApp senders), then paste your WhatsApp Business Account ID here."
-      >
-        <div className="flex items-center gap-2">
-          <input
-            value={wabaDraft}
-            onChange={(e) => setWabaDraft(e.target.value)}
-            placeholder="WhatsApp Business Account ID (WABA)"
-            className={cn(inputClass, "max-w-[360px]")}
-          />
-          <button
-            type="button"
-            onClick={() => void saveWaba()}
-            disabled={savingWaba || wabaDraft.trim() === (settings?.wabaId || "")}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 disabled:opacity-50"
-          >
-            {savingWaba ? <Loader2 size={11} className="animate-spin" /> : wabaSaved ? <Check size={11} /> : null}
-            {wabaSaved ? "Saved" : "Save"}
-          </button>
-        </div>
-        {!wabaSet && !settings?.sandbox && (
-          <p className="flex items-center gap-1.5 text-[11px] text-ink-muted mt-2">
-            <Info size={12} className="shrink-0" /> Number registration is disabled until the WABA ID is set.
-          </p>
-        )}
-      </Card>
+      {/* The platform WABA covers everyone — this advanced card only appears
+          when the platform isn't configured (dev / self-managed setups). */}
+      {!settings?.platformWabaConfigured && (
+        <Card
+          title="WhatsApp Business Account"
+          description="Connect a WhatsApp Business Account to register numbers under. If you don't have one, contact support and we'll set it up for you."
+        >
+          <div className="flex items-center gap-2">
+            <input
+              value={wabaDraft}
+              onChange={(e) => setWabaDraft(e.target.value)}
+              placeholder="WhatsApp Business Account ID (WABA)"
+              className={cn(inputClass, "max-w-[360px]")}
+            />
+            <button
+              type="button"
+              onClick={() => void saveWaba()}
+              disabled={savingWaba || wabaDraft.trim() === (settings?.wabaId || "")}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 disabled:opacity-50"
+            >
+              {savingWaba ? <Loader2 size={11} className="animate-spin" /> : wabaSaved ? <Check size={11} /> : null}
+              {wabaSaved ? "Saved" : "Save"}
+            </button>
+          </div>
+          {!wabaSet && (
+            <p className="flex items-center gap-1.5 text-[11px] text-ink-muted mt-2">
+              <Info size={12} className="shrink-0" /> Number registration is disabled until WhatsApp is configured.
+            </p>
+          )}
+        </Card>
+      )}
 
       <Card
         title="WhatsApp numbers"
-        description="Phone numbers registered as WhatsApp senders. After registering, Meta sends a verification code to the number by SMS or voice — enter it below to bring the sender online."
+        description="Phone numbers registered as WhatsApp senders. Registration and verification are handled automatically — a new number is usually online within a minute or two."
       >
         <div className="flex flex-col gap-2">
           {senders.length === 0 ? (
