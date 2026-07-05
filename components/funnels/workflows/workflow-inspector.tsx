@@ -405,6 +405,21 @@ function WhatsappStepForm({ d, set }: { d: Record<string, unknown>; set: (patch:
       active ? "bg-ink text-on-ink" : "text-ink-muted hover:text-ink"
     }`;
 
+  // The org's own QR-connected WhatsApp: plain conversational messages, no
+  // template/24h machinery — the common case.
+  if (settings?.unipile.connected) {
+    return (
+      <>
+        <FieldHeader label="Message" picker={<VariablePicker targetRef={msgRef} value={msg} onChange={(val) => set({ message: val })} />} />
+        <textarea ref={msgRef} className={area} value={msg} onChange={(e) => set({ message: e.target.value })} placeholder={"Hi {{first_name}}, quick question about {{company}}…"} />
+        <p className="text-[11px] text-ink-faint mt-1.5">
+          Sends from your connected WhatsApp{settings.unipile.phone ? ` (${settings.unipile.phone})` : ""}. Use{" "}
+          {"{{first_name}}"}, {"{{company}}"} or any custom field.
+        </p>
+      </>
+    );
+  }
+
   return (
     <>
       <label className={lab}>From number</label>
@@ -419,7 +434,7 @@ function WhatsappStepForm({ d, set }: { d: Record<string, unknown>; set: (patch:
       {settings?.sandbox ? (
         <p className="text-[11px] text-ink-faint mt-1.5">Sandbox mode — sends use the shared Twilio sandbox number.</p>
       ) : online.length === 0 ? (
-        <p className="text-[11px] text-ink-faint mt-1.5">No WhatsApp sender online — register one in Settings → WhatsApp.</p>
+        <p className="text-[11px] text-ink-faint mt-1.5">No WhatsApp connected — connect your WhatsApp in Settings → WhatsApp.</p>
       ) : null}
 
       <label className={lab}>Message type</label>

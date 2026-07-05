@@ -15,6 +15,12 @@ export interface WhatsappSender {
 }
 
 export interface WhatsappSettings {
+  /** Primary path: the org's own QR-connected WhatsApp (via Unipile). */
+  unipile: {
+    available: boolean;
+    connected: boolean;
+    phone: string | null;
+  };
   /** Org-level WABA override (advanced; usually empty). */
   wabaId: string;
   /** Sender registration is possible — org override OR the platform WABA. */
@@ -38,6 +44,16 @@ export interface WhatsappContentTemplate {
 
 export async function getWhatsappSettings(): Promise<WhatsappSettings> {
   return apiRequest("/whatsapp/settings");
+}
+
+/** Start the QR connect flow — returns a hosted page URL where the user
+ *  scans the QR with their own WhatsApp, then gets redirected back. */
+export async function getWhatsappConnectLink(): Promise<{ url: string }> {
+  return apiRequest("/whatsapp/connect-link", { method: "POST" });
+}
+
+export async function disconnectWhatsappAccount(): Promise<void> {
+  await apiRequest("/whatsapp/account", { method: "DELETE" });
 }
 
 export async function saveWhatsappSettings(wabaId: string): Promise<{ wabaId: string }> {
