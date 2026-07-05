@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect, useCallback, Fragment } from "react";
-import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, ChevronRight, Ban, Sparkles, Search, Bot, UserPlus, Check, Columns3 } from "lucide-react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, Sparkles, Search, Bot, UserPlus, Check, Columns3 } from "lucide-react";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -14,7 +14,7 @@ import { SmartViewBar } from "@/components/filters/smart-view-bar";
 import { EMPTY_FILTER, customFieldsToFilterFields, type FilterGroup, type FilterFieldDef } from "@/lib/types/lead-filter";
 import { matchesFilter } from "@/lib/utils/eval-lead-filter";
 import { listCustomFields } from "@/lib/api/custom-fields";
-import { isTerminalStatus, getStatusDotClass, type LeadStatusOption } from "@/lib/utils/lead-status";
+import { getStatusDotClass, type LeadStatusOption } from "@/lib/utils/lead-status";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { computeActivityCounts } from "@/lib/utils/lead-activity";
 import { useCallContext } from "@/components/calling/call-context";
@@ -47,27 +47,6 @@ interface FunnelLeadTableProps {
 }
 
 const PAGE_SIZE = 25;
-
-function ProgressDots({ current, total }: { current: number; total: number }) {
-  // Sequence-less campaign — there is no step progress to show.
-  if (total <= 0) {
-    return <span className="text-[10px] text-ink-faint">&mdash;</span>;
-  }
-  return (
-    <div className="flex items-center gap-1">
-      {Array.from({ length: total }).map((_, i) => (
-        <div
-          key={i}
-          className={cn(
-            "w-1.5 h-1.5 rounded-full",
-            i < current ? "bg-signal-blue-text" : "bg-section"
-          )}
-        />
-      ))}
-      <span className="text-[10px] text-ink-muted ml-1">{current}/{total}</span>
-    </div>
-  );
-}
 
 function LeadActionMenu({
   lead,
@@ -373,7 +352,6 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [groupByCompany, setGroupByCompany] = useState(true);
-  const [expandedCompanies, setExpandedCompanies] = useState<Set<string>>(new Set());
   const [selectedCompanies, setSelectedCompanies] = useState<Set<string>>(new Set());
   const [enrichToast, setEnrichToast] = useState<string | null>(null);
   const { startCall, activeCall, lastLoggedCall } = useCallContext();
@@ -680,7 +658,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
           onChange={(s) => { setStepFilter(s); setCurrentPage(1); }}
         />
         <button
-          onClick={() => { setGroupByCompany(!groupByCompany); setExpandedCompanies(new Set()); setCurrentPage(1); }}
+          onClick={() => { setGroupByCompany(!groupByCompany); setCurrentPage(1); }}
           aria-pressed={groupByCompany}
           className={cn(
             "flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] text-[11px] font-medium border transition-colors",
@@ -752,7 +730,6 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                       title="Select all companies on this page"
                     />
                   </TableHead>
-                  <TableHead className="w-7" />
                   {companyColumns.map((col) => (
                     <TableHead key={col.key} style={{ width: col.width, minWidth: col.width }}>
                       <div className={cn("flex items-center", col.align === "center" ? "justify-center" : "justify-start")}>
@@ -765,21 +742,15 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
               <TableBody>
                 {(paginatedKeys as unknown as string[]).map((companyName) => {
                   const companyLeads = companyGroups.get(companyName) || [];
-                  const isExpanded = expandedCompanies.has(companyName);
 
                   return (
-                    <Fragment key={companyName}>
-                      {/* Company row \u2014 renders the company-applicable visible columns */}
+                      /* Company row \u2014 opens the lead profile (a company view
+                         with all its contacts) directly. */
                       <TableRow
+                        key={companyName}
                         className="cursor-pointer hover:bg-hover/50"
-                        onClick={() => {
-                          setExpandedCompanies((prev) => {
-                            const next = new Set(prev);
-                            if (next.has(companyName)) next.delete(companyName);
-                            else next.add(companyName);
-                            return next;
-                          });
-                        }}
+                        onClick={() => companyLeads[0] && handleRowClick(companyLeads[0])}
+                        onMouseEnter={() => companyLeads[0] && handleRowHover(companyLeads[0])}
                       >
                         <TableCell className="w-9 px-3" onClick={(e) => e.stopPropagation()}>
                           <input
@@ -789,9 +760,6 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                             onChange={() => toggleSelectCompany(companyName)}
                           />
                         </TableCell>
-                        <TableCell className="w-7 px-0">
-                          <ChevronRight size={14} className={cn("text-ink-muted transition-transform", isExpanded && "rotate-90")} />
-                        </TableCell>
                         {companyColumns.map((col) => (
                           <TableCell key={col.key} style={{ width: col.width, minWidth: col.width }}>
                             <div className={cn("flex items-center min-w-0", col.align === "center" ? "justify-center" : "justify-start")}>
@@ -800,84 +768,6 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                           </TableCell>
                         ))}
                       </TableRow>
-
-                      {/* Expanded contacts */}
-                      {isExpanded && companyLeads.map((lead) => {
-                        const activity = activityMap.get(lead.id) || { calls: 0, emails: 0 };
-                        const isOverdue = lead.nextDate.getTime() < Date.now() && !isTerminalStatus(lead.status);
-
-                        return (
-                          <TableRow
-                            key={lead.id}
-                            className={cn("bg-section/20", onLeadClick && "cursor-pointer hover:bg-hover/50")}
-                            onClick={() => handleRowClick(lead)}
-                            onMouseEnter={() => handleRowHover(lead)}
-                          >
-                            {/* Lead detail rendered as one clean strip — it isn't
-                                column-aligned to the company's Industry/Employees/
-                                Location headers (those describe the company row). */}
-                            <TableCell colSpan={2 + companyColumns.length} className="py-2">
-                              <div className="flex items-center gap-3 pl-[60px] pr-2">
-                                {/* Name + title — red when Do-Not-Contact. Status
-                                    is company-level so it isn't repeated here. */}
-                                <div className="flex-1 min-w-0">
-                                  <span className={cn("text-[12px] font-medium inline-flex items-center gap-1.5", lead.doNotCall ? "text-signal-red-text" : "text-ink")}>
-                                    {lead.name}
-                                    {lead.doNotCall && (
-                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-signal-red/10 text-signal-red-text text-[9px] font-semibold uppercase tracking-wide">
-                                        <Ban size={9} strokeWidth={2} /> DNC
-                                      </span>
-                                    )}
-                                  </span>
-                                  <div className="text-[10px] text-ink-muted truncate">{lead.title}</div>
-                                </div>
-
-                                {/* Step progress */}
-                                <div className="w-[64px] shrink-0 flex justify-center">
-                                  <ProgressDots current={lead.currentStep} total={lead.totalSteps} />
-                                </div>
-
-                                {/* Touch counts — how many times called / emailed */}
-                                <div className="flex items-center gap-2.5 w-[78px] shrink-0">
-                                  <span className="flex items-center gap-1 text-[11px] text-ink-muted tabular-nums" title={`${activity.calls} calls logged`}>
-                                    <Phone size={11} strokeWidth={1.5} /> {activity.calls}
-                                  </span>
-                                  <span className="flex items-center gap-1 text-[11px] text-ink-muted tabular-nums" title={`${activity.emails} emails sent`}>
-                                    <Mail size={11} strokeWidth={1.5} /> {activity.emails}
-                                  </span>
-                                </div>
-
-                                {/* Next due */}
-                                <div className="w-[100px] shrink-0">
-                                  <span className={cn("text-[11px]", isOverdue ? "text-signal-red-text" : "text-ink-muted")}>
-                                    {lead.nextDate.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
-                                    {isOverdue ? " overdue" : ""}
-                                  </span>
-                                </div>
-
-                                {/* Quick actions */}
-                                <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                  <button onClick={(e) => lead.phone ? handleCall(e, lead) : e.stopPropagation()} disabled={!lead.phone || !!activeCall} title="Call"
-                                    className={cn("p-1 rounded-md transition-colors", lead.phone ? "text-signal-green-text hover:bg-signal-green/10" : "text-ink-faint cursor-not-allowed")}>
-                                    <Phone size={12} strokeWidth={1.5} />
-                                  </button>
-                                  <button onClick={(e) => lead.email ? handleEmail(e, lead.email) : e.stopPropagation()} disabled={!lead.email} title="Email"
-                                    className={cn("p-1 rounded-md transition-colors", lead.email ? "text-signal-blue-text hover:bg-signal-blue/10" : "text-ink-faint cursor-not-allowed")}>
-                                    <Mail size={12} strokeWidth={1.5} />
-                                  </button>
-                                  {lead.linkedinUrl && (
-                                    <button onClick={(e) => handleLinkedIn(e, lead.linkedinUrl!)} title="LinkedIn" className="p-1 rounded-md text-[#0A66C2] hover:bg-[#0A66C2]/10 transition-colors">
-                                      <Linkedin size={12} strokeWidth={1.5} />
-                                    </button>
-                                  )}
-                                  <LeadActionMenu lead={lead} funnelId={funnelId} statuses={statuses} onAdvanced={onLeadAdvanced} />
-                                </div>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
-                    </Fragment>
                   );
                 })}
               </TableBody>
