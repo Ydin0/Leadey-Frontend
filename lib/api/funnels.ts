@@ -97,7 +97,7 @@ function hydrateExtras(raw: unknown): ContactExtra[] | undefined {
     .filter((e) => e.value);
 }
 
-function hydrateLead(raw: ApiFunnelLead): FunnelLead {
+export function hydrateLead(raw: ApiFunnelLead): FunnelLead {
   const notes = (raw as any).notes;
   const rawEvents = (raw as any).events;
   const events: FunnelLeadEvent[] = Array.isArray(rawEvents)
@@ -113,6 +113,8 @@ function hydrateLead(raw: ApiFunnelLead): FunnelLead {
 
   return {
     id: asString(raw.id),
+    funnelId: (raw as { funnelId?: string }).funnelId || undefined,
+    funnelName: (raw as { funnelName?: string | null }).funnelName ?? null,
     personId: (raw as { personId?: string | null }).personId ?? null,
     name: asString(raw.name),
     firstName: (raw as { firstName?: string | null }).firstName ?? null,

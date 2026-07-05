@@ -35,6 +35,18 @@ export async function addLeadToCampaign(
   );
 }
 
+/** Bulk-add org leads to an existing campaign (clones each into a fresh row,
+ *  skipping people already enrolled there). */
+export async function bulkAddLeadsToCampaign(
+  funnelId: string,
+  leadIds: string[],
+): Promise<{ added: number; skipped: number }> {
+  return apiRequest(`/funnels/${encodeURIComponent(funnelId)}/leads/bulk-add`, {
+    method: "POST",
+    body: JSON.stringify({ leadIds }),
+  });
+}
+
 /** Remove one of this person's campaign memberships (deletes that campaign's
  *  lead row). `wasCurrent` tells the caller to navigate away. */
 export async function removeLeadFromCampaign(

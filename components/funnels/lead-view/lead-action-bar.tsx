@@ -106,8 +106,8 @@ export function LeadActionBar({
             : "/dashboard/opportunities",
           label: "Back to Opportunities",
         }
-      : backTarget === "companies"
-        ? { href: "/dashboard/companies", label: "Back to Companies" }
+      : backTarget === "companies" || backTarget === "leads"
+        ? { href: "/dashboard/leads", label: "Back to Leads" }
         : { href: `/dashboard/funnels/${funnelId}`, label: `Back to ${campaignName}` };
 
   return (

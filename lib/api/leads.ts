@@ -1,4 +1,6 @@
 import { apiRequest, apiRequestRaw, getAuthToken } from "./client";
+import { hydrateLead } from "./funnels";
+import type { FunnelLead } from "@/lib/types/funnel";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:3001";
 
@@ -91,6 +93,34 @@ function qs(params: Record<string, unknown> | (LeadFilters & { page?: number; pa
 
 export async function getOrgLeads(filters: LeadFilters & { page?: number; pageSize?: number }): Promise<Paged<OrgLead>> {
   return apiRequestRaw<Paged<OrgLead>>(`/leads${qs(filters)}`);
+}
+
+/** Load-all mode feeding the org-wide leads TABLE — full campaign-table lead
+ *  shape (hydrated to FunnelLead), newest first, server-capped at 20k. */
+export async function getAllOrgLeads(): Promise<{
+  leads: FunnelLead[];
+  totalCount: number;
+  truncated: boolean;
+}> {
+  const res = await apiRequestRaw<{
+    data: Record<string, unknown>[];
+    meta: { totalCount: number; truncated: boolean };
+  }>(`/leads?all=1`);
+  const rows = Array.isArray(res.data) ? res.data : [];
+  return {
+    leads: rows.map((raw) => hydrateLead(raw as Parameters<typeof hydrateLead>[0])),
+    totalCount: res.meta?.totalCount ?? rows.length,
+    truncated: !!res.meta?.truncated,
+  };
+}
+
+/** Deferred org-wide per-lead call/email totals (mirrors the per-funnel
+ *  activity-counts endpoint; 60s server cache). */
+export async function getOrgActivityCounts(): Promise<Record<string, { calls: number; emails: number }>> {
+  const data = await apiRequest<{ counts: Record<string, { calls: number; emails: number }> }>(
+    "/leads/activity-counts",
+  );
+  return data.counts ?? {};
 }
 
 export async function getOrgLeadCompanies(

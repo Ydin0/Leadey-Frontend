@@ -95,6 +95,11 @@ export interface ContactExtra {
 
 export interface FunnelLead {
   id: string;
+  /** Which campaign this lead row belongs to — set on org-wide rows (the
+   *  /dashboard/leads table spans campaigns); absent inside a single
+   *  campaign's payload where the funnel id is ambient. */
+  funnelId?: string;
+  funnelName?: string | null;
   /** Canonical person id (master contact) — the same across every campaign
    *  this person is enrolled in. Null for legacy rows with no identity. */
   personId?: string | null;

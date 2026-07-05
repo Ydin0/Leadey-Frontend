@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, Sparkles, Search, Bot, UserPlus, Check, Columns3 } from "lucide-react";
+import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, Sparkles, Search, Bot, UserPlus, Check, Columns3, Megaphone } from "lucide-react";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -26,7 +26,7 @@ import { LeadSortMenu } from "./lead-sort-menu";
 import { LeadStepFilter } from "./lead-step-filter";
 import { ColumnSettingsDrawer } from "./column-settings-drawer";
 import { usePrefetchFunnel } from "@/lib/queries/use-prefetch";
-import { useActivityCounts } from "@/lib/queries/use-activity-counts";
+import { useActivityCounts, useOrgActivityCounts } from "@/lib/queries/use-activity-counts";
 import {
   buildLeadColumns, resolveColumns, loadColumnPrefs, saveColumnPrefs,
   type ColumnPrefs, type LeadColumnCtx,
@@ -35,7 +35,9 @@ import type { LeadSortKey } from "@/lib/utils/sort-leads";
 
 interface FunnelLeadTableProps {
   leads: FunnelLead[];
-  funnelId: string;
+  /** The campaign the table lives in. Absent on the org-wide Leads page,
+   *  where each row carries its own `lead.funnelId` instead. */
+  funnelId?: string;
   /** Campaign sequence steps — powers the "Step" filter. */
   steps?: FunnelStep[];
   /** Shared filter restored from the campaign config (persisted server-side). */
@@ -44,6 +46,11 @@ interface FunnelLeadTableProps {
   onSortChange?: (key: LeadSortKey) => void;
   onLeadAdvanced?: () => void;
   onLeadClick?: (leadIndex: number) => void;
+  /** Org-wide mode: "Create campaign" from the given lead ids (the current
+   *  filtered set from the toolbar button, or the selection from the bulk bar). */
+  onCreateCampaign?: (leadIds: string[]) => void;
+  /** Org-wide mode: add the selected lead ids to an existing campaign. */
+  onAddToCampaign?: (leadIds: string[]) => void;
 }
 
 const PAGE_SIZE = 25;
@@ -310,7 +317,7 @@ function MagicEnrichBar({
   );
 }
 
-export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, sortBy, onSortChange, onLeadAdvanced, onLeadClick }: FunnelLeadTableProps) {
+export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, sortBy, onSortChange, onLeadAdvanced, onLeadClick, onCreateCampaign, onAddToCampaign }: FunnelLeadTableProps) {
   const prefetchFunnel = usePrefetchFunnel();
   // Close-style query builder. Restored from the campaign config (a FilterGroup);
   // a legacy/other shape falls back to empty.
@@ -323,9 +330,12 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   const [customFields, setCustomFields] = useState<FilterFieldDef[]>([]);
 
   // ── Configurable columns (flat lead view) — Close-style picker + persistence.
+  // Org and campaign views keep separate prefs (the org table has a Campaign
+  // column that would render empty inside a single campaign).
+  const columnPrefsKey = funnelId ? undefined : "leadey:lead-columns:org:v1";
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [columnPrefs, setColumnPrefs] = useState<ColumnPrefs | null>(null);
-  useEffect(() => { setColumnPrefs(loadColumnPrefs()); }, []);
+  useEffect(() => { setColumnPrefs(loadColumnPrefs(columnPrefsKey)); }, [columnPrefsKey]);
 
   // Org custom fields → extra filterable fields in the builder.
   useEffect(() => {
@@ -339,6 +349,9 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   // (hydrating from the server value) must not trigger a save-back.
   const hydratedRef = useRef(false);
   useEffect(() => {
+    // Org-wide view has no campaign config to persist to — Smart Views
+    // (scope "org") cover saved filters there.
+    if (!funnelId) return;
     if (!hydratedRef.current) { hydratedRef.current = true; return; }
     const t = setTimeout(() => {
       void saveLeadFilters(funnelId, filterGroup as unknown as Record<string, unknown>).catch((err) =>
@@ -361,7 +374,10 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   // so the call counter + step dots reflect it immediately.
   const handledLogRef = useRef<number | null>(null);
   useEffect(() => {
-    if (!lastLoggedCall || lastLoggedCall.funnelId !== funnelId) return;
+    if (!lastLoggedCall) return;
+    // Campaign view only cares about its own campaign's calls; the org view
+    // spans every campaign, so any logged call refreshes it.
+    if (funnelId && lastLoggedCall.funnelId !== funnelId) return;
     if (handledLogRef.current === lastLoggedCall.at) return;
     handledLogRef.current = lastLoggedCall.at;
     onLeadAdvanced?.();
@@ -370,7 +386,9 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   // Activity counts: the DEFERRED endpoint is authoritative (the payload now
   // ships zeros so the table paints instantly); fall back to payload counts
   // (older backend) and finally to deriving from events on the full view.
-  const { data: deferredCounts } = useActivityCounts(funnelId);
+  const { data: campaignCounts } = useActivityCounts(funnelId ?? "", { enabled: !!funnelId });
+  const { data: orgCounts } = useOrgActivityCounts({ enabled: !funnelId });
+  const deferredCounts = funnelId ? campaignCounts : orgCounts;
   const activityMap = useMemo(() => {
     const map = new Map<string, { calls: number; emails: number }>();
     for (const lead of leads) {
@@ -437,7 +455,10 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   );
 
   // ── Column catalog + resolved (ordered/visible) state for the flat view ──
-  const columnCatalog = useMemo(() => buildLeadColumns(customFields), [customFields]);
+  const columnCatalog = useMemo(
+    () => buildLeadColumns(customFields, { campaign: !funnelId }),
+    [customFields, funnelId],
+  );
   const resolvedColumns = useMemo(() => resolveColumns(columnCatalog, columnPrefs), [columnCatalog, columnPrefs]);
   const visibleColumns = useMemo(() => resolvedColumns.filter((r) => r.visible).map((r) => r.col), [resolvedColumns]);
   // The grouped (by-company) view shows only the company-applicable visible
@@ -453,16 +474,16 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   const applyColumns = useCallback((order: string[], hidden: string[]) => {
     const prefs = { order, hidden };
     setColumnPrefs(prefs);
-    saveColumnPrefs(prefs);
-  }, []);
+    saveColumnPrefs(prefs, columnPrefsKey);
+  }, [columnPrefsKey]);
   const resetColumns = useCallback(() => {
     const prefs = {
       order: columnCatalog.map((c) => c.key),
       hidden: columnCatalog.filter((c) => !c.defaultVisible).map((c) => c.key),
     };
     setColumnPrefs(prefs);
-    saveColumnPrefs(prefs);
-  }, [columnCatalog]);
+    saveColumnPrefs(prefs, columnPrefsKey);
+  }, [columnCatalog, columnPrefsKey]);
 
   // Apply the query-builder filter + free-text search + sequence-step filter.
   const filtered = useMemo(() => {
@@ -585,7 +606,8 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   /** Warm the lead view's data on row hover so the click paints instantly. */
   function handleRowHover(lead: FunnelLead) {
     if (!onLeadClick) return;
-    prefetchFunnel(funnelId, { fullLeadId: lead.id });
+    const fid = lead.funnelId ?? funnelId;
+    if (fid) prefetchFunnel(fid, { fullLeadId: lead.id });
   }
 
   function handleCall(e: React.MouseEvent, lead: FunnelLead) {
@@ -596,7 +618,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
       contactName: lead.name || null,
       companyName: lead.company || null,
       leadId: lead.id || null,
-      funnelId,
+      funnelId: lead.funnelId ?? funnelId ?? null,
     });
   }
 
@@ -618,12 +640,26 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
 
   const allSelected = filtered.length > 0 && filtered.every((l) => selectedIds.has(l.id));
 
+  // Org-wide selection → lead ids, whichever view is active: grouped selection
+  // is companies (expand to their leads), flat selection is lead rows.
+  const selectedLeadIds = useMemo(() => {
+    if (groupByCompany) {
+      const ids: string[] = [];
+      for (const name of selectedCompanies) {
+        for (const l of companyGroups.get(name) ?? []) ids.push(l.id);
+      }
+      return ids;
+    }
+    return filtered.filter((l) => selectedIds.has(l.id)).map((l) => l.id);
+  }, [groupByCompany, selectedCompanies, companyGroups, filtered, selectedIds]);
+  const orgMode = !funnelId;
+
   return (
     <div>
       {/* Smart Views + filter builder + search */}
       <div className="flex items-center gap-2 mb-3 flex-wrap">
         <SmartViewBar
-          scope="campaign"
+          scope={funnelId ? "campaign" : "org"}
           funnelId={funnelId}
           current={filterGroup}
           onApply={(g) => { setFilterGroup(g); setCurrentPage(1); }}
@@ -680,11 +716,54 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
             <Columns3 size={12} strokeWidth={1.5} />
             Columns
           </button>
+          {onCreateCampaign && (
+            <button
+              onClick={() => onCreateCampaign(filtered.map((l) => l.id))}
+              disabled={filtered.length === 0}
+              title="Create a new campaign containing every lead matching the current filters"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              <Megaphone size={12} strokeWidth={1.75} />
+              Create campaign · {filtered.length.toLocaleString()}
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Magic Enrich bulk bar (grouped view) — floats at the bottom */}
-      {groupByCompany && selectedCompanyList.length > 0 && (
+      {/* Org-wide bulk bar — create/add-to campaign from the selection */}
+      {orgMode && selectedLeadIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-[14px] bg-surface border border-border-default shadow-lg">
+          <span className="text-[12px] font-medium text-signal-blue-text">
+            {selectedLeadIds.length.toLocaleString()} lead{selectedLeadIds.length === 1 ? "" : "s"} selected
+          </span>
+          <button
+            onClick={() => { setSelectedCompanies(new Set()); setSelectedIds(new Set()); }}
+            className="text-[11px] text-ink-muted hover:text-ink transition-colors"
+          >
+            Clear
+          </button>
+          <div className="w-px h-5 bg-border-subtle mx-1" />
+          {onAddToCampaign && (
+            <button
+              onClick={() => onAddToCampaign(selectedLeadIds)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary border border-border-subtle text-[11px] font-medium hover:bg-hover transition-colors"
+            >
+              <UserPlus size={12} /> Add to campaign
+            </button>
+          )}
+          {onCreateCampaign && (
+            <button
+              onClick={() => onCreateCampaign(selectedLeadIds)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity"
+            >
+              <Megaphone size={12} /> Create campaign
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Magic Enrich bulk bar (grouped view, campaign-scoped) — floats at the bottom */}
+      {funnelId && groupByCompany && selectedCompanyList.length > 0 && (
         <MagicEnrichBar
           funnelId={funnelId}
           companies={selectedCompanyList}
@@ -845,7 +924,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
                             <Linkedin size={13} strokeWidth={1.5} />
                           </button>
                         )}
-                        <LeadActionMenu lead={lead} funnelId={funnelId} statuses={statuses} onAdvanced={onLeadAdvanced} />
+                        <LeadActionMenu lead={lead} funnelId={(lead.funnelId ?? funnelId)!} statuses={statuses} onAdvanced={onLeadAdvanced} />
                       </div>
                     </TableCell>
                   </TableRow>

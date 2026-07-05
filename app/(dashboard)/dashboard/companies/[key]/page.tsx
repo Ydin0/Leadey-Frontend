@@ -99,11 +99,11 @@ export default function CompanyResolverPage() {
           </>
         )}
         <Link
-          href="/dashboard/companies"
+          href="/dashboard/leads"
           className="mt-5 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity"
         >
           <ArrowLeft size={12} />
-          Back to Companies
+          Back to Leads
         </Link>
       </div>
     </div>

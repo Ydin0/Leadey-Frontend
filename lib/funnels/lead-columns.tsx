@@ -278,8 +278,29 @@ export const BUILTIN_LEAD_COLUMNS: LeadColumn[] = [
   },
 ];
 
-/** Build the full catalog including one column per org custom field. */
-export function buildLeadColumns(customFields: FilterFieldDef[]): LeadColumn[] {
+/** "Campaign" column — org-wide table only (inside one campaign it's ambient). */
+const CAMPAIGN_COLUMN: LeadColumn = {
+  key: "campaign", label: "Campaign", group: "Lead", align: "left", width: 160, defaultVisible: true,
+  render: (l) =>
+    l.funnelName ? (
+      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 bg-section text-ink-secondary truncate max-w-full inline-block">
+        {l.funnelName}
+      </span>
+    ) : dash,
+  companyRender: (group) => {
+    const names = [...new Set(group.map((l) => l.funnelName).filter(Boolean))] as string[];
+    if (names.length === 0) return dash;
+    return (
+      <span className="text-[10px] font-medium rounded-full px-2 py-0.5 bg-section text-ink-secondary truncate max-w-full inline-block">
+        {names[0]}{names.length > 1 ? ` +${names.length - 1}` : ""}
+      </span>
+    );
+  },
+};
+
+/** Build the full catalog including one column per org custom field.
+ *  `opts.campaign` adds the Campaign column (org-wide table). */
+export function buildLeadColumns(customFields: FilterFieldDef[], opts?: { campaign?: boolean }): LeadColumn[] {
   const customCols: LeadColumn[] = customFields.map((f) => ({
     key: f.key, // already "custom:<key>"
     label: f.label,
@@ -289,7 +310,10 @@ export function buildLeadColumns(customFields: FilterFieldDef[]): LeadColumn[] {
     defaultVisible: false,
     render: (lead: FunnelLead, ctx: LeadColumnCtx) => text(ctx.value(lead, f.key)),
   }));
-  return [...BUILTIN_LEAD_COLUMNS, ...customCols];
+  const builtins = opts?.campaign
+    ? [...BUILTIN_LEAD_COLUMNS.slice(0, 1), CAMPAIGN_COLUMN, ...BUILTIN_LEAD_COLUMNS.slice(1)]
+    : BUILTIN_LEAD_COLUMNS;
+  return [...builtins, ...customCols];
 }
 
 // ── Persistence (per-user, localStorage) ─────────────────────────────────
@@ -302,10 +326,10 @@ export interface ColumnPrefs {
   hidden: string[];
 }
 
-export function loadColumnPrefs(): ColumnPrefs | null {
+export function loadColumnPrefs(storageKey: string = STORAGE_KEY): ColumnPrefs | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) return null;
     const p = JSON.parse(raw);
     if (Array.isArray(p?.order) && Array.isArray(p?.hidden)) return { order: p.order, hidden: p.hidden };
@@ -313,9 +337,9 @@ export function loadColumnPrefs(): ColumnPrefs | null {
   return null;
 }
 
-export function saveColumnPrefs(prefs: ColumnPrefs): void {
+export function saveColumnPrefs(prefs: ColumnPrefs, storageKey: string = STORAGE_KEY): void {
   if (typeof window === "undefined") return;
-  try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs)); } catch { /* ignore */ }
+  try { window.localStorage.setItem(storageKey, JSON.stringify(prefs)); } catch { /* ignore */ }
 }
 
 /**
