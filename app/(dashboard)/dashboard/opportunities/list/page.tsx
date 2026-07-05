@@ -123,7 +123,7 @@ export default function OpportunitiesListPage() {
                       <Link
                         href={
                           opp.sourceLeadId && opp.funnelId
-                            ? `/dashboard/funnels/${opp.funnelId}/leads/${opp.sourceLeadId}?from=opportunities`
+                            ? `/dashboard/funnels/${opp.funnelId}/leads/${opp.sourceLeadId}?from=opportunities&pipeline=${encodeURIComponent(opp.pipelineId)}`
                             : `/dashboard/opportunities`
                         }
                         className="text-[12px] font-medium text-ink hover:text-signal-blue-text truncate block"

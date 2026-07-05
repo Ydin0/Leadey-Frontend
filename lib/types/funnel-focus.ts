@@ -1,3 +1,5 @@
+import type { ContactExtra } from "./funnel";
+
 export type LeadStatus =
   | "new"
   | "contacted"
@@ -30,6 +32,9 @@ export interface FunnelLeadContact {
   title: string;
   email: string | null;
   phone: string | null;
+  /** Additional labeled emails/phones (work, personal, …). */
+  extraEmails?: ContactExtra[];
+  extraPhones?: ContactExtra[];
   linkedinUrl: string | null;
   isPrimary: boolean;
   doNotCall?: boolean;

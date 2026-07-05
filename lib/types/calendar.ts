@@ -13,6 +13,8 @@ export interface CalendarAccountsResult {
   platformConfigured: { google: boolean; microsoft: boolean };
 }
 
+export type MeetingResponseStatus = "accepted" | "declined" | "tentative" | "needsAction";
+
 export interface LeadMeeting {
   id: string;
   source: "google" | "outlook" | "calendly";
@@ -22,6 +24,8 @@ export interface LeadMeeting {
   joinUrl: string | null;
   location: string | null;
   organizerEmail: string | null;
+  /** The lead's RSVP to this meeting; null when unknown (e.g. events synced before RSVP tracking). */
+  responseStatus: MeetingResponseStatus | null;
 }
 
 export interface LeadMeetingsResult {

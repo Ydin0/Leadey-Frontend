@@ -35,6 +35,7 @@ export type WorkflowNodeType =
   | "trigger"
   | "email"
   | "sms"
+  | "whatsapp"
   | "linkedin"
   | "call"
   | "wait"

@@ -86,6 +86,13 @@ export interface FunnelLeadEvent {
   timestamp: Date;
 }
 
+/** An additional labeled email or phone on a contact, e.g.
+ *  { label: "Personal", value: "x@y.com" }. */
+export interface ContactExtra {
+  label: string;
+  value: string;
+}
+
 export interface FunnelLead {
   id: string;
   /** Canonical person id (master contact) — the same across every campaign
@@ -99,6 +106,10 @@ export interface FunnelLead {
   company: string;
   title: string;
   email: string;
+  /** Additional labeled emails/phones (work, personal, …) beyond the primary
+   *  email/phone — the primary values stay what dialing/sending use. */
+  extraEmails?: ContactExtra[];
+  extraPhones?: ContactExtra[];
   currentStep: number;
   totalSteps: number;
   /** Built-in status key or a custom org-defined status. */

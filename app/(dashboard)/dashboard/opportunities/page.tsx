@@ -51,12 +51,26 @@ export default function OpportunitiesPage() {
     [resolveMember],
   );
 
-  // ── Default pipeline selection (derived once pipelines resolve) ──
+  // ── Initial pipeline selection (derived once pipelines resolve) ──
+  // ?pipeline= wins (set by the lead view's "Back to Opportunities" link and
+  // kept in sync by the tabs) so returning from an opportunity lands on the
+  // pipeline it was clicked from; otherwise the default pipeline.
   useEffect(() => {
     if (!pipelinesData || activePipelineId) return;
-    const def = pipelinesData.find((p) => p.isDefault) || pipelinesData[0] || null;
+    const requestedId = new URLSearchParams(window.location.search).get("pipeline");
+    const requested = requestedId ? pipelinesData.find((p) => p.id === requestedId) : null;
+    const def = requested || pipelinesData.find((p) => p.isDefault) || pipelinesData[0] || null;
     setActivePipelineId(def?.id ?? null);
   }, [pipelinesData, activePipelineId]);
+
+  // Selecting a tab mirrors the choice into the URL (replace, not push) so a
+  // reload — and the round-trip through a lead view — keeps the pipeline.
+  const selectPipeline = useCallback((id: string) => {
+    setActivePipelineId(id);
+    const url = new URL(window.location.href);
+    url.searchParams.set("pipeline", id);
+    window.history.replaceState(null, "", url.toString());
+  }, []);
 
   useEffect(() => {
     if (pipelinesError) {
@@ -146,7 +160,7 @@ export default function OpportunitiesPage() {
       <PipelineTabs
         pipelines={pipelines}
         activePipelineId={activePipelineId}
-        onSelect={setActivePipelineId}
+        onSelect={selectPipeline}
       />
 
       <PipelineStatsBar summary={summary} loading={loading} />

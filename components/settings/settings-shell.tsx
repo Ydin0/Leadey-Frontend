@@ -24,6 +24,7 @@ import {
   ListPlus,
   Mail,
   MapPin,
+  MessageCircle,
   Phone,
   PhoneCall,
   PlugZap,
@@ -44,6 +45,7 @@ import { DialerSettingsTab } from "@/components/dialer/settings/dialer-settings-
 import { PipelineSettings } from "@/components/opportunities/settings/pipeline-settings";
 import { LinkedInTeamTab } from "./linkedin-team-tab";
 import { EmailAccountsSection } from "./email-accounts-section";
+import { WhatsappSection } from "./whatsapp-section";
 import type {
   AppSettingsSnapshot,
   IntegrationSettings,
@@ -58,6 +60,7 @@ type SettingsTab =
   | "task-categories"
   | "custom-fields"
   | "phone-lines"
+  | "whatsapp"
   | "local-presence"
   | "call-outcomes"
   | "dialer"
@@ -79,6 +82,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "task-categories", label: "Task Categories", icon: ListChecks },
   { id: "custom-fields", label: "Custom Fields", icon: ListPlus },
   { id: "phone-lines", label: "Phone Lines", icon: Phone },
+  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
   { id: "local-presence", label: "Local Presence", icon: MapPin },
   { id: "call-outcomes", label: "Call Outcomes", icon: PhoneCall },
   { id: "dialer", label: "Power Dialer", icon: PhoneCall },
@@ -201,6 +205,7 @@ const VALID_TABS: SettingsTab[] = [
   "task-categories",
   "custom-fields",
   "phone-lines",
+  "whatsapp",
   "local-presence",
   "call-outcomes",
   "dialer",
@@ -334,6 +339,8 @@ export function SettingsShell() {
           {activeTab === "custom-fields" && <CustomFieldsSection />}
 
           {activeTab === "phone-lines" && <PhoneLinesTab />}
+
+          {activeTab === "whatsapp" && <WhatsappSection />}
 
           {activeTab === "local-presence" && <LocalPresenceSection />}
 

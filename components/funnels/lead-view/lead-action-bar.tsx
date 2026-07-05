@@ -89,12 +89,23 @@ export function LeadActionBar({
   // lead's campaign. Read post-mount (not during render) so SSR and hydration
   // agree; the param survives prev/next because goToLeadId preserves the search.
   const [backTarget, setBackTarget] = useState<string | null>(null);
+  // The pipeline the opportunity was clicked from (?pipeline=, set by the
+  // board card / list row) — carried onto the back link so the board reopens
+  // on that pipeline's tab instead of the default one.
+  const [backPipelineId, setBackPipelineId] = useState<string | null>(null);
   useEffect(() => {
-    setBackTarget(new URLSearchParams(window.location.search).get("from"));
+    const params = new URLSearchParams(window.location.search);
+    setBackTarget(params.get("from"));
+    setBackPipelineId(params.get("pipeline"));
   }, []);
   const back =
     backTarget === "opportunities"
-      ? { href: "/dashboard/opportunities", label: "Back to Opportunities" }
+      ? {
+          href: backPipelineId
+            ? `/dashboard/opportunities?pipeline=${encodeURIComponent(backPipelineId)}`
+            : "/dashboard/opportunities",
+          label: "Back to Opportunities",
+        }
       : backTarget === "companies"
         ? { href: "/dashboard/companies", label: "Back to Companies" }
         : { href: `/dashboard/funnels/${funnelId}`, label: `Back to ${campaignName}` };

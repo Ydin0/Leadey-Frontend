@@ -1,4 +1,5 @@
 import type {
+  ContactExtra,
   Funnel,
   FunnelChannel,
   FunnelLead,
@@ -88,6 +89,14 @@ function asLeadStatus(value: unknown): string {
   return normalized;
 }
 
+function hydrateExtras(raw: unknown): ContactExtra[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw
+    .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
+    .map((e) => ({ label: asString(e.label), value: asString(e.value) }))
+    .filter((e) => e.value);
+}
+
 function hydrateLead(raw: ApiFunnelLead): FunnelLead {
   const notes = (raw as any).notes;
   const rawEvents = (raw as any).events;
@@ -119,6 +128,8 @@ function hydrateLead(raw: ApiFunnelLead): FunnelLead {
     source: asString(raw.source),
     score: asNumber(raw.score),
     phone: (raw as any).phone || null,
+    extraEmails: hydrateExtras((raw as any).extraEmails),
+    extraPhones: hydrateExtras((raw as any).extraPhones),
     companyDomain: (raw as any).companyDomain || undefined,
     companyIndustry: (raw as any).companyIndustry || undefined,
     companyEmployeeCount: (raw as any).companyEmployeeCount ? asNumber((raw as any).companyEmployeeCount) : undefined,
@@ -415,17 +426,32 @@ export interface ContactEditPatch {
   email?: string;
   phone?: string;
   linkedinUrl?: string;
+  /** Additional labeled emails/phones — sent as the FULL list (replaces). */
+  extraEmails?: ContactExtra[];
+  extraPhones?: ContactExtra[];
 }
 
 export async function updateLeadContact(
   funnelId: string,
   contactId: string,
   patch: ContactEditPatch,
-): Promise<{ id: string; name: string; title: string; email: string; phone: string; linkedinUrl: string }> {
+): Promise<{
+  id: string; name: string; title: string; email: string; phone: string; linkedinUrl: string;
+  extraEmails?: ContactExtra[]; extraPhones?: ContactExtra[];
+}> {
   const path = funnelId
     ? `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(contactId)}/contact`
     : `/contacts/${encodeURIComponent(contactId)}`;
   return apiRequest(path, { method: "PATCH", body: JSON.stringify(patch) });
+}
+
+/** Delete a contact (lead row) from a campaign — the person's master contact
+ *  and their enrollments in other campaigns are untouched. */
+export async function deleteLeadFromFunnel(funnelId: string, leadId: string): Promise<void> {
+  await apiRequest(
+    `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}`,
+    { method: "DELETE" },
+  );
 }
 
 /** Create a single lead in a campaign (the "Individual contact" / "Add contact"

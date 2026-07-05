@@ -24,7 +24,7 @@ const ConvertToOpportunityModal = dynamic(
   { ssr: false },
 );
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
-import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc, updateLeadContact, updateLeadCompanyInfo, setLeadCustomFieldValues, createLeadInFunnel, type ContactEditPatch } from "@/lib/api/funnels";
+import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc, updateLeadContact, deleteLeadFromFunnel, updateLeadCompanyInfo, setLeadCustomFieldValues, createLeadInFunnel, type ContactEditPatch } from "@/lib/api/funnels";
 import { useCustomFields } from "@/lib/hooks/use-custom-fields";
 import { getCallRecords } from "@/lib/api/phone-lines";
 import { getLeadEmailThread, type LeadEmailMessage } from "@/lib/api/email";
@@ -279,6 +279,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         title: l.title,
         email: l.email || null,
         phone: l.phone || null,
+        extraEmails: l.extraEmails ?? [],
+        extraPhones: l.extraPhones ?? [],
         linkedinUrl: l.linkedinUrl || null,
         isPrimary: l.id === currentLead.id,
         doNotCall: l.doNotCall,
@@ -539,8 +541,20 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
       email: res.email,
       phone: res.phone,
       linkedinUrl: res.linkedinUrl,
+      extraEmails: res.extraEmails ?? [],
+      extraPhones: res.extraPhones ?? [],
     });
   }, [funnelId, onLeadPatch]);
+
+  // Delete a contact (sibling lead row) from this campaign. Only offered on
+  // non-primary contacts, so the currently-viewed lead can't vanish from
+  // under the profile.
+  const handleContactDelete = useCallback(async (contactId: string) => {
+    await deleteLeadFromFunnel(funnelId, contactId);
+    // Drop a now-stale activity quick-filter pointing at the deleted contact.
+    setContactFilter((prev) => (prev === contactId ? null : prev));
+    onLeadsChanged?.();
+  }, [funnelId, onLeadsChanged]);
 
   // Save company / About info — fans out to every contact at this company in
   // the funnel (handled server-side). Reload so the change shows everywhere.
@@ -651,6 +665,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
             onEmail={(email) => { pauseForEngagement(); setReplyPrefill({ to: email, subject: "", body: "" }); setShowComposer(true); }}
             onDnc={handleDnc}
             onContactSave={handleContactSave}
+            onContactDelete={handleContactDelete}
             onCompanySave={handleCompanySave}
             onCustomFieldsSave={handleCustomFieldsSave}
             onAddContact={handleAddContact}

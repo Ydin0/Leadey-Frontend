@@ -46,10 +46,10 @@ export function OpportunityCard({
   // Opportunities open their source lead in the Lead View (there's no longer a
   // dedicated opportunity page). Fall back to the pipeline if the lead is gone.
   // ?from=opportunities makes the lead view's back button return HERE instead
-  // of the lead's campaign.
+  // of the lead's campaign; ?pipeline= brings it back to THIS pipeline's tab.
   const href =
     opp.sourceLeadId && opp.funnelId
-      ? `/dashboard/funnels/${opp.funnelId}/leads/${opp.sourceLeadId}?from=opportunities`
+      ? `/dashboard/funnels/${opp.funnelId}/leads/${opp.sourceLeadId}?from=opportunities&pipeline=${encodeURIComponent(opp.pipelineId)}`
       : `/dashboard/opportunities`;
 
   return (

@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, Video, ChevronRight } from "lucide-react";
+import { CalendarClock, Video, ChevronRight, Check, X, CircleDashed, HelpCircle } from "lucide-react";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getLeadMeetings } from "@/lib/api/calendar";
-import type { LeadMeeting } from "@/lib/types/calendar";
+import type { LeadMeeting, MeetingResponseStatus } from "@/lib/types/calendar";
 import { Section } from "./lead-section";
 
 const SOURCE_LABEL: Record<LeadMeeting["source"], string> = {
@@ -12,6 +12,25 @@ const SOURCE_LABEL: Record<LeadMeeting["source"], string> = {
   outlook: "Outlook",
   calendly: "Calendly",
 };
+
+const RSVP: Record<MeetingResponseStatus, { label: string; icon: typeof Check; className: string }> = {
+  accepted: { label: "Accepted", icon: Check, className: "bg-signal-green/15 text-signal-green-text" },
+  declined: { label: "Declined", icon: X, className: "bg-signal-red/15 text-signal-red-text" },
+  tentative: { label: "Tentative", icon: HelpCircle, className: "bg-signal-amber/15 text-signal-amber-text" },
+  needsAction: { label: "No response", icon: CircleDashed, className: "bg-signal-slate/15 text-signal-slate-text" },
+};
+
+/** Marker for the lead's RSVP to a meeting. Hidden when unknown. */
+function RsvpBadge({ status }: { status: MeetingResponseStatus | null }) {
+  if (!status) return null;
+  const cfg = RSVP[status];
+  const Icon = cfg.icon;
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0 ${cfg.className}`}>
+      <Icon size={10} strokeWidth={2.5} /> {cfg.label}
+    </span>
+  );
+}
 
 /** Human date+time, e.g. "Tue, Jul 1 · 2:30 PM". Marks today/tomorrow. */
 function meetingWhen(iso: string | null): string {
@@ -73,7 +92,10 @@ export function LeadUpcomingMeetingsSection({ funnelId, leadId }: { funnelId: st
                 <CalendarClock size={13} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[12.5px] text-ink-secondary leading-snug truncate">{m.title}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[12.5px] text-ink-secondary leading-snug truncate min-w-0">{m.title}</p>
+                  <RsvpBadge status={m.responseStatus} />
+                </div>
                 <p className="text-[10.5px] text-ink-muted mt-0.5">
                   {meetingWhen(m.startTime)}
                   <span className="text-ink-faint"> · {SOURCE_LABEL[m.source]}</span>

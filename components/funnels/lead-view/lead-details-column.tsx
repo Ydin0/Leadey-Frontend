@@ -24,11 +24,23 @@ import {
   Plus,
   X,
   DollarSign,
+  Trash2,
+  GripVertical,
 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { cn, formatPhoneIntl } from "@/lib/utils";
 import { localTimeFromPhone } from "@/lib/utils/lead-timezone";
 import { confirmDncCall } from "@/lib/utils/dnc";
-import type { FunnelLead } from "@/lib/types/funnel";
+import type { ContactExtra, FunnelLead } from "@/lib/types/funnel";
 import type {
   FunnelLeadCompany,
   FunnelLeadContact,
@@ -87,8 +99,14 @@ interface LeadDetailsColumnProps {
   /** Persist edited contact details — drives the per-contact edit (pencil). */
   onContactSave?: (
     contactId: string,
-    patch: { name?: string; title?: string; email?: string; phone?: string; linkedinUrl?: string },
+    patch: {
+      name?: string; title?: string; email?: string; phone?: string; linkedinUrl?: string;
+      extraEmails?: ContactExtra[]; extraPhones?: ContactExtra[];
+    },
   ) => Promise<void>;
+  /** Delete a contact (lead row) from this campaign — offered on non-primary
+   *  contacts only, behind an inline confirm. */
+  onContactDelete?: (contactId: string) => Promise<void>;
   /** The contact whose activity the timeline is currently filtered to (or null). */
   activeContactId?: string | null;
   /** Click a contact to toggle the activity quick-filter to just that person. */
@@ -110,7 +128,35 @@ function initials(name: string): string {
     .join("");
 }
 
-type ContactDraft = { name: string; title: string; email: string; phone: string; linkedinUrl: string };
+/** One row in the edit form's email/phone lists. `key` is a stable client-only
+ *  id for React/dnd-kit — never persisted. */
+type DraftEntry = ContactExtra & { key: string };
+
+type ContactDraft = {
+  name: string; title: string; linkedinUrl: string;
+  /** Ordered lists — index 0 is the PRIMARY value (what dialing/sending use);
+   *  the rest are the labeled extras. Drag rows to reorder / change primary. */
+  emails: DraftEntry[]; phones: DraftEntry[];
+};
+
+let draftKeySeq = 0;
+const draftKey = () => `dk_${++draftKeySeq}`;
+
+function makeContactDraft(c: FunnelLeadContact): ContactDraft {
+  return {
+    name: c.name,
+    title: c.title || "",
+    linkedinUrl: c.linkedinUrl || "",
+    emails: [
+      { key: draftKey(), label: "", value: c.email || "" },
+      ...(c.extraEmails ?? []).map((e) => ({ ...e, key: draftKey() })),
+    ],
+    phones: [
+      { key: draftKey(), label: "", value: c.phone || "" },
+      ...(c.extraPhones ?? []).map((p) => ({ ...p, key: draftKey() })),
+    ],
+  };
+}
 
 const contactInputClass =
   "w-full bg-surface border border-border-subtle rounded-md px-2 py-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default";
@@ -121,6 +167,7 @@ function ContactRow({
   onEmail,
   onDnc,
   onSave,
+  onDelete,
   active,
   onSelect,
   fallbackLocation,
@@ -132,8 +179,13 @@ function ContactRow({
   /** Persist edited contact details. When provided, an edit (pencil) action shows. */
   onSave?: (
     contactId: string,
-    patch: { name?: string; title?: string; email?: string; phone?: string; linkedinUrl?: string },
+    patch: {
+      name?: string; title?: string; email?: string; phone?: string; linkedinUrl?: string;
+      extraEmails?: ContactExtra[]; extraPhones?: ContactExtra[];
+    },
   ) => Promise<void>;
+  /** Delete this contact from the campaign (non-primary contacts only). */
+  onDelete?: (contactId: string) => Promise<void>;
   /** Highlighted when this contact is the active activity filter. */
   active?: boolean;
   /** Toggle the activity filter to this contact (rendered inside the details). */
@@ -147,14 +199,12 @@ function ContactRow({
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<ContactDraft>({
-    name: c.name,
-    title: c.title || "",
-    email: c.email || "",
-    phone: c.phone || "",
-    linkedinUrl: c.linkedinUrl || "",
-  });
+  const [draft, setDraft] = useState<ContactDraft>(() => makeContactDraft(c));
+  // Drag starts only from each row's grip handle, so the inputs stay usable.
+  const dragSensors = useSensors(useSensor(PointerSensor));
 
   function call() {
     if (!c.phone) return;
@@ -174,7 +224,7 @@ function ContactRow({
   }
 
   function startEdit() {
-    setDraft({ name: c.name, title: c.title || "", email: c.email || "", phone: c.phone || "", linkedinUrl: c.linkedinUrl || "" });
+    setDraft(makeContactDraft(c));
     setError(null);
     setEditing(true);
   }
@@ -185,12 +235,17 @@ function ContactRow({
     setSaving(true);
     setError(null);
     try {
+      // Row 0 of each list is the primary; the rest become the labeled extras.
+      const emails = draft.emails.map((e) => ({ label: e.label.trim(), value: e.value.trim() }));
+      const phones = draft.phones.map((p) => ({ label: p.label.trim(), value: p.value.trim() }));
       await onSave(c.id, {
         name: draft.name.trim(),
         title: draft.title.trim(),
-        email: draft.email.trim(),
-        phone: draft.phone.trim(),
         linkedinUrl: draft.linkedinUrl.trim(),
+        email: emails[0]?.value ?? "",
+        phone: phones[0]?.value ?? "",
+        extraEmails: emails.slice(1).filter((e) => e.value),
+        extraPhones: phones.slice(1).filter((p) => p.value),
       });
       setEditing(false);
     } catch (err) {
@@ -200,15 +255,95 @@ function ContactRow({
     }
   }
 
+  async function applyDelete() {
+    if (!onDelete) return;
+    setDeleting(true);
+    try {
+      await onDelete(c.id);
+      // Stay busy — the row disappears when the leads reload.
+    } catch {
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }
+
+  function setEntry(kind: "emails" | "phones", index: number, next: DraftEntry) {
+    setDraft((d) => ({ ...d, [kind]: d[kind].map((x, i) => (i === index ? next : x)) }));
+  }
+  function removeEntry(kind: "emails" | "phones", index: number) {
+    setDraft((d) => ({ ...d, [kind]: d[kind].filter((_, i) => i !== index) }));
+  }
+  function addEntry(kind: "emails" | "phones") {
+    setDraft((d) => ({ ...d, [kind]: [...d[kind], { key: draftKey(), label: "", value: "" }] }));
+  }
+  function onDragEnd(kind: "emails" | "phones", event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    setDraft((d) => {
+      const list = d[kind];
+      const from = list.findIndex((x) => x.key === String(active.id));
+      const to = list.findIndex((x) => x.key === String(over.id));
+      if (from < 0 || to < 0) return d;
+      return { ...d, [kind]: arrayMove(list, from, to) };
+    });
+  }
+
   if (editing) {
     return (
       <div className="rounded-lg border border-border-subtle bg-section/40 p-2.5 my-1">
         <div className="flex flex-col gap-1.5">
           <input autoFocus value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Full name" className={contactInputClass} />
           <input value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="Title" className={contactInputClass} />
-          <input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} placeholder="Email" className={contactInputClass} />
-          <input value={draft.phone} onChange={(e) => setDraft({ ...draft, phone: e.target.value })} placeholder="Phone" className={contactInputClass} />
-          <input value={draft.linkedinUrl} onChange={(e) => setDraft({ ...draft, linkedinUrl: e.target.value })} placeholder="LinkedIn URL" className={contactInputClass} />
+
+          <span className="text-[9.5px] uppercase tracking-wider text-ink-faint font-medium px-0.5 mt-1">Emails — drag to reorder, top is primary</span>
+          <DndContext sensors={dragSensors} collisionDetection={closestCenter} onDragEnd={(e) => onDragEnd("emails", e)}>
+            <SortableContext items={draft.emails.map((x) => x.key)} strategy={verticalListSortingStrategy}>
+              {draft.emails.map((entry, i) => (
+                <SortableValueRow
+                  key={entry.key}
+                  entry={entry}
+                  isPrimary={i === 0}
+                  placeholder={i === 0 ? "Email" : "Additional email"}
+                  onChange={(next) => setEntry("emails", i, next)}
+                  onRemove={() => removeEntry("emails", i)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+
+          <span className="text-[9.5px] uppercase tracking-wider text-ink-faint font-medium px-0.5 mt-1">Phone numbers — drag to reorder, top is primary</span>
+          <DndContext sensors={dragSensors} collisionDetection={closestCenter} onDragEnd={(e) => onDragEnd("phones", e)}>
+            <SortableContext items={draft.phones.map((x) => x.key)} strategy={verticalListSortingStrategy}>
+              {draft.phones.map((entry, i) => (
+                <SortableValueRow
+                  key={entry.key}
+                  entry={entry}
+                  isPrimary={i === 0}
+                  placeholder={i === 0 ? "Phone" : "Additional phone"}
+                  onChange={(next) => setEntry("phones", i, next)}
+                  onRemove={() => removeEntry("phones", i)}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
+
+          <input value={draft.linkedinUrl} onChange={(e) => setDraft({ ...draft, linkedinUrl: e.target.value })} placeholder="LinkedIn URL" className={cn(contactInputClass, "mt-1")} />
+          <div className="flex items-center gap-3 mt-0.5 px-0.5">
+            <button
+              type="button"
+              onClick={() => addEntry("emails")}
+              className="inline-flex items-center gap-1 text-[10.5px] font-medium text-ink-muted hover:text-ink transition-colors"
+            >
+              <Plus size={10} /> Add email
+            </button>
+            <button
+              type="button"
+              onClick={() => addEntry("phones")}
+              className="inline-flex items-center gap-1 text-[10.5px] font-medium text-ink-muted hover:text-ink transition-colors"
+            >
+              <Plus size={10} /> Add phone
+            </button>
+          </div>
         </div>
         {error && <p className="text-[10.5px] text-signal-red-text mt-1.5">{error}</p>}
         <div className="flex items-center justify-end gap-1.5 mt-2">
@@ -292,6 +427,16 @@ function ContactRow({
               <Ban size={13} />
             </button>
           )}
+          {onDelete && !c.isPrimary && (
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete((v) => !v)}
+              title="Delete contact"
+              className="flex items-center justify-center w-[22px] h-[22px] rounded-md text-ink-muted hover:bg-signal-red/10 hover:text-signal-red-text transition-colors"
+            >
+              <Trash2 size={12} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -305,6 +450,14 @@ function ContactRow({
               </button>
             ) : <span className="text-ink-faint">No phone</span>}
           </DetailRow>
+          {(c.extraPhones ?? []).map((p, i) => (
+            <DetailRow key={`xp-${i}`} icon={Phone} action={<CopyBtn value={p.value} what="phone number" />}>
+              <button onClick={() => onCall(p.value, c.name)} className="text-ink hover:text-accent transition-colors tabular-nums">
+                {formatPhoneIntl(p.value)}
+              </button>
+              {p.label && <ExtraLabel text={p.label} />}
+            </DetailRow>
+          ))}
           <DetailRow icon={Mail} muted={!c.email} action={c.email ? <CopyBtn value={c.email} what="email" /> : undefined}>
             {c.email ? (
               <button onClick={() => onEmail(c.email as string, c.name)} className="text-ink hover:text-accent transition-colors truncate">
@@ -312,6 +465,14 @@ function ContactRow({
               </button>
             ) : <span className="text-ink-faint">No email</span>}
           </DetailRow>
+          {(c.extraEmails ?? []).map((e, i) => (
+            <DetailRow key={`xe-${i}`} icon={Mail} action={<CopyBtn value={e.value} what="email" />}>
+              <button onClick={() => onEmail(e.value, c.name)} className="text-ink hover:text-accent transition-colors truncate">
+                {e.value}
+              </button>
+              {e.label && <ExtraLabel text={e.label} />}
+            </DetailRow>
+          ))}
           {c.linkedinUrl && (
             <DetailRow icon={Linkedin}>
               <a href={c.linkedinUrl.startsWith("http") ? c.linkedinUrl : `https://www.linkedin.com/in/${c.linkedinUrl}`} target="_blank" rel="noreferrer" className="text-accent hover:underline truncate">
@@ -339,6 +500,31 @@ function ContactRow({
               {active ? "Showing this contact — show all" : "Show only this contact's activity"}
             </button>
           )}
+        </div>
+      )}
+
+      {confirmingDelete && onDelete && (
+        <div className="mx-1 mb-2 flex items-center justify-between gap-2 rounded-[8px] bg-signal-red/10 border border-signal-red-text/20 px-2.5 py-2">
+          <span className="text-[10px] text-signal-red-text leading-snug">
+            Delete <strong>{c.name}</strong> from this campaign? Their activity in this campaign is removed too. This can&apos;t be undone.
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => setConfirmingDelete(false)}
+              disabled={deleting}
+              className="px-2 py-0.5 rounded-full bg-section text-ink-secondary text-[10px] font-medium hover:bg-hover transition-colors border border-border-subtle disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => void applyDelete()}
+              disabled={deleting}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-signal-red-text text-on-ink text-[10px] font-medium hover:bg-signal-red-text/90 transition-colors disabled:opacity-50"
+            >
+              {deleting ? <Loader2 size={9} className="animate-spin" /> : <Trash2 size={9} />}
+              Delete
+            </button>
+          </div>
         </div>
       )}
 
@@ -371,6 +557,85 @@ function ContactRow({
         </div>
       )}
     </div>
+  );
+}
+
+/** One draggable email/phone row in the edit form. The list is ordered — the
+ *  top row is the primary value (used for calling/sending); dragging another
+ *  row to the top promotes it. Drag starts from the grip handle only. */
+function SortableValueRow({
+  entry,
+  isPrimary,
+  placeholder,
+  onChange,
+  onRemove,
+}: {
+  entry: DraftEntry;
+  isPrimary: boolean;
+  placeholder: string;
+  onChange: (next: DraftEntry) => void;
+  onRemove: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: entry.key });
+  return (
+    <div
+      ref={setNodeRef}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+      className={cn("flex items-center gap-1.5", isDragging && "relative z-10 opacity-60")}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        title="Drag to reorder — the top row is the primary"
+        className="flex items-center justify-center w-[16px] h-[22px] rounded text-ink-faint hover:text-ink-muted cursor-grab active:cursor-grabbing shrink-0"
+      >
+        <GripVertical size={12} />
+      </button>
+      {isPrimary ? (
+        <span
+          title="The primary value — what calling and sending use"
+          className="w-[84px] shrink-0 text-center text-[9px] font-medium rounded-full px-1.5 py-[3px] bg-signal-slate text-signal-slate-text uppercase tracking-wide"
+        >
+          Primary
+        </span>
+      ) : (
+        <input
+          value={entry.label}
+          onChange={(e) => onChange({ ...entry, label: e.target.value })}
+          placeholder="Label"
+          title='Label, e.g. "Work" or "Personal"'
+          className={cn(contactInputClass, "w-[84px] shrink-0")}
+        />
+      )}
+      <input
+        value={entry.value}
+        onChange={(e) => onChange({ ...entry, value: e.target.value })}
+        placeholder={placeholder}
+        className={contactInputClass}
+      />
+      {isPrimary ? (
+        <span className="w-[22px] shrink-0" />
+      ) : (
+        <button
+          type="button"
+          onClick={onRemove}
+          title="Remove"
+          className="flex items-center justify-center w-[22px] h-[22px] rounded-md text-ink-faint hover:bg-hover hover:text-signal-red-text transition-colors shrink-0"
+        >
+          <X size={12} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Tiny chip naming an additional email/phone (Work, Personal, …). */
+function ExtraLabel({ text }: { text: string }) {
+  return (
+    <span className="ml-1.5 align-middle text-[9px] font-medium rounded-full px-1.5 py-px bg-section text-ink-muted uppercase tracking-wide">
+      {text}
+    </span>
   );
 }
 
@@ -702,6 +967,7 @@ export function LeadDetailsColumn({
   onEmail,
   onDnc,
   onContactSave,
+  onContactDelete,
   activeContactId,
   onContactSelect,
   leads,
@@ -774,6 +1040,7 @@ export function LeadDetailsColumn({
                     onEmail={onEmail}
                     onDnc={onDnc}
                     onSave={onContactSave}
+                    onDelete={onContactDelete}
                     active={activeContactId === c.id}
                     onSelect={onContactSelect ? () => onContactSelect(c.id) : undefined}
                     fallbackLocation={company?.address ?? null}
