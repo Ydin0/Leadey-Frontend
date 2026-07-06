@@ -2,6 +2,7 @@ import { apiRequest, apiRequestRaw } from "./client";
 import type {
   Pipeline,
   PipelineStage,
+  PipelineMember,
   Opportunity,
   OpportunityDetail,
   OpportunityEvent,
@@ -13,6 +14,25 @@ import type {
 
 export async function listPipelines(): Promise<Pipeline[]> {
   return apiRequest<Pipeline[]>("/pipelines");
+}
+
+// ── Pipeline members ────────────────────────────────────────────────
+
+export async function getPipelineMembers(pipelineId: string): Promise<PipelineMember[]> {
+  return apiRequest<PipelineMember[]>(`/pipelines/${encodeURIComponent(pipelineId)}/members`);
+}
+
+export async function addPipelineMember(pipelineId: string, userId: string, role = "contributor"): Promise<PipelineMember> {
+  return apiRequest<PipelineMember>(`/pipelines/${encodeURIComponent(pipelineId)}/members`, {
+    method: "POST",
+    body: JSON.stringify({ userId, role }),
+  });
+}
+
+export async function removePipelineMember(pipelineId: string, userId: string): Promise<void> {
+  await apiRequest(`/pipelines/${encodeURIComponent(pipelineId)}/members/${encodeURIComponent(userId)}`, {
+    method: "DELETE",
+  });
 }
 
 export async function createPipeline(data: {

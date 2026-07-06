@@ -13,6 +13,17 @@ export interface PipelineStage {
   color: string | null;
 }
 
+export interface PipelineMember {
+  id: string;
+  userId: string;
+  role: string;
+  email: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  imageUrl: string | null;
+  createdAt: string;
+}
+
 export interface Pipeline {
   id: string;
   name: string;
@@ -23,6 +34,8 @@ export interface Pipeline {
   /** Number of opportunities in this pipeline (all stages). */
   opportunityCount?: number;
   stages: PipelineStage[];
+  /** Users assigned to this pipeline (admins assign via the header panel). */
+  members?: PipelineMember[];
 }
 
 export interface Opportunity {

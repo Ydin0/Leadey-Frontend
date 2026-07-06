@@ -9,6 +9,7 @@ import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PipelineBoard } from "@/components/opportunities/pipeline-board";
 import { EditOpportunityModal } from "@/components/opportunities/edit-opportunity-modal";
 import { PipelineTabs } from "@/components/opportunities/pipeline-tabs";
+import { PipelineMembersPanel } from "@/components/opportunities/pipeline-members-panel";
 import { PipelineStatsBar } from "@/components/opportunities/pipeline-stats-bar";
 import { OpportunityFilters } from "@/components/opportunities/opportunity-filters";
 import { useTeamMembers } from "@/hooks/use-team-members";
@@ -150,7 +151,8 @@ export default function OpportunitiesPage() {
             Track deals through your pipeline stages and forecast revenue.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {activePipelineId && <PipelineMembersPanel key={activePipelineId} pipelineId={activePipelineId} />}
           <div className="flex items-center bg-section rounded-full p-0.5 border border-border-subtle">
             <button
               type="button"
