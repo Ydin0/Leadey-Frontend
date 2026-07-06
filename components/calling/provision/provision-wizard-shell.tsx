@@ -59,14 +59,19 @@ export function ProvisionWizardShell({ onComplete }: ProvisionWizardShellProps) 
   }
 
   async function handleComplete() {
-    if (line && assignedTo) {
-      try {
-        await updatePhoneLine(line.id, {
-          assignedTo,
-          assignedToName: friendlyName || null,
-        });
-      } catch (err) {
-        console.error("Failed to assign line:", err);
+    if (line) {
+      // The typed name is the line's friendlyName (shown in the table);
+      // assignment is a separate field. The server resolves assignedToName
+      // from the user id, so we only send assignedTo here.
+      const patch: { friendlyName?: string; assignedTo?: string } = {};
+      if (friendlyName.trim()) patch.friendlyName = friendlyName.trim();
+      if (assignedTo) patch.assignedTo = assignedTo;
+      if (Object.keys(patch).length > 0) {
+        try {
+          await updatePhoneLine(line.id, patch);
+        } catch (err) {
+          console.error("Failed to finalize line:", err);
+        }
       }
     }
     onComplete();
