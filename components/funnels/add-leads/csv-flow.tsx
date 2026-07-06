@@ -24,8 +24,11 @@ const REQUIRED: MappedField[] = ["Lead Name", "Company Name"];
 
 /** Fields that may map from more than one CSV column. Everything else is a
  *  single-value field and must map from at most ONE column (no duplicates).
- *  Notes aggregates multiple columns; Skip is the absence of a mapping. */
-const MULTI_USE: ReadonlySet<MappedField> = new Set<MappedField>(["Notes", "--- Skip ---"]);
+ *  Notes aggregates multiple columns; Skip is the absence of a mapping.
+ *  Phone/Email accept MULTIPLE columns (e.g. Work Direct / Mobile / Corporate):
+ *  per contact the first non-empty becomes the primary, the rest are saved as
+ *  labeled extras (label = the CSV column header). */
+const MULTI_USE: ReadonlySet<MappedField> = new Set<MappedField>(["Notes", "Lead Phone", "Lead Email", "--- Skip ---"]);
 const isUniqueField = (f: MappedField) => !MULTI_USE.has(f);
 
 interface ColumnMapping {
@@ -286,9 +289,14 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
     return (
       <div>
         <h3 className="text-[14px] font-semibold text-ink mb-1">Map your columns</h3>
-        <p className="text-[11px] text-ink-muted mb-3">
+        <p className="text-[11px] text-ink-muted mb-1">
           <FileSpreadsheet size={12} className="inline mr-1" />
           {fileName} · {csvRows.length.toLocaleString()} rows · map each column to any lead, company{customFields.length > 0 ? ", or custom" : ""} field.
+        </p>
+        <p className="text-[11px] text-ink-faint mb-3">
+          Map several columns to <span className="font-medium text-ink-muted">Lead Phone</span> or{" "}
+          <span className="font-medium text-ink-muted">Lead Email</span> (e.g. Work, Mobile, Corporate) — the first
+          value becomes the primary and the rest are saved as labeled extras on the contact.
         </p>
 
         <label className="flex items-start gap-2.5 mb-3 p-3 rounded-[12px] border border-border-subtle bg-section/40 cursor-pointer hover:bg-section/60 transition-colors">
@@ -422,6 +430,7 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
                 <span className="flex items-center gap-1.5 text-ink-muted"><CheckCircle2 size={12} className="text-signal-green-text" />{review.totalRows.toLocaleString()} rows read</span>
                 {review.duplicateLeads > 0 && <span className="flex items-center gap-1.5 text-ink-muted"><AlertCircle size={12} className="text-signal-blue-text" />{review.duplicateLeads} duplicate{review.duplicateLeads === 1 ? "" : "s"} skipped</span>}
                 {review.invalidRows > 0 && <span className="flex items-center gap-1.5 text-ink-muted"><AlertTriangle size={12} className="text-signal-red-text" />{review.invalidRows} invalid skipped</span>}
+                {!!review.extraContactRows && review.extraContactRows > 0 && <span className="flex items-center gap-1.5 text-ink-muted"><CheckCircle2 size={12} className="text-signal-green-text" />{review.extraContactRows} with extra phones/emails</span>}
                 {review.existingCompanies > 0 && <span className="flex items-center gap-1.5 text-ink-muted"><Building2 size={12} className="text-ink-faint" />Leads nest under {review.existingCompanies} existing compan{review.existingCompanies === 1 ? "y" : "ies"}</span>}
               </div>
 

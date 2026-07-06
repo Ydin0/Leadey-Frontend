@@ -383,6 +383,8 @@ export interface ImportCsvResult {
   skippedRows: number;
   duplicateLeads: number;
   invalidRows: number;
+  /** Contacts that got ≥1 additional phone/email from extra mapped columns. */
+  extraContactRows?: number;
   companiesTotal: number;
   existingCompanies: number;
   newCompanies: number;
