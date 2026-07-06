@@ -1,71 +1,80 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback } from "react";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { apiRequest } from "@/lib/api/client";
+import { qk } from "@/lib/queries/keys";
+import {
+  builtinRoleDefaults,
+  mergePermissions,
+  hasPerm as hasPermFn,
+  scopeOf as scopeOfFn,
+  NO_PERMISSIONS,
+  type ResolvedPermissions,
+} from "@/lib/types/permissions";
 
-interface Permissions {
-  role: string;
-  isAdmin: boolean;
-  isManager: boolean;
-  canCreateFunnels: boolean;
-  canCreateScrapers: boolean;
-  canManageBilling: boolean;
-  canManageTeam: boolean;
-  canRunScrapers: boolean;
-  canEnrich: boolean;
-  canCall: boolean;
-  canManageTemplates: boolean;
-  loaded: boolean;
+interface MeResponse {
+  role?: string;
+  appRole?: string;
+  isOrgAdmin?: boolean;
+  permissions?: ResolvedPermissions | null;
 }
 
-const DEFAULT: Permissions = {
-  role: "rep",
-  isAdmin: false,
-  isManager: false,
-  canCreateFunnels: false,
-  canCreateScrapers: false,
-  canManageBilling: false,
-  canManageTeam: false,
-  canRunScrapers: true,
-  canEnrich: true,
-  canCall: true,
-  canManageTemplates: false,
-  loaded: false,
-};
+export interface Permissions {
+  loaded: boolean;
+  isOrgAdmin: boolean;
+  appRole: string;
+  permissions: ResolvedPermissions;
+  /** True if the caller has the boolean capability "module.key". */
+  has: (key: string) => boolean;
+  /** The scope string for a "module.view"-style key ("all"|"assigned"|…). */
+  scopeOf: (key: string) => string;
+}
 
+/**
+ * The caller's effective permissions. Server-side is authoritative; this hook
+ * drives UI gating only. Fail CLOSED: on error we resolve to NO_PERMISSIONS
+ * (never admin), and consumers should render nothing sensitive until `loaded`.
+ * Deploy-safety: if the backend is old and omits `permissions`, synthesize
+ * from `role` so the UI degrades to sane defaults rather than locking out.
+ */
 export function usePermissions(): Permissions {
   const isAuthReady = useAuthReady();
-  const [perms, setPerms] = useState<Permissions>(DEFAULT);
+  const { data, isSuccess, isError } = useQuery({
+    queryKey: qk.mePermissions,
+    queryFn: () => apiRequest<MeResponse>("/team/me"),
+    staleTime: 30_000,
+    enabled: isAuthReady,
+  });
 
-  useEffect(() => {
-    if (!isAuthReady) return;
-    apiRequest<{ role: string }>("/team/me")
-      .then((data) => {
-        const role = data.role;
-        const isAdmin = role === "admin" || role === "org:admin";
-        const isManager = role === "manager" || isAdmin;
+  let permissions: ResolvedPermissions = NO_PERMISSIONS;
+  let isOrgAdmin = false;
+  let appRole = "member";
 
-        setPerms({
-          role,
-          isAdmin,
-          isManager,
-          canCreateFunnels: isAdmin || isManager,
-          canCreateScrapers: isAdmin || isManager,
-          canManageBilling: isAdmin,
-          canManageTeam: isAdmin,
-          canRunScrapers: role !== "viewer",
-          canEnrich: role !== "viewer",
-          canCall: role !== "viewer",
-          canManageTemplates: isAdmin || isManager,
-          loaded: true,
-        });
-      })
-      .catch(() => {
-        // Default to admin for now if endpoint fails (backwards compat)
-        setPerms({ ...DEFAULT, isAdmin: true, isManager: true, canCreateFunnels: true, canCreateScrapers: true, canManageBilling: true, canManageTeam: true, canManageTemplates: true, loaded: true });
-      });
-  }, [isAuthReady]);
+  if (data) {
+    isOrgAdmin = !!data.isOrgAdmin;
+    appRole = data.appRole || "member";
+    if (data.permissions) {
+      permissions = data.permissions;
+    } else if (data.role) {
+      // Old backend: derive from the coarse role.
+      const key = data.role === "admin" || data.role === "org:admin" ? "admin" : "member";
+      permissions = mergePermissions(builtinRoleDefaults(key), null);
+    }
+  } else if (isError) {
+    permissions = NO_PERMISSIONS;
+  }
 
-  return perms;
+  const has = useCallback((key: string) => hasPermFn(permissions, key), [permissions]);
+  const scopeOf = useCallback((key: string) => scopeOfFn(permissions, key), [permissions]);
+
+  return {
+    loaded: isSuccess || isError,
+    isOrgAdmin,
+    appRole,
+    permissions,
+    has,
+    scopeOf,
+  };
 }

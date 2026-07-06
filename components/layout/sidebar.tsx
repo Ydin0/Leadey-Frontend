@@ -11,6 +11,7 @@ import { usePrefetchFunnel } from "@/lib/queries/use-prefetch";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getInboxCounts } from "@/lib/api/inbox";
 import { LeadeyMark, LeadeyWordmark } from "@/components/brand/leadey-mark";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import type { NavItem } from "@/lib/types";
 
 export function Sidebar() {
@@ -21,6 +22,25 @@ export function Sidebar() {
   const prefetchFunnel = usePrefetchFunnel();
   const isAuthReady = useAuthReady();
   const [inboxCount, setInboxCount] = useState(0);
+  const { loaded: permsLoaded, has, scopeOf } = usePermissions();
+
+  // Which nav items a user may see, keyed by nav item id. Anything not listed
+  // is always visible (cockpit, settings, team). Until permissions load we show
+  // everything to avoid a flash of a stripped-down sidebar.
+  const canSeeNav = useCallback((id: string): boolean => {
+    if (!permsLoaded) return true;
+    switch (id) {
+      case "funnels": return scopeOf("campaigns.access") !== "none";
+      case "leads": return scopeOf("leads.view") !== "none";
+      case "opportunities": return scopeOf("opportunities.view") !== "none";
+      case "inbox": return scopeOf("inbox.view") !== "none";
+      case "recordings": return scopeOf("calling.recordings") !== "none";
+      case "scrapers": return has("scrapers.view");
+      case "templates": return has("templates.use");
+      case "knowledge-base": return has("knowledgeBase.view");
+      default: return true;
+    }
+  }, [permsLoaded, has, scopeOf]);
 
   useEffect(() => {
     if (!isAuthReady) return;
@@ -82,7 +102,10 @@ export function Sidebar() {
 
       {/* Navigation — labeled sections */}
       <nav className="flex-1 flex flex-col gap-3 px-2 py-2 overflow-y-auto">
-        {navGroups.map((group) => (
+        {navGroups.map((group) => {
+          const visibleItems = group.items.filter((it) => canSeeNav(it.id));
+          if (visibleItems.length === 0) return null;
+          return (
           <div key={group.label} className="flex flex-col gap-0.5">
             {/* Section label — only shown when expanded */}
             <div
@@ -96,7 +119,7 @@ export function Sidebar() {
               </span>
             </div>
 
-            {group.items.map((item) => {
+            {visibleItems.map((item) => {
               const isActive = isItemActive(item);
               const Icon = item.icon;
               const badge = item.id === "inbox" ? (inboxCount || undefined) : item.badge;
@@ -207,7 +230,8 @@ export function Sidebar() {
               );
             })}
           </div>
-        ))}
+          );
+        })}
       </nav>
     </aside>
   );

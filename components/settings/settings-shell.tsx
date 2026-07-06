@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import { BillingSection } from "./billing-section";
 import { CreditsSection } from "./credits-section";
 import { TeamSection } from "./team-section";
@@ -219,12 +220,48 @@ const VALID_TABS: SettingsTab[] = [
   "integrations",
 ];
 
+/** Which permission gates a given settings tab (unlisted tabs are always
+ *  shown). A member without the capability doesn't see the tab, and a
+ *  deep-link to it falls back to Profile. */
+const TAB_GATE: Partial<Record<SettingsTab, string>> = {
+  billing: "settings.manageBilling",
+  credits: "settings.manageBilling",
+  team: "settings.manageTeam",
+  "api-keys": "settings.manageApiKeys",
+  "phone-lines": "settings.managePhoneLines",
+  "email-accounts": "settings.manageIntegrations",
+  integrations: "settings.manageIntegrations",
+  linkedin: "settings.manageIntegrations",
+  "lead-statuses": "settings.manageOrgConfig",
+  "campaign-tags": "settings.manageOrgConfig",
+  "task-categories": "settings.manageOrgConfig",
+  "custom-fields": "settings.manageOrgConfig",
+  "call-outcomes": "settings.manageOrgConfig",
+  "local-presence": "settings.managePhoneLines",
+  pipelines: "opportunities.managePipelines",
+};
+
 export function SettingsShell() {
   const searchParams = useSearchParams();
+  const { loaded: permsLoaded, has } = usePermissions();
+  const canSeeTab = useCallback(
+    (id: SettingsTab) => {
+      const gate = TAB_GATE[id];
+      if (!gate || !permsLoaded) return true;
+      return has(gate);
+    },
+    [permsLoaded, has],
+  );
+  const visibleTabs = useMemo(() => tabs.filter((t) => canSeeTab(t.id)), [canSeeTab]);
   const requestedTab = searchParams.get("tab") as SettingsTab | null;
   const initialTab: SettingsTab =
     requestedTab && VALID_TABS.includes(requestedTab) ? requestedTab : "profile";
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
+  // If the active tab isn't permitted (deep-link or perms loaded late), fall
+  // back to Profile which is always visible.
+  useEffect(() => {
+    if (permsLoaded && !canSeeTab(activeTab)) setActiveTab("profile");
+  }, [permsLoaded, canSeeTab, activeTab]);
   const [draft, setDraft] = useState<AppSettingsSnapshot>(mockSettings);
   const [savedState, setSavedState] = useState<AppSettingsSnapshot>(mockSettings);
 
@@ -297,7 +334,7 @@ export function SettingsShell() {
       <div className="grid grid-cols-12 gap-4">
         <aside className="col-span-3">
           <div className="bg-surface rounded-[14px] border border-border-subtle p-2 space-y-1 sticky top-20">
-            {tabs.map((tab) => {
+            {visibleTabs.map((tab) => {
               const Icon = tab.icon;
               return (
                 <button

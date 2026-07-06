@@ -17,4 +17,8 @@ export const qk = {
   callOutcomes: ["call-outcomes"] as const,
   pipelines: ["pipelines"] as const,
   campaignTags: ["campaign-tags"] as const,
+  /** The caller's own resolved permissions (from GET /team/me). */
+  mePermissions: ["me-permissions"] as const,
+  /** Built-in + custom org roles for the Team settings editor. */
+  orgRoles: ["org-roles"] as const,
 };

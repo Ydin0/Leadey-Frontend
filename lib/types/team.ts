@@ -5,6 +5,10 @@ export interface TeamMember {
   lastName: string | null;
   imageUrl: string | null;
   role: string;
+  /** Granular app-role: a built-in key or a custom org_roles id ("role_…"). */
+  appRole?: string;
+  /** Whether this member has per-user permission overrides on top of the role. */
+  hasOverrides?: boolean;
   createdAt: string;
 }
 

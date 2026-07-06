@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Mail, Loader2, X, ChevronDown, UserPlus, Clock, Trash2, AlertTriangle, Pencil } from "lucide-react";
+import { Users, Mail, Loader2, X, ChevronDown, UserPlus, Clock, Trash2, AlertTriangle, Pencil, SlidersHorizontal } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -22,6 +22,7 @@ import {
   type Department,
 } from "@/lib/api/team";
 import { DepartmentsManager } from "./departments-manager";
+import { MemberPermissionsModal, RolesCard } from "./team-permissions";
 import type { TeamMember, PendingInvitation, SeatUsage } from "@/lib/types/team";
 
 const ROLES = [
@@ -73,6 +74,7 @@ export function TeamSection() {
 
   // Edit member
   const [editMember, setEditMember] = useState<TeamMember | null>(null);
+  const [permMember, setPermMember] = useState<TeamMember | null>(null);
   const [editFirstName, setEditFirstName] = useState("");
   const [editLastName, setEditLastName] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
@@ -359,6 +361,15 @@ export function TeamSection() {
                   )}
                 </div>
 
+                {/* Permissions */}
+                <button
+                  onClick={() => setPermMember(member)}
+                  className="p-1.5 rounded-md text-ink-faint hover:text-ink hover:bg-hover transition-colors"
+                  title="Permissions"
+                >
+                  <SlidersHorizontal size={12} />
+                </button>
+
                 {/* Edit */}
                 <button
                   onClick={() => openEdit(member)}
@@ -393,6 +404,18 @@ export function TeamSection() {
           ))}
         </div>
       </div>
+
+      {/* Roles (built-in presets + custom roles) */}
+      <RolesCard />
+
+      {/* Per-member permissions editor */}
+      {permMember && (
+        <MemberPermissionsModal
+          member={permMember}
+          onClose={() => setPermMember(null)}
+          onSaved={() => { void loadData(); }}
+        />
+      )}
 
       {/* Invite member modal */}
       {showInviteModal && (

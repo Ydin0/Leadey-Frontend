@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Loader2, LayoutGrid, List, AlertCircle } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import { PipelineBoard } from "@/components/opportunities/pipeline-board";
 import { EditOpportunityModal } from "@/components/opportunities/edit-opportunity-modal";
 import { PipelineTabs } from "@/components/opportunities/pipeline-tabs";
@@ -35,6 +37,15 @@ export default function OpportunitiesPage() {
   // Selected owner ids to filter by; empty = all owners.
   const [ownerFilter, setOwnerFilter] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Members restricted to "assigned" opportunities can only ever see their own
+  // (the server enforces this too); lock the owner filter to themselves.
+  const { userId } = useAuth();
+  const { loaded: permsLoaded, scopeOf } = usePermissions();
+  const oppScopeAssigned = permsLoaded && scopeOf("opportunities.view") === "assigned";
+  useEffect(() => {
+    if (oppScopeAssigned && userId) setOwnerFilter([userId]);
+  }, [oppScopeAssigned, userId]);
   // The opportunity being edited inline from the board (hover → pencil).
   const [editingOppId, setEditingOppId] = useState<string | null>(null);
 

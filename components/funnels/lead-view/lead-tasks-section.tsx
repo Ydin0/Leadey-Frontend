@@ -115,7 +115,8 @@ function AssigneePicker({
 export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadId: string }) {
   const isAuthReady = useAuthReady();
   const { userId } = useAuth();
-  const { isManager } = usePermissions();
+  const { has } = usePermissions();
+  const canAssignOthers = has("tasks.assignOthers");
 
   const [tasks, setTasks] = useState<LeadTask[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -140,11 +141,11 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
 
   // Admins/managers can assign to anyone → load the roster for the picker.
   useEffect(() => {
-    if (!isAuthReady || !isManager) return;
+    if (!isAuthReady || !canAssignOthers) return;
     getTeamMembers()
       .then((res) => setMembers(res.members))
       .catch(() => setMembers([]));
-  }, [isAuthReady, isManager]);
+  }, [isAuthReady, canAssignOthers]);
 
   function startAdding() {
     setAssignee(userId ?? null);
@@ -181,7 +182,7 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
         label: label.trim(),
         dueAt: due ? new Date(due).toISOString() : null,
         // Members can only self-assign; admins pick anyone.
-        assigneeId: isManager ? assignee : userId,
+        assigneeId: canAssignOthers ? assignee : userId,
       });
       setTasks((prev) => [...prev, created]);
       setLabel("");
@@ -283,7 +284,7 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
                 onChange={(iso) => setDue(iso ?? "")}
                 placeholder="Due date"
               />
-              {isManager && members.length > 0 && (
+              {canAssignOthers && members.length > 0 && (
                 <AssigneePicker
                   members={members}
                   value={assignee}
