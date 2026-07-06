@@ -8,18 +8,15 @@ import { useDialerContext } from "@/components/dialer/context/dialer-context";
 import { getLocalPresenceConfig, coverageScan, type UncoveredState } from "@/lib/api/calls";
 import { LocalPresencePreflightModal } from "./local-presence-preflight-modal";
 import type { DialerSession } from "@/lib/types/dialer";
-import type { FunnelStep } from "@/lib/types/funnel";
 
 interface DialerConfigModalProps {
-  /** Step mode: queue leads on this call step. */
-  step?: FunnelStep;
-  /** Campaign mode: queue every phone-having lead in this funnel (used when
-   *  the campaign has no call step). */
-  funnelId?: string;
+  /** The campaign to dial — queues every phone-having lead in it. The dialer
+   *  is not tied to sequence steps. */
+  funnelId: string;
   onClose: () => void;
 }
 
-export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModalProps) {
+export function DialerConfigModal({ funnelId, onClose }: DialerConfigModalProps) {
   const dialer = useDialerContext();
   const [excludeDoNotCall, setExcludeDoNotCall] = useState(true);
   const [excludeClosed, setExcludeClosed] = useState(true);
@@ -46,7 +43,7 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
     setError(null);
     try {
       const { session } = await createSession({
-        ...(step ? { funnelStepId: step.id } : { funnelId }),
+        funnelId,
         filters: {
           excludeDoNotCall,
           excludeClosed,
@@ -143,7 +140,7 @@ export function DialerConfigModal({ step, funnelId, onClose }: DialerConfigModal
           <div>
             <h2 className="text-[14px] font-semibold text-ink">Start Power Dialer</h2>
             <p className="text-[11px] text-ink-muted mt-0.5">
-              {step ? `Step: ${step.label}` : "All leads in this campaign"}
+              All leads in this campaign
             </p>
           </div>
           <button

@@ -234,9 +234,9 @@ export default function FunnelDetailPage() {
           <div className="flex items-center gap-3">
             <FunnelMembersPanel funnelId={funnel.id} />
             <div className="w-px h-5 bg-border-subtle" />
-            {/* Prominent power-dialer launcher — only renders if the
-                campaign has at least one call step. */}
-            <DialerLauncherButton steps={funnel.steps} funnelId={funnel.id} />
+            {/* Prominent power-dialer launcher — dials the whole campaign,
+                independent of the sequence steps. */}
+            <DialerLauncherButton funnelId={funnel.id} />
             <button
               onClick={() => router.push(`/dashboard/funnels/${funnel.id}/edit`)}
               className="flex items-center gap-1.5 px-4 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle"

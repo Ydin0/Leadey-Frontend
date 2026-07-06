@@ -8,7 +8,6 @@ import {
 import { cn } from "@/lib/utils";
 import { useCallContext } from "@/components/calling/call-context";
 import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
-import type { FunnelStep } from "@/lib/types/funnel";
 
 function fmtDuration(sec: number): string {
   const s = Math.max(0, Math.floor(sec));
@@ -17,7 +16,7 @@ function fmtDuration(sec: number): string {
 
 /** Phone toolbar shown inside the lead focus view (which overlays the header
  *  dialer): live call controls, calling-number switcher, and power-dial. */
-export function FocusCallControls({ steps, funnelId }: { steps: FunnelStep[]; funnelId: string }) {
+export function FocusCallControls({ funnelId }: { funnelId: string }) {
   const { activeCall, phoneLines, selectedLineId, setSelectedLineId, endCall, toggleMute } = useCallContext();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -124,7 +123,7 @@ export function FocusCallControls({ steps, funnelId }: { steps: FunnelStep[]; fu
             </div>
 
             {/* Power dial */}
-            <DialerLauncherButton steps={steps} funnelId={funnelId} className="!px-3 !py-1.5 !text-[11px]" />
+            <DialerLauncherButton funnelId={funnelId} className="!px-3 !py-1.5 !text-[11px]" />
           </>
         )}
       </div>
