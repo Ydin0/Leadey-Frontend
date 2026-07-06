@@ -424,6 +424,35 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
                 {review.invalidRows > 0 && <span className="flex items-center gap-1.5 text-ink-muted"><AlertTriangle size={12} className="text-signal-red-text" />{review.invalidRows} invalid skipped</span>}
                 {review.existingCompanies > 0 && <span className="flex items-center gap-1.5 text-ink-muted"><Building2 size={12} className="text-ink-faint" />Leads nest under {review.existingCompanies} existing compan{review.existingCompanies === 1 ? "y" : "ies"}</span>}
               </div>
+
+              {/* Which rows were flagged — so the user can see WHY a row is
+                  skipped (duplicate already in the campaign / invalid). */}
+              {review.errors.length > 0 && (
+                <div className="border-t border-border-subtle pt-3">
+                  <p className="text-[11px] font-medium text-ink-secondary mb-1.5">
+                    Skipped rows{review.duplicateLeads + review.invalidRows > review.errors.length ? ` (first ${review.errors.length})` : ""}
+                  </p>
+                  <div className="max-h-[132px] overflow-y-auto rounded-[8px] border border-border-subtle divide-y divide-border-subtle">
+                    {review.errors.map((e, i) => {
+                      const isDup = /duplicate/i.test(e.reason);
+                      return (
+                        <div key={i} className="flex items-center gap-2 px-2.5 py-1.5 text-[11px]">
+                          {isDup
+                            ? <AlertCircle size={11} className="text-signal-blue-text shrink-0" />
+                            : <AlertTriangle size={11} className="text-signal-red-text shrink-0" />}
+                          <span className="text-ink-muted tabular-nums shrink-0">Row {e.row}</span>
+                          <span className="text-ink-secondary truncate">{e.reason}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {review.duplicateLeads > 0 && (
+                    <p className="text-[10.5px] text-ink-faint mt-1.5">
+                      Duplicates are matched by email (or name + company) against contacts already in this campaign — they&apos;re skipped so you don&apos;t get two of the same person.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
