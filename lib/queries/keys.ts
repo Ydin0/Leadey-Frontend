@@ -19,6 +19,8 @@ export const qk = {
   campaignTags: ["campaign-tags"] as const,
   /** The caller's own resolved permissions (from GET /team/me). */
   mePermissions: ["me-permissions"] as const,
+  /** The caller's open tasks — polled for due-task reminders + the banner. */
+  myOpenTasks: ["my-open-tasks"] as const,
   /** Built-in + custom org roles for the Team settings editor. */
   orgRoles: ["org-roles"] as const,
 };

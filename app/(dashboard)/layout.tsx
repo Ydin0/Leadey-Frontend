@@ -10,6 +10,8 @@ import { AuthTokenSync } from "@/components/providers/auth-token-sync";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ScraperRunsProvider } from "@/components/providers/scraper-runs-provider";
 import { CreditsProvider } from "@/components/providers/credits-provider";
+import { DueTasksProvider } from "@/components/providers/due-tasks-provider";
+import { DueTasksBanner, DueTaskAlert } from "@/components/tasks/due-tasks-banner";
 import { ScraperRunsWidget } from "@/components/scrapers/scraper-runs-widget";
 import { AssistantWidget } from "@/components/assistant/assistant-widget";
 
@@ -25,6 +27,7 @@ export default function DashboardLayout({
       <CallProvider>
         <DialerProvider>
           <ScraperRunsProvider>
+          <DueTasksProvider>
             {/* dashboard-backdrop applies the layered radial gradients per
                 the Figma reference. The class is no-op in light mode. */}
             <div className="min-h-screen dashboard-backdrop bg-page">
@@ -40,6 +43,8 @@ export default function DashboardLayout({
                     is running. Pinned above the scroll area. */}
                 <DialerBar />
                 <TrialBanner />
+                {/* Persistent reminder for past-due tasks assigned to you. */}
+                <DueTasksBanner />
                 <div className="flex-1 min-h-0 overflow-y-auto p-6">{children}</div>
               </main>
               <ScraperRunsWidget />
@@ -47,9 +52,12 @@ export default function DashboardLayout({
               <AssistantWidget />
               {/* Global ringing prompt for inbound calls (accept/reject). */}
               <IncomingCallPrompt />
+              {/* Top-right flash + chime when a task first becomes due. */}
+              <DueTaskAlert />
               {/* Auto-reloads stale tabs so reps never run outdated call code. */}
               <VersionGate />
             </div>
+          </DueTasksProvider>
           </ScraperRunsProvider>
         </DialerProvider>
       </CallProvider>
