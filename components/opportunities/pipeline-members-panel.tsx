@@ -8,6 +8,7 @@ import {
 import { getTeamMembers } from "@/lib/api/team";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { usePermissions } from "@/lib/hooks/use-permissions";
+import { MemberAvatar } from "@/components/shared/member-avatar";
 import type { PipelineMember } from "@/lib/types/opportunity";
 import type { TeamMember } from "@/lib/types/team";
 
@@ -85,16 +86,14 @@ export function PipelineMembersPanel({ pipelineId }: { pipelineId: string }) {
       <div className="flex items-center -space-x-1.5">
         {members.slice(0, 5).map((m) => (
           <div key={m.userId} className="relative group">
-            <div className="w-7 h-7 rounded-full bg-signal-blue/10 flex items-center justify-center border-2 border-page text-[10px] font-semibold text-signal-blue-text">
-              {(m.firstName?.[0] || m.email?.[0] || "?").toUpperCase()}
-            </div>
+            <MemberAvatar id={m.userId} name={memberName(m)} size="sm" className="border-2 border-page" />
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 rounded bg-ink text-on-ink text-[9px] whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20">
               {memberName(m)}
             </div>
           </div>
         ))}
         {members.length > 5 && (
-          <div className="w-7 h-7 rounded-full bg-section flex items-center justify-center border-2 border-page text-[9px] font-medium text-ink-muted">
+          <div className="w-6 h-6 rounded-full bg-section flex items-center justify-center border-2 border-page text-[9px] font-medium text-ink-muted">
             +{members.length - 5}
           </div>
         )}
@@ -118,9 +117,7 @@ export function PipelineMembersPanel({ pipelineId }: { pipelineId: string }) {
                 <div className="space-y-1 mb-2 pb-2 border-b border-border-subtle">
                   {members.map((m) => (
                     <div key={m.userId} className="flex items-center gap-2 px-2 py-1 rounded-[8px]">
-                      <div className="w-6 h-6 rounded-full bg-signal-blue/10 flex items-center justify-center text-[9px] font-semibold text-signal-blue-text shrink-0">
-                        {(m.firstName?.[0] || m.email?.[0] || "?").toUpperCase()}
-                      </div>
+                      <MemberAvatar id={m.userId} name={memberName(m)} size="sm" />
                       <p className="text-[11px] font-medium text-ink truncate flex-1">{memberName(m)}</p>
                       <button
                         onClick={() => void handleRemove(m.userId)}
@@ -145,9 +142,7 @@ export function PipelineMembersPanel({ pipelineId }: { pipelineId: string }) {
                       disabled={busy}
                       className="w-full flex items-center gap-2 px-2 py-1.5 rounded-[8px] hover:bg-hover transition-colors text-left disabled:opacity-50"
                     >
-                      <div className="w-6 h-6 rounded-full bg-signal-blue/10 flex items-center justify-center text-[9px] font-semibold text-signal-blue-text shrink-0">
-                        {(tm.firstName?.[0] || tm.email[0]).toUpperCase()}
-                      </div>
+                      <MemberAvatar id={tm.id} name={memberName(tm)} size="sm" />
                       <div className="min-w-0">
                         <p className="text-[11px] font-medium text-ink truncate">{memberName(tm)}</p>
                         <p className="text-[9px] text-ink-faint truncate">{tm.email}</p>
