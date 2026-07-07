@@ -463,7 +463,7 @@ export function SearchDetailShell({ searchId }: SearchDetailShellProps) {
       {/* Run Modal */}
       {showRunModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-ink/40" onClick={() => setShowRunModal(false)} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" onClick={() => setShowRunModal(false)} />
           <div className="relative bg-surface rounded-[14px] border border-border-subtle shadow-xl w-full max-w-sm p-5">
             <h2 className="text-[15px] font-semibold text-ink mb-1">Run Search</h2>
             <p className="text-[11px] text-ink-muted mb-5">Configure how many results to fetch from TheirStack.</p>

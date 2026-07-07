@@ -828,7 +828,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
       {/* Note modal */}
       {noteOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div className="absolute inset-0 bg-ink/30" onClick={() => setNoteOpen(false)} />
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" onClick={() => setNoteOpen(false)} />
           <div className="relative w-full max-w-md bg-surface rounded-[14px] border border-border-subtle shadow-2xl p-5">
             <h3 className="text-[13px] font-semibold text-ink mb-3">Add a note</h3>
             <textarea

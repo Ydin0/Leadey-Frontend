@@ -82,7 +82,7 @@ export function DiscoveryConfigModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-ink/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" onClick={onClose} />
       <div className="relative w-full max-w-lg bg-surface rounded-[14px] border border-border-subtle shadow-xl p-6">
         <button
           onClick={onClose}

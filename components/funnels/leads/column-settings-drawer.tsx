@@ -73,7 +73,9 @@ export function ColumnSettingsDrawer({ open, onClose, resolved, onChange, onRese
       {/* Backdrop */}
       <div
         className={cn(
-          "fixed inset-0 z-[65] bg-ink/30 transition-opacity duration-200",
+          // Theme-safe dark veil + blur (matches SlideOver). bg-ink/30 rendered
+          // as a washed-white overlay in dark mode since --color-ink inverts.
+          "fixed inset-0 z-[65] bg-black/50 backdrop-blur-[3px] transition-opacity duration-200",
           open ? "opacity-100" : "opacity-0 pointer-events-none",
         )}
         onClick={onClose}

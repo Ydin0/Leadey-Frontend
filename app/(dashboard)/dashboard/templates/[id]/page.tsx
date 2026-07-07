@@ -224,7 +224,7 @@ export default function TemplateDetailPage() {
 
       {/* Delete Confirmation */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px]">
           <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-sm shadow-xl">
             <h3 className="text-[14px] font-semibold text-ink mb-2">Delete template?</h3>
             <p className="text-[12px] text-ink-secondary mb-5">

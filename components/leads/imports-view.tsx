@@ -222,7 +222,7 @@ function ImportDetailModal({
   }, [record.id, page]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px] p-4">
       <div className="bg-surface rounded-[14px] border border-border-subtle w-full max-w-3xl max-h-[80vh] flex flex-col shadow-xl">
         <div className="flex items-start justify-between p-5 border-b border-border-subtle">
           <div className="min-w-0">
@@ -315,7 +315,7 @@ function RollbackConfirmModal({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-[3px] p-4">
       <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-sm shadow-xl">
         <h3 className="text-[14px] font-semibold text-ink mb-2">Roll back this import?</h3>
         <p className="text-[12px] text-ink-secondary mb-5">

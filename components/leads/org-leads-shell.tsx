@@ -181,7 +181,7 @@ function CreateCampaignModal({ leadIds, onClose, onDone }: {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-[3px]" onClick={onClose}>
       <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2.5 mb-1">
           <Rocket size={16} className="text-accent" />
@@ -238,7 +238,7 @@ function AddToCampaignModal({ leadIds, onClose, onDone }: {
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-[3px]" onClick={onClose}>
       <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2.5 mb-1">
           <Users size={16} className="text-accent" />

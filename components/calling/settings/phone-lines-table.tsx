@@ -233,7 +233,7 @@ export function PhoneLinesTable({ lines, filters, onSelectLine, onProvision, onC
       />
 
       {confirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/40 p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-[3px] p-4">
           <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-md shadow-xl">
             {confirm.type === "release" ? (
               <>
