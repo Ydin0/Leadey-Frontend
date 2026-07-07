@@ -55,57 +55,51 @@ export function TrialBanner() {
 
   if (isExpired) {
     return (
-      <div className="flex justify-center pt-4">
-        <div className="trial-banner-pill flex items-center gap-3 px-4 py-2 rounded-[24px] text-[12px] font-medium text-signal-red-text">
-          <Sparkles size={12} className="text-signal-red-text" />
-          <span>Your 60-day free trial has expired. Upgrade now to keep using Leadey.</span>
-          <button
-            onClick={handleUpgrade}
-            disabled={loading}
-            className="px-3 py-1 rounded-[20px] bg-signal-red-text text-white text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-          >
-            Upgrade Now
-          </button>
-        </div>
+      <div className="trial-banner-pill flex items-center gap-2.5 px-3.5 py-1.5 rounded-[24px] text-[12px] font-medium text-signal-red-text">
+        <Sparkles size={12} className="text-signal-red-text shrink-0" />
+        <span className="whitespace-nowrap">Your free trial has expired.</span>
+        <button
+          onClick={handleUpgrade}
+          disabled={loading}
+          className="px-3 py-1 rounded-[20px] bg-signal-red-text text-white text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+        >
+          Upgrade now
+        </button>
       </div>
     );
   }
 
   return (
-    <div className="flex justify-center pt-4">
-      <div
+    <div
+      className={cn(
+        "trial-banner-pill flex items-center gap-2.5 px-3.5 py-1.5 rounded-[24px] text-[12px] font-medium",
+        isUrgent ? "text-signal-red-text" : "text-ink-secondary",
+      )}
+    >
+      <Sparkles size={12} className="text-[#97A4D6] shrink-0" />
+      <span className="whitespace-nowrap">
+        <strong className="font-semibold text-ink">Free</strong> plan ·{" "}
+        {daysLeft === 1 ? "1 day" : `${daysLeft} days`} left
+      </span>
+      <button
+        onClick={handleUpgrade}
+        disabled={loading}
         className={cn(
-          "trial-banner-pill flex items-center gap-3 px-4 py-1.5 rounded-[24px] text-[12px] font-medium",
-          isUrgent ? "text-signal-red-text" : "text-ink-secondary",
+          "px-3 py-0.5 rounded-[20px] text-[11px] font-medium tracking-[0.02em] transition-opacity disabled:opacity-50",
+          isUrgent
+            ? "bg-signal-red-text text-white hover:opacity-90"
+            : "bg-[#0F1730] text-white hover:bg-[#1A2347]",
         )}
       >
-        <Sparkles size={12} className="text-[#97A4D6] shrink-0" />
-        <span className="whitespace-nowrap">
-          You&apos;re on the <strong className="font-semibold text-ink">Free</strong> plan —{" "}
-          {daysLeft === 1 ? "1 day" : `${daysLeft} days`} left of your 60-day trial.
-        </span>
-        <button
-          onClick={handleUpgrade}
-          disabled={loading}
-          className={cn(
-            "px-3.5 py-1 rounded-[20px] text-[11px] font-medium tracking-[0.02em] transition-opacity disabled:opacity-50",
-            // Dark navy pill with white text per Figma node 159:783 — same
-            // in both themes so the CTA stays consistently identifiable.
-            isUrgent
-              ? "bg-signal-red-text text-white hover:opacity-90"
-              : "bg-[#0F1730] text-white hover:bg-[#1A2347]",
-          )}
-        >
-          Upgrade
-        </button>
-        <button
-          onClick={() => setDismissed(true)}
-          className="p-0.5 rounded hover:bg-white/10 transition-colors text-ink-muted"
-          aria-label="Dismiss"
-        >
-          <X size={12} />
-        </button>
-      </div>
+        Upgrade
+      </button>
+      <button
+        onClick={() => setDismissed(true)}
+        className="p-0.5 rounded hover:bg-white/10 transition-colors text-ink-muted"
+        aria-label="Dismiss"
+      >
+        <X size={12} />
+      </button>
     </div>
   );
 }

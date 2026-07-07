@@ -1,6 +1,5 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
-import { TrialBanner } from "@/components/layout/trial-banner";
 import { CallProvider } from "@/components/calling/call-context";
 import { IncomingCallPrompt } from "@/components/calling/incoming-call-prompt";
 import { VersionGate } from "@/components/providers/version-gate";
@@ -34,15 +33,14 @@ export default function DashboardLayout({
               <Sidebar />
               <Header />
               {/* Fixed-height app shell: the header/sidebar are fixed, the
-                  dialer + trial bars pin to the top of main, and only the
-                  content area scrolls. This keeps full-height views (e.g. the
-                  lead profile) flush to the viewport instead of overflowing
-                  past the bottom. */}
+                  dialer bar pins to the top of main, and only the content area
+                  scrolls. This keeps full-height views (e.g. the lead profile)
+                  flush to the viewport instead of overflowing past the bottom.
+                  The trial pill now lives centered in the Header. */}
               <main className="ml-[56px] mt-14 h-[calc(100vh-3.5rem)] flex flex-col">
                 {/* Persistent power-dialer bar — only renders while a session
                     is running. Pinned above the scroll area. */}
                 <DialerBar />
-                <TrialBanner />
                 {/* Persistent reminder for past-due tasks assigned to you. */}
                 <DueTasksBanner />
                 <div className="flex-1 min-h-0 overflow-y-auto p-6">{children}</div>
