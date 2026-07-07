@@ -17,10 +17,25 @@ const AVATAR_GRADIENTS = [
   "linear-gradient(135deg, #6FBE9A 0%, #4E9C70 100%)", // emerald
 ];
 
-function gradientFromId(key: string): string {
+/** First (lighter) stop of each avatar gradient — a solid accent usable for
+ *  per-member color coding (calendar meetings, chart series, dots). Kept in
+ *  lockstep with AVATAR_GRADIENTS so the hue always matches the avatar. */
+const AVATAR_SOLIDS = ["#8C9AE0", "#6FBEA8", "#C58FD6", "#E0A878", "#E08FA8", "#7FA8D6", "#9B8FE0", "#6FBE9A"];
+
+function hashOf(key: string): number {
   let hash = 0;
   for (let i = 0; i < key.length; i++) hash = key.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_GRADIENTS[Math.abs(hash) % AVATAR_GRADIENTS.length];
+  return Math.abs(hash);
+}
+
+function gradientFromId(key: string): string {
+  return AVATAR_GRADIENTS[hashOf(key) % AVATAR_GRADIENTS.length];
+}
+
+/** The member's stable accent color — same hue as their avatar gradient, so a
+ *  meeting colored with this reads as "that person" everywhere. */
+export function memberColorFromId(key: string): string {
+  return AVATAR_SOLIDS[hashOf(key) % AVATAR_SOLIDS.length];
 }
 
 /** First initial of the first two words, e.g. "Alex Rivera" → "AR".

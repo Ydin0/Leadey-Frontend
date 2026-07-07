@@ -40,6 +40,8 @@ export interface OrgMeeting extends LeadMeeting {
   funnelId: string | null;
   leadName: string | null;
   company: string | null;
+  /** Owner rep (whose calendar/Calendly the meeting belongs to). */
+  userId: string | null;
 }
 
 export interface OrgMeetingsResult {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@clerk/nextjs";
 import {
   CalendarDays,
   ChevronLeft,
@@ -10,12 +11,16 @@ import {
   Video,
   MapPin,
   User,
+  Users,
+  Check,
   ArrowUpRight,
   CalendarClock,
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { useTeamMembers } from "@/hooks/use-team-members";
+import { MemberAvatar, memberColorFromId } from "@/components/shared/member-avatar";
 import { listMeetings } from "@/lib/api/calendar";
 import type { OrgMeeting } from "@/lib/types/calendar";
 import { SOURCE_LABEL, RsvpBadge, meetingTime } from "@/components/calendar/meeting-bits";
@@ -24,9 +29,12 @@ const VIEW_KEY = "leadey:calendar-view";
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const DAY_MS = 86400000;
+/** Fallback accent when a meeting has no owner (matches the signal-blue text). */
+const FALLBACK_COLOR = "#7FA8D6";
 
 type View = "month" | "week";
-type Scope = "mine" | "org";
+/** People filter: the caller's own meetings, the whole team, or a picked set. */
+type People = "mine" | "all" | string[];
 
 // ── date math (Monday-first, local time) ────────────────────────────
 const midnight = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
@@ -70,6 +78,8 @@ function headerLabel(view: View, anchor: Date): string {
 export function CalendarShell() {
   const router = useRouter();
   const isAuthReady = useAuthReady();
+  const { userId } = useAuth();
+  const { members, resolveMember } = useTeamMembers();
 
   // Restore the last-used view synchronously (client component, lazy init).
   const [view, setView] = useState<View>(() => {
@@ -80,7 +90,8 @@ export function CalendarShell() {
     } catch { /* storage unavailable */ }
     return "month";
   });
-  const [scope, setScope] = useState<Scope>("mine");
+  const [people, setPeople] = useState<People>("mine");
+  const [peopleOpen, setPeopleOpen] = useState(false);
   const [anchor, setAnchor] = useState<Date>(() => midnight(new Date()));
   const [meetings, setMeetings] = useState<OrgMeeting[]>([]);
   const [connected, setConnected] = useState({ calendar: true, calendly: true });
@@ -102,6 +113,7 @@ export function CalendarShell() {
   };
 
   const { from, to } = useMemo(() => rangeFor(view, anchor), [view, anchor]);
+  const scope: "mine" | "org" = people === "mine" ? "mine" : "org";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -121,6 +133,20 @@ export function CalendarShell() {
     void load();
   }, [isAuthReady, load]);
 
+  // People filter applied client-side (the fetch is already mine/org-scoped).
+  const visibleMeetings = useMemo(() => {
+    if (!Array.isArray(people)) return meetings;
+    if (people.length === 0) return meetings;
+    const set = new Set(people);
+    return meetings.filter((m) => m.userId && set.has(m.userId));
+  }, [meetings, people]);
+
+  // Color a meeting by its owner rep so multi-person views read at a glance.
+  const colorOf = useCallback(
+    (m: OrgMeeting) => (m.userId ? memberColorFromId(m.userId) : FALLBACK_COLOR),
+    [],
+  );
+
   // ‹ › navigation (+ keyboard arrows).
   const step = useCallback((dir: -1 | 1) => {
     setAnchor((a) => {
@@ -135,7 +161,7 @@ export function CalendarShell() {
       if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
       if (e.key === "ArrowLeft") step(-1);
       else if (e.key === "ArrowRight") step(1);
-      else if (e.key === "Escape") setPopover(null);
+      else if (e.key === "Escape") { setPopover(null); setPeopleOpen(false); }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -144,21 +170,22 @@ export function CalendarShell() {
   // Group meetings by local day.
   const byDay = useMemo(() => {
     const map = new Map<string, OrgMeeting[]>();
-    for (const m of meetings) {
+    for (const m of visibleMeetings) {
       if (!m.startTime) continue;
       const k = dayKey(new Date(m.startTime));
       (map.get(k) ?? map.set(k, []).get(k)!).push(m);
     }
     for (const list of map.values()) list.sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
     return map;
-  }, [meetings]);
+  }, [visibleMeetings]);
 
   const openPopover = (m: OrgMeeting, e: React.MouseEvent) => {
     e.stopPropagation();
     // Clamp so the card never renders off-screen.
-    const W = 320, H = 260;
+    const W = 320, H = 280;
     const x = Math.min(e.clientX, window.innerWidth - W - 16);
     const y = Math.min(e.clientY, window.innerHeight - H - 16);
+    setPeopleOpen(false);
     setPopover({ meeting: m, x, y });
   };
 
@@ -167,6 +194,26 @@ export function CalendarShell() {
   const today = midnight(new Date());
   const nothingConnected = !connected.calendar && !connected.calendly;
 
+  // Toggle one member in the picked set (starting from mine/all collapses to a list).
+  const toggleMember = (id: string) => {
+    setPeople((prev) => {
+      const base = Array.isArray(prev) ? [...prev] : prev === "all" ? members.map((m) => m.id) : userId ? [userId] : [];
+      const i = base.indexOf(id);
+      if (i >= 0) base.splice(i, 1);
+      else base.push(id);
+      return base;
+    });
+  };
+  const isChecked = (id: string) =>
+    people === "all" || (Array.isArray(people) ? people.includes(id) : id === userId);
+
+  const peopleLabel =
+    people === "mine" ? "My meetings" : people === "all" ? "Everyone" : `${people.length} selected`;
+  const selectedAvatars: string[] =
+    people === "all" ? members.map((m) => m.id).slice(0, 4)
+    : Array.isArray(people) ? people.slice(0, 4)
+    : userId ? [userId] : [];
+
   const segBtn = (active: boolean) =>
     cn(
       "px-3 py-1 rounded-full text-[11px] font-medium transition-colors",
@@ -174,7 +221,7 @@ export function CalendarShell() {
     );
 
   return (
-    <div className="max-w-[1320px] mx-auto" onClick={() => setPopover(null)}>
+    <div className="max-w-[1320px] mx-auto" onClick={() => { setPopover(null); setPeopleOpen(false); }}>
       {/* ── Header ── */}
       <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
         <div className="flex items-center gap-2.5">
@@ -184,42 +231,111 @@ export function CalendarShell() {
           <div>
             <h1 className="text-[18px] font-semibold text-ink leading-tight">Calendar</h1>
             <p className="text-[11.5px] text-ink-muted">
-              {loading ? "Loading…" : `${meetings.length} meeting${meetings.length === 1 ? "" : "s"} in view`}
+              {loading ? "Loading…" : `${visibleMeetings.length} lead meeting${visibleMeetings.length === 1 ? "" : "s"} in view`}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => step(-1)}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-section border border-border-subtle text-ink-secondary hover:bg-hover transition-colors"
-            title="Previous (←)"
-          >
-            <ChevronLeft size={15} />
-          </button>
+        {/* Period navigation: chevrons hug the label so they clearly page the
+            visible week/month; Today sits apart as its own action. */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-section border border-border-subtle rounded-full px-1 py-1">
+            <button
+              onClick={() => step(-1)}
+              className="flex items-center justify-center w-7 h-7 rounded-full text-ink-secondary hover:bg-hover transition-colors"
+              title={view === "week" ? "Previous week (←)" : "Previous month (←)"}
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <span className="text-[13px] font-semibold text-ink min-w-[168px] text-center tabular-nums px-1">
+              {headerLabel(view, anchor)}
+            </span>
+            <button
+              onClick={() => step(1)}
+              className="flex items-center justify-center w-7 h-7 rounded-full text-ink-secondary hover:bg-hover transition-colors"
+              title={view === "week" ? "Next week (→)" : "Next month (→)"}
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
           <button
             onClick={() => setAnchor(midnight(new Date()))}
             className="px-3.5 py-1.5 rounded-full bg-section border border-border-subtle text-[11.5px] font-medium text-ink-secondary hover:bg-hover transition-colors"
           >
             Today
           </button>
-          <button
-            onClick={() => step(1)}
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-section border border-border-subtle text-ink-secondary hover:bg-hover transition-colors"
-            title="Next (→)"
-          >
-            <ChevronRight size={15} />
-          </button>
-          <span className="text-[14px] font-semibold text-ink min-w-[170px] text-center tabular-nums">
-            {headerLabel(view, anchor)}
-          </span>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-section rounded-full p-0.5 border border-border-subtle">
-            <button className={segBtn(scope === "mine")} onClick={() => setScope("mine")}>Mine</button>
-            <button className={segBtn(scope === "org")} onClick={() => setScope("org")}>Everyone</button>
+          {/* People filter — facepile pill + multi-select popover. */}
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => { setPeopleOpen((v) => !v); setPopover(null); }}
+              className={cn(
+                "flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full border text-[11.5px] font-medium transition-colors",
+                peopleOpen || people !== "mine"
+                  ? "bg-signal-blue/10 border-signal-blue-text/25 text-ink"
+                  : "bg-section border-border-subtle text-ink-secondary hover:bg-hover",
+              )}
+            >
+              {selectedAvatars.length > 0 ? (
+                <span className="flex items-center -space-x-1.5">
+                  {selectedAvatars.map((id) => (
+                    <MemberAvatar key={id} id={id} name={resolveMember(id)?.name} size="xs" className="border-2 border-page" />
+                  ))}
+                </span>
+              ) : (
+                <Users size={13} className="text-ink-muted" />
+              )}
+              {peopleLabel}
+            </button>
+
+            {peopleOpen && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-surface rounded-[12px] border border-border-subtle shadow-xl z-40 py-1.5">
+                <p className="px-3 pt-1 pb-1.5 text-[10px] uppercase tracking-wider text-ink-faint font-medium">Show meetings for</p>
+                <button
+                  onClick={() => setPeople("mine")}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[12px] hover:bg-hover transition-colors"
+                >
+                  <User size={13} className="text-ink-muted" />
+                  <span className="flex-1 text-ink">Just me</span>
+                  {people === "mine" && <Check size={13} className="text-accent" />}
+                </button>
+                <button
+                  onClick={() => setPeople("all")}
+                  className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-[12px] hover:bg-hover transition-colors"
+                >
+                  <Users size={13} className="text-ink-muted" />
+                  <span className="flex-1 text-ink">Everyone</span>
+                  {people === "all" && <Check size={13} className="text-accent" />}
+                </button>
+                <div className="my-1.5 border-t border-border-subtle" />
+                <div className="max-h-64 overflow-y-auto">
+                  {members.map((m) => (
+                    <button
+                      key={m.id}
+                      onClick={() => toggleMember(m.id)}
+                      className="w-full flex items-center gap-2.5 px-3 py-1.5 text-left hover:bg-hover transition-colors"
+                    >
+                      <span
+                        className={cn(
+                          "flex items-center justify-center w-4 h-4 rounded-[4px] border shrink-0 transition-colors",
+                          isChecked(m.id) ? "border-transparent text-white" : "border-border-default",
+                        )}
+                        style={isChecked(m.id) ? { background: memberColorFromId(m.id) } : undefined}
+                      >
+                        {isChecked(m.id) && <Check size={11} strokeWidth={3} />}
+                      </span>
+                      <MemberAvatar id={m.id} name={m.name} size="xs" />
+                      <span className="flex-1 min-w-0 text-[12px] text-ink truncate">{m.name}</span>
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: memberColorFromId(m.id) }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+
           <div className="flex items-center bg-section rounded-full p-0.5 border border-border-subtle">
             <button className={segBtn(view === "week")} onClick={() => pickView("week")}>Week</button>
             <button className={segBtn(view === "month")} onClick={() => pickView("month")}>Month</button>
@@ -228,7 +344,7 @@ export function CalendarShell() {
       </div>
 
       {/* ── Empty state (nothing connected) ── */}
-      {nothingConnected && !loading && meetings.length === 0 ? (
+      {nothingConnected && !loading && visibleMeetings.length === 0 ? (
         <div className="card-brand bg-surface rounded-[14px] p-12 text-center max-w-2xl mx-auto">
           <div className="w-12 h-12 rounded-xl flex items-center justify-center mx-auto mb-4 bg-signal-blue/15 text-signal-blue-text">
             <CalendarClock size={22} strokeWidth={1.5} />
@@ -248,9 +364,9 @@ export function CalendarShell() {
           </div>
         </div>
       ) : view === "month" ? (
-        <MonthView anchor={anchor} today={today} now={now} byDay={byDay} loading={loading} onDayOpen={openDay} onMeetingClick={openPopover} />
+        <MonthView anchor={anchor} today={today} now={now} byDay={byDay} loading={loading} colorOf={colorOf} onDayOpen={openDay} onMeetingClick={openPopover} />
       ) : (
-        <WeekView anchor={anchor} today={today} now={now} byDay={byDay} loading={loading} onMeetingClick={openPopover} />
+        <WeekView anchor={anchor} today={today} now={now} byDay={byDay} loading={loading} colorOf={colorOf} onMeetingClick={openPopover} />
       )}
 
       {/* ── Meeting detail popover ── */}
@@ -261,7 +377,10 @@ export function CalendarShell() {
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-start gap-2 mb-2">
-            <span className="flex items-center justify-center w-8 h-8 rounded-full bg-signal-blue/15 text-signal-blue-text shrink-0">
+            <span
+              className="flex items-center justify-center w-8 h-8 rounded-full shrink-0 text-white"
+              style={{ background: colorOf(popover.meeting) }}
+            >
               <CalendarClock size={14} />
             </span>
             <div className="min-w-0">
@@ -288,6 +407,12 @@ export function CalendarShell() {
               <User size={11} className="text-ink-faint shrink-0" />
               {popover.meeting.leadName}
               {popover.meeting.company ? ` · ${popover.meeting.company}` : ""}
+            </p>
+          )}
+          {popover.meeting.userId && (
+            <p className="flex items-center gap-1.5 text-[11px] text-ink-muted mb-1">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: colorOf(popover.meeting) }} />
+              {resolveMember(popover.meeting.userId)?.name || "Teammate"}&apos;s meeting
             </p>
           )}
           {popover.meeting.location && (
@@ -327,9 +452,10 @@ export function CalendarShell() {
 
 // ── Month view ──────────────────────────────────────────────────────
 function MonthView({
-  anchor, today, now, byDay, loading, onDayOpen, onMeetingClick,
+  anchor, today, now, byDay, loading, colorOf, onDayOpen, onMeetingClick,
 }: {
   anchor: Date; today: Date; now: number; byDay: Map<string, OrgMeeting[]>; loading: boolean;
+  colorOf: (m: OrgMeeting) => string;
   onDayOpen: (d: Date) => void;
   onMeetingClick: (m: OrgMeeting, e: React.MouseEvent) => void;
 }) {
@@ -370,19 +496,21 @@ function MonthView({
               </button>
               {items.slice(0, 3).map((m) => {
                 const past = !!m.startTime && now > 0 && new Date(m.startTime).getTime() < now;
+                const color = colorOf(m);
                 return (
                   <button
                     key={m.id}
                     onClick={(e) => onMeetingClick(m, e)}
                     className={cn(
-                      "flex items-center gap-1 w-full text-left rounded-[6px] px-1.5 py-1 text-[10.5px] font-medium truncate transition-colors",
-                      past
-                        ? "bg-section text-ink-faint hover:bg-hover"
-                        : "bg-signal-blue/15 text-signal-blue-text hover:bg-signal-blue/25",
+                      "flex items-center gap-1.5 w-full text-left rounded-[6px] px-1.5 py-1 text-[10.5px] font-medium truncate transition-colors border-l-2 bg-section hover:bg-hover",
+                      past && "opacity-55",
                     )}
+                    style={{ borderLeftColor: color }}
                   >
-                    <span className="tabular-nums shrink-0">{meetingTime(m.startTime)}</span>
-                    <span className="truncate">{m.title || "Meeting"}</span>
+                    <span className="tabular-nums shrink-0" style={{ color: past ? undefined : color }}>
+                      {meetingTime(m.startTime)}
+                    </span>
+                    <span className={cn("truncate", past ? "text-ink-faint" : "text-ink")}>{m.title || "Meeting"}</span>
                   </button>
                 );
               })}
@@ -404,9 +532,10 @@ function MonthView({
 
 // ── Week view ───────────────────────────────────────────────────────
 function WeekView({
-  anchor, today, now, byDay, loading, onMeetingClick,
+  anchor, today, now, byDay, loading, colorOf, onMeetingClick,
 }: {
   anchor: Date; today: Date; now: number; byDay: Map<string, OrgMeeting[]>; loading: boolean;
+  colorOf: (m: OrgMeeting) => string;
   onMeetingClick: (m: OrgMeeting, e: React.MouseEvent) => void;
 }) {
   const start = weekStart(anchor);
@@ -445,18 +574,18 @@ function WeekView({
               ) : (
                 items.map((m) => {
                   const past = !!m.startTime && now > 0 && new Date(m.startTime).getTime() < now;
+                  const color = colorOf(m);
                   return (
                     <button
                       key={m.id}
                       onClick={(e) => onMeetingClick(m, e)}
                       className={cn(
-                        "w-full text-left rounded-[10px] border px-2.5 py-2 transition-colors",
-                        past
-                          ? "border-border-subtle bg-section/40 hover:bg-hover"
-                          : "border-signal-blue-text/20 bg-signal-blue/10 hover:bg-signal-blue/20",
+                        "w-full text-left rounded-[10px] border border-border-subtle bg-section/40 px-2.5 py-2 transition-colors hover:bg-hover border-l-[3px]",
+                        past && "opacity-55",
                       )}
+                      style={{ borderLeftColor: color }}
                     >
-                      <div className={cn("text-[10.5px] font-medium tabular-nums", past ? "text-ink-faint" : "text-signal-blue-text")}>
+                      <div className="text-[10.5px] font-medium tabular-nums" style={{ color: past ? undefined : color }}>
                         {meetingTime(m.startTime)}
                         {m.endTime ? ` – ${meetingTime(m.endTime)}` : ""}
                       </div>
