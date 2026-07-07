@@ -11,7 +11,7 @@ import { getPhoneLines } from "@/lib/api/phone-lines";
 import type { PhoneLine } from "@/lib/types/calling";
 import { listTemplates, createTemplate } from "@/lib/api/templates";
 import type { Template } from "@/lib/types/template";
-import { getWhatsappSettings, type WhatsappSettings } from "@/lib/api/whatsapp";
+import { getWhatsappSettings, listWhatsappTemplates, type WhatsappSettings, type WhatsappTemplate } from "@/lib/api/whatsapp";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { NODE_TYPES } from "./node-types";
 
@@ -365,13 +365,31 @@ function SmsStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Reco
 function WhatsappStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Record<string, unknown>) => void }) {
   const v = (k: string) => (d[k] != null ? String(d[k]) : "");
   const [settings, setSettings] = useState<WhatsappSettings | null>(null);
+  const [templates, setTemplates] = useState<WhatsappTemplate[]>([]);
   const msgRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     getWhatsappSettings().then(setSettings).catch(() => {});
+    listWhatsappTemplates().then(setTemplates).catch(() => {});
   }, []);
 
   const msg = v("message");
+  const mode = v("mode") || "freeform";
+  const approved = templates.filter((t) => t.status === "APPROVED");
+  const selected = approved.find((t) => t.name === v("templateName")) || null;
+  const tvars = Array.isArray(d.templateVariables) ? (d.templateVariables as string[]) : [];
+  const modeBtn = (active: boolean) =>
+    `flex-1 px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors ${active ? "bg-ink text-on-ink" : "text-ink-muted hover:text-ink"}`;
+
+  function pickTemplate(name: string) {
+    const t = approved.find((x) => x.name === name);
+    set({
+      templateName: name,
+      templateLanguage: t?.language || "",
+      contentBody: t?.bodyText || "",
+      templateVariables: t ? Array(t.bodyVariableCount).fill("") : [],
+    });
+  }
 
   return (
     <>
@@ -380,12 +398,60 @@ function WhatsappStepForm({ d, set }: { d: Record<string, unknown>; set: (patch:
           No WhatsApp connected — link your WhatsApp in Settings → WhatsApp for this step to send.
         </p>
       )}
-      <FieldHeader label="Message" picker={<VariablePicker targetRef={msgRef} value={msg} onChange={(val) => set({ message: val })} />} />
-      <textarea ref={msgRef} className={area} value={msg} onChange={(e) => set({ message: e.target.value })} placeholder={"Hi {{first_name}}, quick question about {{company}}…"} />
-      <p className="text-[11px] text-ink-faint mt-1.5">
-        Sends from your connected WhatsApp{settings?.connected && settings.phone ? ` (${settings.phone})` : ""}. Use{" "}
-        {"{{first_name}}"}, {"{{company}}"} or any custom field.
-      </p>
+
+      <label className={lab}>Message type</label>
+      <div className="flex items-center bg-section rounded-full p-0.5 border border-border-subtle">
+        <button type="button" onClick={() => set({ mode: "template" })} className={modeBtn(mode === "template")}>
+          Approved template
+        </button>
+        <button type="button" onClick={() => set({ mode: "freeform" })} className={modeBtn(mode === "freeform")}>
+          Freeform (24h reply)
+        </button>
+      </div>
+
+      {mode === "template" ? (
+        <>
+          <label className={lab}>Template</label>
+          <NativeSelect className={inp} value={v("templateName")} onChange={(e) => pickTemplate(e.target.value)}>
+            <option value="">Choose an approved template…</option>
+            {approved.map((t) => (
+              <option key={`${t.name}:${t.language}`} value={t.name}>{t.name} ({t.language})</option>
+            ))}
+          </NativeSelect>
+          {approved.length === 0 && (
+            <p className="text-[11px] text-ink-faint mt-1.5">No approved templates — create them in Meta Business Manager.</p>
+          )}
+          {selected && (
+            <>
+              <div className="mt-2 rounded-[8px] bg-section border border-border-subtle px-3 py-2 text-[11.5px] text-ink-secondary whitespace-pre-wrap">
+                {selected.bodyText}
+              </div>
+              {tvars.map((val, i) => (
+                <div key={i}>
+                  <label className={lab}>{`Variable {{${i + 1}}}`}</label>
+                  <input
+                    className={inp}
+                    value={val}
+                    onChange={(e) => set({ templateVariables: tvars.map((x, idx) => (idx === i ? e.target.value : x)) })}
+                    placeholder={"e.g. {{first_name}}"}
+                  />
+                </div>
+              ))}
+              {tvars.length > 0 && (
+                <p className="text-[11px] text-ink-faint mt-1.5">Variable values support {"{{first_name}}"}, {"{{company}}"} and custom fields.</p>
+              )}
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <FieldHeader label="Message" picker={<VariablePicker targetRef={msgRef} value={msg} onChange={(val) => set({ message: val })} />} />
+          <textarea ref={msgRef} className={area} value={msg} onChange={(e) => set({ message: e.target.value })} placeholder={"Hi {{first_name}}, quick question about {{company}}…"} />
+          <p className="text-[11px] text-signal-amber-text mt-1.5">
+            Freeform only delivers inside the 24-hour window after the lead&apos;s last WhatsApp message — use an approved template for cold outreach.
+          </p>
+        </>
+      )}
     </>
   );
 }

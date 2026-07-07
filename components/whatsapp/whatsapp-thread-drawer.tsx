@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { X, MessageCircle, Loader2, Send, Check, CheckCheck } from "lucide-react";
+import { X, MessageCircle, Loader2, Send, Check, CheckCheck, FileText } from "lucide-react";
 import Link from "next/link";
+import { NativeSelect } from "@/components/ui/native-select";
 import { cn, formatRelativeTime, formatPhoneIntl } from "@/lib/utils";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { getSmsThread, type SmsMessage } from "@/lib/api/sms";
-import { sendWhatsappToLead, getWhatsappSettings, type WhatsappSettings } from "@/lib/api/whatsapp";
+import { sendWhatsappToLead, getWhatsappSettings, listWhatsappTemplates, type WhatsappSettings, type WhatsappTemplate } from "@/lib/api/whatsapp";
 import { renderPersonalized, type PersonalizationLead } from "@/lib/utils/personalize";
 import { SlideOver } from "@/components/shared/slide-over";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface WhatsappThreadDrawerProps {
   open: boolean;
@@ -43,11 +46,21 @@ export function WhatsappThreadDrawer({
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<WhatsappTemplate[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [templateVars, setTemplateVars] = useState<string[]>([]);
   const endRef = useRef<HTMLDivElement>(null);
 
   const personalize = (text: string) => renderPersonalized(text, lead || { name: leadName });
   const canSend = !!(funnelId && leadId);
   const connected = !!settings?.connected;
+
+  // Meta's 24-hour rule: freeform only when the lead messaged us within 24h;
+  // otherwise (cold/first-touch) an approved template is required.
+  const lastInbound = [...messages].reverse().find((m) => m.direction === "inbound");
+  const inWindow = !!lastInbound && Date.now() - new Date(lastInbound.createdAt).getTime() < DAY_MS;
+  const approvedTemplates = templates.filter((t) => t.status === "APPROVED");
+  const selectedTemplate = approvedTemplates.find((t) => t.name === templateName) || null;
 
   useEffect(() => {
     if (!open) return;
@@ -55,14 +68,51 @@ export function WhatsappThreadDrawer({
     setLoading(true);
     setError(null);
     setBody("");
+    setTemplateName("");
+    setTemplateVars([]);
     const load = funnelId && leadId ? getSmsThread(funnelId, leadId) : Promise.resolve([] as SmsMessage[]);
     load
       .then((m) => !cancelled && setMessages(m.filter((x) => x.channel === "whatsapp")))
       .catch(() => !cancelled && setError("Couldn't load the conversation."))
       .finally(() => !cancelled && setLoading(false));
     getWhatsappSettings().then((s) => !cancelled && setSettings(s)).catch(() => {});
+    listWhatsappTemplates().then((t) => !cancelled && setTemplates(t)).catch(() => {});
     return () => { cancelled = true; };
   }, [open, funnelId, leadId]);
+
+  // Reset the variable inputs to match the picked template's slot count.
+  useEffect(() => {
+    setTemplateVars(selectedTemplate ? Array(selectedTemplate.bodyVariableCount).fill("") : []);
+  }, [templateName]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function appendOptimistic(id: string, text: string, from: string, to: string, status: string) {
+    setMessages((prev) => [
+      ...prev,
+      { id, direction: "outbound", channel: "whatsapp", fromNumber: from, toNumber: to, body: text, status, userId: null, createdAt: new Date().toISOString() },
+    ]);
+  }
+
+  async function handleSendTemplate() {
+    if (!selectedTemplate || sending || !funnelId || !leadId) return;
+    setSending(true);
+    setError(null);
+    try {
+      const vars = templateVars.map((v) => personalize(v));
+      const sent = await sendWhatsappToLead(funnelId, leadId, {
+        templateName: selectedTemplate.name,
+        templateLanguage: selectedTemplate.language,
+        templateVariables: vars,
+        contentBody: selectedTemplate.bodyText,
+      });
+      appendOptimistic(sent.id, sent.body, sent.fromNumber, sent.toNumber, sent.status);
+      setTemplateName("");
+      onSent?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send");
+    } finally {
+      setSending(false);
+    }
+  }
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
@@ -185,7 +235,7 @@ export function WhatsappThreadDrawer({
             to send.
           </p>
         </div>
-      ) : (
+      ) : inWindow ? (
         <div className="shrink-0 border-t border-border-subtle p-3 bg-surface">
           {error && <p className="text-[11px] text-signal-red-text mb-2 px-1">{error}</p>}
           <div className="flex items-end gap-2 rounded-[18px] bg-section border border-border-subtle focus-within:border-signal-green-text/40 transition-colors px-2 py-1.5">
@@ -216,6 +266,61 @@ export function WhatsappThreadDrawer({
               {settings?.phone ? `From ${settings.phone} · ` : ""}⌘↵
             </span>
           </div>
+        </div>
+      ) : (
+        // Outside the 24h window — an approved template is required.
+        <div className="shrink-0 border-t border-border-subtle p-3 bg-surface space-y-2">
+          {error && <p className="text-[11px] text-signal-red-text px-1">{error}</p>}
+          <div className="flex items-center gap-1.5 text-[10.5px] text-ink-muted px-1">
+            <FileText size={12} className="shrink-0 text-ink-faint" />
+            {lastInbound
+              ? "It's been over 24h since their last reply — send an approved template."
+              : "First WhatsApp message — cold outreach requires an approved template."}
+          </div>
+          {approvedTemplates.length === 0 ? (
+            <p className="text-[11px] text-ink-faint px-1">
+              No approved templates yet. Create and submit them in Meta Business Manager, then they&apos;ll appear here.
+            </p>
+          ) : (
+            <>
+              <NativeSelect
+                value={templateName}
+                onChange={(e) => setTemplateName(e.target.value)}
+                className="w-full text-[12px]"
+              >
+                <option value="">Choose a template…</option>
+                {approvedTemplates.map((t) => (
+                  <option key={`${t.name}:${t.language}`} value={t.name}>
+                    {t.name} ({t.language})
+                  </option>
+                ))}
+              </NativeSelect>
+              {selectedTemplate && (
+                <>
+                  <p className="text-[11px] text-ink-secondary bg-section rounded-[8px] px-2.5 py-2 whitespace-pre-wrap leading-relaxed">
+                    {selectedTemplate.bodyText}
+                  </p>
+                  {templateVars.map((v, i) => (
+                    <input
+                      key={i}
+                      value={v}
+                      onChange={(e) => setTemplateVars((prev) => prev.map((x, idx) => (idx === i ? e.target.value : x)))}
+                      placeholder={`Value for {{${i + 1}}} — supports {{first_name}}`}
+                      className="w-full px-2.5 py-1.5 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+                    />
+                  ))}
+                  <button
+                    onClick={() => void handleSendTemplate()}
+                    disabled={sending || templateVars.some((v) => !v.trim())}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-signal-green text-signal-green-text text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                  >
+                    {sending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
+                    Send template
+                  </button>
+                </>
+              )}
+            </>
+          )}
         </div>
       )}
     </SlideOver>
