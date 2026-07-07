@@ -230,8 +230,12 @@ export function CalendarShell() {
           </span>
           <div>
             <h1 className="text-[18px] font-semibold text-ink leading-tight">Calendar</h1>
-            <p className="text-[11.5px] text-ink-muted">
-              {loading ? "Loading…" : `${visibleMeetings.length} lead meeting${visibleMeetings.length === 1 ? "" : "s"} in view`}
+            {/* Stable-width subtitle — swapping to "Loading…" resized the left
+                block and nudged the nav pill. Keep the count text and add an
+                inline spinner instead. */}
+            <p className="flex items-center gap-1.5 text-[11.5px] text-ink-muted">
+              {visibleMeetings.length} lead meeting{visibleMeetings.length === 1 ? "" : "s"} in view
+              {loading && <Loader2 size={10} className="animate-spin text-ink-faint" />}
             </p>
           </div>
         </div>
@@ -247,7 +251,9 @@ export function CalendarShell() {
             >
               <ChevronLeft size={15} />
             </button>
-            <span className="text-[13px] font-semibold text-ink min-w-[168px] text-center tabular-nums px-1">
+            {/* Fixed width so "December 2026" vs "Sep 29 – Oct 5, 2026" never
+                resizes the pill and shifts the chevrons underfoot. */}
+            <span className="text-[13px] font-semibold text-ink w-[190px] text-center tabular-nums px-1 whitespace-nowrap">
               {headerLabel(view, anchor)}
             </span>
             <button
