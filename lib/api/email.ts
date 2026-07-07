@@ -154,6 +154,7 @@ export async function sendEmail(
         cc: payload.cc,
         subject: payload.subject,
         bodyHtml: payload.bodyHtml,
+        attachmentIds: payload.attachmentIds,
       }),
     },
   );

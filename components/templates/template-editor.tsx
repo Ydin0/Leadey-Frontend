@@ -1,25 +1,32 @@
 "use client";
 
 import { useState, useRef, useCallback, useMemo } from "react";
-import { Mail, Linkedin, MessageSquare, ChevronDown, X } from "lucide-react";
+import { Mail, Linkedin, MessageSquare, ChevronDown, X, Paperclip, Loader2, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VariableInserter } from "./variable-inserter";
-import { TEMPLATE_CATEGORIES, TEMPLATE_VARIABLES } from "@/lib/types/template";
-import type { TemplateChannel, TemplateCategory } from "@/lib/types/template";
+import { RichEmailEditor } from "@/components/email/rich-email-editor";
+import { uploadTemplateAttachment, deleteTemplateAttachment } from "@/lib/api/templates";
+import { TEMPLATE_CATEGORIES } from "@/lib/types/template";
+import type { TemplateChannel, TemplateCategory, TemplateAttachment } from "@/lib/types/template";
 
 interface TemplateEditorProps {
+  templateId: string | null;
   name: string;
   channel: TemplateChannel;
   category: TemplateCategory | null;
   subject: string;
   body: string;
+  bodyHtml: string;
   tags: string[];
+  attachments: TemplateAttachment[];
   onNameChange: (value: string) => void;
   onChannelChange: (value: TemplateChannel) => void;
   onCategoryChange: (value: TemplateCategory | null) => void;
   onSubjectChange: (value: string) => void;
   onBodyChange: (value: string) => void;
+  onBodyHtmlChange: (value: string) => void;
   onTagsChange: (value: string[]) => void;
+  onAttachmentsChange: (value: TemplateAttachment[]) => void;
 }
 
 const SAMPLE_DATA: Record<string, string> = {
@@ -37,14 +44,23 @@ function renderPreview(text: string): string {
   return text.replace(/\{\{(\w+)\}\}/g, (_, key) => SAMPLE_DATA[key] || `{{${key}}}`);
 }
 
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function TemplateEditor({
-  name, channel, category, subject, body, tags,
-  onNameChange, onChannelChange, onCategoryChange, onSubjectChange, onBodyChange, onTagsChange,
+  templateId, name, channel, category, subject, body, bodyHtml, tags, attachments,
+  onNameChange, onChannelChange, onCategoryChange, onSubjectChange, onBodyChange, onBodyHtmlChange, onTagsChange, onAttachmentsChange,
 }: TemplateEditorProps) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [tagInput, setTagInput] = useState("");
   const [showCategoryMenu, setShowCategoryMenu] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const insertVariable = useCallback((variable: string) => {
     const textarea = bodyRef.current;
@@ -56,7 +72,6 @@ export function TemplateEditor({
     const end = textarea.selectionEnd;
     const newBody = body.slice(0, start) + variable + body.slice(end);
     onBodyChange(newBody);
-    // Restore cursor position after React re-render
     requestAnimationFrame(() => {
       textarea.selectionStart = textarea.selectionEnd = start + variable.length;
       textarea.focus();
@@ -77,8 +92,35 @@ export function TemplateEditor({
     onTagsChange(tags.filter((t) => t !== tag));
   }
 
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const uploaded: TemplateAttachment[] = [];
+      for (const file of Array.from(files)) {
+        uploaded.push(await uploadTemplateAttachment(file, templateId));
+      }
+      onAttachmentsChange([...attachments, ...uploaded]);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  async function removeAttachment(att: TemplateAttachment) {
+    onAttachmentsChange(attachments.filter((a) => a.id !== att.id));
+    try {
+      await deleteTemplateAttachment(att.id);
+    } catch {
+      // If the delete fails the file is orphaned server-side (harmless); the UI
+      // already dropped it so we don't re-add it.
+    }
+  }
+
   const previewBody = useMemo(() => renderPreview(body), [body]);
-  const previewSubject = useMemo(() => renderPreview(subject), [subject]);
 
   return (
     <div className="space-y-5">
@@ -189,50 +231,108 @@ export function TemplateEditor({
 
       {/* Body */}
       <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">
-            {channel === "email" ? "Email Body" : "Message"}
-          </label>
-          <div className="flex items-center gap-2">
-            <span className="text-[9px] text-ink-faint">{body.length} chars</span>
+        <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5 block">
+          {channel === "email" ? "Email Body" : "Message"}
+        </label>
+
+        {channel === "email" ? (
+          // Rich editor: bold/italic/lists, inline links, {{variables}} + preview.
+          <RichEmailEditor
+            value={bodyHtml}
+            onChange={onBodyHtmlChange}
+            placeholder="Hi {{first_name}}, I noticed {{company}} is…"
+            minHeight={220}
+          />
+        ) : (
+          <>
+            <div className="flex items-center justify-end mb-1.5 gap-2">
+              <span className="text-[9px] text-ink-faint">{body.length} chars</span>
+              <button
+                type="button"
+                onClick={() => setShowPreview(!showPreview)}
+                className={cn(
+                  "text-[10px] font-medium transition-colors",
+                  showPreview ? "text-signal-blue-text" : "text-ink-muted hover:text-ink"
+                )}
+              >
+                {showPreview ? "Editor" : "Preview"}
+              </button>
+            </div>
+            <VariableInserter onInsert={insertVariable} />
+            <div className="mt-2">
+              {showPreview ? (
+                <div className="w-full min-h-[200px] px-3 py-2 rounded-[8px] bg-section/50 border border-border-subtle text-[12px] text-ink leading-relaxed whitespace-pre-wrap">
+                  {previewBody || <span className="text-ink-faint">Nothing to preview</span>}
+                </div>
+              ) : (
+                <textarea
+                  ref={bodyRef}
+                  value={body}
+                  onChange={(e) => onBodyChange(e.target.value)}
+                  placeholder="Hi {{first_name}}, I saw that {{company}} is..."
+                  rows={10}
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default resize-y leading-relaxed"
+                />
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Attachments (email only) */}
+      {channel === "email" && (
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">Attachments</label>
             <button
               type="button"
-              onClick={() => setShowPreview(!showPreview)}
-              className={cn(
-                "text-[10px] font-medium transition-colors",
-                showPreview ? "text-signal-blue-text" : "text-ink-muted hover:text-ink"
-              )}
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-section border border-border-subtle text-[10px] font-medium text-ink-secondary hover:bg-hover transition-colors disabled:opacity-50"
             >
-              {showPreview ? "Editor" : "Preview"}
+              {uploading ? <Loader2 size={11} className="animate-spin" /> : <Paperclip size={11} />}
+              Add file
             </button>
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => handleFiles(e.target.files)}
+            />
           </div>
-        </div>
-
-        <VariableInserter onInsert={insertVariable} />
-
-        <div className="mt-2">
-          {showPreview ? (
-            <div className="w-full min-h-[200px] px-3 py-2 rounded-[8px] bg-section/50 border border-border-subtle text-[12px] text-ink leading-relaxed whitespace-pre-wrap">
-              {channel === "email" && previewSubject && (
-                <div className="font-medium mb-2 pb-2 border-b border-border-subtle">{previewSubject}</div>
-              )}
-              {previewBody || <span className="text-ink-faint">Nothing to preview</span>}
+          <p className="text-[10px] text-ink-faint mb-2">
+            Files (PDFs, welcome packs, …) sent with every email that uses this template. Max 15MB each.
+          </p>
+          {attachments.length > 0 ? (
+            <div className="space-y-1.5">
+              {attachments.map((att) => (
+                <div
+                  key={att.id}
+                  className="flex items-center gap-2 px-3 py-2 rounded-[8px] bg-section border border-border-subtle"
+                >
+                  <FileText size={14} className="text-ink-muted shrink-0" />
+                  <span className="text-[11px] text-ink truncate flex-1">{att.fileName}</span>
+                  <span className="text-[10px] text-ink-faint shrink-0">{formatSize(att.size)}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(att)}
+                    title="Remove attachment"
+                    className="p-0.5 rounded text-ink-faint hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
             </div>
           ) : (
-            <textarea
-              ref={bodyRef}
-              value={body}
-              onChange={(e) => onBodyChange(e.target.value)}
-              placeholder={channel === "email"
-                ? "Hi {{first_name}},\n\nI noticed {{company}} is..."
-                : "Hi {{first_name}}, I saw that {{company}} is..."
-              }
-              rows={10}
-              className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default resize-y leading-relaxed"
-            />
+            <div className="px-3 py-3 rounded-[8px] border border-dashed border-border-default text-center text-[11px] text-ink-faint">
+              No attachments yet
+            </div>
           )}
+          {uploadError && <p className="text-[10px] text-signal-red-text mt-1.5">{uploadError}</p>}
         </div>
-      </div>
+      )}
 
       {/* Tags */}
       <div>

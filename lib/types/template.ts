@@ -1,6 +1,15 @@
 export type TemplateChannel = "email" | "linkedin" | "sms";
 export type TemplateCategory = "outreach" | "follow_up" | "breakup" | "referral" | "custom";
 
+export interface TemplateAttachment {
+  id: string;
+  templateId: string | null;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  createdAt: string;
+}
+
 export interface Template {
   id: string;
   name: string;
@@ -8,10 +17,15 @@ export interface Template {
   category: TemplateCategory | null;
   subject: string | null;
   body: string;
+  /** Rich HTML body for email templates (links + formatting); null on
+   *  legacy/plain templates and on linkedin/sms. */
+  bodyHtml: string | null;
   tags: string[];
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Present on GET /templates/:id and create/update responses. */
+  attachments?: TemplateAttachment[];
 }
 
 export const TEMPLATE_CATEGORIES: { value: TemplateCategory; label: string }[] = [

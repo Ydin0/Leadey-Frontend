@@ -8,7 +8,33 @@ import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { TemplateEditor } from "@/components/templates/template-editor";
 import { getTemplate, createTemplate, updateTemplate, deleteTemplate } from "@/lib/api/templates";
-import type { TemplateChannel, TemplateCategory } from "@/lib/types/template";
+import type { TemplateChannel, TemplateCategory, TemplateAttachment } from "@/lib/types/template";
+
+/** Wrap plain-text (legacy templates / composed drafts) into simple HTML so the
+ *  rich editor renders paragraphs and line breaks correctly. */
+function plainTextToHtml(text: string): string {
+  if (!text) return "";
+  return text
+    .split(/\n{2,}/)
+    .map((p) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+}
+
+/** Extract a plain-text version of the rich HTML body — kept in `body` for
+ *  list previews and non-HTML fallbacks. */
+function htmlToText(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<\/(p|div|h[1-6]|li)>/gi, "\n")
+    .replace(/<br\s*\/?>(?!\n)/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 export default function TemplateDetailPage() {
   const params = useParams();
@@ -28,7 +54,9 @@ export default function TemplateDetailPage() {
   const [category, setCategory] = useState<TemplateCategory | null>(null);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [bodyHtml, setBodyHtml] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [attachments, setAttachments] = useState<TemplateAttachment[]>([]);
 
   const loadTemplate = useCallback(async () => {
     if (isNew) return;
@@ -40,7 +68,11 @@ export default function TemplateDetailPage() {
       setCategory(data.category);
       setSubject(data.subject || "");
       setBody(data.body);
+      // Legacy email templates stored plain text in `body` — upgrade to HTML
+      // for the rich editor on first open.
+      setBodyHtml(data.bodyHtml || (data.channel === "email" ? plainTextToHtml(data.body) : ""));
       setTags(data.tags);
+      setAttachments(data.attachments || []);
     } catch (err) {
       console.error("Failed to load template:", err);
       router.push("/dashboard/templates");
@@ -54,16 +86,39 @@ export default function TemplateDetailPage() {
     loadTemplate();
   }, [isAuthReady, loadTemplate]);
 
+  // For email templates the rich editor is the source of truth; keep a
+  // plain-text extraction in `body` (required, used for previews/fallback).
+  const isEmail = channel === "email";
+  const effectiveBody = isEmail ? htmlToText(bodyHtml) || " " : body;
+
   async function handleSave() {
-    if (!name.trim() || !body.trim()) return;
+    if (!canSave) return;
     setSaving(true);
     try {
       if (isNew) {
-        const created = await createTemplate({ name, channel, category, subject: channel === "email" ? subject : undefined, body, tags });
+        const created = await createTemplate({
+          name,
+          channel,
+          category,
+          subject: isEmail ? subject : undefined,
+          body: effectiveBody,
+          bodyHtml: isEmail ? bodyHtml : null,
+          tags,
+          // Link any files uploaded before the template existed.
+          attachmentIds: attachments.map((a) => a.id),
+        });
         router.push(`/dashboard/templates/${created.id}`);
         router.refresh();
       } else {
-        await updateTemplate(id, { name, channel, category, subject: channel === "email" ? subject : null, body, tags });
+        await updateTemplate(id, {
+          name,
+          channel,
+          category,
+          subject: isEmail ? subject : null,
+          body: effectiveBody,
+          bodyHtml: isEmail ? bodyHtml : null,
+          tags,
+        });
       }
     } catch (err) {
       console.error("Failed to save template:", err);
@@ -84,7 +139,9 @@ export default function TemplateDetailPage() {
     }
   }
 
-  const canSave = name.trim().length > 0 && body.trim().length > 0;
+  const canSave =
+    name.trim().length > 0 &&
+    (channel === "email" ? htmlToText(bodyHtml).length > 0 : body.trim().length > 0);
 
   if (loading) {
     return (
@@ -123,18 +180,23 @@ export default function TemplateDetailPage() {
 
       {/* Editor */}
       <TemplateEditor
+        templateId={isNew ? null : id}
         name={name}
         channel={channel}
         category={category}
         subject={subject}
         body={body}
+        bodyHtml={bodyHtml}
         tags={tags}
+        attachments={attachments}
         onNameChange={setName}
         onChannelChange={setChannel}
         onCategoryChange={setCategory}
         onSubjectChange={setSubject}
         onBodyChange={setBody}
+        onBodyHtmlChange={setBodyHtml}
         onTagsChange={setTags}
+        onAttachmentsChange={setAttachments}
       />
 
       {/* Actions */}

@@ -1,15 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { NativeSelect } from "@/components/ui/native-select";
-import { X, Mail, Loader2, Send, ChevronDown, FileText, Clock } from "lucide-react";
+import { X, Mail, Loader2, Send, ChevronDown, FileText, Clock, Paperclip } from "lucide-react";
 import { RichEmailEditor } from "./rich-email-editor";
 import { SlideOver } from "@/components/shared/slide-over";
 import { listSendingAccounts, sendEmail } from "@/lib/api/email";
-import { listTemplates } from "@/lib/api/templates";
+import { listTemplates, listTemplateAttachments, uploadTemplateAttachment } from "@/lib/api/templates";
 import { renderPersonalized, type PersonalizationLead } from "@/lib/utils/personalize";
 import type { SendingAccount } from "@/lib/types/email";
-import type { Template } from "@/lib/types/template";
+import type { Template, TemplateAttachment } from "@/lib/types/template";
+
+function formatSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export interface ComposerLead extends PersonalizationLead {
   id: string;
@@ -52,8 +58,11 @@ export function EmailComposerDrawer({
   const [showCc, setShowCc] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [attachments, setAttachments] = useState<TemplateAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -75,20 +84,54 @@ export function EmailComposerDrawer({
     setToEmail(initialTo !== undefined ? initialTo : lead.email || "");
     setCc("");
     setShowCc(false);
+    setAttachments([]);
     if (initialSubject !== undefined) setSubject(initialSubject);
     if (initialBody !== undefined) setBody(initialBody);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  function applyTemplate(t: Template) {
+  async function applyTemplate(t: Template) {
     setSubject(t.subject || "");
-    // Templates store plain text; wrap lines into paragraphs for the editor.
-    const html = (t.body || "")
-      .split(/\n{2,}/)
-      .map((p) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
-      .join("");
+    // Prefer the rich HTML body; fall back to wrapping legacy plain text.
+    const html = t.bodyHtml
+      ? t.bodyHtml
+      : (t.body || "")
+          .split(/\n{2,}/)
+          .map((p) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
+          .join("");
     setBody(html);
     setShowTemplates(false);
+    // Pull in the template's attachments (list endpoint omits them).
+    try {
+      const atts = await listTemplateAttachments(t.id);
+      setAttachments(atts);
+    } catch {
+      setAttachments([]);
+    }
+  }
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const uploaded: TemplateAttachment[] = [];
+      for (const file of Array.from(files)) {
+        uploaded.push(await uploadTemplateAttachment(file, null));
+      }
+      setAttachments((prev) => [...prev, ...uploaded]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Attachment upload failed");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  // Composer removes are local only — a template's shared files stay on the
+  // template; ad-hoc uploads just become unreferenced (harmless).
+  function removeAttachment(id: string) {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
   }
 
   async function handleSend() {
@@ -117,12 +160,14 @@ export function EmailComposerDrawer({
         cc: cc.trim() || undefined,
         subject: resolvedSubject,
         bodyHtml: resolvedBody,
+        attachmentIds: attachments.map((a) => a.id),
         stepIndex: stepIndex ?? null,
       });
       onSent({ subject: resolvedSubject, bodyHtml: resolvedBody });
       onClose();
       setSubject("");
       setBody("");
+      setAttachments([]);
     } catch (err) {
       // Surface the real reason (provider error, scope/permission, etc.) so it
       // can actually be fixed — not a generic "try again".
@@ -266,6 +311,44 @@ export function EmailComposerDrawer({
               senderName={fromAccount?.fromName}
               minHeight={240}
             />
+          </Field>
+
+          {/* Attachments */}
+          <Field label="Attachments">
+            <div className="flex items-center gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={uploading}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-section border border-border-subtle text-[10px] font-medium text-ink-secondary hover:bg-hover transition-colors disabled:opacity-50"
+              >
+                {uploading ? <Loader2 size={11} className="animate-spin" /> : <Paperclip size={11} />}
+                Attach file
+              </button>
+              <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+            </div>
+            {attachments.length > 0 && (
+              <div className="space-y-1.5">
+                {attachments.map((att) => (
+                  <div
+                    key={att.id}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-[8px] bg-section border border-border-subtle"
+                  >
+                    <FileText size={13} className="text-ink-muted shrink-0" />
+                    <span className="text-[11px] text-ink truncate flex-1">{att.fileName}</span>
+                    <span className="text-[10px] text-ink-faint shrink-0">{formatSize(att.size)}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(att.id)}
+                      title="Remove"
+                      className="p-0.5 rounded text-ink-faint hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </Field>
 
           {error && <p className="text-[11px] text-signal-red-text">{error}</p>}

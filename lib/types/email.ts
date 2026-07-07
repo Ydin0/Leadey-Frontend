@@ -106,6 +106,8 @@ export interface SendEmailPayload {
   cc?: string;
   subject: string;
   bodyHtml: string;
+  /** Ids of template attachments (or ad-hoc uploads) to attach to the email. */
+  attachmentIds?: string[];
   /** Set when this send completes a campaign step. */
   stepIndex?: number | null;
   scheduledAt?: string | null;
