@@ -28,6 +28,7 @@ const ConvertToOpportunityModal = dynamic(
   { ssr: false },
 );
 import { mapEventsToActivities } from "@/lib/utils/lead-activity";
+import { recordRecentLead } from "@/lib/recent-leads";
 import { updateLeadStatus, advanceLead, logLeadNote, updateLeadNote, deleteLeadNote, markLeadDnc, updateLeadContact, deleteLeadFromFunnel, updateLeadCompanyInfo, setLeadCustomFieldValues, createLeadInFunnel, type ContactEditPatch } from "@/lib/api/funnels";
 import { useCustomFields } from "@/lib/hooks/use-custom-fields";
 import { getCallRecords } from "@/lib/api/phone-lines";
@@ -98,6 +99,18 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   const [contactFilter, setContactFilter] = useState<string | null>(null);
 
   const currentLead = useMemo(() => leads.find((l) => l.id === leadId) || null, [leads, leadId]);
+
+  // Remember visited leads for the global-search empty state (client-only).
+  useEffect(() => {
+    if (!currentLead) return;
+    recordRecentLead({
+      leadId: currentLead.id,
+      funnelId,
+      name: currentLead.name,
+      company: currentLead.company,
+      domain: currentLead.companyDomain,
+    });
+  }, [funnelId, currentLead?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // All contacts (lead rows) of the focused lead's company. The lead profile is
   // a company view, so its activity aggregates across ALL of these — not just

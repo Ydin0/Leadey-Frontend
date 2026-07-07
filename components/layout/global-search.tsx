@@ -10,11 +10,13 @@ import {
   Users,
   Loader2,
   PhoneCall,
+  Clock,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { globalSearch } from "@/lib/api/search";
 import { getRecentCalls, type RecentCall } from "@/lib/api/phone-lines";
+import { getRecentLeads, type RecentLead } from "@/lib/recent-leads";
 import type { SearchResult, SearchResultType } from "@/lib/types/search";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { cn } from "@/lib/utils";
@@ -82,6 +84,7 @@ export function GlobalSearch() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [recent, setRecent] = useState<RecentCall[]>([]);
+  const [recentLeads, setRecentLeads] = useState<RecentLead[]>([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -124,6 +127,8 @@ export function GlobalSearch() {
   useEffect(() => {
     if (!open || !isAuthReady) return;
     let cancelled = false;
+    // Recently-visited leads come from localStorage (client-only, instant).
+    setRecentLeads(getRecentLeads(5));
     getRecentCalls(8)
       .then((r) => { if (!cancelled) setRecent(r); })
       .catch(() => {});
@@ -165,6 +170,12 @@ export function GlobalSearch() {
     router.push(`/dashboard/funnels/${c.funnelId}/leads/${c.leadId}`);
   }
 
+  function goRecentLead(r: RecentLead) {
+    setOpen(false);
+    setQuery("");
+    router.push(`/dashboard/funnels/${r.funnelId}/leads/${r.leadId}`);
+  }
+
   function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Escape") {
       setOpen(false);
@@ -186,7 +197,7 @@ export function GlobalSearch() {
   }
 
   const showDropdown = open && query.trim().length >= 2;
-  const showRecent = open && query.trim().length < 2 && recent.length > 0;
+  const showRecent = open && query.trim().length < 2 && (recentLeads.length > 0 || recent.length > 0);
 
   // Group results while preserving a flat index for keyboard nav.
   let flatIndex = -1;
@@ -221,28 +232,58 @@ export function GlobalSearch() {
         <div className="absolute left-0 top-[calc(100%+6px)] w-[420px] max-w-[80vw] bg-surface border border-border-subtle rounded-[14px] shadow-xl overflow-hidden z-50">
           {!showDropdown ? (
             <div className="max-h-[60vh] overflow-y-auto py-1.5">
-              <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-ink-muted font-medium flex items-center gap-1.5">
-                <PhoneCall size={11} /> Recent calls
-              </div>
-              {recent.map((c) => (
-                <button
-                  key={c.leadId}
-                  type="button"
-                  onClick={() => goLead(c)}
-                  className="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-hover"
-                >
-                  <ResultAvatar
-                    result={{ imageUrl: null, domain: c.domain ?? undefined } as unknown as SearchResult}
-                    Icon={PhoneCall}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] text-ink truncate">{c.name}</span>
-                    {c.company && (
-                      <span className="block text-[11px] text-ink-muted truncate">{c.company}</span>
-                    )}
-                  </span>
-                </button>
-              ))}
+              {recentLeads.length > 0 && (
+                <div className="mb-1">
+                  <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-ink-muted font-medium flex items-center gap-1.5">
+                    <Clock size={11} /> Recently viewed
+                  </div>
+                  {recentLeads.map((r) => (
+                    <button
+                      key={r.leadId}
+                      type="button"
+                      onClick={() => goRecentLead(r)}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-hover"
+                    >
+                      <ResultAvatar
+                        result={{ imageUrl: null, domain: r.domain ?? undefined } as unknown as SearchResult}
+                        Icon={UserRound}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[12px] text-ink truncate">{r.name}</span>
+                        {r.company && (
+                          <span className="block text-[11px] text-ink-muted truncate">{r.company}</span>
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {recent.length > 0 && (
+                <div>
+                  <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-ink-muted font-medium flex items-center gap-1.5">
+                    <PhoneCall size={11} /> Recent calls
+                  </div>
+                  {recent.map((c) => (
+                    <button
+                      key={c.leadId}
+                      type="button"
+                      onClick={() => goLead(c)}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-left transition-colors hover:bg-hover"
+                    >
+                      <ResultAvatar
+                        result={{ imageUrl: null, domain: c.domain ?? undefined } as unknown as SearchResult}
+                        Icon={PhoneCall}
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[12px] text-ink truncate">{c.name}</span>
+                        {c.company && (
+                          <span className="block text-[11px] text-ink-muted truncate">{c.company}</span>
+                        )}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           ) : results.length === 0 ? (
             <div className="px-4 py-6 text-center text-[12px] text-ink-muted">
