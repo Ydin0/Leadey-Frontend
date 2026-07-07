@@ -8,9 +8,17 @@ import { TeamLeaderboard } from "./team-leaderboard";
 import { TeamMembers, MemberModal, type MemberFormData } from "./team-members";
 import { TeamRep } from "./team-rep";
 import { DateRangePicker } from "./date-range-picker";
+import { NativeSelect } from "@/components/ui/native-select";
 import { TeamDataProvider, useTeamData } from "@/lib/team/team-data-context";
 import { Loader2 } from "lucide-react";
-import { WIN_MAP, windowRange, fmtRange, DAYS, type WindowId, type DayRange } from "@/lib/team/team-data";
+import { WIN_MAP, windowRange, fmtRange, DAYS, CH_IDS, CH_MAP, type WindowId, type DayRange } from "@/lib/team/team-data";
+
+/** Leaderboard rank-by metric options (lives in the header now, so it's shared). */
+const RANK_OPTS: [string, string][] = [
+  ["attainment", "Attainment %"], ["volume", "Total volume"], ["connectRate", "Connect rate"],
+  ["meetings", "Opportunities"], ["talkTime", "Talk time"], ["voicemail", "Voicemails"],
+  ...CH_IDS.map((c) => [c, CH_MAP[c].label] as [string, string]),
+];
 
 const DAY_MS = 86400000;
 
@@ -23,6 +31,8 @@ function TeamSectionInner() {
   const [win, setWin] = React.useState<WindowId>("week");
   // Custom calendar selection — overrides the preset window when set.
   const [customRange, setCustomRange] = React.useState<DayRange | null>(null);
+  // Leaderboard rank metric — lifted here so it sits in the header pill row.
+  const [rankBy, setRankBy] = React.useState<string>("attainment");
   const [repId, setRepId] = React.useState<string | null>(null);
   const [modal, setModal] = React.useState<Modal>(null);
 
@@ -79,6 +89,18 @@ function TeamSectionInner() {
           </div>
           <div className="row" style={{ gap: 10 }}>
             {showWindow && dateControls}
+            {tab === "leaderboard" && (
+              <div className="row" style={{ gap: 6 }}>
+                <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>Rank</span>
+                <NativeSelect
+                  value={rankBy}
+                  onChange={(e) => setRankBy(e.target.value)}
+                  className="!w-auto !rounded-full !py-1.5 !pl-3.5 !pr-8 !text-[11px]"
+                >
+                  {RANK_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                </NativeSelect>
+              </div>
+            )}
             <span className="pill pill-soft" style={{ pointerEvents: "none", color: seatsFull ? "var(--signal-red-text)" : "var(--fg2)" }}>
               <Icon name="users-round" size={12} />{seatUsage.used}/{seatUsage.included} seats
             </span>
@@ -114,7 +136,7 @@ function TeamSectionInner() {
       ) : tab === "analytics" ? (
         <TeamAnalytics range={range} rangeLabel={rangeLabel} trendMode={trendMode} onPickRep={setRepId} />
       ) : tab === "leaderboard" ? (
-        <TeamLeaderboard range={range} podium={podium} onPickRep={setRepId} />
+        <TeamLeaderboard range={range} podium={podium} rankBy={rankBy} onPickRep={setRepId} />
       ) : (
         <TeamMembers onPickRep={setRepId} onEdit={(id) => setModal({ mode: "edit", id })} />
       )}

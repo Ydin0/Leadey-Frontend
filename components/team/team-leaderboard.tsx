@@ -1,21 +1,19 @@
 "use client";
 
 import React from "react";
-import { NativeSelect } from "@/components/ui/native-select";
 import { Avatar } from "./team-shared";
 import { Sparkline, Meter, attColor } from "./charts";
 import { DeltaPill } from "./team-shared";
 import {
-  CH_IDS, CH_MAP, attainment, prevRange, sliceRange, sumSlice, bucketed, fmtTalkTime, connectRate,
+  CH_IDS, attainment, prevRange, sliceRange, sumSlice, bucketed, fmtTalkTime, connectRate,
   type ChannelId, type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
 
-export function TeamLeaderboard({ range, podium, onPickRep }: {
-  range: DayRange; podium: boolean; onPickRep: (id: string) => void;
+export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
+  range: DayRange; podium: boolean; rankBy: string; onPickRep: (id: string) => void;
 }) {
   const { activeMembers, departments } = useTeamData();
-  const [rankBy, setRankBy] = React.useState<string>("attainment");
   const [pod, setPod] = React.useState<string>("all");
 
   let members = activeMembers;
@@ -50,18 +48,12 @@ export function TeamLeaderboard({ range, podium, onPickRep }: {
     return r.a.got[rankBy as ChannelId].toLocaleString();
   };
 
-  const rankOpts: [string, string][] = [["attainment", "Attainment %"], ["volume", "Total volume"], ["connectRate", "Connect rate"], ["meetings", "Opportunities"], ["talkTime", "Talk time"], ["voicemail", "Voicemails"], ...CH_IDS.map((c) => [c, CH_MAP[c].label] as [string, string])];
   const medalCol = ["#E8C45C", "#C2CBE0", "#C58B5C"];
 
   return (
     <div className="fade" style={{ display: "grid", gap: 16 }}>
-      <div className="between" style={{ flexWrap: "wrap", gap: 12 }}>
-        <div className="row" style={{ gap: 8 }}>
-          <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>Rank by</span>
-          <NativeSelect className="field" style={{ width: "auto", padding: "7px 10px", fontSize: 12 }} value={rankBy} onChange={(e) => setRankBy(e.target.value)}>
-            {rankOpts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </NativeSelect>
-        </div>
+      {/* Rank-by now lives in the page header; the department filter stays here. */}
+      <div className="row" style={{ justifyContent: "flex-end", flexWrap: "wrap", gap: 12 }}>
         <div className="seg" style={{ flexWrap: "wrap" }}>
           {[["all", "All departments"], ...departments.map((d) => [d.name, d.name] as [string, string])].map(([v, l]) => (
             <button key={v} className={"seg-btn" + (pod === v ? " on" : "")} onClick={() => setPod(v)}>{l}</button>
