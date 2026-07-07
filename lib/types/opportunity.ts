@@ -50,6 +50,8 @@ export interface Opportunity {
   /** Funnel (campaign) of the source lead, when converted from a campaign lead.
    *  Lets opportunity clicks deep-link into the Lead View. Null for manual opps. */
   funnelId: string | null;
+  /** Manual position within its stage column on the board (0 = top). */
+  sortOrder: number;
   value: number;
   currency: string;
   probabilityOverride: number | null;

@@ -14,7 +14,7 @@ import { PipelineStatsBar } from "@/components/opportunities/pipeline-stats-bar"
 import { OpportunityFilters } from "@/components/opportunities/opportunity-filters";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { usePipelinesQuery } from "@/lib/queries/use-org-config";
-import { listOpportunities, updateOpportunity } from "@/lib/api/opportunities";
+import { listOpportunities, reorderOpportunities } from "@/lib/api/opportunities";
 import type {
   Pipeline,
   Opportunity,
@@ -125,20 +125,23 @@ export default function OpportunitiesPage() {
     [pipelines, activePipelineId],
   );
 
-  // ── Drag handler — optimistic update + rollback on error ──
-  async function handleMove(oppId: string, toStageId: string) {
+  // ── Drag handler — optimistic reorder + rollback on error ──
+  // The board sends the target stage's full ordered id list (a cross-column
+  // drop moves the card into it + orders in one call).
+  async function handleReorder(stageId: string, orderedIds: string[]) {
     const prev = opportunities;
+    const posById = new Map(orderedIds.map((id, i) => [id, i]));
     setOpportunities((cur) =>
-      cur.map((o) => (o.id === oppId ? { ...o, stageId: toStageId } : o)),
+      cur.map((o) => (posById.has(o.id) ? { ...o, stageId, sortOrder: posById.get(o.id)! } : o)),
     );
     try {
-      await updateOpportunity(oppId, { stageId: toStageId });
-      // Refresh summary in the background so won/lost counters stay accurate
+      await reorderOpportunities({ stageId, orderedIds });
+      // Refresh summary so won/lost counters stay accurate (order already local).
       void reload();
-    } catch (err: any) {
-      console.error("[opportunities] move failed:", err);
+    } catch (err) {
+      console.error("[opportunities] reorder failed:", err);
       setOpportunities(prev);
-      setError(err?.message || "Move failed — try again");
+      setError(err instanceof Error ? err.message : "Move failed — try again");
     }
   }
 
@@ -209,7 +212,7 @@ export default function OpportunitiesPage() {
         <PipelineBoard
           pipeline={activePipeline}
           opportunities={opportunities}
-          onMove={handleMove}
+          onReorder={handleReorder}
           resolveOwnerInitials={resolveOwnerInitials}
           onEdit={setEditingOppId}
         />

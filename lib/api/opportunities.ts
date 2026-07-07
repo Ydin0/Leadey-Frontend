@@ -193,6 +193,15 @@ export async function deleteOpportunity(id: string): Promise<void> {
   await apiRequest(`/opportunities/${id}`, { method: "DELETE" });
 }
 
+/** Persist a stage column's kanban order (and move cards into it). Each id in
+ *  `orderedIds` gets its position + stageId set in one call. */
+export async function reorderOpportunities(data: { stageId: string; orderedIds: string[] }): Promise<void> {
+  await apiRequest(`/opportunities/reorder`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 export async function winOpportunity(id: string): Promise<Opportunity> {
   return apiRequest<Opportunity>(`/opportunities/${id}/win`, { method: "POST" });
 }
