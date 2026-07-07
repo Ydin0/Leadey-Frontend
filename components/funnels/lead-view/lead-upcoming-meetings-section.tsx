@@ -1,53 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, Video, ChevronRight, Check, X, CircleDashed, HelpCircle } from "lucide-react";
+import { CalendarClock, Video, ChevronRight } from "lucide-react";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getLeadMeetings } from "@/lib/api/calendar";
-import type { LeadMeeting, MeetingResponseStatus } from "@/lib/types/calendar";
+import type { LeadMeeting } from "@/lib/types/calendar";
+import { SOURCE_LABEL, RsvpBadge, meetingWhen } from "@/components/calendar/meeting-bits";
 import { Section } from "./lead-section";
-
-const SOURCE_LABEL: Record<LeadMeeting["source"], string> = {
-  google: "Google Calendar",
-  outlook: "Outlook",
-  calendly: "Calendly",
-};
-
-const RSVP: Record<MeetingResponseStatus, { label: string; icon: typeof Check; className: string }> = {
-  accepted: { label: "Accepted", icon: Check, className: "bg-signal-green/15 text-signal-green-text" },
-  declined: { label: "Declined", icon: X, className: "bg-signal-red/15 text-signal-red-text" },
-  tentative: { label: "Tentative", icon: HelpCircle, className: "bg-signal-amber/15 text-signal-amber-text" },
-  needsAction: { label: "No response", icon: CircleDashed, className: "bg-signal-slate/15 text-signal-slate-text" },
-};
-
-/** Marker for the lead's RSVP to a meeting. Hidden when unknown. */
-function RsvpBadge({ status }: { status: MeetingResponseStatus | null }) {
-  if (!status) return null;
-  const cfg = RSVP[status];
-  const Icon = cfg.icon;
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0 ${cfg.className}`}>
-      <Icon size={10} strokeWidth={2.5} /> {cfg.label}
-    </span>
-  );
-}
-
-/** Human date+time, e.g. "Tue, Jul 1 · 2:30 PM". Marks today/tomorrow. */
-function meetingWhen(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const now = new Date();
-  const sameDay = (a: Date, b: Date) =>
-    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(now.getDate() + 1);
-  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  if (sameDay(d, now)) return `Today · ${time}`;
-  if (sameDay(d, tomorrow)) return `Tomorrow · ${time}`;
-  const date = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
-  return `${date} · ${time}`;
-}
 
 /** Upcoming meetings for the lead — synced from a rep's connected Google/Outlook
  *  calendar (matched by attendee email) plus any Calendly booking for this lead. */

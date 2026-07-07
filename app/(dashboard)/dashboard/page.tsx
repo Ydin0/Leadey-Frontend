@@ -6,6 +6,8 @@ import { GitFork } from "lucide-react";
 import Link from "next/link";
 import { getDashboard, getRepDashboard, type DashboardData, type RepDashboardData, type RepTask } from "@/lib/api/dashboard";
 import { listOpportunities, listPipelines } from "@/lib/api/opportunities";
+import { listMeetings } from "@/lib/api/calendar";
+import type { OrgMeeting } from "@/lib/types/calendar";
 import { updateLeadTask } from "@/lib/api/lead-tasks";
 import type { Opportunity, OpportunitySummary, Pipeline } from "@/lib/types/opportunity";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -44,24 +46,32 @@ export default function DashboardPage() {
   const [oppSummary, setOppSummary] = useState<OpportunitySummary | null>(null);
   const [opps, setOpps] = useState<Opportunity[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [meetings, setMeetings] = useState<OrgMeeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const [repData, dashData, oppData, pipelineData] = await Promise.all([
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart.getTime() + 86400000 - 1);
+      const [repData, dashData, oppData, pipelineData, meetingsData] = await Promise.all([
         getRepDashboard(),
         getDashboard(),
         // The cockpit is the rep's command-center — show THEIR pipeline, not the
         // whole team's.
         listOpportunities({ summary: true, ownerId: user?.id }),
         listPipelines(),
+        // Today's meetings from the rep's connected calendar/Calendly —
+        // best-effort so a calendar hiccup never blanks the dashboard.
+        listMeetings({ from: dayStart, to: dayEnd, scope: "mine" }).catch(() => null),
       ]);
       setRep(repData);
       setDash(dashData);
       setOppSummary(oppData.summary);
       setOpps(oppData.data);
       setPipelines(pipelineData);
+      setMeetings(meetingsData?.meetings ?? []);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load dashboard");
@@ -132,7 +142,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-[1.55fr_1fr] gap-6 items-start">
         <div className="flex flex-col gap-6 min-w-0">
-          <RepTasksPanel tasks={rep.tasks} onToggle={toggleTask} />
+          <RepTasksPanel tasks={rep.tasks} onToggle={toggleTask} meetings={meetings} />
           <RepQueueCockpit calls={dash.calls} linkedin={dash.linkedin} email={dash.email} />
         </div>
         <div className="flex flex-col gap-6 min-w-0 lg:sticky lg:top-[84px]">

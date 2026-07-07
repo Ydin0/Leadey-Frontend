@@ -32,3 +32,18 @@ export interface LeadMeetingsResult {
   meetings: LeadMeeting[];
   calendarConnected: boolean;
 }
+
+/** A meeting in the org/date-range feed (Cockpit + full calendar), enriched
+ *  with the matched lead/campaign for deep links. */
+export interface OrgMeeting extends LeadMeeting {
+  leadId: string | null;
+  funnelId: string | null;
+  leadName: string | null;
+  company: string | null;
+}
+
+export interface OrgMeetingsResult {
+  meetings: OrgMeeting[];
+  calendarConnected: boolean;
+  calendlyConnected: boolean;
+}

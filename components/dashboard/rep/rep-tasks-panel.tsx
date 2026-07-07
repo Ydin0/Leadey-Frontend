@@ -1,9 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, GitFork, CircleCheck } from "lucide-react";
+import { Check, GitFork, CircleCheck, CalendarDays, CalendarClock, Video } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { RepTask } from "@/lib/api/dashboard";
+import type { OrgMeeting } from "@/lib/types/calendar";
+import { RsvpBadge, meetingTime } from "@/components/calendar/meeting-bits";
 
 function timeLabel(dueAt: string | null): string {
   if (!dueAt) return "—";
@@ -74,9 +77,74 @@ function TaskRow({
   );
 }
 
+/** One of today's meetings inside the tasks panel — mirrors the TaskRow
+ *  layout (time column → title/meta) with meeting-specific accents. */
+function MeetingRow({ meeting, now, onOpen }: { meeting: OrgMeeting; now: number; onOpen: (m: OrgMeeting) => void }) {
+  const start = meeting.startTime ? new Date(meeting.startTime) : null;
+  const past = !!start && now > 0 && start.getTime() < now;
+  const soon = !!start && now > 0 && !past && start.getTime() - now < 15 * 60 * 1000;
+  const linked = !!(meeting.funnelId && meeting.leadId);
+  return (
+    <div
+      onClick={() => linked && onOpen(meeting)}
+      className={cn(
+        "group flex items-center gap-3 px-2.5 py-2.5 rounded-[10px] transition-colors",
+        linked ? "hover:bg-section cursor-pointer" : "cursor-default",
+      )}
+    >
+      <span
+        className={cn(
+          "flex items-center justify-center w-[18px] h-[18px] rounded-full shrink-0",
+          past ? "bg-section text-ink-faint" : "bg-signal-blue/15 text-signal-blue-text",
+        )}
+      >
+        <CalendarClock size={11} strokeWidth={2} />
+      </span>
+
+      <span className={cn("text-[11.5px] w-[58px] shrink-0 tabular-nums font-medium", past ? "text-ink-faint" : "text-ink-muted")}>
+        {meetingTime(meeting.startTime)}
+      </span>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={cn("text-[13px] font-medium truncate", past ? "text-ink-faint line-through" : "text-ink")}>
+            {meeting.title || "Meeting"}
+          </span>
+          <RsvpBadge status={meeting.responseStatus} />
+        </div>
+        {(meeting.leadName || meeting.company) && (
+          <div className="text-[11px] text-ink-muted truncate mt-0.5">
+            {meeting.leadName}
+            {meeting.company ? ` · ${meeting.company}` : ""}
+          </div>
+        )}
+      </div>
+
+      {meeting.joinUrl && !past && (
+        <a
+          href={meeting.joinUrl}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "inline-flex items-center gap-1 text-[11px] font-medium rounded-full px-2.5 py-1 shrink-0 transition-colors",
+            soon
+              ? "bg-signal-green text-signal-green-text hover:opacity-90"
+              : "text-signal-blue-text hover:bg-signal-blue/10",
+          )}
+        >
+          <Video size={11} /> Join
+        </a>
+      )}
+    </div>
+  );
+}
+
 interface RepTasksPanelProps {
   tasks: RepTask[];
   onToggle: (task: RepTask) => void;
+  /** Today's meetings (from the connected calendar / Calendly); optional. */
+  meetings?: OrgMeeting[];
 }
 
 const GROUPS: { key: RepTask["group"]; label: string; urgent?: boolean }[] = [
@@ -84,12 +152,25 @@ const GROUPS: { key: RepTask["group"]; label: string; urgent?: boolean }[] = [
   { key: "today", label: "Today" },
 ];
 
-export function RepTasksPanel({ tasks, onToggle }: RepTasksPanelProps) {
+export function RepTasksPanel({ tasks, onToggle, meetings = [] }: RepTasksPanelProps) {
   const router = useRouter();
   const remaining = tasks.filter((t) => !t.done).length;
 
+  // Minute tick so past/imminent meeting styling stays live (and satisfies the
+  // React Compiler's no-impure-render rule for Date.now()).
+  const [now, setNow] = useState(0);
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0); // async first tick (no setState in effect body)
+    const t = setInterval(tick, 60_000);
+    return () => { clearTimeout(first); clearInterval(t); };
+  }, []);
+
   function open(t: RepTask) {
     router.push(`/dashboard/funnels/${t.funnelId}/leads/${t.leadId}`);
+  }
+  function openMeeting(m: OrgMeeting) {
+    if (m.funnelId && m.leadId) router.push(`/dashboard/funnels/${m.funnelId}/leads/${m.leadId}`);
   }
 
   return (
@@ -101,7 +182,27 @@ export function RepTasksPanel({ tasks, onToggle }: RepTasksPanelProps) {
             {remaining} left
           </span>
         </div>
+        <button
+          onClick={() => router.push("/dashboard/calendar")}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary border border-border-subtle text-[11px] font-medium hover:bg-hover transition-colors"
+        >
+          <CalendarDays size={12} strokeWidth={1.75} /> Calendar
+        </button>
       </div>
+
+      {meetings.length > 0 && (
+        <div className="mt-3.5">
+          <div className="flex items-center gap-2 px-2.5 pb-1">
+            <span className="text-[10px] uppercase tracking-wider font-medium text-signal-blue-text">Meetings today</span>
+            <span className="text-[10.5px] text-ink-faint">{meetings.length}</span>
+          </div>
+          <div className="flex flex-col">
+            {meetings.map((m) => (
+              <MeetingRow key={m.id} meeting={m} now={now} onOpen={openMeeting} />
+            ))}
+          </div>
+        </div>
+      )}
 
       {tasks.length === 0 ? (
         <div className="flex flex-col items-center gap-2.5 py-9 text-center">

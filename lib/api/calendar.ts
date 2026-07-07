@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { CalendarAccountsResult, LeadMeetingsResult } from "@/lib/types/calendar";
+import type { CalendarAccountsResult, LeadMeetingsResult, OrgMeetingsResult } from "@/lib/types/calendar";
 
 /** The caller's connected calendars + whether each provider is server-configured. */
 export async function listCalendarAccounts(): Promise<CalendarAccountsResult> {
@@ -21,4 +21,19 @@ export async function getLeadMeetings(funnelId: string, leadId: string): Promise
   return apiRequest<LeadMeetingsResult>(
     `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/meetings`,
   );
+}
+
+/** Org/date-range meetings feed (Cockpit + full calendar). scope "mine"
+ *  (default) = the caller's own connected accounts; "org" = everyone's. */
+export async function listMeetings(params: {
+  from: Date | string;
+  to: Date | string;
+  scope?: "mine" | "org";
+}): Promise<OrgMeetingsResult> {
+  const qs = new URLSearchParams({
+    from: typeof params.from === "string" ? params.from : params.from.toISOString(),
+    to: typeof params.to === "string" ? params.to : params.to.toISOString(),
+    ...(params.scope ? { scope: params.scope } : {}),
+  });
+  return apiRequest<OrgMeetingsResult>(`/calendar/meetings?${qs.toString()}`);
 }
