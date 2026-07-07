@@ -33,7 +33,10 @@ type RecordingsFilters = {
   hasRecording: string | null;
   memberId: string | null;
   search: string;
-  dateRange: "all" | "today" | "7d" | "30d" | "90d";
+  dateRange: "all" | "today" | "7d" | "30d" | "90d" | "custom";
+  /** Inclusive custom range (YYYY-MM-DD), used when dateRange === "custom". */
+  dateFrom: string | null;
+  dateTo: string | null;
   durMode: "any" | "more" | "less";
   durMinutes: string;
 };
@@ -45,6 +48,8 @@ const DEFAULT_FILTERS: RecordingsFilters = {
   memberId: null,
   search: "",
   dateRange: "all",
+  dateFrom: null,
+  dateTo: null,
   durMode: "any",
   durMinutes: "2",
 };
@@ -77,7 +82,9 @@ export default function RecordingsPage() {
   const [hasRecording, setHasRecording] = useState<string | null>(initial.hasRecording);
   const [memberId, setMemberId] = useState<string | null>(initial.memberId);
   const [search, setSearch] = useState(initial.search);
-  const [dateRange, setDateRange] = useState<"all" | "today" | "7d" | "30d" | "90d">(initial.dateRange);
+  const [dateRange, setDateRange] = useState<"all" | "today" | "7d" | "30d" | "90d" | "custom">(initial.dateRange);
+  const [dateFrom, setDateFrom] = useState<string | null>(initial.dateFrom);
+  const [dateTo, setDateTo] = useState<string | null>(initial.dateTo);
   const [durMode, setDurMode] = useState<"any" | "more" | "less">(initial.durMode);
   const [durMinutes, setDurMinutes] = useState(initial.durMinutes);
 
@@ -85,19 +92,30 @@ export default function RecordingsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const payload: RecordingsFilters = {
-      direction, disposition, hasRecording, memberId, search, dateRange, durMode, durMinutes,
+      direction, disposition, hasRecording, memberId, search, dateRange, dateFrom, dateTo, durMode, durMinutes,
     };
     try {
       window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(payload));
     } catch {
       /* storage unavailable — ignore */
     }
-  }, [direction, disposition, hasRecording, memberId, search, dateRange, durMode, durMinutes]);
+  }, [direction, disposition, hasRecording, memberId, search, dateRange, dateFrom, dateTo, durMode, durMinutes]);
 
   const fetchRecords = useCallback(async (p: number) => {
-    // Date range → an ISO startDate.
+    // Date range → ISO start/end. Presets set only a startDate; "custom" sets an
+    // exact inclusive window (start-of-from-day → end-of-to-day, local time).
     let startDate: string | undefined;
-    if (dateRange !== "all") {
+    let endDate: string | undefined;
+    if (dateRange === "custom") {
+      if (dateFrom) {
+        const d = new Date(`${dateFrom}T00:00:00`);
+        if (!Number.isNaN(d.getTime())) startDate = d.toISOString();
+      }
+      if (dateTo) {
+        const d = new Date(`${dateTo}T23:59:59.999`);
+        if (!Number.isNaN(d.getTime())) endDate = d.toISOString();
+      }
+    } else if (dateRange !== "all") {
       if (dateRange === "today") {
         const d = new Date(); d.setHours(0, 0, 0, 0); startDate = d.toISOString();
       } else {
@@ -117,6 +135,7 @@ export default function RecordingsPage() {
         userId: memberId || undefined,
         search: search || undefined,
         startDate,
+        endDate,
         minDuration: durMode === "more" ? secs : undefined,
         maxDuration: durMode === "less" ? secs : undefined,
       });
@@ -128,7 +147,7 @@ export default function RecordingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [direction, disposition, hasRecording, memberId, search, dateRange, durMode, durMinutes]);
+  }, [direction, disposition, hasRecording, memberId, search, dateRange, dateFrom, dateTo, durMode, durMinutes]);
 
   useEffect(() => {
     if (!isAuthReady) return;
@@ -290,7 +309,7 @@ export default function RecordingsPage() {
               <div className="flex flex-wrap gap-1.5">
                 {([
                   { v: "all", l: "All time" }, { v: "today", l: "Today" }, { v: "7d", l: "7 days" },
-                  { v: "30d", l: "30 days" }, { v: "90d", l: "90 days" },
+                  { v: "30d", l: "30 days" }, { v: "90d", l: "90 days" }, { v: "custom", l: "Custom" },
                 ] as const).map((o) => (
                   <button
                     key={o.v}
@@ -307,6 +326,30 @@ export default function RecordingsPage() {
                   </button>
                 ))}
               </div>
+              {dateRange === "custom" && (
+                <div className="mt-2.5 grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] text-ink-muted">From</span>
+                    <input
+                      type="date"
+                      value={dateFrom ?? ""}
+                      max={dateTo ?? undefined}
+                      onChange={(e) => setDateFrom(e.target.value || null)}
+                      className="bg-section border border-border-subtle rounded-[8px] px-2 py-1.5 text-[11px] text-ink focus:outline-none focus:border-border-default"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] text-ink-muted">To</span>
+                    <input
+                      type="date"
+                      value={dateTo ?? ""}
+                      min={dateFrom ?? undefined}
+                      onChange={(e) => setDateTo(e.target.value || null)}
+                      className="bg-section border border-border-subtle rounded-[8px] px-2 py-1.5 text-[11px] text-ink focus:outline-none focus:border-border-default"
+                    />
+                  </label>
+                </div>
+              )}
             </div>
             {/* Duration */}
             <div>
@@ -341,7 +384,7 @@ export default function RecordingsPage() {
         {hasFilters && (
           <button
             type="button"
-            onClick={() => { setDirection(null); setDisposition(null); setHasRecording(null); setMemberId(null); setDateRange("all"); setDurMode("any"); setDurMinutes("2"); setSearch(""); setPage(1); }}
+            onClick={() => { setDirection(null); setDisposition(null); setHasRecording(null); setMemberId(null); setDateRange("all"); setDateFrom(null); setDateTo(null); setDurMode("any"); setDurMinutes("2"); setSearch(""); setPage(1); }}
             className="text-[11px] font-medium text-ink-muted hover:text-ink-secondary transition-colors ml-1"
           >
             Clear all
