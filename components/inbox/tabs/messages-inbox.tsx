@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, MessageSquare, ArrowUpRight } from "lucide-react";
+import { Loader2, MessageSquare, MessageCircle, ArrowUpRight } from "lucide-react";
 import { cn, formatRelativeTime, formatPhoneNumber } from "@/lib/utils";
 import { getSmsThreads, type SmsThread } from "@/lib/api/sms";
 import { SmsThreadDrawer } from "@/components/sms/sms-thread-drawer";
+import { WhatsappThreadDrawer } from "@/components/whatsapp/whatsapp-thread-drawer";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 
 /** Messages tab — every SMS conversation across the org, newest first, with the
@@ -70,6 +71,11 @@ export function MessagesInbox() {
                   {t.contactName && (
                     <span className="text-[10.5px] text-ink-muted shrink-0">{formatPhoneNumber(t.phone)}</span>
                   )}
+                  {t.channel === "whatsapp" && (
+                    <span className="inline-flex items-center gap-0.5 text-[9px] font-medium uppercase tracking-wide rounded-full px-1.5 py-0.5 bg-signal-green/15 text-signal-green-text shrink-0">
+                      <MessageCircle size={9} /> WhatsApp
+                    </span>
+                  )}
                   {t.needsReply && (
                     <span className="text-[9px] font-medium uppercase tracking-wide rounded-full px-1.5 py-0.5 bg-signal-green/15 text-signal-green-text shrink-0">Reply</span>
                   )}
@@ -117,15 +123,28 @@ export function MessagesInbox() {
         )}
       </div>
 
-      <SmsThreadDrawer
-        open={!!active}
-        onClose={() => setActive(null)}
-        funnelId={active?.funnelId ?? null}
-        leadId={active?.leadId ?? null}
-        leadName={active?.contactName || active?.phone || "Conversation"}
-        leadPhone={active?.phone ?? null}
-        onSent={refresh}
-      />
+      {active?.channel === "whatsapp" ? (
+        <WhatsappThreadDrawer
+          open={!!active}
+          onClose={() => setActive(null)}
+          funnelId={active?.funnelId ?? null}
+          leadId={active?.leadId ?? null}
+          leadName={active?.contactName || active?.phone || "Conversation"}
+          leadPhone={active?.phone ?? null}
+          onSent={refresh}
+        />
+      ) : (
+        <SmsThreadDrawer
+          open={!!active}
+          onClose={() => setActive(null)}
+          channelFilter="sms"
+          funnelId={active?.funnelId ?? null}
+          leadId={active?.leadId ?? null}
+          leadName={active?.contactName || active?.phone || "Conversation"}
+          leadPhone={active?.phone ?? null}
+          onSent={refresh}
+        />
+      )}
     </div>
   );
 }

@@ -11,14 +11,7 @@ import { getPhoneLines } from "@/lib/api/phone-lines";
 import type { PhoneLine } from "@/lib/types/calling";
 import { listTemplates, createTemplate } from "@/lib/api/templates";
 import type { Template } from "@/lib/types/template";
-import {
-  listWhatsappSenders,
-  listWhatsappContentTemplates,
-  getWhatsappSettings,
-  type WhatsappSender,
-  type WhatsappContentTemplate,
-  type WhatsappSettings,
-} from "@/lib/api/whatsapp";
+import { getWhatsappSettings, type WhatsappSettings } from "@/lib/api/whatsapp";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { NODE_TYPES } from "./node-types";
 
@@ -371,129 +364,28 @@ function SmsStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Reco
 
 function WhatsappStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Record<string, unknown>) => void }) {
   const v = (k: string) => (d[k] != null ? String(d[k]) : "");
-  const [senders, setSenders] = useState<WhatsappSender[]>([]);
-  const [templates, setTemplates] = useState<WhatsappContentTemplate[]>([]);
   const [settings, setSettings] = useState<WhatsappSettings | null>(null);
   const msgRef = useRef<HTMLTextAreaElement>(null);
-  const mode = v("mode") || "template";
 
   useEffect(() => {
-    listWhatsappSenders().then(setSenders).catch(() => {});
-    listWhatsappContentTemplates().then(setTemplates).catch(() => {});
     getWhatsappSettings().then(setSettings).catch(() => {});
   }, []);
 
-  const online = senders.filter((s) => s.status === "online");
-  const selected = templates.find((t) => t.sid === v("contentSid")) || null;
-  // {{1}}-style placeholder slots in the selected template body.
-  const slots = selected
-    ? [...new Set([...selected.body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((m) => m[1]))].sort((a, b) => Number(a) - Number(b))
-    : [];
-  const vars =
-    d.contentVariables && typeof d.contentVariables === "object" && !Array.isArray(d.contentVariables)
-      ? (d.contentVariables as Record<string, string>)
-      : {};
-
-  function pickTemplate(sid: string) {
-    const t = templates.find((x) => x.sid === sid);
-    set({ contentSid: sid, contentName: t?.name || "", contentBody: t?.body || "", contentVariables: {} });
-  }
-
   const msg = v("message");
-  const modeBtn = (active: boolean) =>
-    `flex-1 px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors ${
-      active ? "bg-ink text-on-ink" : "text-ink-muted hover:text-ink"
-    }`;
-
-  // The org's own QR-connected WhatsApp: plain conversational messages, no
-  // template/24h machinery — the common case.
-  if (settings?.unipile.connected) {
-    return (
-      <>
-        <FieldHeader label="Message" picker={<VariablePicker targetRef={msgRef} value={msg} onChange={(val) => set({ message: val })} />} />
-        <textarea ref={msgRef} className={area} value={msg} onChange={(e) => set({ message: e.target.value })} placeholder={"Hi {{first_name}}, quick question about {{company}}…"} />
-        <p className="text-[11px] text-ink-faint mt-1.5">
-          Sends from your connected WhatsApp{settings.unipile.phone ? ` (${settings.unipile.phone})` : ""}. Use{" "}
-          {"{{first_name}}"}, {"{{company}}"} or any custom field.
-        </p>
-      </>
-    );
-  }
 
   return (
     <>
-      <label className={lab}>From number</label>
-      <NativeSelect className={inp} value={v("lineId")} onChange={(e) => set({ lineId: e.target.value })}>
-        <option value="">Auto (first online sender)</option>
-        {online.map((s) => (
-          <option key={s.id} value={s.lineId || s.id}>
-            {s.lineName ? `${s.lineName} · ${s.number}` : s.number}
-          </option>
-        ))}
-      </NativeSelect>
-      {settings?.sandbox ? (
-        <p className="text-[11px] text-ink-faint mt-1.5">Sandbox mode — sends use the shared Twilio sandbox number.</p>
-      ) : online.length === 0 ? (
-        <p className="text-[11px] text-ink-faint mt-1.5">No WhatsApp connected — connect your WhatsApp in Settings → WhatsApp.</p>
-      ) : null}
-
-      <label className={lab}>Message type</label>
-      <div className="flex items-center bg-section rounded-full p-0.5 border border-border-subtle">
-        <button type="button" onClick={() => set({ mode: "template" })} className={modeBtn(mode === "template")}>
-          Approved template
-        </button>
-        <button type="button" onClick={() => set({ mode: "freeform" })} className={modeBtn(mode === "freeform")}>
-          Freeform (24h window)
-        </button>
-      </div>
-
-      {mode === "template" ? (
-        <>
-          <label className={lab}>Template</label>
-          <NativeSelect className={inp} value={v("contentSid")} onChange={(e) => pickTemplate(e.target.value)}>
-            <option value="">Choose an approved template…</option>
-            {templates.map((t) => (
-              <option key={t.sid} value={t.sid} disabled={t.approvalStatus !== "approved"}>
-                {t.name}
-                {t.approvalStatus !== "approved" ? ` (${t.approvalStatus})` : ""}
-              </option>
-            ))}
-          </NativeSelect>
-          {templates.length === 0 && (
-            <p className="text-[11px] text-ink-faint mt-1.5">No templates yet — create one in Settings → WhatsApp.</p>
-          )}
-          {selected && (
-            <div className="mt-2 rounded-[8px] bg-section border border-border-subtle px-3 py-2 text-[11.5px] text-ink-secondary whitespace-pre-wrap">
-              {selected.body}
-            </div>
-          )}
-          {slots.map((slot) => (
-            <div key={slot}>
-              <label className={lab}>{`Variable {{${slot}}}`}</label>
-              <input
-                className={inp}
-                value={vars[slot] || ""}
-                onChange={(e) => set({ contentVariables: { ...vars, [slot]: e.target.value } })}
-                placeholder={`e.g. {{first_name}}`}
-              />
-            </div>
-          ))}
-          {slots.length > 0 && (
-            <p className="text-[11px] text-ink-faint mt-1.5">
-              Variable values support {"{{first_name}}"}, {"{{company}}"} and custom fields.
-            </p>
-          )}
-        </>
-      ) : (
-        <>
-          <FieldHeader label="Message" picker={<VariablePicker targetRef={msgRef} value={msg} onChange={(val) => set({ message: val })} />} />
-          <textarea ref={msgRef} className={area} value={msg} onChange={(e) => set({ message: e.target.value })} />
-          <p className="text-[11px] text-signal-amber-text mt-1.5">
-            Freeform WhatsApp messages only deliver inside the 24-hour window after the lead&apos;s last WhatsApp
-            message — outside it this step fails. Use an approved template for cold outreach.
-          </p>
-        </>
+      {settings && !settings.connected && (
+        <p className="text-[11px] text-signal-amber-text mt-4">
+          No WhatsApp connected — link your WhatsApp in Settings → WhatsApp for this step to send.
+        </p>
       )}
+      <FieldHeader label="Message" picker={<VariablePicker targetRef={msgRef} value={msg} onChange={(val) => set({ message: val })} />} />
+      <textarea ref={msgRef} className={area} value={msg} onChange={(e) => set({ message: e.target.value })} placeholder={"Hi {{first_name}}, quick question about {{company}}…"} />
+      <p className="text-[11px] text-ink-faint mt-1.5">
+        Sends from your connected WhatsApp{settings?.connected && settings.phone ? ` (${settings.phone})` : ""}. Use{" "}
+        {"{{first_name}}"}, {"{{company}}"} or any custom field.
+      </p>
     </>
   );
 }

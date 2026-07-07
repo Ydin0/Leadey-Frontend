@@ -22,7 +22,7 @@ export const NODE_TYPES: Record<WorkflowNodeType, NodeTypeDef> = {
   trigger:   { type: "trigger",   label: "Trigger",          kicker: "ENTRY",     icon: Zap,          ports: ["out"], fixed: true, defaultData: () => ({ label: "Lead enters campaign", sub: "" }) },
   email:     { type: "email",     label: "Send Email",       kicker: "MESSAGING", icon: Mail,         ports: ["out"], defaultData: () => ({ from: "", subject: "", body: "" }) },
   sms:       { type: "sms",       label: "Send SMS",         kicker: "MESSAGING", icon: MessageSquare,ports: ["out"], defaultData: () => ({ message: "" }) },
-  whatsapp:  { type: "whatsapp",  label: "Send WhatsApp",    kicker: "MESSAGING", icon: MessageCircle,ports: ["out"], defaultData: () => ({ mode: "template", contentSid: "", message: "" }) },
+  whatsapp:  { type: "whatsapp",  label: "Send WhatsApp",    kicker: "MESSAGING", icon: MessageCircle,ports: ["out"], defaultData: () => ({ message: "" }) },
   linkedin:  { type: "linkedin",  label: "LinkedIn",         kicker: "MESSAGING", icon: Linkedin,     ports: ["out"], defaultData: () => ({ ltype: "connection", message: "" }) },
   call:      { type: "call",      label: "Call Task",        kicker: "MESSAGING", icon: Phone,        ports: ["out"], defaultData: () => ({ title: "Call lead", script: "" }) },
   wait:      { type: "wait",      label: "Wait / Delay",     kicker: "TIMING",    icon: Clock,        ports: ["out"], defaultData: () => ({ amount: 2, unit: "days" }) },
@@ -58,7 +58,7 @@ export function nodeSummary(type: WorkflowNodeType, data: Record<string, unknown
     case "trigger": return s("sub") || s("label") || "Lead enters campaign";
     case "email": return s("subject") || "(no subject)";
     case "sms": return s("message") || "(empty message)";
-    case "whatsapp": return s("contentName") || s("message") || "(not configured)";
+    case "whatsapp": return s("message") || "(empty message)";
     case "linkedin": return `${s("ltype") || "connection"}`;
     case "call": return s("title") || "Call task";
     case "wait": return `${s("amount") || "0"} ${s("unit") || "days"}`;

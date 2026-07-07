@@ -3,6 +3,8 @@ import { apiRequest } from "./client";
 export interface SmsMessage {
   id: string;
   direction: "outbound" | "inbound";
+  /** "sms" | "whatsapp" — the thread endpoints return both; drawers filter. */
+  channel?: string;
   fromNumber: string;
   toNumber: string;
   body: string;
@@ -49,6 +51,8 @@ export interface SmsThread {
   companyDomain: string | null;
   /** Canonical company id — deep-links to the universal company profile. */
   masterCompanyId: string | null;
+  /** Channel of the latest message ("sms" | "whatsapp"). */
+  channel?: string;
   lastBody: string;
   lastDirection: "inbound" | "outbound";
   lastAt: string;

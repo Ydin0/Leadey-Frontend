@@ -34,6 +34,9 @@ interface SmsThreadDrawerProps {
   leadPhone: string | null;
   /** Lead fields for personalizing template variables ({{first_name}}, etc.). */
   lead?: PersonalizationLead;
+  /** Restrict the thread to one channel. On the lead profile this is "sms"
+   *  (WhatsApp has its own drawer); the inbox leaves it unset to show all. */
+  channelFilter?: "sms" | "whatsapp";
   /** Called after a message is sent so the parent can refresh the timeline. */
   onSent?: () => void;
 }
@@ -46,6 +49,7 @@ export function SmsThreadDrawer({
   leadName,
   leadPhone,
   lead,
+  channelFilter,
   onSent,
 }: SmsThreadDrawerProps) {
   const { resolveMember } = useTeamMembers();
@@ -77,7 +81,7 @@ export function SmsThreadDrawer({
         ? getSmsThreadByPhone(leadPhone)
         : Promise.resolve([] as SmsMessage[]);
     load
-      .then((m) => !cancelled && setMessages(m))
+      .then((m) => !cancelled && setMessages(channelFilter ? m.filter((x) => (x.channel || "sms") === channelFilter) : m))
       .catch(() => !cancelled && setError("Couldn't load the conversation."))
       .finally(() => !cancelled && setLoading(false));
     setShowTemplates(false);
@@ -97,7 +101,7 @@ export function SmsThreadDrawer({
       .catch(() => {});
     listTemplates("sms").then((t) => !cancelled && setTemplates(t)).catch(() => {});
     return () => { cancelled = true; };
-  }, [open, funnelId, leadId, leadPhone]);
+  }, [open, funnelId, leadId, leadPhone, channelFilter]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });

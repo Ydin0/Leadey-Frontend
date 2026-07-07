@@ -19,6 +19,10 @@ const SmsThreadDrawer = dynamic(
   () => import("@/components/sms/sms-thread-drawer").then((m) => m.SmsThreadDrawer),
   { ssr: false },
 );
+const WhatsappThreadDrawer = dynamic(
+  () => import("@/components/whatsapp/whatsapp-thread-drawer").then((m) => m.WhatsappThreadDrawer),
+  { ssr: false },
+);
 const ConvertToOpportunityModal = dynamic(
   () => import("@/components/opportunities/convert-to-opportunity-modal").then((m) => m.ConvertToOpportunityModal),
   { ssr: false },
@@ -81,6 +85,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   const [advancing, setAdvancing] = useState(false);
   const [showComposer, setShowComposer] = useState(false);
   const [showSms, setShowSms] = useState(false);
+  const [showWhatsapp, setShowWhatsapp] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [showConvert, setShowConvert] = useState(false);
@@ -234,7 +239,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   // (never a stale closure) and ignores key auto-repeat so holding a key can't
   // fly through the list.
   const navRef = useRef<{ prevId: string | null; nextId: string | null; blocked: boolean }>({ prevId, nextId, blocked: false });
-  navRef.current = { prevId, nextId, blocked: showComposer || showSms || noteOpen || showConvert };
+  navRef.current = { prevId, nextId, blocked: showComposer || showSms || showWhatsapp || noteOpen || showConvert };
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.repeat) return;
@@ -642,6 +647,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         onNote={() => { pauseForEngagement(); setNoteOpen(true); }}
         onEmail={() => { pauseForEngagement(); setShowComposer(true); }}
         onSms={() => { pauseForEngagement(); setShowSms(true); }}
+        onWhatsapp={() => { pauseForEngagement(); setShowWhatsapp(true); }}
         onCall={dialPrimary}
       />
 
@@ -737,6 +743,26 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
       <SmsThreadDrawer
         open={showSms}
         onClose={() => setShowSms(false)}
+        channelFilter="sms"
+        funnelId={funnelId}
+        leadId={currentLead.id}
+        leadName={currentLead.name}
+        leadPhone={primaryPhone || null}
+        lead={{
+          name: currentLead.name,
+          company: currentLead.company,
+          title: currentLead.title,
+          email: currentLead.email,
+          companyDomain: currentLead.companyDomain,
+        }}
+        onSent={() => onLeadsChanged?.()}
+      />
+      )}
+
+      {showWhatsapp && (
+      <WhatsappThreadDrawer
+        open={showWhatsapp}
+        onClose={() => setShowWhatsapp(false)}
         funnelId={funnelId}
         leadId={currentLead.id}
         leadName={currentLead.name}
