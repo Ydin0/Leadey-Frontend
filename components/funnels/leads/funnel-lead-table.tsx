@@ -9,7 +9,7 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { useRowLimit } from "@/lib/hooks/use-row-limit";
 import { advanceLead, updateLeadStatus, enrichJobPosts, saveLeadFilters } from "@/lib/api/funnels";
 import { useCredits } from "@/components/providers/credits-provider";
-import { FilterBuilder } from "@/components/filters/filter-builder";
+import { FilterSideOver } from "@/components/filters/filter-side-over";
 import { SmartViewBar } from "@/components/filters/smart-view-bar";
 import { EMPTY_FILTER, customFieldsToFilterFields, type FilterGroup, type FilterFieldDef } from "@/lib/types/lead-filter";
 import { matchesFilter } from "@/lib/utils/eval-lead-filter";
@@ -419,8 +419,18 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
     return map;
   }, [leads]);
 
+  // Campaign options for the org all-leads "Campaign" filter — derived from the
+  // loaded leads (org mode loads them all), value = funnelId, label = name.
+  const campaignOptions = useMemo(() => {
+    if (funnelId) return [];
+    const m = new Map<string, string>();
+    for (const l of leads) if (l.funnelId) m.set(l.funnelId, l.funnelName || l.funnelId);
+    return [...m.entries()].map(([value, label]) => ({ value, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [leads, funnelId]);
+
   const dynamicOptions = useMemo(
     () => ({
+      campaign: campaignOptions,
       // Always offer the operational statuses leads actually hold, even when
       // the org has hidden them from its display list — otherwise leads the
       // sequence moved to "completed" (or fresh "pending" leads) become
@@ -434,7 +444,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
       industry: industryOptions.map((s) => ({ value: s, label: s })),
       location: locationOptions.map((s) => ({ value: s, label: s })),
     }),
-    [statuses, sourceOptions, industryOptions, locationOptions],
+    [statuses, sourceOptions, industryOptions, locationOptions, campaignOptions],
   );
 
   // Resolve a filter field key → value for a given lead (incl. derived fields).
@@ -448,6 +458,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
         case "callCount": return activityMap.get(l.id)?.calls ?? 0;
         case "emailCount": return activityMap.get(l.id)?.emails ?? 0;
         case "leadsInCompany": return companyLeadCounts.get((l.company || "Unknown").toLowerCase()) ?? 0;
+        case "hasOpportunity": return !!l.opportunityId;
         default: return (l as unknown as Record<string, unknown>)[key];
       }
     },
@@ -664,11 +675,12 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
           current={filterGroup}
           onApply={(g) => { setFilterGroup(g); setCurrentPage(1); }}
         />
-        <FilterBuilder
+        <FilterSideOver
           value={filterGroup}
           onChange={(g) => { setFilterGroup(g); setCurrentPage(1); }}
           dynamicOptions={dynamicOptions}
           extraFields={customFields}
+          excludeKeys={orgMode ? [] : ["funnelId"]}
         />
         <div className="relative ml-auto">
           <Search size={13} strokeWidth={1.5} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-faint" />

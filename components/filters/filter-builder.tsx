@@ -29,7 +29,7 @@ interface FilterBuilderProps {
 const inputCls =
   "bg-surface border border-border-subtle rounded-md px-2 py-1 text-[11.5px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default";
 
-const GROUPS: FilterFieldDef["group"][] = ["Lead", "Company", "Activity", "Custom"];
+const GROUPS: FilterFieldDef["group"][] = ["Lead", "Company", "Activity", "Opportunity", "Custom"];
 
 export function FilterBuilder({ value, onChange, dynamicOptions = {}, extraFields = [] }: FilterBuilderProps) {
   const group = value ?? EMPTY_FILTER;
@@ -156,7 +156,7 @@ export function FilterBuilder({ value, onChange, dynamicOptions = {}, extraField
   );
 }
 
-function ValueInput({
+export function ValueInput({
   def,
   cond,
   options,

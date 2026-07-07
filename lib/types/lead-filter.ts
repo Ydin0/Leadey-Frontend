@@ -37,7 +37,7 @@ export const EMPTY_FILTER: FilterGroup = { match: "and", conditions: [] };
 export interface FilterFieldDef {
   key: string;
   label: string;
-  group: "Lead" | "Company" | "Activity" | "Custom";
+  group: "Lead" | "Company" | "Activity" | "Opportunity" | "Custom";
   type: FilterFieldType;
   operators: FilterOperator[];
   /** Static enum options (e.g. boolean); dynamic ones (status/company) are
@@ -84,6 +84,10 @@ export const LEAD_FILTER_FIELDS: FilterFieldDef[] = [
   { key: "linkedinUrl", label: "LinkedIn URL", group: "Lead", type: "text", operators: TEXT_OPS },
   { key: "status", label: "Status", group: "Lead", type: "enum", operators: ENUM_OPS, dynamicOptionsKey: "status" },
   { key: "source", label: "Source", group: "Lead", type: "enum", operators: ENUM_OPS, dynamicOptionsKey: "source" },
+  // Campaign membership — org all-leads page only (a person enrolled in N
+  // campaigns is N lead rows, so "is any of" matches per enrollment). Hidden on
+  // single-campaign pages via the side panel's excludeKeys.
+  { key: "funnelId", label: "Campaign", group: "Lead", type: "enum", operators: ["is", "is_not"], dynamicOptionsKey: "campaign" },
   { key: "score", label: "Score", group: "Lead", type: "number", operators: NUM_OPS },
   { key: "doNotCall", label: "Do Not Contact", group: "Lead", type: "boolean", operators: BOOL_OPS, options: [{ value: "true", label: "Yes" }, { value: "false", label: "No" }] },
   { key: "createdAt", label: "Added", group: "Lead", type: "date", operators: DATE_OPS },
@@ -99,6 +103,8 @@ export const LEAD_FILTER_FIELDS: FilterFieldDef[] = [
   // Activity
   { key: "callCount", label: "Calls made", group: "Activity", type: "number", operators: ["gte", "lte", "is", "between"] },
   { key: "emailCount", label: "Emails sent", group: "Activity", type: "number", operators: ["gte", "lte", "is", "between"] },
+  // Opportunity
+  { key: "hasOpportunity", label: "Has opportunity", group: "Opportunity", type: "boolean", operators: BOOL_OPS, options: [{ value: "true", label: "Yes" }, { value: "false", label: "No" }] },
 ];
 
 export function fieldDef(key: string): FilterFieldDef | undefined {
