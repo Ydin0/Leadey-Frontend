@@ -28,6 +28,7 @@ export function PipelineMembersPanel({ pipelineId }: { pipelineId: string }) {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const addRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,11 +56,13 @@ export function PipelineMembersPanel({ pipelineId }: { pipelineId: string }) {
 
   async function handleAdd(userId: string) {
     setBusy(true);
+    setError(null);
     try {
       const created = await addPipelineMember(pipelineId, userId);
       setMembers((prev) => [...prev, created]);
     } catch (err) {
       console.error("Failed to add pipeline member:", err);
+      setError(err instanceof Error ? err.message : "Couldn't add member — try again");
     } finally {
       setBusy(false);
     }
@@ -112,6 +115,7 @@ export function PipelineMembersPanel({ pipelineId }: { pipelineId: string }) {
           {showAdd && (
             <div className="absolute top-full right-0 mt-2 w-72 bg-surface rounded-[12px] border border-border-subtle shadow-lg z-30 p-3">
               <p className="text-[12px] font-medium text-ink mb-2">Pipeline members</p>
+              {error && <p className="text-[11px] text-signal-red-text mb-2">{error}</p>}
               {/* Current members with a remove control */}
               {members.length > 0 && (
                 <div className="space-y-1 mb-2 pb-2 border-b border-border-subtle">
