@@ -10,6 +10,8 @@ export interface BillingInfo {
   currentPeriodEnd: string | null;
   stripeCustomerId: string | null;
   stripeSubscriptionId: string | null;
+  /** Negotiated discount (0–100 %) applied to the seat subscription. */
+  discountPct: number;
   // Limits
   seatsIncluded: number;
   creditsIncluded: number;

@@ -228,8 +228,14 @@ export function BillingSection() {
   const isTrial = billing.plan === "trial";
   const hasSubscription = !!billing.stripeSubscriptionId;
   const currentPrice = billing.prices[billing.plan as keyof typeof billing.prices];
+  const discountPct = billing.discountPct ?? 0;
+  // Display-only math — Stripe's coupon does the authoritative discounting.
+  const applyDiscount = (amount: number) => (amount * (100 - discountPct)) / 100;
   const perSeat = currentPrice ? currentPrice.amount / 100 : 0;
   const monthlyTotal = perSeat * billing.seatsIncluded;
+  const monthlyTotalDiscounted = applyDiscount(monthlyTotal);
+  const gbp = (n: number) =>
+    `£${n.toLocaleString(undefined, { maximumFractionDigits: Number.isInteger(n) ? 0 : 2 })}`;
 
   return (
     <div className="space-y-5 max-w-4xl">
@@ -242,6 +248,11 @@ export function BillingSection() {
               <span className={cn("text-[9px] uppercase tracking-wide font-semibold rounded-full px-2 py-0.5", status.className)}>
                 {status.label}
               </span>
+              {discountPct > 0 && (
+                <span className="text-[9px] uppercase tracking-wide font-semibold rounded-full px-2 py-0.5 bg-signal-green text-signal-green-text">
+                  {discountPct}% discount
+                </span>
+              )}
             </div>
             <div className="text-[26px] font-semibold text-ink leading-none">{billing.planName}</div>
             <p className="text-[12px] text-ink-muted mt-2 max-w-[380px]">
@@ -256,11 +267,17 @@ export function BillingSection() {
           {hasSubscription && currentPrice && (
             <div className="text-right">
               <div className="text-[26px] font-semibold text-ink tabular-nums leading-none">
-                £{monthlyTotal.toLocaleString()}
+                {discountPct > 0 && (
+                  <span className="text-[15px] font-normal text-ink-faint line-through mr-2">
+                    {gbp(monthlyTotal)}
+                  </span>
+                )}
+                {gbp(monthlyTotalDiscounted)}
                 <span className="text-[13px] font-normal text-ink-muted">/mo</span>
               </div>
               <p className="text-[11.5px] text-ink-muted mt-2 tabular-nums">
                 {billing.seatsIncluded} seat{billing.seatsIncluded === 1 ? "" : "s"} × £{perSeat.toLocaleString()}
+                {discountPct > 0 && ` − ${discountPct}%`}
               </p>
               {billing.currentPeriodEnd && (
                 <p className="text-[11.5px] text-ink-faint mt-1 flex items-center justify-end gap-1.5">
@@ -321,7 +338,8 @@ export function BillingSection() {
               <span className="text-[12px] text-ink-secondary">extra seat{additionalSeats === 1 ? "" : "s"}</span>
             </div>
             <span className="text-[12px] text-ink-muted tabular-nums">
-              +£{(perSeat * additionalSeats).toFixed(0)}/mo
+              +{gbp(applyDiscount(perSeat * additionalSeats))}/mo
+              {discountPct > 0 && ` (${discountPct}% off)`}
             </span>
             <div className="flex items-center gap-2 ml-auto">
               <button
@@ -369,7 +387,12 @@ export function BillingSection() {
         <div>
           <div className="mb-3">
             <h3 className="text-[14px] font-semibold text-ink">Choose a plan</h3>
-            <p className="text-[11.5px] text-ink-muted mt-0.5">Per-seat pricing, billed monthly. Cancel any time.</p>
+            <p className="text-[11.5px] text-ink-muted mt-0.5">
+              Per-seat pricing, billed monthly. Cancel any time.
+              {discountPct > 0 && (
+                <span className="text-signal-green-text font-medium"> Your {discountPct}% discount is applied at checkout.</span>
+              )}
+            </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {(["starter", "growth", "scale"] as const).map((planKey) => {
@@ -379,7 +402,8 @@ export function BillingSection() {
               const isPopular = planKey === "growth";
               const seats = seatCounts[planKey] || details?.minSeats || 1;
               const perSeatPrice = price.amount / 100;
-              const totalPrice = perSeatPrice * seats;
+              const perSeatDiscounted = applyDiscount(perSeatPrice);
+              const totalPrice = applyDiscount(perSeatPrice * seats);
 
               return (
                 <div
@@ -401,7 +425,14 @@ export function BillingSection() {
                     <p className="text-[11px] text-ink-muted mt-0.5 min-h-[30px]">{details?.description}</p>
 
                     <div className="mt-3 mb-4">
-                      <span className="text-[28px] font-semibold text-ink tabular-nums">£{perSeatPrice.toFixed(0)}</span>
+                      {discountPct > 0 && (
+                        <span className="text-[16px] font-normal text-ink-faint line-through mr-2 tabular-nums">
+                          £{perSeatPrice.toFixed(0)}
+                        </span>
+                      )}
+                      <span className="text-[28px] font-semibold text-ink tabular-nums">
+                        {gbp(perSeatDiscounted)}
+                      </span>
                       <span className="text-[11.5px] text-ink-muted"> /seat per month</span>
                     </div>
 
@@ -417,7 +448,7 @@ export function BillingSection() {
                         </StepperButton>
                         <span className="text-[11px] text-ink-muted">seat{seats === 1 ? "" : "s"}</span>
                       </div>
-                      <span className="text-[12px] font-medium text-ink tabular-nums">£{totalPrice.toFixed(0)}/mo</span>
+                      <span className="text-[12px] font-medium text-ink tabular-nums">{gbp(totalPrice)}/mo</span>
                     </div>
 
                     <ul className="space-y-1.5 mb-5 flex-1">
