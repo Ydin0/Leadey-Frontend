@@ -400,10 +400,12 @@ export function BillingSection() {
 
                     <button
                       onClick={() => handleCheckout(planKey)}
-                      disabled={isCurrentPlan || !!checkoutLoading}
+                      // A plan assigned without a Stripe subscription still
+                      // needs paying for — only a live subscription disables.
+                      disabled={(isCurrentPlan && hasSubscription) || !!checkoutLoading}
                       className={cn(
                         "w-full py-2.5 rounded-[20px] text-[11.5px] font-medium transition-opacity",
-                        isCurrentPlan
+                        isCurrentPlan && hasSubscription
                           ? "bg-section text-ink-faint cursor-not-allowed"
                           : isPopular
                             ? "bg-accent text-white hover:opacity-90"
@@ -412,12 +414,10 @@ export function BillingSection() {
                     >
                       {checkoutLoading === planKey ? (
                         <Loader2 size={12} className="animate-spin mx-auto" />
-                      ) : isCurrentPlan ? (
+                      ) : isCurrentPlan && hasSubscription ? (
                         "Current plan"
-                      ) : planKey === "scale" ? (
-                        "Talk to sales"
                       ) : (
-                        "Start 14-day free trial"
+                        "Subscribe"
                       )}
                     </button>
                   </div>
