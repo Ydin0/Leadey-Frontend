@@ -11,6 +11,10 @@ import {
   Check,
   Loader2,
   ArrowUpRight,
+  CreditCard,
+  Link2,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -22,6 +26,8 @@ import {
   getTelephonyCredits,
   updateTelephonySettings,
   telephonyTopupNow,
+  getTelephonyPaymentMethod,
+  type SavedPaymentMethod,
   type CreditTransaction,
   type TelephonyCredits,
 } from "@/lib/api/credits";
@@ -328,6 +334,202 @@ export function CreditsSection() {
   );
 }
 
+const CARD_BRANDS: Record<string, string> = {
+  visa: "Visa",
+  mastercard: "Mastercard",
+  amex: "American Express",
+  discover: "Discover",
+  diners: "Diners Club",
+  jcb: "JCB",
+  unionpay: "UnionPay",
+};
+
+/** Payment confirmation for one-off top-ups: shows the amount and the card
+ *  on file, and only charges when Pay is clicked. No saved method → hands
+ *  off to a secure Stripe Checkout page instead. */
+function TopupConfirmModal({
+  amountMinor,
+  balanceMinor,
+  fmt,
+  onClose,
+}: {
+  amountMinor: number;
+  balanceMinor: number;
+  fmt: (minor: number) => string;
+  onClose: (paid: boolean) => void;
+}) {
+  // undefined = loading, null = nothing on file
+  const [pm, setPm] = useState<SavedPaymentMethod | null | undefined>(undefined);
+  const [paying, setPaying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState<{ balanceMinor: number; settled: string[] } | null>(null);
+
+  useEffect(() => {
+    getTelephonyPaymentMethod()
+      .then(setPm)
+      .catch(() => setPm(null));
+  }, []);
+
+  async function pay() {
+    if (paying) return;
+    setPaying(true);
+    setError(null);
+    try {
+      const res = await telephonyTopupNow(amountMinor);
+      if ("checkoutUrl" in res) {
+        window.location.href = res.checkoutUrl;
+        return;
+      }
+      setDone({ balanceMinor: res.balanceMinor, settled: res.settledInvoices });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Payment failed");
+    } finally {
+      setPaying(false);
+    }
+  }
+
+  const owing = balanceMinor < 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px] p-4">
+      <style>{`
+        @keyframes topup-in { 0% { transform: scale(0.92) translateY(8px); opacity: 0; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+        @keyframes topup-draw { to { stroke-dashoffset: 0; } }
+        .topup-modal { animation: topup-in 0.25s cubic-bezier(0.21, 1.02, 0.73, 1) both; }
+        .topup-ring { stroke-dasharray: 190; stroke-dashoffset: 190; animation: topup-draw 0.6s ease-out 0.1s forwards; }
+        .topup-check { stroke-dasharray: 40; stroke-dashoffset: 40; animation: topup-draw 0.35s ease-out 0.55s forwards; }
+      `}</style>
+
+      <div className="topup-modal w-full max-w-[400px] bg-surface rounded-[16px] border border-border-subtle shadow-2xl overflow-hidden">
+        {done ? (
+          /* ── Success ── */
+          <div className="px-7 py-9 text-center">
+            <svg viewBox="0 0 68 68" className="w-[68px] h-[68px] mx-auto">
+              <circle cx="34" cy="34" r="30" fill="none" strokeWidth="4.5" strokeLinecap="round"
+                transform="rotate(-90 34 34)" className="topup-ring stroke-signal-green-text" />
+              <path d="M21 35 L30 44 L47 26" fill="none" strokeWidth="5" strokeLinecap="round"
+                strokeLinejoin="round" className="topup-check stroke-signal-green-text" />
+            </svg>
+            <h3 className="text-[17px] font-semibold text-ink mt-5">Payment successful</h3>
+            <p className="text-[12px] text-ink-muted mt-1.5 tabular-nums">
+              {fmt(amountMinor)} added — new balance{" "}
+              <span className={cn("font-medium", done.balanceMinor < 0 ? "text-signal-red-text" : "text-ink")}>
+                {fmt(done.balanceMinor)}
+              </span>
+            </p>
+            {done.settled.length > 0 && (
+              <p className="text-[11.5px] text-signal-green-text mt-2">
+                Invoice{done.settled.length === 1 ? "" : "s"} {done.settled.join(", ")} settled ✓
+              </p>
+            )}
+            <button
+              onClick={() => onClose(true)}
+              className="mt-6 px-6 py-2.5 rounded-[20px] bg-ink text-on-ink text-[12px] font-medium hover:opacity-90 transition-opacity"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          /* ── Confirm ── */
+          <>
+            <div
+              className="px-6 py-5 flex items-start justify-between"
+              style={{
+                backgroundColor: "#0C1122",
+                backgroundImage:
+                  "radial-gradient(70% 60% at 100% 100%, rgba(151,164,214,0.18) 0%, rgba(151,164,214,0) 65%), linear-gradient(135deg, #0C1122 0%, #141A30 100%)",
+              }}
+            >
+              <div>
+                <p className="text-[10px] uppercase tracking-[0.12em] text-[#97A4D6] font-medium">Telephony top-up</p>
+                <p className="text-[30px] font-semibold text-white tabular-nums leading-tight mt-1">{fmt(amountMinor)}</p>
+              </div>
+              <button
+                onClick={() => onClose(false)}
+                className="p-1.5 -mr-1.5 -mt-1 rounded-full text-[#97A4D6] hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5">
+              <p className={cn("mb-2", SECTION_LABEL)}>Paying with</p>
+              {pm === undefined ? (
+                <div className="flex items-center gap-2.5 rounded-[12px] border border-border-subtle bg-section/40 px-3.5 py-3">
+                  <Loader2 size={14} className="animate-spin text-ink-muted" />
+                  <span className="text-[12px] text-ink-muted">Loading payment method…</span>
+                </div>
+              ) : pm === null ? (
+                <div className="flex items-start gap-2.5 rounded-[12px] border border-border-subtle bg-section/40 px-3.5 py-3">
+                  <CreditCard size={16} className="text-ink-secondary shrink-0 mt-0.5" />
+                  <p className="text-[12px] text-ink-secondary">
+                    No saved payment method — you&apos;ll complete this payment on a secure Stripe
+                    page, and your card is saved for next time.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 rounded-[12px] border border-border-subtle bg-section/40 px-3.5 py-3">
+                  <div className="w-9 h-9 rounded-[8px] bg-surface border border-border-subtle flex items-center justify-center shrink-0">
+                    {pm.kind === "link" ? (
+                      <Link2 size={15} className="text-accent" />
+                    ) : (
+                      <CreditCard size={15} className="text-accent" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[12.5px] font-medium text-ink">
+                      {pm.kind === "link"
+                        ? "Stripe Link"
+                        : `${CARD_BRANDS[pm.brand] ?? pm.brand} ${pm.last4 ? `•••• ${pm.last4}` : ""}`}
+                    </p>
+                    <p className="text-[11px] text-ink-muted truncate">
+                      {pm.kind === "link"
+                        ? pm.email || "Saved payment method"
+                        : pm.expMonth
+                          ? `Expires ${String(pm.expMonth).padStart(2, "0")}/${String(pm.expYear).slice(-2)}`
+                          : "Saved payment method"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-[11px] text-ink-muted mt-3">
+                {owing
+                  ? `Your balance is ${fmt(balanceMinor)} — open telephony invoices covered by this top-up are settled automatically, oldest first.`
+                  : "The amount is added to your telephony balance immediately."}
+              </p>
+
+              {error && <p className="text-[11.5px] font-medium text-signal-red-text mt-3">{error}</p>}
+
+              <div className="flex items-center gap-1.5 mt-4 text-ink-faint">
+                <ShieldCheck size={12} />
+                <span className="text-[10.5px]">Processed securely by Stripe</span>
+              </div>
+            </div>
+
+            <div className="px-6 pb-5 flex items-center justify-end gap-2">
+              <button
+                onClick={() => onClose(false)}
+                className="px-4 py-2 rounded-[20px] text-[11.5px] font-medium text-ink-secondary border border-border-subtle hover:bg-hover transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void pay()}
+                disabled={paying || pm === undefined}
+                className="inline-flex items-center gap-1.5 px-5 py-2 rounded-[20px] bg-ink text-on-ink text-[11.5px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+              >
+                {paying ? <Loader2 size={13} className="animate-spin" /> : <CreditCard size={13} />}
+                {pm === null ? "Continue to payment" : `Pay ${fmt(amountMinor)}`}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MonthStat({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <div className="px-5 py-3">
@@ -476,40 +678,12 @@ function TelephonySettingsCard({ data, onRefresh }: { data: TelephonyCredits; on
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
   const [topupDraft, setTopupDraft] = useState("");
-  const [toppingUp, setToppingUp] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const toMinor = (s: string) => Math.round((parseFloat(s) || 0) * 100);
   // What the FIRST auto charge would be if enabled right now (covers any
   // outstanding negative balance up to the target).
   const firstChargeMinor = Math.min(Math.max(0, toMinor(targetDraft) - data.balanceMinor), 1_000_000);
-
-  async function topupNow() {
-    const amountMinor = toMinor(topupDraft);
-    if (toppingUp || amountMinor < 500) return;
-    setToppingUp(true);
-    setNotice(null);
-    try {
-      const res = await telephonyTopupNow(amountMinor);
-      if ("checkoutUrl" in res) {
-        // No saved card — pay via Stripe Checkout (which saves the card).
-        window.location.href = res.checkoutUrl;
-        return;
-      }
-      setNotice({
-        tone: "ok",
-        text:
-          res.settledInvoices.length > 0
-            ? `Charged ${fmt(amountMinor)} — invoice${res.settledInvoices.length === 1 ? "" : "s"} ${res.settledInvoices.join(", ")} settled. New balance ${fmt(res.balanceMinor)}.`
-            : `Charged ${fmt(amountMinor)} — new balance ${fmt(res.balanceMinor)}.`,
-      });
-      setTopupDraft("");
-      onRefresh();
-    } catch (err) {
-      setNotice({ tone: "err", text: err instanceof Error ? err.message : "Top-up failed" });
-    } finally {
-      setToppingUp(false);
-    }
-  }
 
   async function save() {
     if (saving) return;
@@ -606,18 +780,33 @@ function TelephonySettingsCard({ data, onRefresh }: { data: TelephonyCredits; on
           telephony invoices it covers are settled automatically, oldest first.
         </p>
         <div className="flex items-center gap-2 flex-wrap">
-          <MoneyInput value={topupDraft} onChange={setTopupDraft} placeholder="100" disabled={toppingUp} />
+          <MoneyInput value={topupDraft} onChange={setTopupDraft} placeholder="100" />
           <button
-            onClick={() => void topupNow()}
-            disabled={toppingUp || toMinor(topupDraft) < 500}
+            onClick={() => setConfirmOpen(true)}
+            disabled={toMinor(topupDraft) < 500}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11.5px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
           >
-            {toppingUp ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+            <Plus size={13} />
             {toMinor(topupDraft) >= 500 ? `Top up ${fmt(toMinor(topupDraft))}` : "Top up"}
           </button>
           <span className="text-[10.5px] text-ink-faint">min {fmt(500)}</span>
         </div>
       </div>
+
+      {confirmOpen && (
+        <TopupConfirmModal
+          amountMinor={toMinor(topupDraft)}
+          balanceMinor={data.balanceMinor}
+          fmt={fmt}
+          onClose={(paid) => {
+            setConfirmOpen(false);
+            if (paid) {
+              setTopupDraft("");
+              onRefresh();
+            }
+          }}
+        />
+      )}
 
       <div className="flex items-center justify-end gap-3 mt-5 pt-4 border-t border-border-subtle">
         {notice && (

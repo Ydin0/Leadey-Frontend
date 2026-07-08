@@ -93,6 +93,24 @@ export interface TelephonySettingsResult {
   immediateTopup: { charged: boolean; amountMinor?: number; error?: string };
 }
 
+export interface SavedPaymentMethod {
+  kind: string; // "card" | "link" | ...
+  brand: string;
+  last4: string | null;
+  expMonth: number | null;
+  expYear: number | null;
+  email: string | null;
+}
+
+/** The payment method a top-up would charge — shown on the confirmation
+ *  dialog. Null when nothing is on file (top-up then goes via Checkout). */
+export async function getTelephonyPaymentMethod(): Promise<SavedPaymentMethod | null> {
+  const res = await apiRequest<{ paymentMethod: SavedPaymentMethod | null }>(
+    "/credits/telephony/payment-method",
+  );
+  return res.paymentMethod;
+}
+
 /** One-off telephony top-up. With a saved card it charges immediately and
  *  settles open telephony invoices oldest-first; with no card on file the
  *  response carries a Stripe Checkout URL instead (paying there saves the
