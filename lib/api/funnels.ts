@@ -458,6 +458,20 @@ export async function deleteLeadFromFunnel(funnelId: string, leadId: string): Pr
   );
 }
 
+/** Bulk delete selected leads. mode "campaign" removes only these enrollments
+ *  (the people stay in other campaigns / the org leads list); "everywhere"
+ *  deletes the same people's enrollments across ALL campaigns — destructive. */
+export async function bulkDeleteLeads(
+  funnelId: string,
+  leadIds: string[],
+  mode: "campaign" | "everywhere",
+): Promise<{ deleted: number }> {
+  return apiRequest<{ deleted: number }>(
+    `/funnels/${encodeURIComponent(funnelId)}/leads/bulk-delete`,
+    { method: "POST", body: JSON.stringify({ leadIds, mode }) },
+  );
+}
+
 /** Create a single lead in a campaign (the "Individual contact" / "Add contact"
  *  flow). Only name + company are required; the rest is filled on the profile.
  *  Returns the new lead id so the caller can open its profile. */

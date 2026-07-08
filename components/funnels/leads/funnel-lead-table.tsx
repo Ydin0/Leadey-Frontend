@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, Sparkles, Search, Bot, UserPlus, Check, Columns3, Megaphone } from "lucide-react";
+import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, Sparkles, Search, Bot, UserPlus, Check, Columns3, Megaphone, Trash2, UserMinus } from "lucide-react";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -51,6 +51,12 @@ interface FunnelLeadTableProps {
   onCreateCampaign?: (leadIds: string[]) => void;
   /** Org-wide mode: add the selected lead ids to an existing campaign. */
   onAddToCampaign?: (leadIds: string[]) => void;
+  /** Campaign mode: remove the selected leads from THIS campaign only (the
+   *  parent owns the confirm modal + API call). Gated on leads.delete. */
+  onRemoveLeads?: (leadIds: string[]) => void;
+  /** Campaign mode: permanently delete the selected leads everywhere (typed
+   *  confirmation owned by the parent). Gated on leads.delete. */
+  onDeleteLeads?: (leadIds: string[]) => void;
 }
 
 const PAGE_SIZE = 25;
@@ -187,6 +193,8 @@ function MagicEnrichBar({
   onSelectAll,
   onClear,
   onDone,
+  onRemove,
+  onDelete,
 }: {
   funnelId: string;
   companies: SelectedCompany[];
@@ -200,6 +208,10 @@ function MagicEnrichBar({
   onSelectAll: () => void;
   onClear: () => void;
   onDone: (summary: string) => void;
+  /** Remove the selected companies' leads from this campaign (parent confirms). */
+  onRemove?: () => void;
+  /** Permanently delete the selected companies' leads (parent typed-confirms). */
+  onDelete?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -266,6 +278,23 @@ function MagicEnrichBar({
 
       <div className="w-px h-5 bg-border-subtle mx-1" />
 
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+        >
+          <UserMinus size={12} /> Remove from campaign
+        </button>
+      )}
+      {onDelete && (
+        <button
+          onClick={onDelete}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-signal-red/10 border border-signal-red-text/20 text-[11px] font-medium text-signal-red-text hover:bg-signal-red/20 transition-colors"
+        >
+          <Trash2 size={12} /> Delete
+        </button>
+      )}
+
       <div className="relative" ref={ref}>
         <button
           onClick={() => setOpen((v) => !v)}
@@ -317,7 +346,7 @@ function MagicEnrichBar({
   );
 }
 
-export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, sortBy, onSortChange, onLeadAdvanced, onLeadClick, onCreateCampaign, onAddToCampaign }: FunnelLeadTableProps) {
+export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, sortBy, onSortChange, onLeadAdvanced, onLeadClick, onCreateCampaign, onAddToCampaign, onRemoveLeads, onDeleteLeads }: FunnelLeadTableProps) {
   const prefetchFunnel = usePrefetchFunnel();
   // Close-style query builder. Restored from the campaign config (a FilterGroup);
   // a legacy/other shape falls back to empty.
@@ -789,7 +818,41 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
             setSelectedCompanies(new Set());
             onLeadAdvanced?.();
           }}
+          onRemove={onRemoveLeads ? () => onRemoveLeads(selectedLeadIds) : undefined}
+          onDelete={onDeleteLeads ? () => onDeleteLeads(selectedLeadIds) : undefined}
         />
+      )}
+
+      {/* Campaign-mode bulk bar (flat view) — remove from campaign / delete. */}
+      {funnelId && !groupByCompany && selectedLeadIds.length > 0 && (onRemoveLeads || onDeleteLeads) && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-5 py-3 rounded-[14px] bg-surface border border-border-default shadow-lg">
+          <span className="text-[12px] font-medium text-signal-blue-text">
+            {selectedLeadIds.length.toLocaleString()} lead{selectedLeadIds.length === 1 ? "" : "s"} selected
+          </span>
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            className="text-[11px] text-ink-muted hover:text-ink transition-colors"
+          >
+            Clear
+          </button>
+          <div className="w-px h-5 bg-border-subtle mx-1" />
+          {onRemoveLeads && (
+            <button
+              onClick={() => onRemoveLeads(selectedLeadIds)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+            >
+              <UserMinus size={12} /> Remove from campaign
+            </button>
+          )}
+          {onDeleteLeads && (
+            <button
+              onClick={() => onDeleteLeads(selectedLeadIds)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-signal-red/10 border border-signal-red-text/20 text-[11px] font-medium text-signal-red-text hover:bg-signal-red/20 transition-colors"
+            >
+              <Trash2 size={12} /> Delete
+            </button>
+          )}
+        </div>
       )}
 
       {/* Enrich result toast */}

@@ -40,7 +40,8 @@ const AddLeadsModal = dynamic(
 );
 import { FunnelMembersPanel } from "@/components/funnels/members/funnel-members-panel";
 import { DialerLauncherButton } from "@/components/dialer/launcher/dialer-launcher-button";
-import { updateFunnelStatus, deleteFunnel, backfillCompanyData } from "@/lib/api/funnels";
+import { updateFunnelStatus, deleteFunnel, backfillCompanyData, bulkDeleteLeads } from "@/lib/api/funnels";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import { useFunnel } from "@/lib/queries/use-funnel";
 import { patchFunnel, invalidateFunnel } from "@/lib/queries/funnel-cache";
 import { sortLeads, DEFAULT_LEAD_SORT, type LeadSortKey } from "@/lib/utils/sort-leads";
@@ -65,7 +66,17 @@ export default function FunnelDetailPage() {
   const [statusChanging, setStatusChanging] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  // Type-"delete" safety for campaign deletion (someone nuked a campaign by accident).
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [sortBy, setSortBy] = useState<LeadSortKey>(DEFAULT_LEAD_SORT);
+  const { has } = usePermissions();
+
+  // Bulk lead actions from the selection bar. "remove" = out of this campaign
+  // only; "delete" = the person's enrollments everywhere (typed confirmation).
+  const [bulkAction, setBulkAction] = useState<{ mode: "remove" | "delete"; ids: string[] } | null>(null);
+  const [bulkConfirmText, setBulkConfirmText] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
 
   // The campaign — served instantly from the shared cache (a previous visit,
   // the campaigns list, or a hover prefetch) while a fresh copy revalidates in
@@ -149,6 +160,22 @@ export default function FunnelDetailPage() {
   }, [funnelId, qc]);
 
   const refreshFunnel = useCallback(() => invalidateFunnel(qc, funnelId), [qc, funnelId]);
+
+  const runBulkAction = useCallback(async () => {
+    if (!bulkAction) return;
+    setBulkBusy(true);
+    setBulkError(null);
+    try {
+      await bulkDeleteLeads(funnelId, bulkAction.ids, bulkAction.mode === "delete" ? "everywhere" : "campaign");
+      setBulkAction(null);
+      setBulkConfirmText("");
+      invalidateFunnel(qc, funnelId);
+    } catch (err) {
+      setBulkError(err instanceof Error ? err.message : "Action failed — try again");
+    } finally {
+      setBulkBusy(false);
+    }
+  }, [bulkAction, funnelId, qc]);
 
   if (isPending && !funnel) {
     return (
@@ -248,13 +275,15 @@ export default function FunnelDetailPage() {
               onIndividual={() => setShowNewLead(true)}
               onSource={(source) => { setAddLeadsSource(source); setShowAddLeads(true); }}
             />
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="p-1.5 rounded-md text-ink-muted hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
-              title="Delete campaign"
-            >
-              <Trash2 size={14} strokeWidth={1.5} />
-            </button>
+            {has("campaigns.delete") && (
+              <button
+                onClick={() => { setDeleteConfirmText(""); setShowDeleteConfirm(true); }}
+                className="p-1.5 rounded-md text-ink-muted hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
+                title="Delete campaign"
+              >
+                <Trash2 size={14} strokeWidth={1.5} />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -300,6 +329,8 @@ export default function FunnelDetailPage() {
               const lead = sortedLeads[index];
               if (lead) router.push(`/dashboard/funnels/${funnel.id}/leads/${lead.id}`);
             }}
+            onRemoveLeads={has("leads.delete") ? (ids) => { setBulkError(null); setBulkConfirmText(""); setBulkAction({ mode: "remove", ids }); } : undefined}
+            onDeleteLeads={has("leads.delete") ? (ids) => { setBulkError(null); setBulkConfirmText(""); setBulkAction({ mode: "delete", ids }); } : undefined}
           />
         )
       )}
@@ -363,12 +394,22 @@ export default function FunnelDetailPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px]">
           <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-sm shadow-xl">
             <h3 className="text-[14px] font-semibold text-ink mb-2">Delete campaign?</h3>
-            <p className="text-[12px] text-ink-secondary mb-5">
+            <p className="text-[12px] text-ink-secondary mb-4">
               This will permanently delete <span className="font-medium text-ink">{funnel.name}</span> and all its leads, events, and import history. This cannot be undone.
             </p>
+            <label className="block text-[11px] text-ink-muted mb-1.5">
+              Type <span className="font-semibold text-signal-red-text">delete</span> to confirm
+            </label>
+            <input
+              autoFocus
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="delete"
+              className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-signal-red-text/50 mb-4"
+            />
             <div className="flex items-center justify-end gap-2">
               <button
-                onClick={() => setShowDeleteConfirm(false)}
+                onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmText(""); }}
                 disabled={deleting}
                 className="px-4 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle disabled:opacity-50"
               >
@@ -376,10 +417,70 @@ export default function FunnelDetailPage() {
               </button>
               <button
                 onClick={() => void handleDelete()}
-                disabled={deleting}
+                disabled={deleting || deleteConfirmText.trim().toLowerCase() !== "delete"}
                 className="px-4 py-1.5 rounded-[20px] bg-signal-red-text text-on-ink text-[11px] font-medium hover:bg-signal-red-text/90 transition-colors disabled:opacity-50"
               >
                 {deleting ? "Deleting..." : "Delete Campaign"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk lead action confirmation — remove (soft) vs delete (typed). */}
+      {bulkAction && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px]">
+          <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-sm shadow-xl">
+            {bulkAction.mode === "remove" ? (
+              <>
+                <h3 className="text-[14px] font-semibold text-ink mb-2">
+                  Remove {bulkAction.ids.length.toLocaleString()} lead{bulkAction.ids.length === 1 ? "" : "s"} from this campaign?
+                </h3>
+                <p className="text-[12px] text-ink-secondary mb-5">
+                  They&apos;ll be taken out of <span className="font-medium text-ink">{funnel.name}</span> only —
+                  they stay in any other campaigns and in your Leads list.
+                </p>
+              </>
+            ) : (
+              <>
+                <h3 className="text-[14px] font-semibold text-ink mb-2">
+                  Delete {bulkAction.ids.length.toLocaleString()} lead{bulkAction.ids.length === 1 ? "" : "s"} permanently?
+                </h3>
+                <p className="text-[12px] text-ink-secondary mb-4">
+                  This removes them from <span className="font-medium text-ink">every campaign</span> and your
+                  Leads list, including their events, tasks and documents. This cannot be undone.
+                </p>
+                <label className="block text-[11px] text-ink-muted mb-1.5">
+                  Type <span className="font-semibold text-signal-red-text">delete</span> to confirm
+                </label>
+                <input
+                  autoFocus
+                  value={bulkConfirmText}
+                  onChange={(e) => setBulkConfirmText(e.target.value)}
+                  placeholder="delete"
+                  className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-signal-red-text/50 mb-4"
+                />
+              </>
+            )}
+            {bulkError && <p className="text-[11px] text-signal-red-text mb-3">{bulkError}</p>}
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => { setBulkAction(null); setBulkConfirmText(""); }}
+                disabled={bulkBusy}
+                className="px-4 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void runBulkAction()}
+                disabled={bulkBusy || (bulkAction.mode === "delete" && bulkConfirmText.trim().toLowerCase() !== "delete")}
+                className={`px-4 py-1.5 rounded-[20px] text-[11px] font-medium transition-colors disabled:opacity-50 ${
+                  bulkAction.mode === "delete"
+                    ? "bg-signal-red-text text-on-ink hover:bg-signal-red-text/90"
+                    : "bg-ink text-on-ink hover:bg-ink/90"
+                }`}
+              >
+                {bulkBusy ? "Working…" : bulkAction.mode === "delete" ? "Delete leads" : "Remove from campaign"}
               </button>
             </div>
           </div>
