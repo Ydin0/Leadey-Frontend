@@ -57,3 +57,28 @@ export async function startCreditCheckout(credits: number): Promise<string> {
 export function creditsToUsd(credits: number, centsPerCredit = 1): string {
   return `$${((credits * centsPerCredit) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+// ─── Telephony money wallet (read-only, customer-facing) ────────────
+
+export interface TelephonyCreditTx {
+  id: string;
+  kind: "topup" | "usage" | "adjustment";
+  period: string | null;
+  amountMinor: number;
+  balanceAfterMinor: number;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface TelephonyCredits {
+  balanceMinor: number;
+  bufferPct: number;
+  currency: string;
+  recent: TelephonyCreditTx[];
+}
+
+/** The org's telephony balance: calls/SMS/numbers draw it down daily; paid
+ *  telephony invoices (usage + buffer %) top it up. */
+export async function getTelephonyCredits(): Promise<TelephonyCredits> {
+  return apiRequest<TelephonyCredits>("/credits/telephony");
+}

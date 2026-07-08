@@ -21,7 +21,9 @@ import {
   getCreditTransactions,
   startCreditCheckout,
   creditsToUsd,
+  getTelephonyCredits,
   type CreditTransaction,
+  type TelephonyCredits,
 } from "@/lib/api/credits";
 
 const ACTION_LABELS: Record<string, string> = {
@@ -52,6 +54,11 @@ export function CreditsSection() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [txLoading, setTxLoading] = useState(false);
+  const [telephony, setTelephony] = useState<TelephonyCredits | null>(null);
+
+  useEffect(() => {
+    getTelephonyCredits().then(setTelephony).catch(() => {});
+  }, []);
 
   const minTopup = info?.minTopup ?? 500;
 
@@ -141,6 +148,9 @@ export function CreditsSection() {
           </a>
         </div>
       </div>
+
+      {/* Telephony wallet — calls/SMS/numbers usage vs paid invoices */}
+      {telephony && <TelephonyBalanceCard data={telephony} />}
 
       {/* Cost table */}
       <div className="rounded-[14px] border border-border-subtle bg-surface p-5">
@@ -289,6 +299,68 @@ export function CreditsSection() {
           <div className="py-8 text-center"><p className="text-[12px] text-ink-muted">No credit activity yet.</p></div>
         )}
       </div>
+    </div>
+  );
+}
+
+/** The org's telephony money wallet (read-only): calls, SMS and phone-number
+ *  rental draw it down daily; paying a telephony invoice (usage + buffer %)
+ *  tops it up. Negative = usage accrued that hasn't been invoiced/paid yet. */
+function TelephonyBalanceCard({ data }: { data: TelephonyCredits }) {
+  const currency = (data.currency || "usd").toUpperCase();
+  const fmt = (minor: number) =>
+    new Intl.NumberFormat(undefined, { style: "currency", currency }).format(minor / 100);
+  const owing = data.balanceMinor < 0;
+
+  return (
+    <div className="rounded-[14px] border border-border-subtle bg-surface p-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">
+            <Phone size={12} className="text-accent" /> Telephony balance
+            {owing && (
+              <span className="text-[9px] uppercase tracking-wide font-semibold text-signal-red-text bg-signal-red/15 px-1.5 py-0.5 rounded-full">
+                Owing
+              </span>
+            )}
+          </div>
+          <div className="flex items-baseline gap-2">
+            <span className={cn("text-[34px] font-semibold tabular-nums leading-none", owing ? "text-signal-red-text" : "text-ink")}>
+              {fmt(data.balanceMinor)}
+            </span>
+            <span className="text-[13px] text-ink-muted">buffer {data.bufferPct}%</span>
+          </div>
+          {owing && (
+            <p className="text-[12px] text-ink-secondary mt-1.5 tabular-nums">
+              Usage to date {fmt(Math.abs(data.balanceMinor))} · next invoice ≈{" "}
+              <span className="font-medium text-ink">
+                {fmt(Math.round(Math.abs(data.balanceMinor) * (1 + data.bufferPct / 100)))}
+              </span>
+            </p>
+          )}
+          <p className="text-[11px] text-ink-muted mt-1.5 max-w-[520px]">
+            Calls, texts and phone-number rental draw this down as you use them; paying your
+            telephony invoice (usage + a {data.bufferPct}% calling buffer) tops it back up.
+          </p>
+        </div>
+      </div>
+
+      {data.recent.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-border-subtle space-y-1">
+          <p className="text-[10px] uppercase tracking-wider text-ink-faint font-medium mb-1.5">Recent activity</p>
+          {data.recent.slice(0, 5).map((t) => (
+            <div key={t.id} className="flex items-center gap-2 text-[11.5px]">
+              <span className="text-ink-secondary capitalize">{t.kind === "topup" ? "Invoice payment" : t.kind}</span>
+              {t.period && <span className="text-[10px] text-ink-faint bg-section rounded-full px-1.5 py-0.5">{t.period}</span>}
+              {t.description && <span className="text-ink-faint truncate max-w-[240px]">· {t.description}</span>}
+              <span className={cn("ml-auto font-medium tabular-nums", t.amountMinor < 0 ? "text-ink-secondary" : "text-signal-green-text")}>
+                {t.amountMinor > 0 ? "+" : ""}{fmt(t.amountMinor)}
+              </span>
+              <span className="text-[10.5px] text-ink-faint tabular-nums w-[84px] text-right">{fmt(t.balanceAfterMinor)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
