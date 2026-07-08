@@ -368,7 +368,10 @@ function TelephonyBalanceCard({ data, onRefresh }: { data: TelephonyCredits; onR
   const fmt = (minor: number) =>
     new Intl.NumberFormat(undefined, { style: "currency", currency }).format(minor / 100);
   const owing = data.balanceMinor < 0;
-  const { budget, autoTopup } = data;
+  // Defensive defaults: during a deploy the API can briefly serve the old
+  // response shape without these fields — never crash the whole tab over it.
+  const budget = data.budget ?? { period: "", limitMinor: null, spentMinor: 0, blocked: false };
+  const autoTopup = data.autoTopup ?? { enabled: false, thresholdMinor: 0, targetMinor: 0, lastError: null };
 
   // Editable drafts (major units), seeded once from the server state.
   const [limitDraft, setLimitDraft] = useState(budget.limitMinor ? String(budget.limitMinor / 100) : "");
