@@ -28,6 +28,7 @@ import { getPhoneLines, getCallRecords, saveCallRecord, resolveCaller } from "@/
 import { logLeadCall } from "@/lib/api/funnels";
 import { getLocalPresenceConfig, resolveCallerId, provisionLocalNumber } from "@/lib/api/calls";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { useTelephonyBlock } from "@/components/telephony/telephony-block";
 
 const CallContext = createContext<CallContextValue | null>(null);
 
@@ -133,6 +134,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [localBuyPrompt, setLocalBuyPrompt] = useState<
     { to: string; meta?: CallMeta; stateName: string; areaCode: string } | null
   >(null);
+  // Spend gate: out-of-credit / budget-reached modal for outbound dials.
+  const { ensureAllowed: ensureTelephonyAllowed, blockModal: telephonyBlockModal } = useTelephonyBlock();
 
   // ── Fetch phone lines + call records once auth is ready ──
   useEffect(() => {
@@ -709,6 +712,11 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      // Telephony spend gate: balance floor / monthly budget. The server
+      // also refuses the dial, but catching it here gives the rep a proper
+      // modal instead of an instant dead call.
+      if (!(await ensureTelephonyAllowed())) return false;
+
       let line = phoneLines.find((l) => l.id === selectedLineId);
       if (!line) return false;
 
@@ -788,7 +796,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       }
       return true;
     },
-    [activeCall, deviceReady, phoneLines, selectedLineId, bindCallEvents]
+    [activeCall, deviceReady, phoneLines, selectedLineId, bindCallEvents, ensureTelephonyAllowed]
   );
 
   // ── Accept / reject a ringing inbound call ────
@@ -909,6 +917,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
           onCancel={() => setLocalBuyPrompt(null)}
         />
       )}
+      {telephonyBlockModal}
     </CallContext.Provider>
   );
 }

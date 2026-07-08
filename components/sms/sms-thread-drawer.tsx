@@ -12,6 +12,7 @@ import { renderPersonalized, type PersonalizationLead } from "@/lib/utils/person
 import type { PhoneLine } from "@/lib/types/calling";
 import type { Template } from "@/lib/types/template";
 import { SlideOver } from "@/components/shared/slide-over";
+import { useTelephonyBlock, isTelephonyBlockedError } from "@/components/telephony/telephony-block";
 
 /** Rough dial-country of a number — so we text a UK lead from a UK number and a
  *  US lead from a US number (Twilio rejects mismatched From/To combinations). */
@@ -61,6 +62,7 @@ export function SmsThreadDrawer({
   const [showTemplates, setShowTemplates] = useState(false);
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
+  const { ensureAllowed: ensureTelephonyAllowed, showBlockModal, blockModal: telephonyBlockModal } = useTelephonyBlock();
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -112,6 +114,8 @@ export function SmsThreadDrawer({
   async function handleSend() {
     const text = body.trim();
     if (!text || sending || !funnelId || !leadId) return;
+    // Spend gate: balance floor / monthly budget.
+    if (!(await ensureTelephonyAllowed())) return;
     setSending(true);
     setError(null);
     try {
@@ -120,7 +124,11 @@ export function SmsThreadDrawer({
       setBody("");
       onSent?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send");
+      if (isTelephonyBlockedError(err)) {
+        showBlockModal(); // stale client cache — server refused; show the modal
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to send");
+      }
     } finally {
       setSending(false);
     }
@@ -129,6 +137,8 @@ export function SmsThreadDrawer({
   const segments = Math.max(1, Math.ceil(body.length / 160));
 
   return (
+    <>
+    {telephonyBlockModal}
     <SlideOver open={open} onClose={onClose} width="max-w-[440px]">
       {/* Header */}
       <div className="relative shrink-0 px-5 py-4 border-b border-border-subtle">
@@ -298,6 +308,7 @@ export function SmsThreadDrawer({
       </div>
       )}
     </SlideOver>
+    </>
   );
 }
 

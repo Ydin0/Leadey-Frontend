@@ -5,6 +5,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { X, Loader2, ShieldCheck, UserCheck, Clock, Calendar, AlertCircle, Play } from "lucide-react";
 import { createSession, getActiveSession, endSession } from "@/lib/api/dialer";
 import { useDialerContext } from "@/components/dialer/context/dialer-context";
+import { useTelephonyBlock } from "@/components/telephony/telephony-block";
 import { getLocalPresenceConfig, coverageScan, type UncoveredState } from "@/lib/api/calls";
 import { LocalPresencePreflightModal } from "./local-presence-preflight-modal";
 import type { DialerSession } from "@/lib/types/dialer";
@@ -17,6 +18,7 @@ interface DialerConfigModalProps {
 }
 
 export function DialerConfigModal({ funnelId, onClose }: DialerConfigModalProps) {
+  const { ensureAllowed: ensureTelephonyAllowed, blockModal: telephonyBlockModal } = useTelephonyBlock();
   const dialer = useDialerContext();
   const [excludeDoNotCall, setExcludeDoNotCall] = useState(true);
   const [excludeClosed, setExcludeClosed] = useState(true);
@@ -39,6 +41,8 @@ export function DialerConfigModal({ funnelId, onClose }: DialerConfigModalProps)
   }
 
   async function handleStart() {
+    // Spend gate: don't even create a session when calling is blocked.
+    if (!(await ensureTelephonyAllowed())) return;
     setStarting(true);
     setError(null);
     try {
@@ -128,6 +132,8 @@ export function DialerConfigModal({ funnelId, onClose }: DialerConfigModalProps)
   }
 
   return (
+    <>
+    {telephonyBlockModal}
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
       onClick={onClose}
@@ -255,6 +261,7 @@ export function DialerConfigModal({ funnelId, onClose }: DialerConfigModalProps)
         </div>
       </div>
     </div>
+    </>
   );
 }
 

@@ -5,6 +5,7 @@ import { Loader2, AlertCircle, ArrowRight, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { autoAllocatePhoneLine, updatePhoneLine } from "@/lib/api/phone-lines";
 import { StepIndicator } from "@/components/shared/step-indicator";
+import { useTelephonyBlock } from "@/components/telephony/telephony-block";
 import { StepSelectCountry } from "./step-select-country";
 import { StepSelectType } from "./step-select-type";
 import { StepAssignMember } from "./step-assign-member";
@@ -30,6 +31,7 @@ export function ProvisionWizardShell({ onComplete }: ProvisionWizardShellProps) 
   const [country, setCountry] = useState<CountryOption | null>(null);
   const [type, setType] = useState<PhoneLineType | null>(null);
   const [allocating, setAllocating] = useState(false);
+  const { ensureAllowed: ensureTelephonyAllowed, blockModal: telephonyBlockModal } = useTelephonyBlock();
   const [allocateError, setAllocateError] = useState<string | null>(null);
   const [line, setLine] = useState<PhoneLine | null>(null);
   const [assignedTo, setAssignedTo] = useState<string | null>(null);
@@ -41,6 +43,8 @@ export function ProvisionWizardShell({ onComplete }: ProvisionWizardShellProps) 
 
   async function handleAutoAllocate() {
     if (!country || !type) return;
+    // Spend gate: buying a number is Twilio spend.
+    if (!(await ensureTelephonyAllowed())) return;
     setAllocating(true);
     setAllocateError(null);
     try {
@@ -79,6 +83,7 @@ export function ProvisionWizardShell({ onComplete }: ProvisionWizardShellProps) 
 
   return (
     <div className="space-y-6">
+      {telephonyBlockModal}
       <div className="bg-surface rounded-[14px] border border-border-subtle p-4">
         <StepIndicator steps={steps} currentStep={currentStep} />
       </div>

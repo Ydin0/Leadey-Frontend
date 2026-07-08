@@ -648,11 +648,16 @@ function TelephonyBalanceCard({ data }: { data: TelephonyCredits }) {
             style={{ width: budget.limitMinor ? `${Math.max(spentPct, 1.5)}%` : "100%", opacity: budget.limitMinor ? 1 : 0.35 }}
           />
         </div>
-        {budget.blocked && (
+        {data.floor?.blocked ? (
+          <p className="text-[11px] font-medium text-signal-red-text mt-1.5">
+            Calling is paused — your balance has reached its {fmt(data.floor.floorMinor)} limit. Top
+            up to resume.
+          </p>
+        ) : budget.blocked ? (
           <p className="text-[11px] font-medium text-signal-red-text mt-1.5">
             Budget reached — outbound calls and texts are paused.
           </p>
-        )}
+        ) : null}
       </div>
     </div>
   );

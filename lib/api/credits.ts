@@ -77,6 +77,12 @@ export interface TelephonyCredits {
     targetMinor: number;
     lastError: string | null;
   };
+  /** Hard spend cut-off: live balance at/below floorMinor blocks calling. */
+  floor?: {
+    floorMinor: number;
+    liveBalanceMinor: number;
+    blocked: boolean;
+  };
 }
 
 /** The org's telephony balance: calls/SMS/numbers draw it down daily; paid
