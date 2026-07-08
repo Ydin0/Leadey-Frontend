@@ -11,6 +11,11 @@ export const qk = {
   /** Load-all org-wide leads for the /dashboard/leads table. */
   orgLeads: ["org-leads"] as const,
   orgActivityCounts: ["activity-counts", "org"] as const,
+  /** Per-lead derived filter values (opp stage + AI call outcomes). Scope is
+   *  a funnel id or "org". */
+  leadFilterInsights: (scope: string) => ["lead-filter-insights", scope] as const,
+  /** Lead ids whose call transcripts contain a keyword. */
+  transcriptMatches: (scope: string, q: string) => ["transcript-matches", scope, q] as const,
   teamMembers: ["team-members"] as const,
   customFields: ["custom-fields"] as const,
   leadStatuses: ["lead-statuses"] as const,

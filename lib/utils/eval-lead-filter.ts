@@ -67,10 +67,12 @@ function evalCondition(c: FilterCondition, get: ValueGetter): boolean {
   }
 
   if (def?.type === "enum") {
-    const s = asStr(raw).toLowerCase();
+    // The row value may itself be multi-valued (e.g. a lead's call outcomes)
+    // — "is" matches when ANY of them is selected.
+    const values = (Array.isArray(raw) ? raw : [raw]).map((x) => asStr(x).toLowerCase()).filter(Boolean);
     const arr = (Array.isArray(val) ? val : [val]).map((x) => asStr(x).toLowerCase());
-    if (c.op === "is") return arr.includes(s);
-    if (c.op === "is_not") return !arr.includes(s);
+    if (c.op === "is") return values.some((v) => arr.includes(v));
+    if (c.op === "is_not") return !values.some((v) => arr.includes(v));
     return true;
   }
 

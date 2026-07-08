@@ -27,6 +27,10 @@ import { LeadStepFilter } from "./lead-step-filter";
 import { ColumnSettingsDrawer } from "./column-settings-drawer";
 import { usePrefetchFunnel } from "@/lib/queries/use-prefetch";
 import { useActivityCounts, useOrgActivityCounts } from "@/lib/queries/use-activity-counts";
+import { useQuery, useQueries } from "@tanstack/react-query";
+import { qk } from "@/lib/queries/keys";
+import { usePipelinesQuery, useCallOutcomesQuery } from "@/lib/queries/use-org-config";
+import { getLeadFilterInsights, getTranscriptMatches } from "@/lib/api/leads";
 import {
   buildLeadColumns, resolveColumns, loadColumnPrefs, saveColumnPrefs,
   type ColumnPrefs, type LeadColumnCtx,
@@ -418,6 +422,48 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   const { data: campaignCounts } = useActivityCounts(funnelId ?? "", { enabled: !!funnelId });
   const { data: orgCounts } = useOrgActivityCounts({ enabled: !funnelId });
   const deferredCounts = funnelId ? campaignCounts : orgCounts;
+
+  // ── Derived filter data for fields the lead rows don't carry ──
+  // Opportunity stage + AI call outcomes come as a sparse per-lead map;
+  // transcript keywords resolve to server-matched lead-id sets. All fetched
+  // only while the filter actually uses those fields.
+  const usedFilterFields = useMemo(
+    () => new Set(filterGroup.conditions.map((c) => c.field)),
+    [filterGroup],
+  );
+  const needsInsights = usedFilterFields.has("oppStage") || usedFilterFields.has("callOutcome");
+  const { data: filterInsights } = useQuery({
+    queryKey: qk.leadFilterInsights(funnelId ?? "org"),
+    queryFn: () => getLeadFilterInsights(funnelId ?? undefined),
+    staleTime: 60_000,
+    enabled: needsInsights,
+  });
+  const transcriptKeywords = useMemo(
+    () => [...new Set(
+      filterGroup.conditions
+        .filter((c) => c.field === "transcriptKeywords" && typeof c.value === "string" && c.value.trim().length >= 2)
+        .map((c) => (c.value as string).trim().toLowerCase()),
+    )],
+    [filterGroup],
+  );
+  const transcriptQueries = useQueries({
+    queries: transcriptKeywords.map((kw) => ({
+      queryKey: qk.transcriptMatches(funnelId ?? "org", kw),
+      queryFn: () => getTranscriptMatches(kw, funnelId ?? undefined),
+      staleTime: 60_000,
+    })),
+  });
+  const transcriptSets = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    transcriptKeywords.forEach((kw, i) => {
+      const ids = transcriptQueries[i]?.data;
+      if (ids) m.set(kw, new Set(ids));
+    });
+    return m;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- useQueries returns a new array each render; key on the data refs
+  }, [transcriptKeywords, ...transcriptQueries.map((q) => q.data)]);
+  const { data: pipelinesData } = usePipelinesQuery({ enabled: true });
+  const { data: callOutcomesData } = useCallOutcomesQuery({ enabled: true });
   const activityMap = useMemo(() => {
     const map = new Map<string, { calls: number; emails: number }>();
     for (const lead of leads) {
@@ -472,8 +518,14 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
       source: sourceOptions.map((s) => ({ value: s, label: s })),
       industry: industryOptions.map((s) => ({ value: s, label: s })),
       location: locationOptions.map((s) => ({ value: s, label: s })),
+      // Opportunity stages across every pipeline (deduped by name — the
+      // evaluators match case-insensitively on the stage name).
+      oppStage: [...new Map(
+        (pipelinesData ?? []).flatMap((p) => p.stages).map((st) => [st.label.toLowerCase(), { value: st.label, label: st.label }]),
+      ).values()],
+      callOutcome: (callOutcomesData ?? []).map((o) => ({ value: o.key, label: o.label })),
     }),
-    [statuses, sourceOptions, industryOptions, locationOptions, campaignOptions],
+    [statuses, sourceOptions, industryOptions, locationOptions, campaignOptions, pipelinesData, callOutcomesData],
   );
 
   // Resolve a filter field key → value for a given lead (incl. derived fields).
@@ -488,10 +540,19 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
         case "emailCount": return activityMap.get(l.id)?.emails ?? 0;
         case "leadsInCompany": return companyLeadCounts.get((l.company || "Unknown").toLowerCase()) ?? 0;
         case "hasOpportunity": return !!l.opportunityId;
+        case "oppStage": return filterInsights?.[l.id]?.oppStage ?? "";
+        case "callOutcome": return filterInsights?.[l.id]?.callOutcomes ?? [];
+        case "transcriptKeywords": {
+          // The evaluator substring-matches — return the keywords this lead's
+          // transcripts matched (server-resolved), joined.
+          const hits: string[] = [];
+          for (const [kw, set] of transcriptSets) if (set.has(l.id)) hits.push(kw);
+          return hits.join(" \u0001 ");
+        }
         default: return (l as unknown as Record<string, unknown>)[key];
       }
     },
-    [activityMap, companyLeadCounts],
+    [activityMap, companyLeadCounts, filterInsights, transcriptSets],
   );
 
   // ── Column catalog + resolved (ordered/visible) state for the flat view ──

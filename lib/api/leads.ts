@@ -149,6 +149,26 @@ export async function getOrgLeadFunnel(id: string): Promise<{ funnelId: string }
   return apiRequest<{ funnelId: string }>(`/leads/${id}/funnel`);
 }
 
+/** Per-lead derived filter values (opportunity stage, AI call outcomes) —
+ *  sparse map fetched only while a filter uses those fields. */
+export async function getLeadFilterInsights(funnelId?: string): Promise<
+  Record<string, { oppStage: string | null; callOutcomes: string[] }>
+> {
+  const params = funnelId ? `?funnelId=${encodeURIComponent(funnelId)}` : "";
+  const res = await apiRequest<{ insights: Record<string, { oppStage: string | null; callOutcomes: string[] }> }>(
+    `/leads/filter-insights${params}`,
+  );
+  return res.insights;
+}
+
+/** Lead ids whose call transcripts contain the phrase. */
+export async function getTranscriptMatches(q: string, funnelId?: string): Promise<string[]> {
+  const params = new URLSearchParams({ q });
+  if (funnelId) params.set("funnelId", funnelId);
+  const res = await apiRequest<{ leadIds: string[] }>(`/leads/transcript-matches?${params}`);
+  return res.leadIds;
+}
+
 /** Permanently delete lead rows across the org (events/tasks/docs cascade). */
 export async function bulkDeleteOrgLeads(leadIds: string[]): Promise<{ deleted: number }> {
   return apiRequest<{ deleted: number }>(`/leads/bulk-delete`, {

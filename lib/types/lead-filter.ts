@@ -103,8 +103,13 @@ export const LEAD_FILTER_FIELDS: FilterFieldDef[] = [
   // Activity
   { key: "callCount", label: "Calls made", group: "Activity", type: "number", operators: ["gte", "lte", "is", "between"] },
   { key: "emailCount", label: "Emails sent", group: "Activity", type: "number", operators: ["gte", "lte", "is", "between"] },
+  // AI call categorization (call_records.outcome — org-defined label set).
+  { key: "callOutcome", label: "Call outcome (AI)", group: "Activity", type: "enum", operators: ENUM_OPS, dynamicOptionsKey: "callOutcome" },
+  // Any call transcript containing a phrase (server-resolved match set).
+  { key: "transcriptKeywords", label: "Call transcript", group: "Activity", type: "text", operators: ["contains", "not_contains"] },
   // Opportunity
   { key: "hasOpportunity", label: "Has opportunity", group: "Opportunity", type: "boolean", operators: BOOL_OPS, options: [{ value: "true", label: "Yes" }, { value: "false", label: "No" }] },
+  { key: "oppStage", label: "Opportunity stage", group: "Opportunity", type: "enum", operators: ENUM_OPS, dynamicOptionsKey: "oppStage" },
 ];
 
 export function fieldDef(key: string): FilterFieldDef | undefined {
