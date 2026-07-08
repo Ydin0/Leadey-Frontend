@@ -192,7 +192,7 @@ function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean
         on ? "bg-signal-green-text" : "bg-section border border-border-default",
       )}
     >
-      <span className={cn("absolute top-0.5 w-5 h-5 rounded-full bg-surface shadow transition-transform", on ? "translate-x-[22px]" : "translate-x-0.5")} />
+      <span className={cn("absolute left-0 top-0.5 w-5 h-5 rounded-full bg-surface shadow transition-transform", on ? "translate-x-[22px]" : "translate-x-0.5")} />
     </button>
   );
 }

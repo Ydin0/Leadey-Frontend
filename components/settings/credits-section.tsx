@@ -352,7 +352,7 @@ function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean
     >
       <span
         className={cn(
-          "absolute top-0.5 w-5 h-5 rounded-full bg-surface shadow transition-transform",
+          "absolute left-0 top-0.5 w-5 h-5 rounded-full bg-surface shadow transition-transform",
           on ? "translate-x-[22px]" : "translate-x-0.5",
         )}
       />
@@ -496,17 +496,15 @@ function TelephonyBalanceCard({ data, onRefresh }: { data: TelephonyCredits; onR
 
       {/* ── Auto top-up ── */}
       <div className="mt-4 pt-4 border-t border-border-subtle">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1">Auto top-up</p>
-            <p className="text-[11px] text-ink-muted max-w-[440px]">
-              Automatically recharge your balance from your saved card so calling and texting never
-              stop. While enabled, telephony is billed through these charges instead of monthly
-              invoices.
-            </p>
-          </div>
+        <div className="flex items-center gap-3 mb-1">
+          <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">Auto top-up</p>
           <Toggle on={atEnabled} onChange={setAtEnabled} disabled={saving} />
         </div>
+        <p className="text-[11px] text-ink-muted max-w-[520px]">
+          Automatically recharge your balance from your saved card so calling and texting never
+          stop. While enabled, telephony is billed through these charges instead of monthly
+          invoices.
+        </p>
         {atEnabled && (
           <div className="flex items-end gap-4 flex-wrap mt-3">
             <div>
