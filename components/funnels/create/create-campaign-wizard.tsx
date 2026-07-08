@@ -162,9 +162,10 @@ function initialStateFor(funnel?: Funnel): WizState {
     matchAll: aud?.matchAll ?? true,
     conditions: aud?.conditions?.length ? aud.conditions : base.conditions,
     autoEnroll: aud?.autoEnroll ?? true,
-    steps: funnel.steps.length
-      ? funnel.steps.map((st, i) => ({ id: st.id || `s${i + 1}`, ch: st.channel, day: st.dayOffset, body: st.subject || st.action || "" }))
-      : base.steps,
+    // Mirror the campaign's REAL steps — including none. Falling back to the
+    // starter sequence here silently re-added steps to sequence-less
+    // campaigns every time they were edited.
+    steps: funnel.steps.map((st, i) => ({ id: st.id || `s${i + 1}`, ch: st.channel, day: st.dayOffset, body: st.subject || st.action || "" })),
     exit: ex ?? base.exit,
     emailAuto: em?.enabled ?? true,
     mailboxSel,
