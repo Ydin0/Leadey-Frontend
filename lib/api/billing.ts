@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { BillingInfo, StripeInvoice } from "@/lib/types/billing";
+import type { BillingInfo, StripeInvoice, LeadeyInvoice } from "@/lib/types/billing";
 
 export async function getBillingInfo(): Promise<BillingInfo> {
   return apiRequest<BillingInfo>("/billing");
@@ -21,4 +21,12 @@ export async function createPortalSession(): Promise<{ url: string }> {
 
 export async function getInvoices(): Promise<StripeInvoice[]> {
   return apiRequest<StripeInvoice[]>("/billing/invoices");
+}
+
+export async function getLeadeyInvoices(): Promise<LeadeyInvoice[]> {
+  return apiRequest<LeadeyInvoice[]>("/billing/leadey-invoices");
+}
+
+export async function getLeadeyInvoice(id: string): Promise<LeadeyInvoice> {
+  return apiRequest<LeadeyInvoice>(`/billing/leadey-invoices/${id}`);
 }

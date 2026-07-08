@@ -27,6 +27,37 @@ export interface BillingInfo {
   };
 }
 
+export interface LeadeyInvoiceLineItem {
+  description: string;
+  quantity: number;
+  unit: string;
+  amountMinor: number;
+}
+
+/** A Leadey-issued invoice (telephony usage, seats, or manual). Telephony
+ *  invoices arrive with a single summary line — the detailed breakdown is
+ *  internal. */
+export interface LeadeyInvoice {
+  id: string;
+  number: string;
+  type: string;
+  status: string; // open | paid | void
+  period: string | null;
+  currency: string;
+  lineItems: LeadeyInvoiceLineItem[];
+  subtotalMinor: number;
+  totalMinor: number;
+  paymentUrl: string | null;
+  issuedAt: string;
+  dueAt: string | null;
+  paidAt: string | null;
+  orgName: string;
+  billingName: string | null;
+  billingEmail: string | null;
+  billingAddress: string | null;
+  billingVat: string | null;
+}
+
 export interface StripeInvoice {
   id: string;
   number: string | null;

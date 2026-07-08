@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { ExternalLink, Loader2, Check, Minus, Plus, Download, CreditCard, CalendarClock } from "lucide-react";
+import { useCallback, useState, useEffect } from "react";
+import Link from "next/link";
+import { ExternalLink, Loader2, Check, Minus, Plus, Download, CreditCard, CalendarClock, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
-import { getBillingInfo, createCheckoutSession, getInvoices } from "@/lib/api/billing";
+import { getBillingInfo, createCheckoutSession, getInvoices, getLeadeyInvoices } from "@/lib/api/billing";
 import { apiRequest } from "@/lib/api/client";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { downloadInvoiceAsPdf } from "@/lib/utils/generate-invoice-pdf";
-import type { BillingInfo, StripeInvoice } from "@/lib/types/billing";
+import type { BillingInfo, StripeInvoice, LeadeyInvoice } from "@/lib/types/billing";
 
 const PLAN_DETAILS: Record<string, { minSeats: number; description: string; features: string[] }> = {
   starter: {
@@ -82,7 +83,9 @@ export function BillingSection() {
   const isAuthReady = useAuthReady();
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [invoices, setInvoices] = useState<StripeInvoice[]>([]);
+  const [leadeyInvoices, setLeadeyInvoices] = useState<LeadeyInvoice[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
@@ -92,13 +95,30 @@ export function BillingSection() {
   const [showAddSeats, setShowAddSeats] = useState(false);
   const [additionalSeats, setAdditionalSeats] = useState(1);
 
+  // Each dataset loads independently — a failing Stripe invoice fetch must
+  // never blank the whole tab.
+  const load = useCallback(() => {
+    setLoading(true);
+    setLoadError(null);
+    getBillingInfo()
+      .then(setBilling)
+      .catch((err) => {
+        console.error("Failed to load billing:", err);
+        setLoadError(err instanceof Error ? err.message : "Failed to load billing");
+      })
+      .finally(() => setLoading(false));
+    getInvoices()
+      .then(setInvoices)
+      .catch((err) => console.error("Failed to load Stripe invoices:", err));
+    getLeadeyInvoices()
+      .then(setLeadeyInvoices)
+      .catch((err) => console.error("Failed to load Leadey invoices:", err));
+  }, []);
+
   useEffect(() => {
     if (!isAuthReady) return;
-    Promise.all([getBillingInfo(), getInvoices()])
-      .then(([b, inv]) => { setBilling(b); setInvoices(inv); })
-      .catch((err) => console.error("Failed to load billing:", err))
-      .finally(() => setLoading(false));
-  }, [isAuthReady]);
+    load();
+  }, [isAuthReady, load]);
 
   // Seat selection per plan (for the plan-picker cards)
   const [seatCounts, setSeatCounts] = useState<Record<string, number>>({
@@ -169,7 +189,20 @@ export function BillingSection() {
     );
   }
 
-  if (!billing) return null;
+  if (!billing) {
+    return (
+      <div className="rounded-[14px] border border-border-subtle bg-surface p-8 text-center max-w-4xl">
+        <p className="text-[13px] font-medium text-ink mb-1">Couldn&apos;t load billing</p>
+        <p className="text-[12px] text-ink-muted mb-4">{loadError || "Something went wrong fetching your plan."}</p>
+        <button
+          onClick={load}
+          className="px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11.5px] font-medium hover:opacity-90 transition-opacity"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   const status = planStatusLabel[billing.planStatus] || planStatusLabel.active;
   const isTrial = billing.plan === "trial";
@@ -395,11 +428,91 @@ export function BillingSection() {
         </div>
       )}
 
-      {/* ── Invoice history ── */}
+      {/* ── Leadey invoices (telephony + seats) ── */}
+      {leadeyInvoices.length > 0 && (
+        <div className="rounded-[14px] border border-border-subtle bg-surface overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border-subtle">
+            <h3 className="text-[13px] font-semibold text-ink">Invoices</h3>
+            <p className="text-[11px] text-ink-muted mt-0.5">Telephony usage and seat invoices issued by Leadey.</p>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
+                <TableHead className="text-left">Invoice</TableHead>
+                <TableHead className="text-left w-[110px]">Type</TableHead>
+                <TableHead className="text-left w-[110px]">Period</TableHead>
+                <TableHead className="text-right w-[110px]">Amount</TableHead>
+                <TableHead className="text-center w-[90px]">Status</TableHead>
+                <TableHead className="text-right w-[150px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {leadeyInvoices.map((inv) => {
+                const money = new Intl.NumberFormat(undefined, {
+                  style: "currency",
+                  currency: inv.currency.toUpperCase(),
+                }).format(inv.totalMinor / 100);
+                return (
+                  <TableRow key={inv.id} className="hover:bg-hover/40">
+                    <TableCell>
+                      <span className="text-[12px] font-medium text-ink">{inv.number}</span>
+                      <span className="text-[10.5px] text-ink-faint ml-2">
+                        {new Date(inv.issuedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-[11.5px] text-ink-secondary capitalize">{inv.type}</span>
+                    </TableCell>
+                    <TableCell className="text-[11.5px] text-ink-secondary tabular-nums">{inv.period || "—"}</TableCell>
+                    <TableCell className="text-right text-[12px] font-semibold text-ink tabular-nums">{money}</TableCell>
+                    <TableCell className="text-center">
+                      <span
+                        className={cn(
+                          "text-[10px] font-medium rounded-full px-2 py-0.5 capitalize",
+                          inv.status === "paid"
+                            ? "bg-signal-green text-signal-green-text"
+                            : inv.status === "void"
+                              ? "bg-signal-slate text-signal-slate-text"
+                              : "bg-signal-blue text-signal-blue-text",
+                        )}
+                      >
+                        {inv.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="inline-flex items-center gap-1.5">
+                        {inv.status === "open" && inv.paymentUrl && (
+                          <a
+                            href={inv.paymentUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-[16px] bg-ink text-on-ink text-[10.5px] font-medium hover:opacity-90 transition-opacity"
+                          >
+                            <CreditCard size={11} /> Pay
+                          </a>
+                        )}
+                        <Link
+                          href={`/dashboard/invoices/${inv.id}`}
+                          className="inline-flex items-center gap-1 px-3 py-1 rounded-[16px] border border-border-subtle text-[10.5px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+                        >
+                          <FileText size={11} /> View
+                        </Link>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* ── Subscription payments (Stripe) ── */}
       {invoices.length > 0 && (
         <div className="rounded-[14px] border border-border-subtle bg-surface overflow-hidden">
           <div className="px-5 py-3.5 border-b border-border-subtle">
-            <h3 className="text-[13px] font-semibold text-ink">Invoice history</h3>
+            <h3 className="text-[13px] font-semibold text-ink">Subscription payments</h3>
+            <p className="text-[11px] text-ink-muted mt-0.5">Plan charges billed through Stripe.</p>
           </div>
           <Table>
             <TableHeader>
