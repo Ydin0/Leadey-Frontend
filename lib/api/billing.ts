@@ -12,6 +12,13 @@ export async function createCheckoutSession(priceId: string, seats?: number): Pr
   });
 }
 
+export async function addSubscriptionSeats(seats: number): Promise<{ seats: number }> {
+  return apiRequest<{ seats: number }>("/billing/add-seats", {
+    method: "POST",
+    body: JSON.stringify({ seats }),
+  });
+}
+
 export async function createPortalSession(): Promise<{ url: string }> {
   return apiRequest<{ url: string }>("/billing/portal", {
     method: "POST",

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ExternalLink, Loader2, Check, Minus, Plus, Download, CreditCard, CalendarClock, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
-import { getBillingInfo, createCheckoutSession, getInvoices, getLeadeyInvoices } from "@/lib/api/billing";
+import { getBillingInfo, createCheckoutSession, getInvoices, getLeadeyInvoices, addSubscriptionSeats } from "@/lib/api/billing";
 import { apiRequest } from "@/lib/api/client";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -101,7 +101,21 @@ export function BillingSection() {
     setLoading(true);
     setLoadError(null);
     getBillingInfo()
-      .then(setBilling)
+      .then((b) => {
+        setBilling(b);
+        // Default the plan pickers to the org's assigned seat count — a
+        // subscription's quantity REPLACES the admin-granted seats, so the
+        // company must subscribe with at least what they're using.
+        if (b.seatsIncluded > 1) {
+          setSeatCounts((prev) => {
+            const next = { ...prev };
+            for (const key of Object.keys(next)) {
+              next[key] = Math.max(b.seatsIncluded, PLAN_DETAILS[key]?.minSeats || 1);
+            }
+            return next;
+          });
+        }
+      })
       .catch((err) => {
         console.error("Failed to load billing:", err);
         setLoadError(err instanceof Error ? err.message : "Failed to load billing");
@@ -151,16 +165,22 @@ export function BillingSection() {
     }
   }
 
+  const [addSeatsNotice, setAddSeatsNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+
+  // Bumps the existing subscription's quantity — never a second checkout.
   async function handleAddSeats() {
     if (!billing) return;
-    const price = billing.prices[billing.plan as keyof typeof billing.prices];
-    if (!price?.priceId) return;
     setCheckoutLoading("add-seats");
+    setAddSeatsNotice(null);
     try {
-      const { url } = await createCheckoutSession(price.priceId, additionalSeats);
-      window.location.href = url;
+      const res = await addSubscriptionSeats(additionalSeats);
+      setBilling((prev) => (prev ? { ...prev, seatsIncluded: res.seats } : prev));
+      setShowAddSeats(false);
+      setAdditionalSeats(1);
+      setAddSeatsNotice({ tone: "ok", text: `Seats updated to ${res.seats} — the prorated difference is charged to your card now.` });
     } catch (err) {
-      console.error("Add seats failed:", err);
+      setAddSeatsNotice({ tone: "err", text: err instanceof Error ? err.message : "Failed to add seats" });
+    } finally {
       setCheckoutLoading(null);
     }
   }
@@ -318,6 +338,17 @@ export function BillingSection() {
                 {checkoutLoading === "add-seats" ? <Loader2 size={12} className="animate-spin" /> : "Confirm & pay"}
               </button>
             </div>
+          </div>
+        )}
+
+        {addSeatsNotice && (
+          <div
+            className={cn(
+              "border-t border-border-subtle px-6 py-2.5 text-[11.5px]",
+              addSeatsNotice.tone === "err" ? "text-signal-red-text font-medium" : "text-signal-green-text",
+            )}
+          >
+            {addSeatsNotice.text}
           </div>
         )}
 
