@@ -58,27 +58,49 @@ export function creditsToUsd(credits: number, centsPerCredit = 1): string {
   return `$${((credits * centsPerCredit) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-// ─── Telephony money wallet (read-only, customer-facing) ────────────
-
-export interface TelephonyCreditTx {
-  id: string;
-  kind: "topup" | "usage" | "adjustment";
-  period: string | null;
-  amountMinor: number;
-  balanceAfterMinor: number;
-  description: string | null;
-  createdAt: string;
-}
+// ─── Telephony money wallet (customer-facing) ───────────────────────
 
 export interface TelephonyCredits {
   balanceMinor: number;
   bufferPct: number;
   currency: string;
-  recent: TelephonyCreditTx[];
+  /** This month's billed usage vs the org's monthly spending limit. */
+  budget: {
+    period: string;
+    limitMinor: number | null;
+    spentMinor: number;
+    blocked: boolean;
+  };
+  autoTopup: {
+    enabled: boolean;
+    thresholdMinor: number;
+    targetMinor: number;
+    lastError: string | null;
+  };
 }
 
 /** The org's telephony balance: calls/SMS/numbers draw it down daily; paid
- *  telephony invoices (usage + buffer %) top it up. */
+ *  telephony invoices (usage + buffer %) or auto top-ups add to it. */
 export async function getTelephonyCredits(): Promise<TelephonyCredits> {
   return apiRequest<TelephonyCredits>("/credits/telephony");
+}
+
+export interface TelephonySettingsResult {
+  monthlyLimitMinor: number | null;
+  autoTopup: { enabled: boolean; thresholdMinor: number; targetMinor: number };
+  /** If auto top-up was enabled and the balance was below the threshold, the
+   *  card was charged immediately — the outcome lands here. */
+  immediateTopup: { charged: boolean; amountMinor?: number; error?: string };
+}
+
+export async function updateTelephonySettings(settings: {
+  monthlyLimitMinor: number | null;
+  autoTopupEnabled: boolean;
+  autoTopupThresholdMinor: number;
+  autoTopupTargetMinor: number;
+}): Promise<TelephonySettingsResult> {
+  return apiRequest<TelephonySettingsResult>("/credits/telephony/settings", {
+    method: "PUT",
+    body: JSON.stringify(settings),
+  });
 }

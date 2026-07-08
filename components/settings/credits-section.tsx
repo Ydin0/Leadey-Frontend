@@ -22,6 +22,7 @@ import {
   startCreditCheckout,
   creditsToUsd,
   getTelephonyCredits,
+  updateTelephonySettings,
   type CreditTransaction,
   type TelephonyCredits,
 } from "@/lib/api/credits";
@@ -56,9 +57,13 @@ export function CreditsSection() {
   const [txLoading, setTxLoading] = useState(false);
   const [telephony, setTelephony] = useState<TelephonyCredits | null>(null);
 
-  useEffect(() => {
+  const refreshTelephony = useCallback(() => {
     getTelephonyCredits().then(setTelephony).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    refreshTelephony();
+  }, [refreshTelephony]);
 
   const minTopup = info?.minTopup ?? 500;
 
@@ -150,7 +155,7 @@ export function CreditsSection() {
       </div>
 
       {/* Telephony wallet — calls/SMS/numbers usage vs paid invoices */}
-      {telephony && <TelephonyBalanceCard data={telephony} />}
+      {telephony && <TelephonyBalanceCard data={telephony} onRefresh={refreshTelephony} />}
 
       {/* Cost table */}
       <div className="rounded-[14px] border border-border-subtle bg-surface p-5">
@@ -303,17 +308,115 @@ export function CreditsSection() {
   );
 }
 
-/** The org's telephony money wallet (read-only): calls, SMS and phone-number
- *  rental draw it down daily; paying a telephony invoice (usage + buffer %)
- *  tops it up. Negative = usage accrued that hasn't been invoiced/paid yet. */
-function TelephonyBalanceCard({ data }: { data: TelephonyCredits }) {
+const MONEY_INPUT_CLASS =
+  "w-28 bg-section border border-border-subtle rounded-[8px] pl-6 pr-3 py-1.5 text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default tabular-nums";
+
+function MoneyInput({
+  value,
+  onChange,
+  placeholder,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="relative inline-flex items-center">
+      <span className="absolute left-2.5 text-[11px] text-ink-faint pointer-events-none">$</span>
+      <input
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/[^0-9.]/g, ""))}
+        placeholder={placeholder}
+        disabled={disabled}
+        className={cn(MONEY_INPUT_CLASS, disabled && "opacity-50")}
+      />
+    </div>
+  );
+}
+
+function Toggle({ on, onChange, disabled }: { on: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      onClick={() => !disabled && onChange(!on)}
+      disabled={disabled}
+      className={cn(
+        "relative w-11 h-6 rounded-full transition-colors shrink-0 disabled:opacity-50",
+        on ? "bg-signal-green-text" : "bg-section border border-border-default",
+      )}
+    >
+      <span
+        className={cn(
+          "absolute top-0.5 w-5 h-5 rounded-full bg-surface shadow transition-transform",
+          on ? "translate-x-[22px]" : "translate-x-0.5",
+        )}
+      />
+    </button>
+  );
+}
+
+/** The org's telephony money wallet: calls, SMS and phone-number rental draw
+ *  it down as they happen; invoice payments or auto top-ups add to it. Also
+ *  hosts the monthly spending limit + auto top-up settings (Close-style). */
+function TelephonyBalanceCard({ data, onRefresh }: { data: TelephonyCredits; onRefresh: () => void }) {
   const currency = (data.currency || "usd").toUpperCase();
   const fmt = (minor: number) =>
     new Intl.NumberFormat(undefined, { style: "currency", currency }).format(minor / 100);
   const owing = data.balanceMinor < 0;
+  const { budget, autoTopup } = data;
+
+  // Editable drafts (major units), seeded once from the server state.
+  const [limitDraft, setLimitDraft] = useState(budget.limitMinor ? String(budget.limitMinor / 100) : "");
+  const [atEnabled, setAtEnabled] = useState(autoTopup.enabled);
+  const [thresholdDraft, setThresholdDraft] = useState(
+    autoTopup.enabled || autoTopup.thresholdMinor > 0 ? String(autoTopup.thresholdMinor / 100) : "",
+  );
+  const [targetDraft, setTargetDraft] = useState(
+    autoTopup.enabled || autoTopup.targetMinor > 0 ? String(autoTopup.targetMinor / 100) : "",
+  );
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+
+  const toMinor = (s: string) => Math.round((parseFloat(s) || 0) * 100);
+  const spentPct = budget.limitMinor ? Math.min(100, (budget.spentMinor / budget.limitMinor) * 100) : 0;
+
+  async function save() {
+    if (saving) return;
+    setSaving(true);
+    setNotice(null);
+    try {
+      const res = await updateTelephonySettings({
+        monthlyLimitMinor: limitDraft.trim() === "" ? null : toMinor(limitDraft),
+        autoTopupEnabled: atEnabled,
+        autoTopupThresholdMinor: toMinor(thresholdDraft),
+        autoTopupTargetMinor: toMinor(targetDraft),
+      });
+      if (res.immediateTopup.charged) {
+        setNotice({
+          tone: "ok",
+          text: `Saved — your card was charged ${fmt(res.immediateTopup.amountMinor ?? 0)} to bring the balance up to target.`,
+        });
+      } else if (res.immediateTopup.error) {
+        setNotice({ tone: "err", text: `Saved, but the top-up charge failed: ${res.immediateTopup.error}` });
+      } else {
+        setNotice({ tone: "ok", text: "Settings saved." });
+      }
+      onRefresh();
+    } catch (err) {
+      setNotice({ tone: "err", text: err instanceof Error ? err.message : "Failed to save settings" });
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="rounded-[14px] border border-border-subtle bg-surface p-5">
+      {/* ── Balance ── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">
@@ -328,9 +431,9 @@ function TelephonyBalanceCard({ data }: { data: TelephonyCredits }) {
             <span className={cn("text-[34px] font-semibold tabular-nums leading-none", owing ? "text-signal-red-text" : "text-ink")}>
               {fmt(data.balanceMinor)}
             </span>
-            <span className="text-[13px] text-ink-muted">buffer {data.bufferPct}%</span>
+            {!autoTopup.enabled && <span className="text-[13px] text-ink-muted">buffer {data.bufferPct}%</span>}
           </div>
-          {owing && (
+          {owing && !autoTopup.enabled && (
             <p className="text-[12px] text-ink-secondary mt-1.5 tabular-nums">
               Usage to date {fmt(Math.abs(data.balanceMinor))} · next invoice ≈{" "}
               <span className="font-medium text-ink">
@@ -339,28 +442,107 @@ function TelephonyBalanceCard({ data }: { data: TelephonyCredits }) {
             </p>
           )}
           <p className="text-[11px] text-ink-muted mt-1.5 max-w-[520px]">
-            Calls, texts and phone-number rental draw this down as you use them; paying your
-            telephony invoice (usage + a {data.bufferPct}% calling buffer) tops it back up.
+            Calls, texts and phone-number rental draw this down as you use them;{" "}
+            {autoTopup.enabled
+              ? "auto top-up recharges it from your saved card."
+              : `paying your telephony invoice (usage + a ${data.bufferPct}% calling buffer) tops it back up.`}
           </p>
         </div>
       </div>
 
-      {data.recent.length > 0 && (
-        <div className="mt-4 pt-3 border-t border-border-subtle space-y-1">
-          <p className="text-[10px] uppercase tracking-wider text-ink-faint font-medium mb-1.5">Recent activity</p>
-          {data.recent.slice(0, 5).map((t) => (
-            <div key={t.id} className="flex items-center gap-2 text-[11.5px]">
-              <span className="text-ink-secondary capitalize">{t.kind === "topup" ? "Invoice payment" : t.kind}</span>
-              {t.period && <span className="text-[10px] text-ink-faint bg-section rounded-full px-1.5 py-0.5">{t.period}</span>}
-              {t.description && <span className="text-ink-faint truncate max-w-[240px]">· {t.description}</span>}
-              <span className={cn("ml-auto font-medium tabular-nums", t.amountMinor < 0 ? "text-ink-secondary" : "text-signal-green-text")}>
-                {t.amountMinor > 0 ? "+" : ""}{fmt(t.amountMinor)}
-              </span>
-              <span className="text-[10.5px] text-ink-faint tabular-nums w-[84px] text-right">{fmt(t.balanceAfterMinor)}</span>
+      {/* ── Current spend vs monthly budget ── */}
+      <div className="mt-4 pt-4 border-t border-border-subtle">
+        <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Current spend</p>
+        <p className="text-[12px] text-ink-secondary tabular-nums">
+          Your team has used <span className="font-medium text-ink">{fmt(budget.spentMinor)}</span> this month
+          {budget.limitMinor ? <> of your {fmt(budget.limitMinor)} budget.</> : <> — no monthly limit set.</>}
+        </p>
+        {budget.limitMinor != null && (
+          <>
+            <div className="mt-2 h-1.5 rounded-full bg-section overflow-hidden">
+              <div
+                className={cn("h-full rounded-full transition-all", spentPct >= 100 ? "bg-signal-red-text" : spentPct >= 80 ? "bg-amber-500" : "bg-signal-green-text")}
+                style={{ width: `${Math.max(spentPct, 1)}%` }}
+              />
             </div>
-          ))}
+            <div className="flex justify-between mt-1 text-[10.5px] text-ink-faint tabular-nums">
+              <span>{fmt(0)}</span>
+              <span>{fmt(budget.limitMinor)} budget</span>
+            </div>
+          </>
+        )}
+        {budget.blocked && (
+          <p className="text-[11px] font-medium text-signal-red-text mt-1.5">
+            Budget reached — outbound calls and texts are paused until you raise the limit or the month rolls over.
+          </p>
+        )}
+      </div>
+
+      {/* ── Monthly spending limit ── */}
+      <div className="mt-4 pt-4 border-t border-border-subtle">
+        <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1">Monthly spending limit</p>
+        <p className="text-[11px] text-ink-muted mb-2 max-w-[520px]">
+          Keep your team within a budget for calling and texting. When the month&apos;s usage reaches
+          this amount, outbound calls and SMS pause until the next month. Leave empty for no limit.
+        </p>
+        <div className="flex items-center gap-2">
+          <MoneyInput value={limitDraft} onChange={setLimitDraft} placeholder="No limit" />
+          <span className="text-[11px] text-ink-faint">per month</span>
         </div>
-      )}
+      </div>
+
+      {/* ── Auto top-up ── */}
+      <div className="mt-4 pt-4 border-t border-border-subtle">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1">Auto top-up</p>
+            <p className="text-[11px] text-ink-muted max-w-[440px]">
+              Automatically recharge your balance from your saved card so calling and texting never
+              stop. While enabled, telephony is billed through these charges instead of monthly
+              invoices.
+            </p>
+          </div>
+          <Toggle on={atEnabled} onChange={setAtEnabled} disabled={saving} />
+        </div>
+        {atEnabled && (
+          <div className="flex items-end gap-4 flex-wrap mt-3">
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">
+                When balance goes below
+              </label>
+              <MoneyInput value={thresholdDraft} onChange={setThresholdDraft} placeholder="25" />
+            </div>
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">
+                Recharge to
+              </label>
+              <MoneyInput value={targetDraft} onChange={setTargetDraft} placeholder="200" />
+            </div>
+          </div>
+        )}
+        {autoTopup.lastError && atEnabled && (
+          <p className="text-[11px] font-medium text-signal-red-text mt-2">
+            Last top-up attempt failed: {autoTopup.lastError}
+          </p>
+        )}
+      </div>
+
+      {/* ── Save ── */}
+      <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-border-subtle">
+        {notice && (
+          <p className={cn("text-[11.5px]", notice.tone === "err" ? "text-signal-red-text font-medium" : "text-signal-green-text")}>
+            {notice.text}
+          </p>
+        )}
+        <button
+          onClick={() => void save()}
+          disabled={saving || (atEnabled && (toMinor(targetDraft) <= toMinor(thresholdDraft) || toMinor(targetDraft) <= 0))}
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[12px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+        >
+          {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+          Save settings
+        </button>
+      </div>
     </div>
   );
 }
