@@ -291,7 +291,19 @@ function EmailStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Re
 
   return (
     <>
-      <label className={lab}>From</label>
+      <label className={lab}>Send as</label>
+      <NativeSelect className={inp} value={v("senderMode")} onChange={(e) => set({ senderMode: e.target.value })}>
+        <option value="">A fixed mailbox (choose below)</option>
+        <option value="actor">The user who triggered the workflow</option>
+      </NativeSelect>
+      {v("senderMode") === "actor" && (
+        <p className="text-[11px] text-ink-faint mt-1.5">
+          Sends from the mailbox of whoever fired the trigger (e.g. changed the status or added the
+          lead). If they have no connected mailbox, the fallback below is used.
+        </p>
+      )}
+
+      <label className={lab}>{v("senderMode") === "actor" ? "Fallback mailbox" : "From"}</label>
       <NativeSelect className={inp} value={v("accountId")} onChange={(e) => {
         const id = e.target.value; const acc = accounts.find((a) => a.id === id);
         set({ accountId: id, from: acc?.email || "" });
@@ -340,7 +352,19 @@ function SmsStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Reco
 
   return (
     <>
-      <label className={lab}>From number</label>
+      <label className={lab}>Send as</label>
+      <NativeSelect className={inp} value={v("senderMode")} onChange={(e) => set({ senderMode: e.target.value })}>
+        <option value="">A fixed number (choose below)</option>
+        <option value="actor">The user who triggered the workflow</option>
+      </NativeSelect>
+      {v("senderMode") === "actor" && (
+        <p className="text-[11px] text-ink-faint mt-1.5">
+          Texts from the phone line assigned to whoever fired the trigger. If they have no assigned
+          line, the fallback below is used.
+        </p>
+      )}
+
+      <label className={lab}>{v("senderMode") === "actor" ? "Fallback number" : "From number"}</label>
       <NativeSelect className={inp} value={v("lineId")} onChange={(e) => set({ lineId: e.target.value })}>
         <option value="">Auto (match recipient country)</option>
         {lines.map((l) => <option key={l.id} value={l.id}>{l.friendlyName ? `${l.friendlyName} · ${l.number}` : l.number}</option>)}
