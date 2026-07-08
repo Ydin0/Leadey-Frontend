@@ -149,6 +149,14 @@ export async function getOrgLeadFunnel(id: string): Promise<{ funnelId: string }
   return apiRequest<{ funnelId: string }>(`/leads/${id}/funnel`);
 }
 
+/** Permanently delete lead rows across the org (events/tasks/docs cascade). */
+export async function bulkDeleteOrgLeads(leadIds: string[]): Promise<{ deleted: number }> {
+  return apiRequest<{ deleted: number }>(`/leads/bulk-delete`, {
+    method: "POST",
+    body: JSON.stringify({ leadIds }),
+  });
+}
+
 export async function createCampaignFromLeads(payload: {
   name: string;
   description?: string;

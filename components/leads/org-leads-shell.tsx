@@ -9,8 +9,9 @@ import { ImportsView } from "@/components/leads/imports-view";
 import { NativeSelect } from "@/components/ui/native-select";
 import { useOrgLeads, useInvalidateOrgLeads } from "@/lib/queries/use-org-leads";
 import { useFunnels } from "@/lib/queries/use-funnels";
-import { createCampaignFromLeads } from "@/lib/api/leads";
+import { createCampaignFromLeads, bulkDeleteOrgLeads } from "@/lib/api/leads";
 import { bulkAddLeadsToCampaign } from "@/lib/api/lead-campaigns";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import { sortLeads, DEFAULT_LEAD_SORT, type LeadSortKey } from "@/lib/utils/sort-leads";
 
 const SORT_STORAGE_KEY = "leadey:org-lead-sort";
@@ -49,6 +50,8 @@ export function OrgLeadsShell() {
   // = explicit selection).
   const [createIds, setCreateIds] = useState<string[] | null>(null);
   const [addIds, setAddIds] = useState<string[] | null>(null);
+  const [deleteIds, setDeleteIds] = useState<string[] | null>(null);
+  const { has } = usePermissions();
 
   return (
     <div>
@@ -126,6 +129,7 @@ export function OrgLeadsShell() {
             }}
             onCreateCampaign={(ids) => setCreateIds(ids)}
             onAddToCampaign={(ids) => setAddIds(ids)}
+            onDeleteLeads={has("leads.delete") ? (ids) => setDeleteIds(ids) : undefined}
           />
         </>
       )}
@@ -137,6 +141,17 @@ export function OrgLeadsShell() {
           onDone={(funnelId) => {
             setCreateIds(null);
             router.push(`/dashboard/funnels/${funnelId}`);
+          }}
+        />
+      )}
+      {deleteIds && (
+        <DeleteLeadsModal
+          leadIds={deleteIds}
+          onClose={() => setDeleteIds(null)}
+          onDone={(deleted) => {
+            setDeleteIds(null);
+            showStatus("success", `Deleted ${deleted.toLocaleString()} lead${deleted === 1 ? "" : "s"}.`);
+            invalidateOrgLeads();
           }}
         />
       )}
@@ -154,6 +169,73 @@ export function OrgLeadsShell() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+/** Typed-confirmation permanent delete (mirrors the campaign page's bulk
+ *  delete dialog — org-wide, so there is no soft "remove" variant here). */
+function DeleteLeadsModal({ leadIds, onClose, onDone }: {
+  leadIds: string[];
+  onClose: () => void;
+  onDone: (deleted: number) => void;
+}) {
+  const [confirmText, setConfirmText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (busy || confirmText.trim().toLowerCase() !== "delete") return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await bulkDeleteOrgLeads(leadIds);
+      onDone(res.deleted);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete leads");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-[3px]" onClick={onClose}>
+      <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-[14px] font-semibold text-ink mb-2">
+          Delete {leadIds.length.toLocaleString()} lead{leadIds.length === 1 ? "" : "s"} permanently?
+        </h3>
+        <p className="text-[12px] text-ink-secondary mb-4">
+          This removes the selected rows from their campaigns and your Leads list, including their
+          events, tasks and documents. This cannot be undone.
+        </p>
+        <label className="block text-[11px] text-ink-muted mb-1.5">
+          Type <span className="font-semibold text-signal-red-text">delete</span> to confirm
+        </label>
+        <input
+          autoFocus
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void submit(); }}
+          placeholder="delete"
+          className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-signal-red-text/50 mb-4"
+        />
+        {error && <p className="text-[11px] text-signal-red-text mb-3">{error}</p>}
+        <div className="flex items-center justify-end gap-2">
+          <button
+            onClick={onClose}
+            disabled={busy}
+            className="px-4 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => void submit()}
+            disabled={busy || confirmText.trim().toLowerCase() !== "delete"}
+            className="px-4 py-1.5 rounded-[20px] bg-signal-red-text text-on-ink text-[11px] font-medium hover:bg-signal-red-text/90 transition-colors disabled:opacity-50"
+          >
+            {busy ? "Deleting…" : "Delete leads"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

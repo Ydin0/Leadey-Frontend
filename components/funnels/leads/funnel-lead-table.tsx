@@ -800,6 +800,14 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
               <Megaphone size={12} /> Create campaign
             </button>
           )}
+          {onDeleteLeads && (
+            <button
+              onClick={() => onDeleteLeads(selectedLeadIds)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-signal-red/10 border border-signal-red-text/20 text-[11px] font-medium text-signal-red-text hover:bg-signal-red/20 transition-colors"
+            >
+              <Trash2 size={12} /> Delete
+            </button>
+          )}
         </div>
       )}
 

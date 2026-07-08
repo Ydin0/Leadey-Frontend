@@ -74,6 +74,21 @@ function evalCondition(c: FilterCondition, get: ValueGetter): boolean {
     return true;
   }
 
+  // Phone: digit-normalized on both sides — "+44 7911 220866", "+447911…"
+  // and "07911…" must all match a "+447" query. The UK trunk form (leading
+  // 0) is also tried as its international form (44…).
+  if (c.field === "phone") {
+    const dq = asStr(Array.isArray(val) ? val[0] : val).replace(/\D/g, "");
+    if (dq) {
+      const dv = asStr(raw).replace(/\D/g, "");
+      const forms = dv.startsWith("0") ? [dv, "44" + dv.slice(1)] : [dv];
+      if (c.op === "contains") return forms.some((f) => f.includes(dq));
+      if (c.op === "not_contains") return !forms.some((f) => f.includes(dq));
+      if (c.op === "is") return forms.includes(dq);
+      if (c.op === "is_not") return !forms.includes(dq);
+    }
+  }
+
   // text
   const s = asStr(raw).toLowerCase();
   const q = asStr(Array.isArray(val) ? val[0] : val).toLowerCase();
