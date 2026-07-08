@@ -69,15 +69,19 @@ export function CreditsSection() {
 
   const minTopup = info?.minTopup ?? 500;
 
-  // Stripe returned after a top-up — refresh the balance and flash a banner.
+  // Stripe returned after a top-up — refresh the balances and flash a banner.
   useEffect(() => {
     if (searchParams.get("topup") === "success") {
       setShowTopupSuccess(true);
       refresh();
-      const t = setTimeout(() => refresh(), 2500); // webhook may lag a moment
+      refreshTelephony();
+      const t = setTimeout(() => {
+        refresh();
+        refreshTelephony();
+      }, 2500); // webhook may lag a moment
       return () => clearTimeout(t);
     }
-  }, [searchParams, refresh]);
+  }, [searchParams, refresh, refreshTelephony]);
 
   const loadTxns = useCallback(async (p: number) => {
     setTxLoading(true);
@@ -486,6 +490,11 @@ function TelephonySettingsCard({ data, onRefresh }: { data: TelephonyCredits; on
     setNotice(null);
     try {
       const res = await telephonyTopupNow(amountMinor);
+      if ("checkoutUrl" in res) {
+        // No saved card — pay via Stripe Checkout (which saves the card).
+        window.location.href = res.checkoutUrl;
+        return;
+      }
       setNotice({
         tone: "ok",
         text:

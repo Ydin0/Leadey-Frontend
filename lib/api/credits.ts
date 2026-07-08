@@ -93,12 +93,13 @@ export interface TelephonySettingsResult {
   immediateTopup: { charged: boolean; amountMinor?: number; error?: string };
 }
 
-/** One-off telephony top-up: charges the saved card immediately and settles
- *  open telephony invoices oldest-first. */
-export async function telephonyTopupNow(amountMinor: number): Promise<{
-  balanceMinor: number;
-  settledInvoices: string[];
-}> {
+/** One-off telephony top-up. With a saved card it charges immediately and
+ *  settles open telephony invoices oldest-first; with no card on file the
+ *  response carries a Stripe Checkout URL instead (paying there saves the
+ *  card for future top-ups). */
+export async function telephonyTopupNow(amountMinor: number): Promise<
+  { balanceMinor: number; settledInvoices: string[] } | { checkoutUrl: string }
+> {
   return apiRequest("/credits/telephony/topup", {
     method: "POST",
     body: JSON.stringify({ amountMinor }),
