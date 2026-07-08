@@ -2,7 +2,7 @@
 
 import { useCallback, useState, useEffect } from "react";
 import Link from "next/link";
-import { ExternalLink, Loader2, Check, Minus, Plus, Download, CreditCard, CalendarClock, FileText } from "lucide-react";
+import { Loader2, Check, Minus, Plus, Download, CreditCard, CalendarClock, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getBillingInfo, createCheckoutSession, getInvoices, getLeadeyInvoices, addSubscriptionSeats } from "@/lib/api/billing";
@@ -157,7 +157,12 @@ export function BillingSection() {
     setCheckoutLoading(planKey);
     try {
       const seats = seatCounts[planKey] || 1;
-      const { url } = await createCheckoutSession(priceId, seats);
+      // Explicit return URLs — the backend default derives from CORS_ORIGIN,
+      // which can point at the wrong domain.
+      const { url } = await createCheckoutSession(priceId, seats, {
+        successUrl: `${window.location.origin}/dashboard/settings/billing-success`,
+        cancelUrl: `${window.location.origin}/dashboard/settings?tab=billing`,
+      });
       window.location.href = url;
     } catch (err) {
       console.error("Checkout failed:", err);
@@ -613,7 +618,13 @@ export function BillingSection() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
+                    <div className="inline-flex items-center gap-1.5">
+                      <Link
+                        href={`/dashboard/invoices/stripe/${inv.id}`}
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-[16px] border border-border-subtle text-[10.5px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+                      >
+                        <FileText size={11} /> View
+                      </Link>
                       {inv.invoicePdf ? (
                         <a
                           href={inv.invoicePdf}
@@ -632,17 +643,6 @@ export function BillingSection() {
                         >
                           <Download size={13} />
                         </button>
-                      )}
-                      {inv.invoiceUrl && (
-                        <a
-                          href={inv.invoiceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="View online"
-                          className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
-                        >
-                          <ExternalLink size={13} />
-                        </a>
                       )}
                     </div>
                   </TableCell>

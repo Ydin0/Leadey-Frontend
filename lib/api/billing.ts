@@ -5,10 +5,14 @@ export async function getBillingInfo(): Promise<BillingInfo> {
   return apiRequest<BillingInfo>("/billing");
 }
 
-export async function createCheckoutSession(priceId: string, seats?: number): Promise<{ url: string }> {
+export async function createCheckoutSession(
+  priceId: string,
+  seats?: number,
+  urls?: { successUrl: string; cancelUrl: string },
+): Promise<{ url: string }> {
   return apiRequest<{ url: string }>("/billing/checkout", {
     method: "POST",
-    body: JSON.stringify({ priceId, seats }),
+    body: JSON.stringify({ priceId, seats, ...urls }),
   });
 }
 
@@ -28,6 +32,14 @@ export async function createPortalSession(): Promise<{ url: string }> {
 
 export async function getInvoices(): Promise<StripeInvoice[]> {
   return apiRequest<StripeInvoice[]>("/billing/invoices");
+}
+
+/** One Stripe subscription invoice, reshaped by the backend to the Leadey
+ *  invoice-document format (rendered by InvoiceView). */
+export async function getStripeInvoiceDetail(id: string): Promise<
+  LeadeyInvoice & { periodLabel: string | null; amountPaidMinor: number }
+> {
+  return apiRequest(`/billing/invoices/${id}`);
 }
 
 export async function getLeadeyInvoices(): Promise<LeadeyInvoice[]> {

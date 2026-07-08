@@ -4,23 +4,22 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
-import { InvoiceView } from "@/components/billing/invoice-view";
-import { getLeadeyInvoice } from "@/lib/api/billing";
-import type { LeadeyInvoice } from "@/lib/types/billing";
+import { InvoiceView, type InvoiceDocData } from "@/components/billing/invoice-view";
+import { getStripeInvoiceDetail } from "@/lib/api/billing";
 
-/** Customer view of a Leadey-issued invoice (telephony/seats). Telephony
- *  invoices arrive from the API already summarized to a single line. */
-export default function CustomerInvoicePage() {
+/** Customer view of a Stripe subscription invoice, rendered in the Leadey
+ *  invoice style (the backend reshapes Stripe's data to our document form). */
+export default function StripeInvoicePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const isAuthReady = useAuthReady();
 
-  const [inv, setInv] = useState<LeadeyInvoice | null>(null);
+  const [inv, setInv] = useState<InvoiceDocData | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!isAuthReady) return;
-    getLeadeyInvoice(params.id)
+    getStripeInvoiceDetail(params.id)
       .then(setInv)
       .catch((e) => setError(e instanceof Error ? e.message : "Failed to load invoice"));
   }, [isAuthReady, params.id]);
