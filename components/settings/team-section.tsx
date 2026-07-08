@@ -23,8 +23,19 @@ import {
 } from "@/lib/api/team";
 import { DepartmentsManager } from "./departments-manager";
 import { MemberPermissionsModal, RolesCard } from "./team-permissions";
+import { getOrgRoles, updateMemberPermissions, type RoleDescriptor } from "@/lib/api/team-roles";
 import type { TeamMember, PendingInvitation, SeatUsage } from "@/lib/types/team";
 
+/** Granular built-in roles assignable from the dropdown (Admin is the Clerk
+ *  org role and handled separately; custom roles are appended at runtime). */
+const BUILTIN_APP_ROLES = [
+  { value: "manager", label: "Manager" },
+  { value: "member", label: "Member" },
+  { value: "viewer", label: "Viewer" },
+];
+
+/** Clerk access roles — what an INVITE can grant (granular roles are assigned
+ *  after the member joins, from the member row's role dropdown). */
 const ROLES = [
   { value: "org:admin", label: "Admin" },
   { value: "org:member", label: "Member" },
@@ -34,6 +45,15 @@ function roleLabel(role: string): string {
   if (role === "org:admin") return "Admin";
   if (role === "org:member") return "Member";
   return role.replace("org:", "");
+}
+
+/** The member's effective role label: org:admin wins; otherwise the granular
+ *  app-role (custom role name when it's a role_… id). */
+function effectiveRoleLabel(m: TeamMember, customRoles: RoleDescriptor[]): string {
+  if (m.role === "org:admin") return "Admin";
+  const ar = m.appRole || "member";
+  if (ar.startsWith("role_")) return customRoles.find((r) => r.id === ar)?.name || "Custom role";
+  return ar.charAt(0).toUpperCase() + ar.slice(1);
 }
 
 function memberName(m: TeamMember): string {
@@ -48,6 +68,7 @@ export function TeamSection() {
   const [invitations, setInvitations] = useState<PendingInvitation[]>([]);
   const [seatUsage, setSeatUsage] = useState<SeatUsage>({ used: 0, included: 1 });
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [customRoles, setCustomRoles] = useState<RoleDescriptor[]>([]);
   // member email (lowercased) → assigned department name
   const [deptByEmail, setDeptByEmail] = useState<Record<string, string>>({});
   const [savingDept, setSavingDept] = useState<string | null>(null);
@@ -113,16 +134,18 @@ export function TeamSection() {
 
   const loadData = useCallback(async () => {
     try {
-      const [teamData, invData, depts, kpi] = await Promise.all([
+      const [teamData, invData, depts, kpi, rolesData] = await Promise.all([
         getTeamMembers(),
         getPendingInvitations(),
         getDepartments().catch(() => [] as Department[]),
         getTeamKpiConfig().catch(() => ({})),
+        getOrgRoles().catch(() => null),
       ]);
       setMembers(teamData.members);
       setSeatUsage(teamData.seatUsage);
       setInvitations(invData);
       setDepartments(depts);
+      setCustomRoles(rolesData?.custom ?? []);
       const map: Record<string, string> = {};
       for (const [email, cfg] of Object.entries(kpi)) {
         const pod = (cfg as { pod?: string })?.pod;
@@ -190,12 +213,22 @@ export function TeamSection() {
     }
   }
 
-  async function handleRoleChange(userId: string, newRole: string) {
-    setChangingRole(userId);
+  /** Assign a role from the dropdown. "org:admin" is the Clerk access role;
+   *  everything else (manager/member/viewer or a custom role_… id) is the
+   *  granular app-role — demoting from admin first when needed so the org:admin
+   *  escape hatch doesn't keep overriding the granular permissions. */
+  async function handlePickRole(member: TeamMember, value: string) {
+    setChangingRole(member.id);
     setShowRoleMenu(null);
     try {
-      await updateMemberRole(userId, newRole);
-      setMembers((prev) => prev.map((m) => m.id === userId ? { ...m, role: newRole } : m));
+      if (value === "org:admin") {
+        await updateMemberRole(member.id, "org:admin");
+        setMembers((prev) => prev.map((m) => (m.id === member.id ? { ...m, role: "org:admin", appRole: "admin" } : m)));
+      } else {
+        if (member.role === "org:admin") await updateMemberRole(member.id, "org:member");
+        await updateMemberPermissions(member.id, { appRole: value });
+        setMembers((prev) => prev.map((m) => (m.id === member.id ? { ...m, role: "org:member", appRole: value } : m)));
+      }
     } catch (err) {
       console.error("Failed to update role:", err);
     } finally {
@@ -340,23 +373,55 @@ export function TeamSection() {
                     disabled={changingRole === member.id}
                     className="flex items-center gap-1 px-2.5 py-1 rounded-[8px] text-[11px] font-medium bg-section border border-border-subtle text-ink-secondary hover:bg-hover transition-colors disabled:opacity-50"
                   >
-                    {changingRole === member.id ? <Loader2 size={10} className="animate-spin" /> : roleLabel(member.role)}
+                    {changingRole === member.id ? <Loader2 size={10} className="animate-spin" /> : effectiveRoleLabel(member, customRoles)}
                     <ChevronDown size={10} />
                   </button>
                   {showRoleMenu === member.id && (
-                    <div className="absolute right-0 top-full mt-1 w-32 bg-surface rounded-[8px] border border-border-subtle shadow-lg z-20 py-1">
-                      {ROLES.map((r) => (
+                    <div className="absolute right-0 top-full mt-1 w-44 bg-surface rounded-[8px] border border-border-subtle shadow-lg z-20 py-1">
+                      <p className="px-3 pt-1 pb-0.5 text-[9px] uppercase tracking-wider text-ink-faint font-semibold">Access</p>
+                      <button
+                        onClick={() => handlePickRole(member, "org:admin")}
+                        className={cn(
+                          "w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover transition-colors",
+                          member.role === "org:admin" ? "font-medium text-ink" : "text-ink-secondary",
+                        )}
+                      >
+                        Admin
+                      </button>
+                      <p className="px-3 pt-1.5 pb-0.5 text-[9px] uppercase tracking-wider text-ink-faint font-semibold border-t border-border-subtle mt-1">Roles</p>
+                      {BUILTIN_APP_ROLES.map((r) => (
                         <button
                           key={r.value}
-                          onClick={() => handleRoleChange(member.id, r.value)}
+                          onClick={() => handlePickRole(member, r.value)}
                           className={cn(
                             "w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover transition-colors",
-                            member.role === r.value ? "font-medium text-ink" : "text-ink-secondary"
+                            member.role !== "org:admin" && (member.appRole || "member") === r.value
+                              ? "font-medium text-ink"
+                              : "text-ink-secondary",
                           )}
                         >
                           {r.label}
                         </button>
                       ))}
+                      {customRoles.length > 0 && (
+                        <>
+                          <p className="px-3 pt-1.5 pb-0.5 text-[9px] uppercase tracking-wider text-ink-faint font-semibold border-t border-border-subtle mt-1">Custom roles</p>
+                          {customRoles.map((r) => (
+                            <button
+                              key={r.id}
+                              onClick={() => r.id && handlePickRole(member, r.id)}
+                              className={cn(
+                                "w-full text-left px-3 py-1.5 text-[11px] hover:bg-hover transition-colors truncate",
+                                member.role !== "org:admin" && member.appRole === r.id
+                                  ? "font-medium text-ink"
+                                  : "text-ink-secondary",
+                              )}
+                            >
+                              {r.name}
+                            </button>
+                          ))}
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
