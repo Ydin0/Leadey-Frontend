@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
-import { CreditCard, ExternalLink, Loader2, Check, Sparkles, Minus, Plus, Download } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ExternalLink, Loader2, Check, Minus, Plus, Download, CreditCard, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getBillingInfo, createCheckoutSession, getInvoices } from "@/lib/api/billing";
 import { apiRequest } from "@/lib/api/client";
 import { NativeSelect } from "@/components/ui/native-select";
+import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { downloadInvoiceAsPdf } from "@/lib/utils/generate-invoice-pdf";
 import type { BillingInfo, StripeInvoice } from "@/lib/types/billing";
 
@@ -59,9 +59,24 @@ const PLAN_DETAILS: Record<string, { minSeats: number; description: string; feat
 const planStatusLabel: Record<string, { label: string; className: string }> = {
   active: { label: "Active", className: "bg-signal-green text-signal-green-text" },
   trialing: { label: "Trial", className: "bg-signal-blue text-signal-blue-text" },
-  past_due: { label: "Past Due", className: "bg-signal-red text-signal-red-text" },
+  past_due: { label: "Past due", className: "bg-signal-red text-signal-red-text" },
   cancelled: { label: "Cancelled", className: "bg-signal-slate text-signal-slate-text" },
 };
+
+const SECTION_LABEL = "text-[10px] uppercase tracking-wider text-ink-muted font-medium";
+
+function StepperButton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="w-7 h-7 flex items-center justify-center rounded-full border border-border-subtle text-ink-muted hover:bg-hover hover:text-ink disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+    >
+      {children}
+    </button>
+  );
+}
 
 export function BillingSection() {
   const isAuthReady = useAuthReady();
@@ -85,7 +100,7 @@ export function BillingSection() {
       .finally(() => setLoading(false));
   }, [isAuthReady]);
 
-  // Seat selection per plan
+  // Seat selection per plan (for the plan-picker cards)
   const [seatCounts, setSeatCounts] = useState<Record<string, number>>({
     starter: 1,
     growth: 1,
@@ -116,10 +131,24 @@ export function BillingSection() {
     }
   }
 
+  async function handleAddSeats() {
+    if (!billing) return;
+    const price = billing.prices[billing.plan as keyof typeof billing.prices];
+    if (!price?.priceId) return;
+    setCheckoutLoading("add-seats");
+    try {
+      const { url } = await createCheckoutSession(price.priceId, additionalSeats);
+      window.location.href = url;
+    } catch (err) {
+      console.error("Add seats failed:", err);
+      setCheckoutLoading(null);
+    }
+  }
+
   async function handleCancelRequest() {
     setCancelSubmitting(true);
     try {
-      // Send cancellation request (this doesn't actually cancel — it sends a request to the team)
+      // Sends a request to the team — doesn't cancel on the spot.
       await apiRequest("/billing/cancel-request", {
         method: "POST",
         body: JSON.stringify({ reason: cancelReason, feedback: cancelFeedback }),
@@ -145,193 +174,339 @@ export function BillingSection() {
   const status = planStatusLabel[billing.planStatus] || planStatusLabel.active;
   const isTrial = billing.plan === "trial";
   const hasSubscription = !!billing.stripeSubscriptionId;
+  const currentPrice = billing.prices[billing.plan as keyof typeof billing.prices];
+  const perSeat = currentPrice ? currentPrice.amount / 100 : 0;
+  const monthlyTotal = perSeat * billing.seatsIncluded;
 
   return (
-    <div className="space-y-6">
-      {/* Current Plan */}
-      <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
-        <div className="flex items-center justify-between mb-4">
+    <div className="space-y-5 max-w-4xl">
+      {/* ── Current plan ── */}
+      <div className="rounded-[14px] border border-border-subtle bg-surface overflow-hidden">
+        <div className="p-6 flex items-start justify-between gap-6 flex-wrap">
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-[14px] font-semibold text-ink">{billing.planName} Plan</h3>
-              <span className={cn("text-[10px] font-medium rounded-full px-2 py-0.5", status.className)}>
+            <div className={cn("flex items-center gap-2 mb-2", SECTION_LABEL)}>
+              <CreditCard size={12} className="text-accent" /> Current plan
+              <span className={cn("text-[9px] uppercase tracking-wide font-semibold rounded-full px-2 py-0.5", status.className)}>
                 {status.label}
               </span>
             </div>
-            {isTrial && (
-              <p className="text-[11px] text-ink-muted mt-1">
-                {billing.trialDaysLeft > 0
-                  ? `${billing.trialDaysLeft} days remaining in your free trial`
-                  : "Your trial has expired"}
-              </p>
-            )}
-            {hasSubscription && billing.currentPeriodEnd && (
-              <p className="text-[11px] text-ink-muted mt-1">
-                Next billing date: {new Date(billing.currentPeriodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-              </p>
-            )}
+            <div className="text-[26px] font-semibold text-ink leading-none">{billing.planName}</div>
+            <p className="text-[12px] text-ink-muted mt-2 max-w-[380px]">
+              {isTrial
+                ? billing.trialDaysLeft > 0
+                  ? `${billing.trialDaysLeft} day${billing.trialDaysLeft === 1 ? "" : "s"} left in your free trial — pick a plan below to keep everything running.`
+                  : "Your trial has expired — pick a plan below to keep everything running."
+                : PLAN_DETAILS[billing.plan]?.description ?? ""}
+            </p>
           </div>
-        </div>
 
-        {/* Usage + Seats */}
-        <div className="space-y-4">
-          {/* Credits now live in their own tab (unified prepaid wallet). */}
-          <Link
-            href="/dashboard/settings?tab=credits"
-            className="flex items-center justify-between rounded-[10px] border border-border-subtle bg-section/40 px-3 py-2.5 hover:bg-hover transition-colors"
-          >
-            <div>
-              <p className="text-[12px] font-medium text-ink">Credits</p>
-              <p className="text-[10px] text-ink-muted">View balance, top up & usage reports</p>
-            </div>
-            <span className="text-[11px] font-medium text-accent">Open Credits →</span>
-          </Link>
-
-          {/* Seats */}
-          <div className="flex items-center justify-between py-3 border-t border-border-subtle">
-            <div>
-              <p className="text-[12px] font-medium text-ink">Seats</p>
-              <p className="text-[10px] text-ink-muted">{billing.seatsIncluded} seat{billing.seatsIncluded !== 1 ? "s" : ""} on your plan</p>
-            </div>
-            {hasSubscription && (
-              <div className="relative">
-                <button
-                  onClick={() => setShowAddSeats(!showAddSeats)}
-                  className="px-3 py-1.5 rounded-[20px] text-[11px] font-medium bg-section text-ink-secondary border border-border-subtle hover:bg-hover transition-colors"
-                >
-                  <Plus size={10} className="inline mr-1" />
-                  Add Seats
-                </button>
-                {showAddSeats && (
-                  <div className="absolute right-0 top-full mt-2 w-64 bg-surface rounded-[12px] border border-border-subtle shadow-lg p-4 z-30">
-                    <p className="text-[12px] font-medium text-ink mb-3">Add seats to your plan</p>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setAdditionalSeats(Math.max(1, additionalSeats - 1))}
-                          className="w-7 h-7 flex items-center justify-center rounded-md border border-border-subtle text-ink-muted hover:bg-hover transition-colors"
-                        >
-                          <Minus size={12} />
-                        </button>
-                        <span className="text-[14px] font-semibold text-ink w-8 text-center">{additionalSeats}</span>
-                        <button
-                          type="button"
-                          onClick={() => setAdditionalSeats(additionalSeats + 1)}
-                          className="w-7 h-7 flex items-center justify-center rounded-md border border-border-subtle text-ink-muted hover:bg-hover transition-colors"
-                        >
-                          <Plus size={12} />
-                        </button>
-                      </div>
-                      <span className="text-[11px] text-ink-muted">
-                        seat{additionalSeats !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-ink-faint mb-3">
-                      {(() => {
-                        const price = billing.prices[billing.plan as keyof typeof billing.prices];
-                        if (!price) return "";
-                        return `+£${((price.amount / 100) * additionalSeats).toFixed(0)}/mo added to your next invoice`;
-                      })()}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setShowAddSeats(false)}
-                        className="px-3 py-1.5 rounded-[8px] text-[11px] font-medium text-ink-muted hover:bg-hover transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const price = billing.prices[billing.plan as keyof typeof billing.prices];
-                          if (!price?.priceId) return;
-                          setCheckoutLoading("add-seats");
-                          try {
-                            const { url } = await createCheckoutSession(price.priceId, additionalSeats);
-                            window.location.href = url;
-                          } catch (err) {
-                            console.error("Add seats failed:", err);
-                            setCheckoutLoading(null);
-                          }
-                        }}
-                        disabled={!!checkoutLoading}
-                        className="flex-1 py-1.5 rounded-[8px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors disabled:opacity-50"
-                      >
-                        {checkoutLoading === "add-seats" ? <Loader2 size={11} className="animate-spin mx-auto" /> : "Confirm & Pay"}
-                      </button>
-                    </div>
-                  </div>
-                )}
+          {hasSubscription && currentPrice && (
+            <div className="text-right">
+              <div className="text-[26px] font-semibold text-ink tabular-nums leading-none">
+                £{monthlyTotal.toLocaleString()}
+                <span className="text-[13px] font-normal text-ink-muted">/mo</span>
               </div>
-            )}
-          </div>
-
-          {/* Limits grid */}
-          <div className="grid grid-cols-4 gap-3 text-[11px] py-3 border-t border-border-subtle">
-            <div>
-              <span className="text-ink-faint text-[10px]">Funnels</span>
-              <p className="text-ink font-medium">{billing.funnelsAllowed === -1 ? "Unlimited" : billing.funnelsAllowed}</p>
-            </div>
-            <div>
-              <span className="text-ink-faint text-[10px]">Phone lines</span>
-              <p className="text-ink font-medium">{billing.phoneLinesAllowed}</p>
-            </div>
-            <div>
-              <span className="text-ink-faint text-[10px]">Enrichment</span>
-              <p className="text-ink font-medium">{billing.enrichmentCredits.toLocaleString()}/mo</p>
-            </div>
-            <div>
-              <span className="text-ink-faint text-[10px]">Call recording</span>
-              <p className="text-ink font-medium">{billing.callRecording ? "Yes" : "No"}</p>
-            </div>
-          </div>
-
-          {/* Cancel link */}
-          {hasSubscription && (
-            <div className="pt-3 border-t border-border-subtle">
-              <button
-                onClick={() => setShowCancelModal(true)}
-                className="text-[11px] text-ink-faint hover:text-signal-red-text transition-colors"
-              >
-                Cancel subscription
-              </button>
+              <p className="text-[11.5px] text-ink-muted mt-2 tabular-nums">
+                {billing.seatsIncluded} seat{billing.seatsIncluded === 1 ? "" : "s"} × £{perSeat.toLocaleString()}
+              </p>
+              {billing.currentPeriodEnd && (
+                <p className="text-[11.5px] text-ink-faint mt-1 flex items-center justify-end gap-1.5">
+                  <CalendarClock size={12} />
+                  Renews {new Date(billing.currentPeriodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                </p>
+              )}
             </div>
           )}
         </div>
+
+        {/* Plan allowance cells */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-border-subtle divide-x divide-border-subtle">
+          <div className="px-5 py-4">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-ink-faint font-medium">Seats</span>
+              {hasSubscription && (
+                <button
+                  onClick={() => setShowAddSeats((v) => !v)}
+                  className="text-[10.5px] font-medium text-accent hover:opacity-80 transition-opacity"
+                >
+                  + Add
+                </button>
+              )}
+            </div>
+            <p className="text-[17px] font-semibold text-ink tabular-nums mt-1">{billing.seatsIncluded}</p>
+          </div>
+          <div className="px-5 py-4">
+            <span className="text-[10px] uppercase tracking-wider text-ink-faint font-medium">Funnels</span>
+            <p className="text-[17px] font-semibold text-ink tabular-nums mt-1">
+              {billing.funnelsAllowed === -1 ? "Unlimited" : billing.funnelsAllowed}
+            </p>
+          </div>
+          <div className="px-5 py-4">
+            <span className="text-[10px] uppercase tracking-wider text-ink-faint font-medium">Phone lines</span>
+            <p className="text-[17px] font-semibold text-ink tabular-nums mt-1">{billing.phoneLinesAllowed}</p>
+          </div>
+          <div className="px-5 py-4">
+            <span className="text-[10px] uppercase tracking-wider text-ink-faint font-medium">Enrichments</span>
+            <p className="text-[17px] font-semibold text-ink tabular-nums mt-1">
+              {billing.enrichmentCredits.toLocaleString()}
+              <span className="text-[11px] font-normal text-ink-muted">/mo</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Inline add-seats panel */}
+        {showAddSeats && hasSubscription && (
+          <div className="border-t border-border-subtle bg-section/40 px-6 py-4 flex items-center gap-5 flex-wrap">
+            <div className="flex items-center gap-2.5">
+              <StepperButton onClick={() => setAdditionalSeats(Math.max(1, additionalSeats - 1))} disabled={additionalSeats <= 1}>
+                <Minus size={12} />
+              </StepperButton>
+              <span className="text-[15px] font-semibold text-ink w-7 text-center tabular-nums">{additionalSeats}</span>
+              <StepperButton onClick={() => setAdditionalSeats(additionalSeats + 1)}>
+                <Plus size={12} />
+              </StepperButton>
+              <span className="text-[12px] text-ink-secondary">extra seat{additionalSeats === 1 ? "" : "s"}</span>
+            </div>
+            <span className="text-[12px] text-ink-muted tabular-nums">
+              +£{(perSeat * additionalSeats).toFixed(0)}/mo
+            </span>
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={() => setShowAddSeats(false)}
+                className="px-3.5 py-1.5 rounded-[20px] text-[11px] font-medium text-ink-muted hover:bg-hover transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void handleAddSeats()}
+                disabled={!!checkoutLoading}
+                className="px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {checkoutLoading === "add-seats" ? <Loader2 size={12} className="animate-spin" /> : "Confirm & pay"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {hasSubscription && (
+          <div className="border-t border-border-subtle px-6 py-3 flex items-center justify-end">
+            <button
+              onClick={() => setShowCancelModal(true)}
+              className="text-[11px] text-ink-faint hover:text-signal-red-text transition-colors"
+            >
+              Cancel subscription
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Cancel Modal */}
+      {/* ── Plan picker (trial / no subscription) ── */}
+      {(isTrial || !hasSubscription) && (
+        <div>
+          <div className="mb-3">
+            <h3 className="text-[14px] font-semibold text-ink">Choose a plan</h3>
+            <p className="text-[11.5px] text-ink-muted mt-0.5">Per-seat pricing, billed monthly. Cancel any time.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {(["starter", "growth", "scale"] as const).map((planKey) => {
+              const price = billing.prices[planKey];
+              const details = PLAN_DETAILS[planKey];
+              const isCurrentPlan = billing.plan === planKey;
+              const isPopular = planKey === "growth";
+              const seats = seatCounts[planKey] || details?.minSeats || 1;
+              const perSeatPrice = price.amount / 100;
+              const totalPrice = perSeatPrice * seats;
+
+              return (
+                <div
+                  key={planKey}
+                  className={cn(
+                    "rounded-[14px] border bg-surface flex flex-col overflow-hidden",
+                    isPopular ? "border-accent" : "border-border-subtle",
+                  )}
+                >
+                  {isPopular ? (
+                    <div className="bg-accent/10 text-accent text-[9.5px] font-semibold uppercase tracking-wider text-center py-1.5">
+                      Most popular
+                    </div>
+                  ) : (
+                    <div className="py-1.5 text-[9.5px]">&nbsp;</div>
+                  )}
+                  <div className="p-5 pt-3 flex flex-col flex-1">
+                    <h4 className="text-[14px] font-semibold text-ink capitalize">{planKey}</h4>
+                    <p className="text-[11px] text-ink-muted mt-0.5 min-h-[30px]">{details?.description}</p>
+
+                    <div className="mt-3 mb-4">
+                      <span className="text-[28px] font-semibold text-ink tabular-nums">£{perSeatPrice.toFixed(0)}</span>
+                      <span className="text-[11.5px] text-ink-muted"> /seat per month</span>
+                    </div>
+
+                    {/* Seat selector */}
+                    <div className="flex items-center justify-between rounded-[10px] border border-border-subtle bg-section/40 px-3 py-2 mb-4">
+                      <div className="flex items-center gap-2">
+                        <StepperButton onClick={() => adjustSeats(planKey, -1)} disabled={seats <= (details?.minSeats || 1)}>
+                          <Minus size={11} />
+                        </StepperButton>
+                        <span className="text-[13px] font-semibold text-ink w-6 text-center tabular-nums">{seats}</span>
+                        <StepperButton onClick={() => adjustSeats(planKey, 1)}>
+                          <Plus size={11} />
+                        </StepperButton>
+                        <span className="text-[11px] text-ink-muted">seat{seats === 1 ? "" : "s"}</span>
+                      </div>
+                      <span className="text-[12px] font-medium text-ink tabular-nums">£{totalPrice.toFixed(0)}/mo</span>
+                    </div>
+
+                    <ul className="space-y-1.5 mb-5 flex-1">
+                      {details?.features.map((f) => (
+                        <li key={f} className="flex items-start gap-1.5 text-[11px] text-ink-secondary">
+                          <Check size={11} className="text-signal-green-text shrink-0 mt-0.5" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+
+                    <button
+                      onClick={() => handleCheckout(planKey)}
+                      disabled={isCurrentPlan || !!checkoutLoading}
+                      className={cn(
+                        "w-full py-2.5 rounded-[20px] text-[11.5px] font-medium transition-opacity",
+                        isCurrentPlan
+                          ? "bg-section text-ink-faint cursor-not-allowed"
+                          : isPopular
+                            ? "bg-accent text-white hover:opacity-90"
+                            : "bg-ink text-on-ink hover:opacity-90",
+                      )}
+                    >
+                      {checkoutLoading === planKey ? (
+                        <Loader2 size={12} className="animate-spin mx-auto" />
+                      ) : isCurrentPlan ? (
+                        "Current plan"
+                      ) : planKey === "scale" ? (
+                        "Talk to sales"
+                      ) : (
+                        "Start 14-day free trial"
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Invoice history ── */}
+      {invoices.length > 0 && (
+        <div className="rounded-[14px] border border-border-subtle bg-surface overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border-subtle">
+            <h3 className="text-[13px] font-semibold text-ink">Invoice history</h3>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
+                <TableHead className="text-left">Invoice</TableHead>
+                <TableHead className="text-left w-[140px]">Date</TableHead>
+                <TableHead className="text-right w-[110px]">Amount</TableHead>
+                <TableHead className="text-center w-[100px]">Status</TableHead>
+                <TableHead className="text-right w-[90px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoices.map((inv) => (
+                <TableRow key={inv.id} className="hover:bg-hover/40">
+                  <TableCell>
+                    <span className="text-[12px] font-medium text-ink">{inv.number || "—"}</span>
+                  </TableCell>
+                  <TableCell className="text-[11.5px] text-ink-secondary">
+                    {inv.createdAt
+                      ? new Date(inv.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+                      : "—"}
+                  </TableCell>
+                  <TableCell className="text-right text-[12px] font-semibold text-ink tabular-nums">
+                    £{((inv.amountPaid || inv.amountDue) / 100).toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span
+                      className={cn(
+                        "text-[10px] font-medium rounded-full px-2 py-0.5 capitalize",
+                        inv.status === "paid"
+                          ? "bg-signal-green text-signal-green-text"
+                          : "bg-signal-slate text-signal-slate-text",
+                      )}
+                    >
+                      {inv.status || "pending"}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      {inv.invoicePdf ? (
+                        <a
+                          href={inv.invoicePdf}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Download PDF"
+                          className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
+                        >
+                          <Download size={13} />
+                        </a>
+                      ) : (
+                        <button
+                          onClick={() => downloadInvoiceAsPdf(inv, billing?.planName || "Leadey")}
+                          title="Download PDF"
+                          className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
+                        >
+                          <Download size={13} />
+                        </button>
+                      )}
+                      {inv.invoiceUrl && (
+                        <a
+                          href={inv.invoiceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View online"
+                          className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
+                        >
+                          <ExternalLink size={13} />
+                        </a>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* ── Cancel modal ── */}
       {showCancelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px]">
           <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-md shadow-xl">
             {cancelSubmitted ? (
               <div className="text-center py-4">
                 <Check size={32} className="text-signal-green-text mx-auto mb-3" />
-                <h3 className="text-[14px] font-semibold text-ink mb-1">Request Received</h3>
+                <h3 className="text-[14px] font-semibold text-ink mb-1">Request received</h3>
                 <p className="text-[12px] text-ink-muted mb-4">
                   We have received your cancellation request. Our team will be in touch within 24 hours.
                 </p>
                 <button
                   onClick={() => { setShowCancelModal(false); setCancelSubmitted(false); setCancelReason(""); setCancelFeedback(""); }}
-                  className="px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
+                  className="px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity"
                 >
                   Close
                 </button>
               </div>
             ) : (
               <>
-                <h3 className="text-[14px] font-semibold text-ink mb-1">Cancel Subscription</h3>
+                <h3 className="text-[14px] font-semibold text-ink mb-1">Cancel subscription</h3>
                 <p className="text-[12px] text-ink-muted mb-4">
                   We are sorry to see you go. Please let us know why so we can improve.
                 </p>
 
                 <div className="space-y-3 mb-5">
                   <div>
-                    <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5 block">Reason</label>
-                    <NativeSelect
-                      value={cancelReason}
-                      onChange={(e) => setCancelReason(e.target.value)}
-                    >
+                    <label className={cn("mb-1.5 block", SECTION_LABEL)}>Reason</label>
+                    <NativeSelect value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}>
                       <option value="">Select a reason...</option>
                       <option value="too_expensive">Too expensive</option>
                       <option value="missing_features">Missing features I need</option>
@@ -342,7 +517,7 @@ export function BillingSection() {
                     </NativeSelect>
                   </div>
                   <div>
-                    <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5 block">Additional Feedback</label>
+                    <label className={cn("mb-1.5 block", SECTION_LABEL)}>Additional feedback</label>
                     <textarea
                       value={cancelFeedback}
                       onChange={(e) => setCancelFeedback(e.target.value)}
@@ -358,7 +533,7 @@ export function BillingSection() {
                     onClick={() => setShowCancelModal(false)}
                     className="px-4 py-2 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle"
                   >
-                    Keep Subscription
+                    Keep subscription
                   </button>
                   <button
                     onClick={handleCancelRequest}
@@ -366,189 +541,11 @@ export function BillingSection() {
                     className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-signal-red text-signal-red-text text-[11px] font-medium hover:bg-signal-red/80 transition-colors disabled:opacity-50"
                   >
                     {cancelSubmitting && <Loader2 size={11} className="animate-spin" />}
-                    Submit Cancellation Request
+                    Submit cancellation request
                   </button>
                 </div>
               </>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* Plans Grid (show if trial or no subscription) */}
-      {(isTrial || !hasSubscription) && (
-        <div>
-          <h3 className="text-[14px] font-semibold text-ink mb-3">Choose a Plan</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {(["starter", "growth", "scale"] as const).map((planKey) => {
-              const price = billing.prices[planKey];
-              const details = PLAN_DETAILS[planKey];
-              const isCurrentPlan = billing.plan === planKey;
-              const isPopular = planKey === "growth";
-              const seats = seatCounts[planKey] || details?.minSeats || 1;
-              const perSeatPrice = price.amount / 100;
-              const totalPrice = perSeatPrice * seats;
-
-              return (
-                <div
-                  key={planKey}
-                  className={cn(
-                    "bg-surface rounded-[14px] border p-5 relative flex flex-col",
-                    isPopular ? "border-signal-blue-text" : "border-border-subtle"
-                  )}
-                >
-                  {isPopular && (
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-signal-blue-text text-white text-[9px] font-semibold">
-                      Most Popular
-                    </span>
-                  )}
-                  <h4 className="text-[14px] font-semibold text-ink capitalize">{planKey}</h4>
-                  <p className="text-[10px] text-ink-muted mt-0.5 mb-3">{details?.description}</p>
-
-                  <div className="mb-1">
-                    <span className="text-[24px] font-bold text-ink">&pound;{perSeatPrice.toFixed(0)}</span>
-                    <span className="text-[11px] text-ink-muted">/seat/month</span>
-                  </div>
-
-                  {/* Seat selector */}
-                  <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border-subtle">
-                    <span className="text-[11px] text-ink-secondary">Seats:</span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => adjustSeats(planKey, -1)}
-                        disabled={seats <= (details?.minSeats || 1)}
-                        className="w-6 h-6 flex items-center justify-center rounded-md border border-border-subtle text-ink-muted hover:bg-hover disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                      >
-                        <Minus size={10} />
-                      </button>
-                      <span className="text-[13px] font-semibold text-ink w-6 text-center">{seats}</span>
-                      <button
-                        type="button"
-                        onClick={() => adjustSeats(planKey, 1)}
-                        className="w-6 h-6 flex items-center justify-center rounded-md border border-border-subtle text-ink-muted hover:bg-hover transition-colors"
-                      >
-                        <Plus size={10} />
-                      </button>
-                    </div>
-                    <span className="text-[11px] text-ink-faint ml-auto">
-                      &pound;{totalPrice.toFixed(0)}/mo
-                    </span>
-                  </div>
-
-                  <ul className="space-y-1.5 mb-5 flex-1">
-                    {details?.features.map((f) => (
-                      <li key={f} className="flex items-center gap-1.5 text-[11px] text-ink-secondary">
-                        <Check size={11} className="text-signal-green-text shrink-0" />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    onClick={() => handleCheckout(planKey)}
-                    disabled={isCurrentPlan || !!checkoutLoading}
-                    className={cn(
-                      "w-full py-2.5 rounded-[20px] text-[11px] font-medium transition-colors",
-                      isCurrentPlan
-                        ? "bg-section text-ink-faint cursor-not-allowed"
-                        : isPopular
-                          ? "bg-signal-blue-text text-white hover:opacity-90"
-                          : "bg-ink text-on-ink hover:bg-ink/90"
-                    )}
-                  >
-                    {checkoutLoading === planKey ? (
-                      <Loader2 size={12} className="animate-spin mx-auto" />
-                    ) : isCurrentPlan ? (
-                      "Current Plan"
-                    ) : planKey === "scale" ? (
-                      "Talk to Sales"
-                    ) : (
-                      "Start 14-Day Free Trial"
-                    )}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Invoice History */}
-      {invoices.length > 0 && (
-        <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
-          <h3 className="text-[14px] font-semibold text-ink mb-3">Invoice History</h3>
-          <div className="overflow-hidden rounded-[10px] border border-border-subtle">
-            <table className="w-full text-[11px]">
-              <thead>
-                <tr className="bg-section/50 border-b border-border-subtle">
-                  <th className="text-left px-3 py-2 font-medium text-ink-muted">Invoice</th>
-                  <th className="text-left px-3 py-2 font-medium text-ink-muted">Date</th>
-                  <th className="text-right px-3 py-2 font-medium text-ink-muted">Amount</th>
-                  <th className="text-center px-3 py-2 font-medium text-ink-muted">Status</th>
-                  <th className="text-right px-3 py-2 font-medium text-ink-muted w-20"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoices.map((inv) => (
-                  <tr key={inv.id} className="border-b border-border-subtle last:border-b-0">
-                    <td className="px-3 py-2.5">
-                      <span className="text-[12px] font-medium text-ink">{inv.number || "—"}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-ink-secondary">
-                      {inv.createdAt ? new Date(inv.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : "—"}
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span className="text-[12px] font-semibold text-ink">
-                        &pound;{((inv.amountPaid || inv.amountDue) / 100).toFixed(2)}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <span className={cn(
-                        "text-[10px] font-medium rounded-full px-2 py-0.5",
-                        inv.status === "paid" ? "bg-signal-green text-signal-green-text" : "bg-signal-slate text-signal-slate-text"
-                      )}>
-                        {inv.status || "pending"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {inv.invoicePdf ? (
-                          <a
-                            href={inv.invoicePdf}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="Download PDF"
-                            className="p-1 rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
-                          >
-                            <Download size={13} />
-                          </a>
-                        ) : (
-                          <button
-                            onClick={() => downloadInvoiceAsPdf(inv, billing?.planName || "Leadey")}
-                            title="Download PDF"
-                            className="p-1 rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
-                          >
-                            <Download size={13} />
-                          </button>
-                        )}
-                        {inv.invoiceUrl && (
-                          <a
-                            href={inv.invoiceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title="View online"
-                            className="p-1 rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
-                          >
-                            <ExternalLink size={13} />
-                          </a>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </div>
       )}
