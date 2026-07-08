@@ -21,6 +21,7 @@ import {
   creditsToUsd,
   getTelephonyCredits,
   updateTelephonySettings,
+  telephonyTopupNow,
   type CreditTransaction,
   type TelephonyCredits,
 } from "@/lib/api/credits";
@@ -470,8 +471,36 @@ function TelephonySettingsCard({ data, onRefresh }: { data: TelephonyCredits; on
   );
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ tone: "ok" | "err"; text: string } | null>(null);
+  const [topupDraft, setTopupDraft] = useState("");
+  const [toppingUp, setToppingUp] = useState(false);
 
   const toMinor = (s: string) => Math.round((parseFloat(s) || 0) * 100);
+  // What the FIRST auto charge would be if enabled right now (covers any
+  // outstanding negative balance up to the target).
+  const firstChargeMinor = Math.min(Math.max(0, toMinor(targetDraft) - data.balanceMinor), 1_000_000);
+
+  async function topupNow() {
+    const amountMinor = toMinor(topupDraft);
+    if (toppingUp || amountMinor < 500) return;
+    setToppingUp(true);
+    setNotice(null);
+    try {
+      const res = await telephonyTopupNow(amountMinor);
+      setNotice({
+        tone: "ok",
+        text:
+          res.settledInvoices.length > 0
+            ? `Charged ${fmt(amountMinor)} — invoice${res.settledInvoices.length === 1 ? "" : "s"} ${res.settledInvoices.join(", ")} settled. New balance ${fmt(res.balanceMinor)}.`
+            : `Charged ${fmt(amountMinor)} — new balance ${fmt(res.balanceMinor)}.`,
+      });
+      setTopupDraft("");
+      onRefresh();
+    } catch (err) {
+      setNotice({ tone: "err", text: err instanceof Error ? err.message : "Top-up failed" });
+    } finally {
+      setToppingUp(false);
+    }
+  }
 
   async function save() {
     if (saving) return;
@@ -545,11 +574,39 @@ function TelephonySettingsCard({ data, onRefresh }: { data: TelephonyCredits; on
               </div>
             </div>
           )}
+          {atEnabled && data.balanceMinor < 0 && toMinor(targetDraft) > 0 && (
+            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-2 tabular-nums">
+              Your balance is {fmt(data.balanceMinor)}, so the first charge will be ≈{" "}
+              <span className="font-medium">{fmt(firstChargeMinor)}</span> — it clears your
+              outstanding usage and any open telephony invoices it covers.
+            </p>
+          )}
           {autoTopup.lastError && atEnabled && (
             <p className="text-[11px] font-medium text-signal-red-text mt-2">
               Last top-up attempt failed: {autoTopup.lastError}
             </p>
           )}
+        </div>
+      </div>
+
+      {/* ── One-off top-up ── */}
+      <div className="mt-5 pt-4 border-t border-border-subtle">
+        <p className={cn("mb-1", SECTION_LABEL)}>One-off top-up</p>
+        <p className="text-[11px] text-ink-muted mb-2.5 max-w-[560px]">
+          Charge your saved card once, right now. The amount is added to your balance and any open
+          telephony invoices it covers are settled automatically, oldest first.
+        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <MoneyInput value={topupDraft} onChange={setTopupDraft} placeholder="100" disabled={toppingUp} />
+          <button
+            onClick={() => void topupNow()}
+            disabled={toppingUp || toMinor(topupDraft) < 500}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11.5px] font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+          >
+            {toppingUp ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+            {toMinor(topupDraft) >= 500 ? `Top up ${fmt(toMinor(topupDraft))}` : "Top up"}
+          </button>
+          <span className="text-[10.5px] text-ink-faint">min {fmt(500)}</span>
         </div>
       </div>
 

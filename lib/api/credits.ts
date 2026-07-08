@@ -93,6 +93,18 @@ export interface TelephonySettingsResult {
   immediateTopup: { charged: boolean; amountMinor?: number; error?: string };
 }
 
+/** One-off telephony top-up: charges the saved card immediately and settles
+ *  open telephony invoices oldest-first. */
+export async function telephonyTopupNow(amountMinor: number): Promise<{
+  balanceMinor: number;
+  settledInvoices: string[];
+}> {
+  return apiRequest("/credits/telephony/topup", {
+    method: "POST",
+    body: JSON.stringify({ amountMinor }),
+  });
+}
+
 export async function updateTelephonySettings(settings: {
   monthlyLimitMinor: number | null;
   autoTopupEnabled: boolean;
