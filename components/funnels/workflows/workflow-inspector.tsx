@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Trash2, X, Loader2, BookmarkPlus, Check } from "lucide-react";
+import { Trash2, X, Loader2, BookmarkPlus, Check, Paperclip } from "lucide-react";
 import type { Workflow, WorkflowNode, WorkflowSettings, WorkflowStatus } from "@/lib/types/workflow";
 import { NativeSelect } from "@/components/ui/native-select";
 import { VariablePicker } from "./variable-picker";
@@ -9,7 +9,7 @@ import { listEmailAccounts } from "@/lib/api/email-accounts";
 import type { EmailAccount } from "@/lib/types/email-accounts";
 import { getPhoneLines } from "@/lib/api/phone-lines";
 import type { PhoneLine } from "@/lib/types/calling";
-import { listTemplates, createTemplate } from "@/lib/api/templates";
+import { listTemplates, createTemplate, listTemplateAttachments, uploadTemplateAttachment } from "@/lib/api/templates";
 import type { Template } from "@/lib/types/template";
 import { getWhatsappSettings, listWhatsappTemplates, type WhatsappSettings, type WhatsappTemplate } from "@/lib/api/whatsapp";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
@@ -275,18 +275,52 @@ function EmailStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Re
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [tplId, setTplId] = useState("");
+  const [uploading, setUploading] = useState(false);
   const subjectRef = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  // Attached files live on the node as parallel arrays: ids feed the engine,
+  // the {id, name} list is only for display here.
+  const attached = Array.isArray(d.attachments) ? (d.attachments as { id: string; name: string }[]) : [];
 
   useEffect(() => {
     listEmailAccounts().then(setAccounts).catch(() => {});
     listTemplates("email").then(setTemplates).catch(() => {});
   }, []);
 
-  function applyTemplate(id: string) {
+  function setAttached(next: { id: string; name: string }[]) {
+    set({ attachments: next, attachmentIds: next.map((a) => a.id) });
+  }
+
+  async function applyTemplate(id: string) {
     setTplId(id);
     const t = templates.find((x) => x.id === id);
-    if (t) set({ subject: t.subject || "", body: t.body || "" });
+    if (!t) return;
+    set({ subject: t.subject || "", body: t.body || "" });
+    try {
+      const atts = await listTemplateAttachments(t.id);
+      setAttached(atts.map((a) => ({ id: a.id, name: a.fileName })));
+    } catch {
+      setAttached([]);
+    }
+  }
+
+  async function handleFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploading(true);
+    try {
+      const uploaded: { id: string; name: string }[] = [];
+      for (const file of Array.from(files)) {
+        const a = await uploadTemplateAttachment(file, null);
+        uploaded.push({ id: a.id, name: a.fileName });
+      }
+      setAttached([...attached, ...uploaded]);
+    } catch {
+      // upload errors are non-fatal; the chip simply doesn't appear
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   }
 
   return (
@@ -324,6 +358,28 @@ function EmailStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Re
 
       <FieldHeader label="Body" picker={<VariablePicker targetRef={bodyRef} value={v("body")} onChange={(val) => set({ body: val })} />} />
       <textarea ref={bodyRef} className={area} value={v("body")} onChange={(e) => set({ body: e.target.value })} />
+
+      <label className={lab}>Attachments</label>
+      {attached.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {attached.map((a) => (
+            <span key={a.id} className="inline-flex items-center gap-1.5 max-w-full pl-2.5 pr-1.5 py-1 rounded-full bg-section border border-border-subtle text-[11px] text-ink">
+              <Paperclip size={11} className="text-ink-muted shrink-0" />
+              <span className="truncate max-w-[160px]">{a.name}</span>
+              <button type="button" onClick={() => setAttached(attached.filter((x) => x.id !== a.id))}
+                className="p-0.5 rounded-full hover:bg-hover text-ink-muted hover:text-ink" aria-label={`Remove ${a.name}`}>
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+      <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
+      <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading}
+        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover disabled:opacity-50">
+        {uploading ? <Loader2 size={12} className="animate-spin" /> : <Paperclip size={12} />}
+        {uploading ? "Uploading…" : "Attach file"}
+      </button>
 
       <SaveTemplateRow channel="email" subject={v("subject")} body={v("body")} onSaved={(t) => setTemplates((p) => [t, ...p])} />
       <p className="text-[11px] text-ink-faint mt-3">Use {"{{first_name}}"}, {"{{company}}"} or any custom field for personalization.</p>
