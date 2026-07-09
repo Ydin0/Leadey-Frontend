@@ -10,16 +10,16 @@ import { TasksInbox } from "./tabs/tasks-inbox";
 import { CallsInbox } from "./tabs/calls-inbox";
 import { MessagesInbox } from "./tabs/messages-inbox";
 import { PrimaryFeed } from "./tabs/primary-feed";
+import { EmailInbox } from "./email/email-inbox";
 import { PotentialContactsInbox } from "./tabs/potential-contacts-inbox";
 import { getInboxCounts, type InboxCounts } from "@/lib/api/inbox";
 
-type TabKey = "primary" | "calls" | "messages" | "tasks" | "reminders" | "potential";
+type TabKey = "primary" | "emails" | "calls" | "messages" | "tasks" | "reminders" | "potential";
 
-// Every tab here is backed by LIVE org data (no mock/hardcoded content). The
-// Emails tab is intentionally omitted until a real email backend is wired up —
-// it must not ship with the placeholder mock threads.
+// Every tab here is backed by LIVE org data (no mock/hardcoded content).
 const TABS: { key: TabKey; label: string; icon: typeof Mail; count?: keyof InboxCounts }[] = [
   { key: "primary", label: "Primary", icon: InboxIcon, count: "total" },
+  { key: "emails", label: "Emails", icon: Mail, count: "emails" },
   { key: "calls", label: "Missed Calls", icon: Phone, count: "calls" },
   { key: "messages", label: "Messages", icon: MessageSquare, count: "messages" },
   { key: "tasks", label: "Tasks", icon: ListChecks, count: "tasks" },
@@ -86,6 +86,8 @@ export function InboxShell() {
       {/* Active tab */}
       {tab === "primary" ? (
         <PrimaryFeed />
+      ) : tab === "emails" ? (
+        <EmailInbox />
       ) : tab === "calls" ? (
         <CallsInbox />
       ) : tab === "messages" ? (

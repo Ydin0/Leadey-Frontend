@@ -28,4 +28,7 @@ export const qk = {
   myOpenTasks: ["my-open-tasks"] as const,
   /** Built-in + custom org roles for the Team settings editor. */
   orgRoles: ["org-roles"] as const,
+  /** Org-wide email inbox: thread list + one open conversation. */
+  emailThreads: ["email-threads"] as const,
+  emailThread: (leadId: string) => ["email-thread", leadId] as const,
 };

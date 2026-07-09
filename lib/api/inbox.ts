@@ -5,6 +5,7 @@ export interface InboxCounts {
   reminders: number;
   calls: number;
   messages: number;
+  emails: number;
   potential: number;
   total: number;
 }
