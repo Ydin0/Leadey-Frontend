@@ -53,6 +53,8 @@ export function EmailInbox() {
   }, []);
 
   const [folder, setFolder] = useState<EmailFolder>("inbox");
+  /** null = all mailboxes; otherwise the checked mailbox (account) ids. */
+  const [mailboxSel, setMailboxSel] = useState<string[] | null>(null);
   const [statusKey, setStatusKey] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [quick, setQuick] = useState({ unread: false, starred: false });
@@ -116,6 +118,10 @@ export function EmailInbox() {
     let list = threads.filter((t) =>
       statusKey ? t.status === statusKey && !t.archived : inFolder(t, folder),
     );
+    if (mailboxSel) {
+      const sel = new Set(mailboxSel);
+      list = list.filter((t) => t.mailboxes.some((m) => sel.has(m.id)));
+    }
     const q = search.trim().toLowerCase();
     if (q) {
       list = list.filter((t) =>
@@ -131,7 +137,29 @@ export function EmailInbox() {
       company: (a, b) => a.company.localeCompare(b.company),
     };
     return [...list].sort(sorters[sort]);
-  }, [threads, folder, statusKey, search, quick, sort]);
+  }, [threads, folder, statusKey, mailboxSel, search, quick, sort]);
+
+  // Every mailbox the caller can see: their own connected accounts plus any
+  // mailbox appearing in the (permission-filtered) thread list. Reps without
+  // org-wide inbox permission only ever receive their own here.
+  const railMailboxes = useMemo(() => {
+    const map = new Map<string, { id: string; email: string; active: boolean | null }>();
+    for (const a of accounts) map.set(a.id, { id: a.id, email: a.email, active: a.isActive });
+    for (const t of threads)
+      for (const m of t.mailboxes)
+        if (!map.has(m.id)) map.set(m.id, { id: m.id, email: m.email, active: null });
+    return [...map.values()].sort((a, b) => a.email.localeCompare(b.email));
+  }, [accounts, threads]);
+
+  function toggleMailbox(id: string) {
+    setMailboxSel((prev) => {
+      if (prev === null) return [id]; // from "all" → just this one
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      // Nothing left, or everything checked again → back to "all".
+      if (next.length === 0 || next.length === railMailboxes.length) return null;
+      return next;
+    });
+  }
 
   const inboxUnread = useMemo(() => threads.filter((t) => inFolder(t, "inbox") && t.unread).length, [threads]);
   const folderCount = (f: EmailFolder) =>
@@ -237,15 +265,49 @@ export function EmailInbox() {
           <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">Mailboxes</span>
         </div>
         <div className="flex flex-col gap-px px-2 pb-3">
-          {accounts.map((a) => (
-            <div key={a.id} className="flex items-center gap-2 px-2.5 py-1.5 min-w-0">
+          {railMailboxes.length > 1 && (
+            <button
+              onClick={() => setMailboxSel(null)}
+              className={cn(
+                "flex items-center gap-2 px-2.5 py-1.5 rounded-[8px] text-[11.5px] transition-colors",
+                mailboxSel === null ? "text-ink font-medium" : "text-ink-secondary hover:bg-hover/50",
+              )}
+            >
               <span className={cn(
-                "w-[7px] h-[7px] rounded-full shrink-0",
-                a.isActive ? "bg-signal-green-text" : "bg-signal-red-text",
-              )} />
-              <span className="text-[11.5px] text-ink-secondary truncate">{a.email}</span>
-            </div>
-          ))}
+                "w-[15px] h-[15px] rounded-[4px] border flex items-center justify-center shrink-0 transition-colors",
+                mailboxSel === null ? "bg-ink border-ink" : "border-border-default",
+              )}>
+                {mailboxSel === null && <Check size={10} className="text-on-ink" />}
+              </span>
+              All mailboxes
+            </button>
+          )}
+          {railMailboxes.map((m) => {
+            const checked = mailboxSel === null || mailboxSel.includes(m.id);
+            return (
+              <button
+                key={m.id}
+                onClick={() => toggleMailbox(m.id)}
+                title={m.email}
+                className={cn(
+                  "flex items-center gap-2 px-2.5 py-1.5 rounded-[8px] min-w-0 transition-colors",
+                  checked ? "text-ink" : "text-ink-muted hover:bg-hover/50",
+                )}
+              >
+                <span className={cn(
+                  "w-[15px] h-[15px] rounded-[4px] border flex items-center justify-center shrink-0 transition-colors",
+                  checked ? "bg-ink border-ink" : "border-border-default",
+                )}>
+                  {checked && <Check size={10} className="text-on-ink" />}
+                </span>
+                <span className={cn(
+                  "w-[7px] h-[7px] rounded-full shrink-0",
+                  m.active === null ? "bg-signal-slate-text" : m.active ? "bg-signal-green-text" : "bg-signal-red-text",
+                )} />
+                <span className="text-[11.5px] truncate">{m.email}</span>
+              </button>
+            );
+          })}
           <button
             onClick={() => router.push("/dashboard/settings?tab=email-accounts")}
             className="flex items-center gap-2 px-2.5 py-1.5 rounded-[8px] text-[11.5px] text-ink-muted hover:bg-hover/50 hover:text-ink transition-colors"

@@ -11,18 +11,20 @@ export const FOLDER_DEFS: { id: EmailFolder; label: string; icon: string }[] = [
   { id: "archive", label: "Archive", icon: "archive" },
 ];
 
-/** Which folder(s) a thread belongs to right now. */
+/** Which folder(s) a thread belongs to right now. Like a normal email
+ *  client: Inbox = conversations that have RECEIVED mail; outbound-only
+ *  outreach that hasn't been answered yet lives in Sent. */
 export function inFolder(t: EmailThreadSummary, folder: EmailFolder): boolean {
   const snoozed = !!t.snoozedUntil && new Date(t.snoozedUntil) > new Date();
   switch (folder) {
     case "inbox":
-      return !t.archived && !snoozed;
+      return t.hasInbound && !t.archived && !snoozed;
     case "starred":
       return t.starred && !t.archived;
     case "snoozed":
       return snoozed && !t.archived;
     case "sent":
-      return t.lastDirection === "outbound" && !t.archived && !snoozed;
+      return t.hasOutbound && !t.archived && !snoozed;
     case "archive":
       return t.archived;
   }

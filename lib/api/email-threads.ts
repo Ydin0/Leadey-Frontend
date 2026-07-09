@@ -18,10 +18,13 @@ export interface EmailThreadSummary {
   lastDirection: "inbound" | "outbound";
   messageCount: number;
   hasInbound: boolean;
+  hasOutbound: boolean;
   unread: boolean;
   starred: boolean;
   archived: boolean;
   snoozedUntil: string | null;
+  /** Connected mailboxes this conversation went through. */
+  mailboxes: { id: string; email: string; userId: string }[];
 }
 
 export interface EmailThreadMessage {
