@@ -74,6 +74,16 @@ export interface FunnelLeadActivity {
   funnelId?: string | null;
   funnelName?: string | null;
   leadId?: string | null;
+  /** Files attached to a note (lead-document snapshots) — rendered as
+   *  downloadable chips on the note card; also appear in the Documents tab. */
+  attachments?: NoteAttachment[];
+}
+
+export interface NoteAttachment {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
 }
 
 export interface FunnelLeadCustomField {

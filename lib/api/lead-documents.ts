@@ -50,9 +50,9 @@ export async function deleteLeadDocument(documentId: string): Promise<void> {
 
 /** Download via an authed fetch (the endpoint needs the Bearer token, so a
  *  plain <a href> won't work) and hand the bytes to the browser. */
-export async function downloadLeadDocument(doc: LeadDocument): Promise<void> {
+export async function downloadLeadDocumentById(id: string, fileName: string): Promise<void> {
   const token = getAuthToken();
-  const res = await fetch(`${API_BASE_URL}/api/lead-documents/${encodeURIComponent(doc.id)}/download`, {
+  const res = await fetch(`${API_BASE_URL}/api/lead-documents/${encodeURIComponent(id)}/download`, {
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
   });
   if (!res.ok) throw new Error(`Download failed (${res.status})`);
@@ -60,9 +60,13 @@ export async function downloadLeadDocument(doc: LeadDocument): Promise<void> {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = doc.fileName;
+  a.download = fileName;
   document.body.appendChild(a);
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+export async function downloadLeadDocument(doc: LeadDocument): Promise<void> {
+  return downloadLeadDocumentById(doc.id, doc.fileName);
 }

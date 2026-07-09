@@ -119,6 +119,9 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
       const userId = (e.meta?.userId as string) || null;
       const userName = (e.meta?.userName as string) || null;
       const meetingUrl = (e.meta?.joinUrl as string) || null;
+      const attachments = Array.isArray(e.meta?.attachments)
+        ? (e.meta.attachments as FunnelLeadActivity["attachments"])
+        : undefined;
 
       return {
         id: e.id,
@@ -131,6 +134,7 @@ export function mapEventsToActivities(events: FunnelLeadEvent[]): FunnelLeadActi
         userInitials: "",
         userId,
         userName,
+        attachments,
       };
     });
 }

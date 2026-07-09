@@ -572,10 +572,11 @@ export async function logLeadNote(
   funnelId: string,
   leadId: string,
   text: string,
+  attachmentIds?: string[],
 ): Promise<{ id: string }> {
   return apiRequest<{ id: string }>(
     `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/notes`,
-    { method: "POST", body: JSON.stringify({ text }) },
+    { method: "POST", body: JSON.stringify({ text, attachmentIds }) },
   );
 }
 

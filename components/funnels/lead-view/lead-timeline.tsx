@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   Phone,
@@ -21,6 +21,7 @@ import {
   MessageSquare,
   Loader2,
   Filter,
+  Paperclip,
   X,
   CalendarCheck,
   CalendarX,
@@ -37,11 +38,19 @@ import { MemberAvatar } from "@/components/shared/member-avatar";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { getStatusDotClass, getStatusLabel, type LeadStatusOption } from "@/lib/utils/lead-status";
-import type { FunnelLeadActivity, ActivityTransition } from "@/lib/types/funnel-focus";
+import type { FunnelLeadActivity, ActivityTransition, NoteAttachment } from "@/lib/types/funnel-focus";
 import type { CallRecord } from "@/lib/types/calling";
 import type { LeadEmailMessage } from "@/lib/api/email";
+import { uploadLeadDocument, downloadLeadDocumentById, type LeadDocument } from "@/lib/api/lead-documents";
 import { EmailActivityCard, type EmailReplyMode } from "./email-activity-card";
 import { LeadDocumentsPanel } from "./lead-documents-panel";
+
+function formatBytes(bytes: number): string {
+  if (!bytes) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 /** Per-item campaign/contact attribution (was used by the removed universal
  *  company timeline; kept for the additive itemMeta prop API). */
@@ -346,6 +355,13 @@ function ActivityCard({
             <p className="text-[12.5px] text-ink leading-snug whitespace-pre-wrap">{a.summary}</p>
           )}
           {a.detail && <p className="text-[11.5px] text-ink-muted mt-1 leading-relaxed">{a.detail}</p>}
+          {a.attachments && a.attachments.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-2.5">
+              {a.attachments.map((att) => (
+                <NoteAttachmentChip key={att.id} att={att} />
+              ))}
+            </div>
+          )}
           {a.type === "meeting_scheduled" && a.meetingUrl && (
             <a href={a.meetingUrl} target="_blank" rel="noreferrer"
               className="inline-flex items-center gap-1 text-[11px] font-medium text-signal-blue-text hover:underline mt-1">
@@ -470,11 +486,95 @@ function TimelineRow({
   );
 }
 
-/* ── Inline note composer ────────────────────────────────────────────── */
-function Composer({ onAdd }: { onAdd: (text: string) => void }) {
-  const [text, setText] = useState("");
+/* ── Note attachment chip (download) ─────────────────────────────────── */
+function NoteAttachmentChip({ att }: { att: NoteAttachment }) {
+  const [busy, setBusy] = useState(false);
   return (
-    <div className="rounded-[14px] border border-border-subtle bg-surface overflow-hidden mb-5">
+    <button
+      type="button"
+      onClick={async () => {
+        setBusy(true);
+        try { await downloadLeadDocumentById(att.id, att.fileName); }
+        catch { /* file may have been removed */ }
+        finally { setBusy(false); }
+      }}
+      disabled={busy}
+      title={`Download ${att.fileName}`}
+      className="group flex items-center gap-2.5 bg-section border border-border-subtle rounded-[10px] pl-2.5 pr-3 py-1.5 hover:border-border-default transition-colors disabled:opacity-60"
+    >
+      <span className="w-[26px] h-[26px] rounded-[6px] bg-surface flex items-center justify-center shrink-0">
+        <FileText size={14} className="text-ink-muted" />
+      </span>
+      <span className="flex flex-col items-start min-w-0">
+        <span className="text-[11.5px] font-medium text-ink truncate max-w-[170px]">{att.fileName}</span>
+        {att.size > 0 && <span className="text-[9.5px] text-ink-faint">{formatBytes(att.size)}</span>}
+      </span>
+      {busy ? <Loader2 size={13} className="animate-spin text-ink-muted shrink-0" /> : <Download size={13} className="text-ink-muted group-hover:text-ink shrink-0" />}
+    </button>
+  );
+}
+
+/* ── Inline note composer ────────────────────────────────────────────── */
+function Composer({
+  onAdd,
+  funnelId,
+  leadId,
+  onDocsUploaded,
+}: {
+  onAdd: (text: string, attachments?: NoteAttachment[]) => void;
+  /** When present, files can be dropped/attached — they upload as lead
+   *  documents (so they also appear in the Documents tab) and attach to the note. */
+  funnelId?: string;
+  leadId?: string;
+  onDocsUploaded?: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const canAttach = !!funnelId && !!leadId;
+
+  function addFiles(list: FileList | null) {
+    if (!list || !list.length) return;
+    setError(null);
+    setFiles((prev) => [...prev, ...Array.from(list)]);
+  }
+
+  async function submit() {
+    const clean = text.trim();
+    if (!clean && files.length === 0) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      let attachments: NoteAttachment[] | undefined;
+      if (canAttach && files.length) {
+        const uploaded: LeadDocument[] = [];
+        for (const f of files) uploaded.push(await uploadLeadDocument(funnelId!, leadId!, f));
+        attachments = uploaded.map((d) => ({ id: d.id, fileName: d.fileName, mimeType: d.mimeType, size: d.size }));
+        onDocsUploaded?.();
+      }
+      onAdd(clean, attachments);
+      setText("");
+      setFiles([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to attach files");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      onDragOver={canAttach ? (e) => { e.preventDefault(); setDragOver(true); } : undefined}
+      onDragLeave={canAttach ? () => setDragOver(false) : undefined}
+      onDrop={canAttach ? (e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); } : undefined}
+      className={cn(
+        "relative rounded-[14px] border bg-surface overflow-hidden mb-5 transition-colors",
+        dragOver ? "border-accent border-dashed bg-accent/5" : "border-border-subtle",
+      )}
+    >
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
@@ -482,22 +582,55 @@ function Composer({ onAdd }: { onAdd: (text: string) => void }) {
         placeholder="Write a note about this lead…"
         className="w-full bg-transparent px-4 py-3 text-[13px] text-ink placeholder:text-ink-faint focus:outline-none resize-none"
       />
+
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-4 pb-2">
+          {files.map((f, i) => (
+            <span key={i} className="inline-flex items-center gap-1.5 max-w-full pl-2.5 pr-1.5 py-1 rounded-full bg-section border border-border-subtle text-[11px] text-ink">
+              <FileText size={11} className="text-ink-muted shrink-0" />
+              <span className="truncate max-w-[160px]">{f.name}</span>
+              {f.size > 0 && <span className="text-ink-faint">{formatBytes(f.size)}</span>}
+              <button
+                onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))}
+                className="p-0.5 rounded-full hover:bg-hover text-ink-muted hover:text-ink"
+                aria-label={`Remove ${f.name}`}
+              >
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {error && <p className="text-[11px] text-signal-red-text px-4 pb-1.5">{error}</p>}
+
       <div className="flex items-center justify-between px-4 py-2.5 border-t border-border-subtle">
-        <button
-          onClick={() => {
-            if (text.trim()) {
-              onAdd(text.trim());
-              setText("");
-            }
-          }}
-          disabled={!text.trim()}
-          className="px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50 transition-colors"
-        >
-          Add note
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={submit}
+            disabled={submitting || (!text.trim() && files.length === 0)}
+            className="px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50 transition-colors inline-flex items-center gap-1.5"
+          >
+            {submitting && <Loader2 size={11} className="animate-spin" />}
+            Add note
+          </button>
+          {canAttach && (
+            <>
+              <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); if (fileRef.current) fileRef.current.value = ""; }} />
+              <button
+                onClick={() => fileRef.current?.click()}
+                disabled={submitting}
+                title="Attach files"
+                className="w-[30px] h-[30px] flex items-center justify-center rounded-[8px] text-ink-muted hover:bg-hover hover:text-ink transition-colors disabled:opacity-50"
+              >
+                <Paperclip size={15} />
+              </button>
+            </>
+          )}
+        </div>
         <span className="flex items-center gap-1.5 text-[11px] text-ink-faint">
           <Check size={12} className="text-signal-green-text" />
-          Notes save to this lead
+          {canAttach ? "Notes + files save to this lead" : "Notes save to this lead"}
         </span>
       </div>
     </div>
@@ -513,7 +646,7 @@ interface LeadTimelineProps {
    *  and the Documents tab is hidden. */
   funnelId?: string;
   leadId?: string;
-  onAddNote: (text: string) => void;
+  onAddNote: (text: string, attachments?: NoteAttachment[]) => void;
   onEditNote?: (id: string, text: string) => void;
   onDeleteNote?: (id: string) => void;
   onReplyEmail?: (message: LeadEmailMessage, mode: EmailReplyMode) => void;
@@ -606,7 +739,7 @@ export function LeadTimeline({ activities, callRecords, emailMessages, funnelId,
       {/* Wide cap: the feed should use the available width on large screens
           instead of pinning to a narrow centered column. */}
       <div className="max-w-[1480px] mx-auto w-full px-7 pt-5 pb-16">
-        {filter !== "Documents" && (composerSlot ?? <Composer onAdd={onAddNote} />)}
+        {filter !== "Documents" && (composerSlot ?? <Composer onAdd={onAddNote} funnelId={funnelId} leadId={leadId} />)}
 
         {/* Filters */}
         <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">

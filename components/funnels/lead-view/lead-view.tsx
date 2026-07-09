@@ -44,6 +44,7 @@ import type {
   FunnelLeadActivity,
   FunnelLeadCompany,
   FunnelLeadCustomField,
+  NoteAttachment,
 } from "@/lib/types/funnel-focus";
 import type { CallRecord } from "@/lib/types/calling";
 
@@ -477,9 +478,10 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     setShowComposer(true);
   }, []);
 
-  function addNote(text: string) {
-    if (!currentLead || !text.trim()) return;
+  function addNote(text: string, attachments?: NoteAttachment[]) {
+    if (!currentLead) return;
     const clean = text.trim();
+    if (!clean && !attachments?.length) return;
     const leadIdLocal = currentLead.id;
     const tmpId = `tmp_${Date.now()}`;
     // Optimistic — show immediately, then persist as a real lead event so it
@@ -491,8 +493,9 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
       summary: clean,
       timestamp: new Date(),
       userInitials: "You",
+      attachments: attachments?.length ? attachments : undefined,
     });
-    void logLeadNote(funnelId, leadIdLocal, clean)
+    void logLeadNote(funnelId, leadIdLocal, clean, attachments?.map((a) => a.id))
       .then((res) => {
         if (res?.id) {
           setExtraActivities((prev) => ({
