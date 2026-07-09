@@ -1,4 +1,26 @@
-import { apiRequest } from "./client";
+import { apiRequest, getAuthToken } from "./client";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:3001";
+
+/** Download an email attachment via an authed fetch (the endpoint needs the
+ *  Bearer token, so a plain <a href> won't work). */
+export async function downloadEmailAttachment(id: string, fileName: string): Promise<void> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE_URL}/api/email/attachments/${encodeURIComponent(id)}/download`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) throw new Error(`Download failed (${res.status})`);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
 
 /** One org-wide email conversation (thread = all messages for one lead). */
 export interface EmailThreadSummary {
@@ -27,6 +49,13 @@ export interface EmailThreadSummary {
   mailboxes: { id: string; email: string; userId: string }[];
 }
 
+export interface EmailAttachmentRef {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface EmailThreadMessage {
   id: string;
   direction: "inbound" | "outbound";
@@ -37,6 +66,7 @@ export interface EmailThreadMessage {
   bodyHtml: string;
   openedAt: string | null;
   status: string;
+  attachments: EmailAttachmentRef[];
   createdAt: string;
 }
 

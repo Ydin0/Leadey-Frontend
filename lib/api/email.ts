@@ -103,6 +103,13 @@ export async function getThreadByLead(leadId: string): Promise<EmailThread | nul
   return delay(t ? { ...t, messages: [...(t.messages || [])] } : null);
 }
 
+export interface EmailAttachmentRef {
+  id: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+}
+
 export interface LeadEmailMessage {
   id: string;
   direction: "outbound" | "inbound";
@@ -116,6 +123,7 @@ export interface LeadEmailMessage {
   openedAt: string | null;
   openCount: number;
   userId: string | null;
+  attachments: EmailAttachmentRef[];
   createdAt: string;
 }
 

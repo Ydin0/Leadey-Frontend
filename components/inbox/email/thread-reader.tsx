@@ -20,6 +20,7 @@ import { renderPersonalized } from "@/lib/utils/personalize";
 import type { LeadStatusOption } from "@/lib/utils/lead-status";
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { NativeSelect } from "@/components/ui/native-select";
+import { AttachmentChips } from "@/components/email/attachment-chips";
 import { STATUS_BADGE, messageTime, snoozePresets } from "./shared";
 
 interface ThreadReaderProps {
@@ -228,6 +229,11 @@ export function ThreadReader({ leadId, summary, statuses, onPatch, onClose, show
                     className="mt-3 text-[13px] text-ink-secondary leading-relaxed break-words [&_a]:text-accent [&_a]:underline [&_p]:my-1.5 [&_img]:max-w-full [&_blockquote]:border-l-2 [&_blockquote]:border-border-default [&_blockquote]:pl-3 [&_blockquote]:text-ink-muted"
                     dangerouslySetInnerHTML={{ __html: m.bodyHtml }}
                   />
+                  {m.attachments?.length > 0 && (
+                    <div className="mt-3.5">
+                      <AttachmentChips attachments={m.attachments} />
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

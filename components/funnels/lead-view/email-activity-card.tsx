@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import type { LeadEmailMessage } from "@/lib/api/email";
+import { AttachmentChips } from "@/components/email/attachment-chips";
 
 export type EmailReplyMode = "reply" | "reply_all" | "forward";
 
@@ -96,6 +97,12 @@ export function EmailActivityCard({
 
           {/* Rendered email body (sandboxed — no scripts run) */}
           <EmailBody html={message.bodyHtml || message.bodyText} />
+
+          {message.attachments?.length > 0 && (
+            <div className="px-4 pt-1 pb-3">
+              <AttachmentChips attachments={message.attachments} />
+            </div>
+          )}
 
           <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border-subtle">
             <button
