@@ -2,15 +2,36 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Inbox, MessageSquare, Loader2 } from "lucide-react";
+import {
+  Bell, Inbox, MessageSquare, Mail, MailOpen, PhoneMissed, CalendarCheck,
+  Loader2, type LucideIcon,
+} from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
+import { playNotificationChime } from "@/lib/utils/notification-sound";
 import {
   listNotifications, markNotificationRead, markAllNotificationsRead,
   type AppNotification,
 } from "@/lib/api/notifications";
 
 const POLL_MS = 30_000;
+
+/** Icon + tint per notification type. */
+function iconFor(type: string): { Icon: LucideIcon; tint: string } {
+  switch (type) {
+    case "email_reply":
+      return { Icon: Mail, tint: "bg-signal-blue/15 text-signal-blue-text" };
+    case "email_opened":
+      return { Icon: MailOpen, tint: "bg-signal-slate/15 text-signal-slate-text" };
+    case "missed_call":
+      return { Icon: PhoneMissed, tint: "bg-signal-red/15 text-signal-red-text" };
+    case "meeting":
+      return { Icon: CalendarCheck, tint: "bg-signal-violet/15 text-signal-violet-text" };
+    case "sms_reply":
+    default:
+      return { Icon: MessageSquare, tint: "bg-signal-green/15 text-signal-green-text" };
+  }
+}
 
 export function NotificationDropdown() {
   const router = useRouter();
@@ -20,12 +41,25 @@ export function NotificationDropdown() {
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
+  // Ids already seen — seeded silently on the first poll so a page load never
+  // blasts the chime for a backlog. After that, a new id → chime.
+  const seenRef = useRef<Set<string> | null>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await listNotifications();
       setItems(res.data);
       setUnread(res.meta.unreadCount);
+
+      if (seenRef.current === null) {
+        seenRef.current = new Set(res.data.map((n) => n.id));
+      } else {
+        const seen = seenRef.current;
+        // Chime once if any unread arrival is genuinely new to this session.
+        const fresh = res.data.some((n) => !n.read && !seen.has(n.id));
+        for (const n of res.data) seen.add(n.id);
+        if (fresh) playNotificationChime();
+      }
     } catch {
       // transient — keep prior state
     } finally {
@@ -110,7 +144,9 @@ export function NotificationDropdown() {
                 <p className="text-[12px] text-ink-muted">No new notifications</p>
               </div>
             ) : (
-              items.map((n) => (
+              items.map((n) => {
+                const { Icon, tint } = iconFor(n.type);
+                return (
                 <button
                   key={n.id}
                   onClick={() => handleClick(n)}
@@ -119,8 +155,8 @@ export function NotificationDropdown() {
                     !n.read && "bg-signal-blue/5",
                   )}
                 >
-                  <span className="flex items-center justify-center w-7 h-7 rounded-full bg-signal-green/15 text-signal-green-text shrink-0 mt-0.5">
-                    <MessageSquare size={13} strokeWidth={2} />
+                  <span className={cn("flex items-center justify-center w-7 h-7 rounded-full shrink-0 mt-0.5", tint)}>
+                    <Icon size={13} strokeWidth={2} />
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="text-[12px] font-medium text-ink truncate">{n.title}</p>
@@ -129,7 +165,8 @@ export function NotificationDropdown() {
                   </div>
                   {!n.read && <span className="w-2 h-2 rounded-full bg-signal-blue-text shrink-0 mt-1.5" />}
                 </button>
-              ))
+                );
+              })
             )}
           </div>
         </div>
