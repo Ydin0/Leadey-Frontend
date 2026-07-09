@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { EmailAccount, SmtpConnectPayload } from "@/lib/types/email-accounts";
+import type { EmailAccount, OrgEmailAccount, SmtpConnectPayload } from "@/lib/types/email-accounts";
 
 /** The caller's connected inboxes (their own, org-scoped). */
 export async function listEmailAccounts(): Promise<EmailAccount[]> {
@@ -7,6 +7,20 @@ export async function listEmailAccounts(): Promise<EmailAccount[]> {
 }
 
 /** Begin an OAuth connect — returns the provider authorize URL to redirect to. */
+export async function listOrgEmailAccounts(): Promise<OrgEmailAccount[]> {
+  return apiRequest<OrgEmailAccount[]>("/email/accounts?scope=org");
+}
+
+export async function updateEmailAccount(
+  id: string,
+  patch: { fromName?: string; signature?: string | null },
+): Promise<EmailAccount> {
+  return apiRequest<EmailAccount>(`/email/accounts/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
 export async function startEmailOAuth(provider: "google" | "microsoft"): Promise<string> {
   const res = await apiRequest<{ url: string }>(`/email/accounts/oauth/${provider}/start`);
   return res.url;

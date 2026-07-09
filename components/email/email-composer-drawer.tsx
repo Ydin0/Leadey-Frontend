@@ -311,6 +311,21 @@ export function EmailComposerDrawer({
               senderName={fromAccount?.fromName}
               minHeight={240}
             />
+            {fromAccount?.signature ? (
+              <div className="mt-2 rounded-[8px] border border-border-subtle bg-section/40 px-3 py-2">
+                <p className="text-[9px] uppercase tracking-wider text-ink-faint font-medium mb-1">
+                  Signature added automatically
+                </p>
+                <div
+                  className="text-[11.5px] text-ink-muted leading-relaxed [&_a]:text-accent"
+                  dangerouslySetInnerHTML={{
+                    __html: /<[a-z][\s\S]*>/i.test(fromAccount.signature)
+                      ? fromAccount.signature
+                      : fromAccount.signature.replace(/\n/g, "<br>"),
+                  }}
+                />
+              </div>
+            ) : null}
           </Field>
 
           {/* Attachments */}

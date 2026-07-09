@@ -17,6 +17,8 @@ export interface SendingAccount {
   sentToday: number;
   /** 0–100 deliverability/health score. */
   healthScore: number;
+  /** Per-account signature appended automatically at send time. */
+  signature?: string | null;
 }
 
 /** A single email in a thread — outbound (from a rep/sequence) or inbound. */

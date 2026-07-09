@@ -3,18 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  Mail, Loader2, Plus, Trash2, Star, Server, CheckCircle2, AlertCircle, X, Calendar, RefreshCw,
+  Mail, Loader2, Plus, Trash2, Star, Server, CheckCircle2, AlertCircle, X, Calendar, RefreshCw, Pencil, Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import {
-  listEmailAccounts, startEmailOAuth, connectSmtpAccount,
-  setDefaultEmailAccount, disconnectEmailAccount,
+  listEmailAccounts, listOrgEmailAccounts, startEmailOAuth, connectSmtpAccount,
+  setDefaultEmailAccount, disconnectEmailAccount, updateEmailAccount,
 } from "@/lib/api/email-accounts";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import {
   listCalendarAccounts, startCalendarOAuth, disconnectCalendarAccount,
 } from "@/lib/api/calendar";
-import type { EmailAccount } from "@/lib/types/email-accounts";
+import type { EmailAccount, OrgEmailAccount } from "@/lib/types/email-accounts";
 import type { CalendarAccount, CalendarAccountsResult } from "@/lib/types/calendar";
 
 const PROVIDER_LABEL: Record<string, string> = { gmail: "Gmail", outlook: "Outlook", smtp: "SMTP" };
@@ -33,6 +34,10 @@ export function EmailAccountsSection() {
   const [calLoaded, setCalLoaded] = useState(false);
   const [calError, setCalError] = useState(false);
   const [calConnecting, setCalConnecting] = useState<string | null>(null);
+  const [editing, setEditing] = useState<EmailAccount | null>(null);
+  const { has } = usePermissions();
+  const canSeeAll = has("settings.manageIntegrations");
+  const [orgAccounts, setOrgAccounts] = useState<OrgEmailAccount[] | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -42,6 +47,14 @@ export function EmailAccountsSection() {
       setEmailError(true);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const loadOrgAccounts = useCallback(async () => {
+    try {
+      setOrgAccounts(await listOrgEmailAccounts());
+    } catch {
+      setOrgAccounts(null);
     }
   }, []);
 
@@ -64,6 +77,10 @@ export function EmailAccountsSection() {
     void load();
     void loadCal();
   }, [isAuthReady, load, loadCal]);
+
+  useEffect(() => {
+    if (isAuthReady && canSeeAll) void loadOrgAccounts();
+  }, [isAuthReady, canSeeAll, loadOrgAccounts]);
 
   // Surface the OAuth round-trip result and clean the URL.
   useEffect(() => {
@@ -198,6 +215,9 @@ export function EmailAccountsSection() {
                 )}>
                   {a.status === "active" ? "Connected" : a.status}
                 </span>
+                <button onClick={() => setEditing(a)} title="Edit name & signature" className="p-1.5 rounded-md text-ink-muted hover:bg-hover hover:text-ink transition-colors">
+                  <Pencil size={14} />
+                </button>
                 {!a.isDefault && (
                   <button onClick={() => void makeDefault(a.id)} title="Set as default" className="p-1.5 rounded-md text-ink-muted hover:bg-hover hover:text-ink transition-colors">
                     <Star size={14} />
@@ -211,6 +231,54 @@ export function EmailAccountsSection() {
           </div>
         )}
       </section>
+
+      {/* Admin: every connected mailbox in the org, with its owner */}
+      {canSeeAll && orgAccounts && orgAccounts.length > 0 && (
+        <section className="bg-surface rounded-[14px] border border-border-subtle p-4">
+          <div className="flex items-center gap-2 mb-1">
+            <Users size={14} className="text-ink-muted" strokeWidth={1.5} />
+            <h3 className="text-[13px] font-semibold text-ink">All connected accounts</h3>
+          </div>
+          <p className="text-[11px] text-ink-muted mb-3">Every mailbox connected across the workspace and who it belongs to.</p>
+          <div className="space-y-1.5">
+            {orgAccounts.map((a) => (
+              <div key={a.id} className="flex items-center gap-3 px-3 py-2 rounded-[10px] border border-border-subtle bg-section/30">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[12px] font-medium text-ink truncate">{a.email}</p>
+                    {a.isDefault && (
+                      <span className="text-[9px] uppercase tracking-wide font-semibold text-signal-green-text bg-signal-green/15 rounded-full px-1.5 py-0.5">Default</span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-ink-muted truncate">
+                    {a.ownerName || "Unknown user"} · {PROVIDER_LABEL[a.provider] || a.provider}
+                    {a.signature ? " · has signature" : ""}
+                  </p>
+                </div>
+                <span className={cn(
+                  "text-[10px] font-medium rounded-full px-2 py-0.5 shrink-0",
+                  a.status === "active" ? "bg-signal-green text-signal-green-text" : "bg-signal-red/15 text-signal-red-text",
+                )}>
+                  {a.status === "active" ? "Connected" : a.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {editing && (
+        <EditAccountModal
+          account={editing}
+          onClose={() => setEditing(null)}
+          onSaved={(updated) => {
+            setEditing(null);
+            setAccounts((prev) => prev.map((x) => (x.id === updated.id ? updated : x)));
+            if (canSeeAll) void loadOrgAccounts();
+            setToast({ type: "success", text: "Account updated." });
+          }}
+        />
+      )}
 
       {/* Calendars — connect Google/Outlook calendar so upcoming meetings appear on lead profiles */}
       <section className="bg-surface rounded-[14px] border border-border-subtle p-4">
@@ -406,5 +474,84 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
       {...props}
       className="w-full bg-section border border-border-subtle rounded-[8px] px-3 py-2 text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-signal-blue-text/40"
     />
+  );
+}
+
+/** Edit a connected account's from-name + signature. The signature is
+ *  appended automatically to one-off and workflow emails at send time
+ *  (Smartlead sequences are unaffected). */
+function EditAccountModal({
+  account,
+  onClose,
+  onSaved,
+}: {
+  account: EmailAccount;
+  onClose: () => void;
+  onSaved: (updated: EmailAccount) => void;
+}) {
+  const [fromName, setFromName] = useState(account.fromName || "");
+  const [signature, setSignature] = useState(account.signature || "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await updateEmailAccount(account.id, {
+        fromName: fromName.trim(),
+        signature: signature.trim() ? signature : null,
+      });
+      onSaved(updated);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-[3px]" onClick={onClose}>
+      <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-lg shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-[14px] font-semibold text-ink mb-1">Edit {account.email}</h3>
+        <p className="text-[11.5px] text-ink-muted mb-4">
+          The signature is appended automatically to one-off emails and workflow emails sent from
+          this mailbox. Plain text or HTML. Campaign sequences (Smartlead) are unaffected.
+        </p>
+
+        <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">From name</label>
+        <input
+          value={fromName}
+          onChange={(e) => setFromName(e.target.value)}
+          placeholder="e.g. Yaseen from Leadey"
+          className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default mb-4"
+        />
+
+        <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Signature</label>
+        <textarea
+          value={signature}
+          onChange={(e) => setSignature(e.target.value)}
+          rows={8}
+          placeholder={"Best,\nYaseen Deen\nFounder, Leadey\n+44 7911 220866"}
+          className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default resize-y font-mono"
+        />
+
+        {error && <p className="text-[11px] text-signal-red-text mt-2">{error}</p>}
+
+        <div className="flex items-center justify-end gap-2 mt-5">
+          <button onClick={onClose} className="px-4 py-2 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle">
+            Cancel
+          </button>
+          <button
+            onClick={() => void save()}
+            disabled={busy}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            {busy && <Loader2 size={12} className="animate-spin" />}
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

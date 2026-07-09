@@ -5,9 +5,17 @@ export interface EmailAccount {
   provider: EmailAccountProvider;
   email: string;
   fromName: string;
+  /** Appended to one-off + workflow emails (HTML or plain text). */
+  signature: string | null;
   status: string; // active | error | disconnected
   isDefault: boolean;
   createdAt: string;
+}
+
+/** Admin org-wide view: every connected mailbox + its owner. */
+export interface OrgEmailAccount extends EmailAccount {
+  userId: string;
+  ownerName: string | null;
 }
 
 export interface SmtpConnectPayload {

@@ -55,6 +55,7 @@ export async function listSendingAccounts(): Promise<SendingAccount[]> {
     dailyLimit: 0,
     sentToday: 0,
     healthScore: 100,
+    signature: a.signature ?? null,
   }));
 }
 
