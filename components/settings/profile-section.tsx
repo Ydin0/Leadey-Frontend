@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { NativeSelect } from "@/components/ui/native-select";
 import { MemberAvatar } from "@/components/shared/member-avatar";
+import { PhoneNumberInput } from "@/components/shared/phone-number-input";
 
 const TIMEZONES = [
   "Europe/London", "Europe/Paris", "Europe/Berlin", "Europe/Amsterdam", "Europe/Madrid",
@@ -20,6 +21,7 @@ export function ProfileSection() {
   const { user, isLoaded } = useUser();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [phone, setPhone] = useState("");
   const [timezone, setTimezone] = useState(Intl.DateTimeFormat().resolvedOptions().timeZone);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -28,7 +30,13 @@ export function ProfileSection() {
     if (user) {
       setFirstName(user.firstName || "");
       setLastName(user.lastName || "");
-      // Load saved timezone from user metadata
+      // Phone lives in unsafe metadata (captured at sign-up); fall back to a
+      // real Clerk phone identity if one exists.
+      setPhone(
+        ((user.unsafeMetadata as any)?.phone as string) ||
+        user.primaryPhoneNumber?.phoneNumber ||
+        "",
+      );
       const savedTz = (user.unsafeMetadata as any)?.timezone;
       if (savedTz) setTimezone(savedTz);
     }
@@ -41,7 +49,7 @@ export function ProfileSection() {
       await user.update({
         firstName,
         lastName,
-        unsafeMetadata: { ...(user.unsafeMetadata || {}), timezone },
+        unsafeMetadata: { ...(user.unsafeMetadata || {}), timezone, phone },
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -93,11 +101,7 @@ export function ProfileSection() {
             <input type="email" value={primaryEmail} disabled
               className="w-full px-3 py-2 rounded-[10px] bg-section/50 text-[12px] text-ink-muted outline-none border border-border-subtle cursor-not-allowed" />
           </div>
-          <div>
-            <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Phone</label>
-            <input type="text" value={user.primaryPhoneNumber?.phoneNumber || ""} disabled
-              className="w-full px-3 py-2 rounded-[10px] bg-section/50 text-[12px] text-ink-muted outline-none border border-border-subtle cursor-not-allowed" />
-          </div>
+          <PhoneNumberInput label="Phone" value={phone} onChange={setPhone} placeholder="7893 952310" />
           <div>
             <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Timezone</label>
             <NativeSelect value={timezone} onChange={(e) => setTimezone(e.target.value)}>

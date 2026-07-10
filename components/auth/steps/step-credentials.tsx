@@ -5,6 +5,7 @@ import { useSignUp } from "@clerk/nextjs";
 import { isClerkAPIResponseError } from "@clerk/nextjs/errors";
 import Link from "next/link";
 import { AuthInput } from "../auth-input";
+import { PhoneNumberInput } from "@/components/shared/phone-number-input";
 import { Loader2 } from "lucide-react";
 
 interface StepCredentialsProps {
@@ -17,12 +18,18 @@ export function StepCredentials({ onNext }: StepCredentialsProps) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!isLoaded) return;
+
+    if (!phone || phone.replace(/[^\d]/g, "").length < 6) {
+      setError("Please enter a valid phone number.");
+      return;
+    }
 
     setError("");
     setLoading(true);
@@ -32,6 +39,9 @@ export function StepCredentials({ onNext }: StepCredentialsProps) {
         firstName,
         lastName,
         emailAddress: email,
+        // Captured into the Clerk user's unsafe metadata (no SMS verification),
+        // then synced to users.phone by the user.created webhook.
+        unsafeMetadata: { phone },
       });
 
       await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
@@ -76,6 +86,12 @@ export function StepCredentials({ onNext }: StepCredentialsProps) {
           onChange={(e) => setEmail(e.target.value)}
           required
           autoComplete="email"
+        />
+        <PhoneNumberInput
+          label="Phone number"
+          value={phone}
+          onChange={setPhone}
+          placeholder="7893 952310"
         />
 
         {error && (
