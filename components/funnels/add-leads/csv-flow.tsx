@@ -12,6 +12,12 @@ import {
   type CsvColumnMapping, type CsvGroupBy, type ImportCsvResult, type EnrichCompaniesResult,
 } from "@/lib/api/funnels";
 import { useCustomFields } from "@/lib/hooks/use-custom-fields";
+import { createCustomField } from "@/lib/api/custom-fields";
+import { CUSTOM_FIELD_TYPES, type CustomFieldDefinition, type CustomFieldType } from "@/lib/types/custom-field";
+import { TagInput } from "@/components/shared/tag-input";
+
+/** Sentinel option value that opens the inline "create custom field" modal. */
+const CREATE_FIELD_SENTINEL = "__create_custom_field__";
 
 // ── Field vocabulary (grouped, Close-style) ──────────────────────────────
 const LEAD_FIELDS = ["Lead Name", "Lead First Name", "Lead Last Name", "Lead Email", "Lead Title", "Lead Phone", "Lead LinkedIn"] as const;
@@ -108,7 +114,16 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
   funnelId: string; onDone: () => void; onImported?: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const { fields: customFields } = useCustomFields();
+  const { fields: hookCustomFields, reload: reloadCustomFields } = useCustomFields();
+  // Fields created inline during this session, merged with the cached list so a
+  // just-created field is a valid <select> value before the query refetches.
+  const [createdFields, setCreatedFields] = useState<CustomFieldDefinition[]>([]);
+  const customFields = useCallback(() => {
+    const seen = new Set<string>();
+    return [...hookCustomFields, ...createdFields].filter((f) => (seen.has(f.key) ? false : (seen.add(f.key), true)));
+  }, [hookCustomFields, createdFields])();
+  // Which column's dropdown opened the create-field modal.
+  const [createFieldFor, setCreateFieldFor] = useState<number | null>(null);
   const [step, setStep] = useState<Step>("upload");
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState("");
@@ -169,6 +184,26 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
 
   const mappingPayload = (): CsvColumnMapping[] =>
     mappings.map((m) => ({ csvColumn: m.csvColumn, mappedField: m.mappedField, autoMapped: m.autoMapped }));
+
+  // Create a custom field inline and map the requesting column to it.
+  async function handleCreateField(input: { label: string; fieldType: CustomFieldType; options: string[] }) {
+    const def = await createCustomField({
+      label: input.label,
+      fieldType: input.fieldType,
+      options: input.fieldType === "select" ? input.options : [],
+    });
+    setCreatedFields((prev) => (prev.some((f) => f.key === def.key) ? prev : [...prev, def]));
+    const target = `custom:${def.key}` as MappedField;
+    const col = createFieldFor;
+    setMappings((prev) => prev.map((x, i) => {
+      if (i === col) return { ...x, mappedField: target, autoMapped: false };
+      // Custom fields are single-value — drop the mapping from any other column.
+      if (x.mappedField === target) return { ...x, mappedField: "--- Skip ---" as MappedField, autoMapped: false };
+      return x;
+    }));
+    void reloadCustomFields();
+    setCreateFieldFor(null);
+  }
 
   // Send only the columns that are actually mapped (and only non-empty values).
   // Skipped columns are dead weight — trimming them keeps large imports (5k+
@@ -340,6 +375,12 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
                         value={m.mappedField}
                         onChange={(e) => {
                           const next = e.target.value as MappedField;
+                          if (next === CREATE_FIELD_SENTINEL) {
+                            // Don't change the mapping — open the create modal
+                            // for this column; the <select> keeps its prior value.
+                            setCreateFieldFor(index);
+                            return;
+                          }
                           setMappings((prev) => prev.map((x, i) => {
                             if (i === index) return { ...x, mappedField: next, autoMapped: false };
                             // A single-value field can only live on one column —
@@ -359,7 +400,10 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
                             {customFields.map((f) => <option key={f.key} value={`custom:${f.key}`}>{f.label}</option>)}
                           </optgroup>
                         )}
-                        <optgroup label="Other">{OTHER_FIELDS.map((o) => <option key={o} value={o}>{o === "--- Skip ---" ? "Skip column" : o}</option>)}</optgroup>
+                        <optgroup label="Other">
+                          {OTHER_FIELDS.map((o) => <option key={o} value={o}>{o === "--- Skip ---" ? "Skip column" : o}</option>)}
+                          <option value={CREATE_FIELD_SENTINEL}>+ Create custom field…</option>
+                        </optgroup>
                       </NativeSelect>
                     </div>
                   </td>
@@ -368,6 +412,14 @@ export function CSVFlow({ funnelId, onDone, onImported }: {
             </tbody>
           </table>
         </div>
+
+        {createFieldFor !== null && (
+          <CreateFieldModal
+            onClose={() => setCreateFieldFor(null)}
+            onCreate={handleCreateField}
+            existingKeys={customFields.map((f) => f.key)}
+          />
+        )}
 
         {missingRequired.length > 0 && (
           <div className="mb-3 rounded-[10px] border border-signal-blue-text/25 bg-signal-blue/10 px-3 py-2 flex items-center gap-2">
@@ -527,6 +579,98 @@ function ErrorBox({ error }: { error: string }) {
     <div className="my-3 rounded-[10px] border border-signal-red-text/25 bg-signal-red/10 px-3 py-2 flex items-start gap-2">
       <AlertCircle size={14} className="text-signal-red-text mt-0.5 shrink-0" />
       <p className="text-[11px] text-signal-red-text">{error}</p>
+    </div>
+  );
+}
+
+/** Mirror of the backend slugifyFieldKey so we can detect a duplicate before
+ *  submitting (backend is idempotent by this same slug). */
+function slugifyFieldKey(label: string): string {
+  return (label || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+/** Inline "create custom field" modal used from the CSV column-mapping step. */
+function CreateFieldModal({
+  onClose,
+  onCreate,
+  existingKeys,
+}: {
+  onClose: () => void;
+  onCreate: (input: { label: string; fieldType: CustomFieldType; options: string[] }) => Promise<void>;
+  existingKeys: string[];
+}) {
+  const [label, setLabel] = useState("");
+  const [fieldType, setFieldType] = useState<CustomFieldType>("text");
+  const [options, setOptions] = useState<string[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const key = slugifyFieldKey(label);
+  const duplicate = !!key && existingKeys.includes(key);
+  const canSave = !!key && !duplicate && !saving && (fieldType !== "select" || options.length > 0);
+
+  async function save() {
+    if (!canSave) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onCreate({ label: label.trim(), fieldType, options });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not create field");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm p-6" onClick={onClose}>
+      <div className="w-[420px] bg-surface border border-border-default rounded-[14px] shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-border-subtle">
+          <h3 className="text-[13px] font-semibold text-ink">New custom field</h3>
+          <button onClick={onClose} className="text-ink-muted hover:text-ink"><XIcon size={16} /></button>
+        </div>
+        <div className="p-4 space-y-3.5">
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Field name</label>
+            <input
+              autoFocus
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && canSave) save(); }}
+              placeholder="e.g. Funding Stage"
+              className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+            />
+            {duplicate && <p className="text-[10.5px] text-signal-red-text mt-1">A field with this name already exists — pick it from the list instead.</p>}
+          </div>
+          <div>
+            <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Type</label>
+            <NativeSelect
+              value={fieldType}
+              onChange={(e) => setFieldType(e.target.value as CustomFieldType)}
+              className="w-full text-[12px] text-ink bg-section border border-border-subtle rounded-[8px] px-2.5 py-2 focus:outline-none focus:border-border-default"
+            >
+              {CUSTOM_FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </NativeSelect>
+          </div>
+          {fieldType === "select" && (
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Options</label>
+              <TagInput tags={options} onChange={setOptions} placeholder="Type an option, press Enter" />
+            </div>
+          )}
+          {error && <p className="text-[11px] text-signal-red-text">{error}</p>}
+        </div>
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-border-subtle">
+          <button onClick={onClose} className="px-3 py-1.5 rounded-[20px] text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors">Cancel</button>
+          <button
+            onClick={save}
+            disabled={!canSave}
+            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50 transition-colors"
+          >
+            {saving && <Loader2 size={11} className="animate-spin" />}
+            Create &amp; map
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

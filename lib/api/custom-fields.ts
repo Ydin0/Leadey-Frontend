@@ -25,3 +25,15 @@ export async function saveCustomFields(
     body: JSON.stringify({ fields }),
   });
 }
+
+/** POST /api/custom-fields — append ONE field (leaves others untouched).
+ *  Used to create a custom field inline while mapping a CSV import; only needs
+ *  the campaigns.addLeads permission. Idempotent by slug. */
+export async function createCustomField(
+  input: { label: string; fieldType?: CustomFieldDefinition["fieldType"]; options?: string[]; isRequired?: boolean },
+): Promise<CustomFieldDefinition> {
+  return apiRequest<CustomFieldDefinition>("/custom-fields", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
