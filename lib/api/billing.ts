@@ -42,6 +42,27 @@ export async function getStripeInvoiceDetail(id: string): Promise<
   return apiRequest(`/billing/invoices/${id}`);
 }
 
+/** Standalone Stripe payments (calling-credit top-ups + one-off charges). */
+export interface StripePayment {
+  id: string;
+  description: string;
+  amount: number;
+  currency: string;
+  status: string;
+  createdAt: string;
+}
+
+export async function getStripePayments(): Promise<StripePayment[]> {
+  return apiRequest<StripePayment[]>("/billing/payments");
+}
+
+/** One Stripe payment reshaped to the Leadey invoice-document format. */
+export async function getStripePaymentDetail(id: string): Promise<
+  LeadeyInvoice & { periodLabel: string | null; amountPaidMinor: number }
+> {
+  return apiRequest(`/billing/payments/${id}`);
+}
+
 export async function getLeadeyInvoices(): Promise<LeadeyInvoice[]> {
   return apiRequest<LeadeyInvoice[]>("/billing/leadey-invoices");
 }

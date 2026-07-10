@@ -2,14 +2,13 @@
 
 import { useCallback, useState, useEffect } from "react";
 import Link from "next/link";
-import { Loader2, Check, Minus, Plus, Download, CreditCard, CalendarClock, FileText } from "lucide-react";
+import { Loader2, Check, Minus, Plus, CreditCard, CalendarClock, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
-import { getBillingInfo, createCheckoutSession, getInvoices, getLeadeyInvoices, addSubscriptionSeats } from "@/lib/api/billing";
+import { getBillingInfo, createCheckoutSession, getInvoices, getLeadeyInvoices, getStripePayments, addSubscriptionSeats, type StripePayment } from "@/lib/api/billing";
 import { apiRequest } from "@/lib/api/client";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import { downloadInvoiceAsPdf } from "@/lib/utils/generate-invoice-pdf";
 import type { BillingInfo, StripeInvoice, LeadeyInvoice } from "@/lib/types/billing";
 
 const PLAN_DETAILS: Record<string, { minSeats: number; description: string; features: string[] }> = {
@@ -83,6 +82,7 @@ export function BillingSection() {
   const isAuthReady = useAuthReady();
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [invoices, setInvoices] = useState<StripeInvoice[]>([]);
+  const [payments, setPayments] = useState<StripePayment[]>([]);
   const [leadeyInvoices, setLeadeyInvoices] = useState<LeadeyInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -124,6 +124,9 @@ export function BillingSection() {
     getInvoices()
       .then(setInvoices)
       .catch((err) => console.error("Failed to load Stripe invoices:", err));
+    getStripePayments()
+      .then(setPayments)
+      .catch((err) => console.error("Failed to load Stripe payments:", err));
     getLeadeyInvoices()
       .then(setLeadeyInvoices)
       .catch((err) => console.error("Failed to load Leadey invoices:", err));
@@ -505,12 +508,12 @@ export function BillingSection() {
           <Table>
             <TableHeader>
               <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
-                <TableHead className="text-left">Invoice</TableHead>
-                <TableHead className="text-left w-[110px]">Type</TableHead>
-                <TableHead className="text-left w-[110px]">Period</TableHead>
-                <TableHead className="text-right w-[110px]">Amount</TableHead>
-                <TableHead className="text-center w-[90px]">Status</TableHead>
-                <TableHead className="text-right w-[150px]"></TableHead>
+                <TableHead className="text-left w-[30%]">Invoice</TableHead>
+                <TableHead className="text-left">Type</TableHead>
+                <TableHead className="text-left">Period</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right w-[16%]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -585,10 +588,10 @@ export function BillingSection() {
             <TableHeader>
               <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
                 <TableHead className="text-left">Invoice</TableHead>
-                <TableHead className="text-left w-[140px]">Date</TableHead>
-                <TableHead className="text-right w-[110px]">Amount</TableHead>
-                <TableHead className="text-center w-[100px]">Status</TableHead>
-                <TableHead className="text-right w-[90px]"></TableHead>
+                <TableHead className="text-left">Date</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right w-[15%]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -618,33 +621,62 @@ export function BillingSection() {
                     </span>
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="inline-flex items-center gap-1.5">
-                      <Link
-                        href={`/dashboard/invoices/stripe/${inv.id}`}
-                        className="inline-flex items-center gap-1 px-3 py-1 rounded-[16px] border border-border-subtle text-[10.5px] font-medium text-ink-secondary hover:bg-hover transition-colors"
-                      >
-                        <FileText size={11} /> View
-                      </Link>
-                      {inv.invoicePdf ? (
-                        <a
-                          href={inv.invoicePdf}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title="Download PDF"
-                          className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
-                        >
-                          <Download size={13} />
-                        </a>
-                      ) : (
-                        <button
-                          onClick={() => downloadInvoiceAsPdf(inv, billing?.planName || "Leadey")}
-                          title="Download PDF"
-                          className="p-1.5 rounded-md text-ink-muted hover:text-ink hover:bg-hover transition-colors"
-                        >
-                          <Download size={13} />
-                        </button>
-                      )}
-                    </div>
+                    <Link
+                      href={`/dashboard/invoices/stripe/${inv.id}`}
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-[16px] border border-border-subtle text-[10.5px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+                    >
+                      <FileText size={11} /> View
+                    </Link>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+
+      {/* ── Top-ups & one-off payments (Stripe PaymentIntents) ── */}
+      {payments.length > 0 && (
+        <div className="rounded-[14px] border border-border-subtle bg-surface overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-border-subtle">
+            <h3 className="text-[13px] font-semibold text-ink">Top-ups &amp; payments</h3>
+            <p className="text-[11px] text-ink-muted mt-0.5">Calling-credit top-ups and one-off charges via Stripe.</p>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
+                <TableHead className="text-left">Description</TableHead>
+                <TableHead className="text-left">Date</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right w-[15%]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {payments.map((p) => (
+                <TableRow key={p.id} className="hover:bg-hover/40">
+                  <TableCell className="text-[12px] font-medium text-ink truncate">{p.description}</TableCell>
+                  <TableCell className="text-[11.5px] text-ink-secondary">
+                    {new Date(p.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </TableCell>
+                  <TableCell className="text-right text-[12px] font-semibold text-ink tabular-nums">
+                    {new Intl.NumberFormat(undefined, { style: "currency", currency: p.currency.toUpperCase() }).format(p.amount / 100)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className={cn(
+                      "text-[10px] font-medium rounded-full px-2 py-0.5 capitalize",
+                      p.status === "succeeded" ? "bg-signal-green text-signal-green-text" : "bg-signal-slate text-signal-slate-text",
+                    )}>
+                      {p.status === "succeeded" ? "paid" : p.status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Link
+                      href={`/dashboard/invoices/payment/${p.id}`}
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-[16px] border border-border-subtle text-[10.5px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+                    >
+                      <FileText size={11} /> View
+                    </Link>
                   </TableCell>
                 </TableRow>
               ))}
