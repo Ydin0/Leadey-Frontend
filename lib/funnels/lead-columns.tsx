@@ -309,6 +309,11 @@ export function buildLeadColumns(customFields: FilterFieldDef[], opts?: { campai
     width: 150,
     defaultVisible: false,
     render: (lead: FunnelLead, ctx: LeadColumnCtx) => text(ctx.value(lead, f.key)),
+    // Grouped-by-company view: show the first non-empty value across the
+    // company's leads (same approach as Source/Industry). Without this the
+    // column is silently dropped when grouping by company.
+    companyRender: (group: FunnelLead[], ctx: LeadColumnCtx) =>
+      text(firstWith(group, (l) => ctx.value(l, f.key))),
   }));
   const builtins = opts?.campaign
     ? [...BUILTIN_LEAD_COLUMNS.slice(0, 1), CAMPAIGN_COLUMN, ...BUILTIN_LEAD_COLUMNS.slice(1)]
