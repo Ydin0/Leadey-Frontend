@@ -63,10 +63,3 @@ export async function getStripePaymentDetail(id: string): Promise<
   return apiRequest(`/billing/payments/${id}`);
 }
 
-export async function getLeadeyInvoices(): Promise<LeadeyInvoice[]> {
-  return apiRequest<LeadeyInvoice[]>("/billing/leadey-invoices");
-}
-
-export async function getLeadeyInvoice(id: string): Promise<LeadeyInvoice> {
-  return apiRequest<LeadeyInvoice>(`/billing/leadey-invoices/${id}`);
-}

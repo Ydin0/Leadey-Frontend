@@ -5,11 +5,11 @@ import Link from "next/link";
 import { Loader2, Check, Minus, Plus, CreditCard, CalendarClock, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
-import { getBillingInfo, createCheckoutSession, getInvoices, getLeadeyInvoices, getStripePayments, addSubscriptionSeats, type StripePayment } from "@/lib/api/billing";
+import { getBillingInfo, createCheckoutSession, getInvoices, getStripePayments, addSubscriptionSeats, type StripePayment } from "@/lib/api/billing";
 import { apiRequest } from "@/lib/api/client";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
-import type { BillingInfo, StripeInvoice, LeadeyInvoice } from "@/lib/types/billing";
+import type { BillingInfo, StripeInvoice } from "@/lib/types/billing";
 
 const PLAN_DETAILS: Record<string, { minSeats: number; description: string; features: string[] }> = {
   starter: {
@@ -83,7 +83,6 @@ export function BillingSection() {
   const [billing, setBilling] = useState<BillingInfo | null>(null);
   const [invoices, setInvoices] = useState<StripeInvoice[]>([]);
   const [payments, setPayments] = useState<StripePayment[]>([]);
-  const [leadeyInvoices, setLeadeyInvoices] = useState<LeadeyInvoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
@@ -127,9 +126,6 @@ export function BillingSection() {
     getStripePayments()
       .then(setPayments)
       .catch((err) => console.error("Failed to load Stripe payments:", err));
-    getLeadeyInvoices()
-      .then(setLeadeyInvoices)
-      .catch((err) => console.error("Failed to load Leadey invoices:", err));
   }, []);
 
   useEffect(() => {
@@ -495,85 +491,6 @@ export function BillingSection() {
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* ── Leadey invoices (telephony + seats) ── */}
-      {leadeyInvoices.length > 0 && (
-        <div className="rounded-[14px] border border-border-subtle bg-surface overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-border-subtle">
-            <h3 className="text-[13px] font-semibold text-ink">Invoices</h3>
-            <p className="text-[11px] text-ink-muted mt-0.5">Telephony usage and seat invoices issued by Leadey.</p>
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-border-subtle bg-section/50 hover:bg-section/50">
-                <TableHead className="text-left w-[30%]">Invoice</TableHead>
-                <TableHead className="text-left">Type</TableHead>
-                <TableHead className="text-left">Period</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead className="text-center">Status</TableHead>
-                <TableHead className="text-right w-[16%]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {leadeyInvoices.map((inv) => {
-                const money = new Intl.NumberFormat(undefined, {
-                  style: "currency",
-                  currency: inv.currency.toUpperCase(),
-                }).format(inv.totalMinor / 100);
-                return (
-                  <TableRow key={inv.id} className="hover:bg-hover/40">
-                    <TableCell>
-                      <span className="text-[12px] font-medium text-ink">{inv.number}</span>
-                      <span className="text-[10.5px] text-ink-faint ml-2">
-                        {new Date(inv.issuedAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-[11.5px] text-ink-secondary capitalize">{inv.type}</span>
-                    </TableCell>
-                    <TableCell className="text-[11.5px] text-ink-secondary tabular-nums">{inv.period || "—"}</TableCell>
-                    <TableCell className="text-right text-[12px] font-semibold text-ink tabular-nums">{money}</TableCell>
-                    <TableCell className="text-center">
-                      <span
-                        className={cn(
-                          "text-[10px] font-medium rounded-full px-2 py-0.5 capitalize",
-                          inv.status === "paid"
-                            ? "bg-signal-green text-signal-green-text"
-                            : inv.status === "void"
-                              ? "bg-signal-slate text-signal-slate-text"
-                              : "bg-signal-blue text-signal-blue-text",
-                        )}
-                      >
-                        {inv.status}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="inline-flex items-center gap-1.5">
-                        {inv.status === "open" && inv.paymentUrl && (
-                          <a
-                            href={inv.paymentUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-3 py-1 rounded-[16px] bg-ink text-on-ink text-[10.5px] font-medium hover:opacity-90 transition-opacity"
-                          >
-                            <CreditCard size={11} /> Pay
-                          </a>
-                        )}
-                        <Link
-                          href={`/dashboard/invoices/${inv.id}`}
-                          className="inline-flex items-center gap-1 px-3 py-1 rounded-[16px] border border-border-subtle text-[10.5px] font-medium text-ink-secondary hover:bg-hover transition-colors"
-                        >
-                          <FileText size={11} /> View
-                        </Link>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
         </div>
       )}
 
