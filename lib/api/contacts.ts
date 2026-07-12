@@ -39,6 +39,18 @@ export async function cancelDiscoveryRun(
   );
 }
 
+/** Remove duplicate discovered contacts in an assignment (keeps one row per
+ *  LinkedIn profile, preferring the enriched copy). Returns how many were
+ *  removed + how many unique remain. */
+export async function dedupeContacts(
+  assignmentId: string,
+): Promise<{ removed: number; kept: number }> {
+  return apiRequest<{ removed: number; kept: number }>("/contacts/dedupe", {
+    method: "POST",
+    body: JSON.stringify({ assignmentId }),
+  });
+}
+
 // ─── Company Counts ─────────────────────────────────────────────────
 
 export async function getContactCompanyCounts(

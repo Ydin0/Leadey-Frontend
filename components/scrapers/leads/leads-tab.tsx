@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Users, Search, Sparkles, FolderInput, EyeOff, Loader2,
-  ChevronDown, X as XIcon, Ban, Download, RotateCcw,
+  ChevronDown, X as XIcon, Ban, Download, RotateCcw, CopyX,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -28,6 +28,7 @@ import {
   sendContactsToFunnel,
   resetEnrichment,
   resetStuckEnrichments,
+  dedupeContacts,
 } from "@/lib/api/contacts";
 import { listFunnels } from "@/lib/api/funnels";
 import type { Funnel } from "@/lib/types/funnel";
@@ -88,6 +89,7 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, c
 
   // Export
   const [exporting, setExporting] = useState(false);
+  const [deduping, setDeduping] = useState(false);
 
   // Funnel picker
   const [showFunnelPicker, setShowFunnelPicker] = useState(false);
@@ -446,6 +448,24 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, c
     }
   }
 
+  async function handleDedupe() {
+    if (!confirm("Remove duplicate contacts in this list? Keeps one row per LinkedIn profile (the enriched copy where available). This can't be undone.")) return;
+    setDeduping(true);
+    try {
+      const { removed } = await dedupeContacts(assignmentId);
+      showStatus("success", removed === 0 ? "No duplicates found — nothing to remove" : `Removed ${removed.toLocaleString()} duplicate${removed === 1 ? "" : "s"}`);
+      if (removed > 0) {
+        setPage(1);
+        await fetchContacts(1); // refreshes the table + the Leads count badge
+      }
+    } catch (err) {
+      showStatus("error", "Failed to remove duplicates");
+      console.error("Dedupe failed:", err);
+    } finally {
+      setDeduping(false);
+    }
+  }
+
   async function handleDismissSelected() {
     const ids = Array.from(selection.selectedIds);
     if (ids.length === 0) return;
@@ -696,6 +716,15 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, c
               Reset Stuck
             </button>
           )}
+          <button
+            onClick={handleDedupe}
+            disabled={totalCount === 0 || deduping}
+            title="Remove duplicate contacts (keeps one per LinkedIn profile)"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] text-[11px] font-medium bg-surface text-ink border border-border-subtle hover:bg-hover transition-colors disabled:opacity-50"
+          >
+            {deduping ? <Loader2 size={11} className="animate-spin" /> : <CopyX size={11} />}
+            {deduping ? "Removing…" : "Remove duplicates"}
+          </button>
           <button
             onClick={handleExport}
             disabled={totalCount === 0 || exporting}
