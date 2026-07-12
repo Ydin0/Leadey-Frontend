@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, FileText, Mail, Phone, MessageSquare, MessageCircle, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, FileText, Mail, Phone, MessageSquare, MessageCircle, CalendarPlus, Pencil, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { LeadCampaignsMenu } from "./lead-campaigns-menu";
@@ -26,6 +26,7 @@ interface LeadActionBarProps {
   onEmail: () => void;
   onSms: () => void;
   onWhatsapp: () => void;
+  onBookMeeting: () => void;
   onCall: () => void;
 }
 
@@ -45,6 +46,7 @@ export function LeadActionBar({
   onEmail,
   onSms,
   onWhatsapp,
+  onBookMeeting,
   onCall,
 }: LeadActionBarProps) {
   const [open, setOpen] = useState(false);
@@ -259,6 +261,13 @@ export function LeadActionBar({
           >
             <MessageCircle size={13} strokeWidth={1.5} />
             WhatsApp
+          </button>
+          <button
+            onClick={onBookMeeting}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-signal-blue text-signal-blue-text text-[11px] font-medium hover:bg-signal-blue/80 transition-colors"
+          >
+            <CalendarPlus size={13} strokeWidth={1.5} />
+            Book meeting
           </button>
           <button
             onClick={onCall}

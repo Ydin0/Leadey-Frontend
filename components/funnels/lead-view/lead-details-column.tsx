@@ -117,6 +117,8 @@ interface LeadDetailsColumnProps {
   stepTracker?: ReactNode;
   /** Read-only hiring roles for a standalone contact (from scraped jobs). */
   seedHiringRoles?: import("@/lib/api/hiring-roles").HiringRole[];
+  /** Bumped after booking a meeting so the Upcoming meetings section refetches. */
+  meetingsRefreshKey?: number;
 }
 
 function initials(name: string): string {
@@ -974,6 +976,7 @@ export function LeadDetailsColumn({
   statuses,
   stepTracker,
   seedHiringRoles,
+  meetingsRefreshKey,
 }: LeadDetailsColumnProps) {
   const [tab, setTab] = useState<"details" | "leads">("details");
   const [addingContact, setAddingContact] = useState(false);
@@ -1014,7 +1017,7 @@ export function LeadDetailsColumn({
           <LeadTasksSection funnelId={funnelId} leadId={leadId} />
 
           {/* Upcoming meetings (connected calendars + Calendly) */}
-          <LeadUpcomingMeetingsSection funnelId={funnelId} leadId={leadId} />
+          <LeadUpcomingMeetingsSection funnelId={funnelId} leadId={leadId} refreshKey={meetingsRefreshKey} />
 
           {/* Opportunities */}
           <LeadOpportunitySection

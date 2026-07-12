@@ -10,6 +10,7 @@ export const SOURCE_LABEL: Record<LeadMeeting["source"], string> = {
   google: "Google Calendar",
   outlook: "Outlook",
   calendly: "Calendly",
+  leadey: "Leadey",
 };
 
 const RSVP: Record<MeetingResponseStatus, { label: string; icon: typeof Check; className: string }> = {

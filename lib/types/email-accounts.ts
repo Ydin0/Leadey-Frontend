@@ -11,6 +11,9 @@ export interface EmailAccount {
   signatureId: string | null;
   status: string; // active | error | disconnected
   isDefault: boolean;
+  /** True when this account can create calendar events (host a meeting).
+   *  Older send-only connections are false until reconnected. */
+  canSchedule?: boolean;
   createdAt: string;
 }
 

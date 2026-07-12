@@ -6,6 +6,7 @@ import dynamic from "next/dynamic";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { LeadActionBar } from "./lead-action-bar";
 import { LeadDetailsColumn, type EditableCustomField, type CompanyInfoPatch } from "./lead-details-column";
+import { BookMeetingModal } from "./book-meeting-modal";
 import { LeadTimeline } from "./lead-timeline";
 import { LeadStepTracker } from "@/components/funnels/focus/lead-step-tracker";
 import { FocusCallControls } from "@/components/funnels/focus/focus-call-controls";
@@ -88,6 +89,9 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   const [showComposer, setShowComposer] = useState(false);
   const [showSms, setShowSms] = useState(false);
   const [showWhatsapp, setShowWhatsapp] = useState(false);
+  const [showBooking, setShowBooking] = useState(false);
+  // Bumped after a booking so the "Upcoming meetings" section refetches.
+  const [meetingsRefresh, setMeetingsRefresh] = useState(0);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [showConvert, setShowConvert] = useState(false);
@@ -664,6 +668,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         onEmail={() => { pauseForEngagement(); setShowComposer(true); }}
         onSms={() => { pauseForEngagement(); setShowSms(true); }}
         onWhatsapp={() => { pauseForEngagement(); setShowWhatsapp(true); }}
+        onBookMeeting={() => { pauseForEngagement(); setShowBooking(true); }}
         onCall={dialPrimary}
       />
 
@@ -696,6 +701,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
             leads={leads}
             statuses={statuses}
             seedHiringRoles={seedHiringRoles}
+            meetingsRefreshKey={meetingsRefresh}
             stepTracker={
               steps.length > 0 ? (
                 <LeadStepTracker
@@ -816,6 +822,21 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         stepIndex={currentStepDef?.channel === "email" ? effectiveStep - 1 : null}
         onSent={handleEmailSent}
       />
+      )}
+
+      {/* Book meeting */}
+      {showBooking && (
+        <BookMeetingModal
+          open={showBooking}
+          onClose={() => setShowBooking(false)}
+          funnelId={funnelId}
+          leadId={currentLead.id}
+          leadName={currentLead.name}
+          leadEmail={currentLead.email}
+          company={currentLead.company}
+          contacts={companyContacts.map((c) => ({ id: c.id, name: c.name, email: c.email, extraEmails: c.extraEmails }))}
+          onBooked={() => setMeetingsRefresh((n) => n + 1)}
+        />
       )}
 
       {/* Convert modal */}

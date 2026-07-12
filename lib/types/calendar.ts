@@ -17,7 +17,7 @@ export type MeetingResponseStatus = "accepted" | "declined" | "tentative" | "nee
 
 export interface LeadMeeting {
   id: string;
-  source: "google" | "outlook" | "calendly";
+  source: "google" | "outlook" | "calendly" | "leadey";
   title: string;
   startTime: string | null;
   endTime: string | null;

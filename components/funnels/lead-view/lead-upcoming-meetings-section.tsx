@@ -1,20 +1,23 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { CalendarClock, Video, ChevronRight } from "lucide-react";
+import { CalendarClock, Video, ChevronRight, X, Loader2 } from "lucide-react";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getLeadMeetings } from "@/lib/api/calendar";
+import { cancelMeeting } from "@/lib/api/meetings";
 import type { LeadMeeting } from "@/lib/types/calendar";
 import { SOURCE_LABEL, RsvpBadge, meetingWhen } from "@/components/calendar/meeting-bits";
 import { Section } from "./lead-section";
 
-/** Upcoming meetings for the lead — synced from a rep's connected Google/Outlook
- *  calendar (matched by attendee email) plus any Calendly booking for this lead. */
-export function LeadUpcomingMeetingsSection({ funnelId, leadId }: { funnelId: string; leadId: string }) {
+/** Upcoming meetings for the lead — booked in Leadey, synced from a rep's
+ *  connected Google/Outlook calendar (matched by attendee email), or Calendly.
+ *  `refreshKey` bumps after a new booking to refetch. */
+export function LeadUpcomingMeetingsSection({ funnelId, leadId, refreshKey }: { funnelId: string; leadId: string; refreshKey?: number }) {
   const isAuthReady = useAuthReady();
   const [meetings, setMeetings] = useState<LeadMeeting[]>([]);
   const [calendarConnected, setCalendarConnected] = useState(true);
   const [loaded, setLoaded] = useState(false);
+  const [cancelingId, setCancelingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -31,7 +34,18 @@ export function LeadUpcomingMeetingsSection({ funnelId, leadId }: { funnelId: st
   useEffect(() => {
     if (!isAuthReady) return;
     void load();
-  }, [isAuthReady, load]);
+  }, [isAuthReady, load, refreshKey]);
+
+  async function handleCancel(id: string) {
+    if (!confirm("Cancel this meeting? Attendees will be notified.")) return;
+    setCancelingId(id);
+    try {
+      await cancelMeeting(id);
+      await load();
+    } finally {
+      setCancelingId(null);
+    }
+  }
 
   return (
     <Section icon={CalendarClock} title="Upcoming meetings" count={meetings.length || null}>
@@ -59,16 +73,27 @@ export function LeadUpcomingMeetingsSection({ funnelId, leadId }: { funnelId: st
                   {meetingWhen(m.startTime)}
                   <span className="text-ink-faint"> · {SOURCE_LABEL[m.source]}</span>
                 </p>
-                {m.joinUrl && (
-                  <a
-                    href={m.joinUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-signal-blue-text hover:underline mt-1"
-                  >
-                    <Video size={11} /> Join <ChevronRight size={11} />
-                  </a>
-                )}
+                <div className="flex items-center gap-3 mt-1">
+                  {m.joinUrl && (
+                    <a
+                      href={m.joinUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-signal-blue-text hover:underline"
+                    >
+                      <Video size={11} /> Join <ChevronRight size={11} />
+                    </a>
+                  )}
+                  {m.source === "leadey" && (
+                    <button
+                      onClick={() => handleCancel(m.id)}
+                      disabled={cancelingId === m.id}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-ink-muted hover:text-signal-red-text disabled:opacity-50"
+                    >
+                      {cancelingId === m.id ? <Loader2 size={11} className="animate-spin" /> : <X size={11} />} Cancel
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))
