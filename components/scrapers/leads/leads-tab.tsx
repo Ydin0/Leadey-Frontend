@@ -206,7 +206,13 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, c
   useEffect(() => {
     if (!activeRun) return;
 
+    let inFlight = false;
     pollRef.current = setInterval(async () => {
+      // Ingesting a large run takes far longer than the 8s interval — never let
+      // a second poll fire while one is still in flight (it would race the
+      // backend into re-ingesting the same contacts).
+      if (inFlight) return;
+      inFlight = true;
       try {
         const updated = await pollDiscoveryRun(activeRun.id);
         if (updated.status === "succeeded" || updated.status === "failed") {
@@ -226,6 +232,8 @@ export function LeadsTab({ assignmentId, companiesWithLinkedIn, onCountChange, c
         }
       } catch (err) {
         console.error("Poll error:", err);
+      } finally {
+        inFlight = false;
       }
     }, 8000);
 
