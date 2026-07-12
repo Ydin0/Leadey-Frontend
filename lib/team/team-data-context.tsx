@@ -14,9 +14,21 @@ import {
 } from "./team-data";
 import { DEFAULT_CARD_IDS, sanitizeCardIds } from "./metric-catalog";
 
+export interface TeamFilter {
+  /** Explicitly-picked rep ids. */
+  repIds: string[];
+  /** Picked department names (matched against each member's pod). */
+  departments: string[];
+}
+
 interface TeamDataValue {
   members: Member[];        // includes pending invites (for the roster)
   activeMembers: Member[];  // excludes pending (for analytics/leaderboard)
+  /** activeMembers narrowed by the shared rep+department filter (union). When
+   *  the filter is empty this equals activeMembers. */
+  filteredMembers: Member[];
+  filter: TeamFilter;
+  setFilter: (f: TeamFilter) => void;
   seatUsage: { used: number; included: number };
   departments: Department[];
   loading: boolean;
@@ -143,10 +155,16 @@ export function TeamDataProvider({ children }: { children: React.ReactNode }) {
     await saveAnalyticsCards(clean).catch(() => {});
   }, []);
 
+  const [filter, setFilter] = useState<TeamFilter>({ repIds: [], departments: [] });
+
   const activeMembers = members.filter((m) => m.status !== "pending");
+  const filterActive = filter.repIds.length > 0 || filter.departments.length > 0;
+  const filteredMembers = filterActive
+    ? activeMembers.filter((m) => filter.repIds.includes(m.id) || filter.departments.includes(m.pod))
+    : activeMembers;
 
   return (
-    <Ctx.Provider value={{ members, activeMembers, seatUsage, departments, loading, cardIds, saveCards, refresh, addMember, updateTargets }}>
+    <Ctx.Provider value={{ members, activeMembers, filteredMembers, filter, setFilter, seatUsage, departments, loading, cardIds, saveCards, refresh, addMember, updateTargets }}>
       {children}
     </Ctx.Provider>
   );

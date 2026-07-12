@@ -35,14 +35,18 @@ const TALK_COLOR = "#E0A878";
 export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
   range: DayRange; rangeLabel: string; trendMode: "area" | "bars"; onPickRep: (id: string) => void;
 }) {
-  const { activeMembers: members, departments, cardIds, saveCards } = useTeamData();
+  const { filteredMembers: members, activeMembers, departments, cardIds, saveCards } = useTeamData();
   const { has } = usePermissions();
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const canEdit = has("settings.manageTeam");
   if (members.length === 0) {
     return (
       <div className="card fade" style={{ padding: 48, textAlign: "center" }}>
-        <p style={{ fontSize: 13, color: "var(--fg-muted)" }}>No active reps yet. Invite your team to see activity here.</p>
+        <p style={{ fontSize: 13, color: "var(--fg-muted)" }}>
+          {activeMembers.length === 0
+            ? "No active reps yet. Invite your team to see activity here."
+            : "No reps match the current filter. Adjust or clear it to see activity."}
+        </p>
       </div>
     );
   }

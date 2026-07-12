@@ -53,6 +53,9 @@ export interface CampaignConfig {
   /** Shared per-campaign column layout ("save for everyone") — order + hidden
    *  keys every rep sees unless they've saved their own personal layout. */
   columnPrefs?: { order: string[]; hidden: string[] };
+  /** Department names with live access to this campaign — anyone whose team
+   *  department matches gets access (dynamic membership), alongside individuals. */
+  departmentAccess?: string[];
 }
 
 export interface FunnelStep {

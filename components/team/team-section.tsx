@@ -8,6 +8,7 @@ import { TeamLeaderboard } from "./team-leaderboard";
 import { TeamMembers, MemberModal, type MemberFormData } from "./team-members";
 import { TeamRep } from "./team-rep";
 import { DateRangePicker } from "./date-range-picker";
+import { TeamFilterControl } from "./team-filter-control";
 import { NativeSelect } from "@/components/ui/native-select";
 import { TeamDataProvider, useTeamData } from "@/lib/team/team-data-context";
 import { Loader2 } from "lucide-react";
@@ -89,6 +90,7 @@ function TeamSectionInner() {
           </div>
           <div className="row" style={{ gap: 10 }}>
             {showWindow && dateControls}
+            {showWindow && <TeamFilterControl />}
             {tab === "leaderboard" && (
               <div className="row" style={{ gap: 6 }}>
                 <span style={{ fontSize: 11, color: "var(--fg-muted)" }}>Rank</span>

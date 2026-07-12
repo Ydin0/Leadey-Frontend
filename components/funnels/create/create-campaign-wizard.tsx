@@ -10,6 +10,9 @@ import {
   Sparkles, Pencil, Rocket, ArrowLeft, ArrowRight, UserRound, Info, Loader2,
 } from "lucide-react";
 import { MemberAvatar } from "@/components/shared/member-avatar";
+import { MemberMultiSelect } from "@/components/shared/member-multi-select";
+import { MultiSelectPills } from "@/components/shared/multi-select-pills";
+import { getDepartments } from "@/lib/api/team";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { listEmailAccounts } from "@/lib/api/email-accounts";
@@ -82,6 +85,7 @@ interface WizState {
   desc: string;
   visibility: "private" | "public";
   members: string[]; // assigned ids excluding owner
+  departments: string[]; // department names with live access
   audMode: "dynamic" | "static";
   matchAll: boolean;
   conditions: CampaignAudienceCondition[];
@@ -118,6 +122,7 @@ function initialStateFor(funnel?: Funnel): WizState {
     desc: "",
     visibility: "private",
     members: [],
+    departments: [],
     audMode: "dynamic",
     matchAll: true,
     conditions: [{ id: "k1", field: "meetings", value: "0" }],
@@ -158,6 +163,7 @@ function initialStateFor(funnel?: Funnel): WizState {
     desc: funnel.description,
     visibility: funnel.visibility ?? "private",
     members: funnel.members.filter((m) => m.role !== "owner").map((m) => m.teamMemberId),
+    departments: Array.isArray(cfg.departmentAccess) ? cfg.departmentAccess : [],
     audMode: aud?.mode ?? "dynamic",
     matchAll: aud?.matchAll ?? true,
     conditions: aud?.conditions?.length ? aud.conditions : base.conditions,
@@ -188,6 +194,7 @@ export function CreateCampaignWizard({ mode = "create", funnel }: CreateCampaign
   const funnelId = funnel?.id;
 
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  const [deptOptions, setDeptOptions] = useState<string[]>([]);
   const [leadBase, setLeadBase] = useState(0);
   const [launching, setLaunching] = useState(false);
   const [launched, setLaunched] = useState(false);
@@ -204,9 +211,14 @@ export function CreateCampaignWizard({ mode = "create", funnel }: CreateCampaign
     let cancelled = false;
     (async () => {
       try {
-        const [accts, funnels] = await Promise.all([listEmailAccounts(), listFunnels()]);
+        const [accts, funnels, depts] = await Promise.all([
+          listEmailAccounts(),
+          listFunnels(),
+          getDepartments().catch(() => []),
+        ]);
         if (cancelled) return;
         setAccounts(accts);
+        setDeptOptions(depts.map((d) => d.name));
         // Default-select the connected (active) mailboxes.
         setS((p) => {
           const sel: Record<string, boolean> = { ...p.mailboxSel };
@@ -322,6 +334,7 @@ export function CreateCampaignWizard({ mode = "create", funnel }: CreateCampaign
           visibility: s.visibility,
           steps,
           members: s.members,
+          departments: s.departments,
           audience,
           exit: s.exit,
           ...(emailAutomation ? { emailAutomation } : {}),
@@ -335,6 +348,7 @@ export function CreateCampaignWizard({ mode = "create", funnel }: CreateCampaign
           visibility: s.visibility,
           steps,
           members: s.members,
+          departments: s.departments,
           audience,
           exit: s.exit,
           ...(emailAutomation ? { emailAutomation } : {}),
@@ -349,10 +363,6 @@ export function CreateCampaignWizard({ mode = "create", funnel }: CreateCampaign
       setLaunching(false);
     }
   }, [launching, s, matchEstimate, hasEmailStep, selectedMailboxes, isEdit, funnelId]);
-
-  // Toggle helpers
-  const toggleMember = (id: string) =>
-    setS((p) => ({ ...p, members: p.members.includes(id) ? p.members.filter((x) => x !== id) : [...p.members, id] }));
   const toggleExit = (k: keyof WizState["exit"]) => setS((p) => ({ ...p, exit: { ...p.exit, [k]: !p.exit[k] } }));
   const toggleTrack = (k: keyof WizState["track"]) => setS((p) => ({ ...p, track: { ...p.track, [k]: !p.track[k] } }));
   const toggleDay = (k: string) => setS((p) => ({ ...p, days: { ...p.days, [k]: !p.days[k] } }));
@@ -498,38 +508,34 @@ export function CreateCampaignWizard({ mode = "create", funnel }: CreateCampaign
                       </div>
                     </div>
 
-                    <div className="flex flex-col gap-2.5">
-                      <label className="text-[12px] font-medium text-ink-secondary">Assigned members</label>
-                      <div className="flex flex-wrap gap-2.5">
-                        {reps.map((r) => {
-                          const isOwner = r.id === ownerId;
-                          const sel = isOwner || s.members.includes(r.id);
-                          return (
-                            <button
-                              key={r.id}
-                              onClick={() => !isOwner && toggleMember(r.id)}
-                              title={isOwner ? "Owner — can't be removed" : sel ? "Remove from campaign" : "Add to campaign"}
-                              className={cn(
-                                "inline-flex items-center gap-2 rounded-full pl-1 pr-3 py-1 border transition-colors",
-                                sel ? "bg-section border-border-default text-ink" : "bg-transparent border-border-subtle text-ink-secondary hover:border-border-default",
-                                isOwner ? "cursor-default" : "cursor-pointer",
-                              )}
-                            >
-                              <MemberAvatar id={r.id} name={r.name} className="w-[22px] h-[22px] text-[9px]" />
-                              <span className="text-[12.5px] whitespace-nowrap">{isOwner ? `${r.name} (you)` : r.name}</span>
-                              {isOwner ? (
-                                <span className="text-[10px] font-medium rounded-full px-2 py-0.5 bg-signal-blue text-signal-blue-text">Owner</span>
-                              ) : sel ? (
-                                <Check size={13} className="text-accent" />
-                              ) : null}
-                            </button>
-                          );
-                        })}
+                    {deptOptions.length > 0 && (
+                      <div className="flex flex-col gap-2.5">
+                        <MultiSelectPills
+                          label="Departments"
+                          options={deptOptions}
+                          selected={s.departments}
+                          onChange={(departments) => patch({ departments })}
+                          placeholder="Search departments…"
+                        />
+                        <span className="text-[11px] text-ink-faint -mt-1">
+                          Everyone in these departments gets access — including people added to them later.
+                        </span>
                       </div>
+                    )}
+
+                    <div className="flex flex-col gap-2.5">
+                      <MemberMultiSelect
+                        label="Assigned people"
+                        options={reps.filter((r) => r.id !== ownerId).map((r) => ({ id: r.id, name: r.name, email: r.email }))}
+                        selected={s.members}
+                        onChange={(members) => patch({ members })}
+                        pinned={ownerId ? [{ id: ownerId, name: reps.find((r) => r.id === ownerId)?.name || "You", note: "owner" }] : []}
+                        placeholder="Search people to add…"
+                      />
                       <span className="text-[11px] text-ink-faint">
                         {s.visibility === "private"
-                          ? "Private campaign — only these members can see it."
-                          : "Public campaign — visible to the whole team; these members are the workers."}
+                          ? "Private campaign — only the departments + people above (and the owner) can see it."
+                          : "Public campaign — visible to the whole team; the people above are the assigned workers."}
                       </span>
                     </div>
                   </div>

@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { Avatar } from "./team-shared";
 import { Sparkline, Meter, attColor } from "./charts";
 import { DeltaPill } from "./team-shared";
@@ -13,11 +12,7 @@ import { useTeamData } from "@/lib/team/team-data-context";
 export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
   range: DayRange; podium: boolean; rankBy: string; onPickRep: (id: string) => void;
 }) {
-  const { activeMembers, departments } = useTeamData();
-  const [pod, setPod] = React.useState<string>("all");
-
-  let members = activeMembers;
-  if (pod !== "all") members = members.filter((m) => m.pod === pod);
+  const { filteredMembers: members } = useTeamData();
 
   const pr = prevRange(range);
   const rows = members.map((m) => {
@@ -52,15 +47,7 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
 
   return (
     <div className="fade" style={{ display: "grid", gap: 16 }}>
-      {/* Rank-by now lives in the page header; the department filter stays here. */}
-      <div className="row" style={{ justifyContent: "flex-end", flexWrap: "wrap", gap: 12 }}>
-        <div className="seg" style={{ flexWrap: "wrap" }}>
-          {[["all", "All departments"], ...departments.map((d) => [d.name, d.name] as [string, string])].map(([v, l]) => (
-            <button key={v} className={"seg-btn" + (pod === v ? " on" : "")} onClick={() => setPod(v)}>{l}</button>
-          ))}
-        </div>
-      </div>
-
+      {/* Rank-by + rep/department filtering now live in the page header. */}
       {podium && rows.length >= 3 && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, alignItems: "end" }}>
           {[1, 0, 2].map((idx) => {

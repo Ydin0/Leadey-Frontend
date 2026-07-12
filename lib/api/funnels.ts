@@ -322,6 +322,8 @@ export interface CreateFunnelPayload {
   emailAutomation?: CampaignEmailAutomation;
   /** Assigned team-member ids (besides the creator, who becomes owner). */
   members?: string[];
+  /** Department names granted live access to this campaign (dynamic membership). */
+  departments?: string[];
 }
 
 export async function createFunnel(payload: CreateFunnelPayload): Promise<Funnel> {
@@ -744,6 +746,8 @@ export interface UpdateFunnelPayload {
   emailAutomation?: CampaignEmailAutomation;
   /** Full set of assigned member ids (besides the owner) — synced on the backend. */
   members?: string[];
+  /** Department names granted live access to this campaign (dynamic membership). */
+  departments?: string[];
 }
 
 /** Edit a campaign's name / description / steps. Replacing steps clamps each
