@@ -21,8 +21,8 @@ export function WeeklyHoursEditor({ value, onChange }: { value: WeeklyAvailabili
               onClick={() => setDay(key, on ? [] : [{ start: "09:00", end: "17:00" }])}
               className="w-[104px] shrink-0 flex items-center gap-2 pt-1"
             >
-              <span className={cn("relative w-8 h-[18px] rounded-full transition-colors", on ? "bg-signal-green" : "bg-border-default")}>
-                <span className={cn("absolute top-[2px] w-3.5 h-3.5 rounded-full bg-surface transition-all", on ? "left-[16px]" : "left-[2px]")} />
+              <span className={cn("relative w-8 h-[18px] rounded-full transition-colors", on ? "bg-signal-green-text" : "bg-border-default")}>
+                <span className={cn("absolute top-[2px] w-3.5 h-3.5 rounded-full bg-surface shadow-sm transition-all", on ? "left-[16px]" : "left-[2px]")} />
               </span>
               <span className={cn("text-[12px] font-medium", on ? "text-ink" : "text-ink-faint")}>{label.slice(0, 3)}</span>
             </button>

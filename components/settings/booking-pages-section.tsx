@@ -79,8 +79,8 @@ export function BookingPagesSection() {
 
 function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} className={cn("relative w-9 h-[20px] rounded-full transition-colors shrink-0", on ? "bg-signal-green" : "bg-border-default")}>
-      <span className={cn("absolute top-[2px] w-4 h-4 rounded-full bg-surface transition-all", on ? "left-[18px]" : "left-[2px]")} />
+    <button type="button" onClick={onClick} className={cn("relative w-9 h-[20px] rounded-full transition-colors shrink-0", on ? "bg-signal-green-text" : "bg-border-default")}>
+      <span className={cn("absolute top-[2px] w-4 h-4 rounded-full bg-surface shadow-sm transition-all", on ? "left-[18px]" : "left-[2px]")} />
     </button>
   );
 }
