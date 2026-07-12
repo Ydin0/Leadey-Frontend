@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { X, GripVertical, Eye, EyeOff, Plus, Search, RotateCcw } from "lucide-react";
+import { X, GripVertical, Eye, EyeOff, Plus, Search, RotateCcw, Check, User, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LeadColumn, LeadColumnGroup } from "@/lib/funnels/lead-columns";
 
@@ -10,9 +10,16 @@ interface ColumnSettingsDrawerProps {
   onClose: () => void;
   /** Current state: every column in display order with its visibility. */
   resolved: { col: LeadColumn; visible: boolean }[];
-  /** Persist a new full order + hidden set. */
+  /** Live-preview a new full order + hidden set (not persisted until saved). */
   onChange: (order: string[], hidden: string[]) => void;
   onReset: () => void;
+  /** Persist the current layout for just this rep (this campaign). */
+  onSaveForMe: () => void;
+  /** Persist for the whole team on this campaign. Absent on the org-wide Leads
+   *  page (no single campaign to share to). */
+  onSaveForEveryone?: () => void;
+  /** Which save just succeeded — drives the confirmation label. */
+  saved?: "me" | "everyone" | null;
 }
 
 const GROUP_ORDER: LeadColumnGroup[] = ["Lead", "Company", "Sequence", "Activity", "Custom"];
@@ -32,7 +39,7 @@ function reorderVisible(order: string[], hiddenSet: Set<string>, fromKey: string
   return order.map((k) => (hiddenSet.has(k) ? k : visible[vi++]));
 }
 
-export function ColumnSettingsDrawer({ open, onClose, resolved, onChange, onReset }: ColumnSettingsDrawerProps) {
+export function ColumnSettingsDrawer({ open, onClose, resolved, onChange, onReset, onSaveForMe, onSaveForEveryone, saved }: ColumnSettingsDrawerProps) {
   const [query, setQuery] = useState("");
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
@@ -185,19 +192,36 @@ export function ColumnSettingsDrawer({ open, onClose, resolved, onChange, onRese
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-t border-border-subtle shrink-0">
-          <button
-            onClick={onReset}
-            className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-ink-muted hover:text-ink transition-colors"
-          >
-            <RotateCcw size={12} /> Reset to default
-          </button>
-          <button
-            onClick={onClose}
-            className="px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11.5px] font-medium hover:opacity-90 transition-opacity"
-          >
-            Done
-          </button>
+        <div className="px-5 py-3.5 border-t border-border-subtle shrink-0 flex flex-col gap-2.5">
+          <div className="flex items-center justify-between">
+            <button
+              onClick={onReset}
+              className="inline-flex items-center gap-1.5 text-[11.5px] font-medium text-ink-muted hover:text-ink transition-colors"
+            >
+              <RotateCcw size={12} /> Reset to default
+            </button>
+            {saved && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-signal-green-text">
+                <Check size={12} /> {saved === "everyone" ? "Saved for everyone" : "Saved for you"}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onSaveForMe}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-[20px] border border-border-default text-[11.5px] font-medium text-ink hover:bg-hover transition-colors"
+            >
+              <User size={12} /> Save for me
+            </button>
+            {onSaveForEveryone && (
+              <button
+                onClick={onSaveForEveryone}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-[20px] bg-ink text-on-ink text-[11.5px] font-medium hover:opacity-90 transition-opacity"
+              >
+                <Users size={12} /> Save for everyone
+              </button>
+            )}
+          </div>
         </div>
       </aside>
     </>

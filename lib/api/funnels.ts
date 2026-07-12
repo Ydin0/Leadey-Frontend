@@ -530,6 +530,19 @@ export async function saveLeadFilters(
   });
 }
 
+/** Persist the campaign's shared column layout ("save for everyone") to
+ *  funnels.config so every rep sees it on this campaign unless they've saved
+ *  their own personal layout. */
+export async function saveColumnPrefsShared(
+  funnelId: string,
+  columnPrefs: { order: string[]; hidden: string[] },
+): Promise<void> {
+  await apiRequest(`/funnels/${encodeURIComponent(funnelId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ columnPrefs }),
+  });
+}
+
 /** Magic Enrich → "Find job posts": search TheirStack for each company's recent
  *  open jobs and add them as hiring roles on every lead at that company in this
  *  campaign. Idempotent (dedupes by role title per lead). */

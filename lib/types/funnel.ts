@@ -50,6 +50,9 @@ export interface CampaignConfig {
   /** Shared per-campaign lead filters (the Leads tab filter bar). Persisted so
    *  the filtered view is the same for every rep and survives a refresh. */
   leadFilters?: Record<string, unknown>;
+  /** Shared per-campaign column layout ("save for everyone") — order + hidden
+   *  keys every rep sees unless they've saved their own personal layout. */
+  columnPrefs?: { order: string[]; hidden: string[] };
 }
 
 export interface FunnelStep {

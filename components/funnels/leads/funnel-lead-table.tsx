@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { useRowLimit } from "@/lib/hooks/use-row-limit";
-import { advanceLead, updateLeadStatus, enrichJobPosts, saveLeadFilters } from "@/lib/api/funnels";
+import { advanceLead, updateLeadStatus, enrichJobPosts, saveLeadFilters, saveColumnPrefsShared } from "@/lib/api/funnels";
 import { useCredits } from "@/components/providers/credits-provider";
 import { FilterSideOver } from "@/components/filters/filter-side-over";
 import { SmartViewBar } from "@/components/filters/smart-view-bar";
@@ -46,6 +46,9 @@ interface FunnelLeadTableProps {
   steps?: FunnelStep[];
   /** Shared filter restored from the campaign config (persisted server-side). */
   initialFilters?: FilterGroup;
+  /** Shared column layout restored from the campaign config ("save for
+   *  everyone"). A rep's own saved layout (localStorage) takes precedence. */
+  initialColumns?: ColumnPrefs;
   sortBy?: LeadSortKey;
   onSortChange?: (key: LeadSortKey) => void;
   onLeadAdvanced?: () => void;
@@ -350,7 +353,7 @@ function MagicEnrichBar({
   );
 }
 
-export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, sortBy, onSortChange, onLeadAdvanced, onLeadClick, onCreateCampaign, onAddToCampaign, onRemoveLeads, onDeleteLeads }: FunnelLeadTableProps) {
+export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, initialColumns, sortBy, onSortChange, onLeadAdvanced, onLeadClick, onCreateCampaign, onAddToCampaign, onRemoveLeads, onDeleteLeads }: FunnelLeadTableProps) {
   const prefetchFunnel = usePrefetchFunnel();
   // Close-style query builder. Restored from the campaign config (a FilterGroup);
   // a legacy/other shape falls back to empty.
@@ -363,12 +366,18 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
   const [customFields, setCustomFields] = useState<FilterFieldDef[]>([]);
 
   // ── Configurable columns (flat lead view) — Close-style picker + persistence.
-  // Org and campaign views keep separate prefs (the org table has a Campaign
-  // column that would render empty inside a single campaign).
-  const columnPrefsKey = funnelId ? undefined : "leadey:lead-columns:org:v1";
+  // A rep's layout is saved PER CAMPAIGN (localStorage keyed by funnelId), so
+  // changing columns on one campaign never bleeds into another. The org-wide
+  // Leads page has its own key (it carries a Campaign column that's empty inside
+  // a single campaign). Precedence on load: the rep's own saved layout for this
+  // campaign → the campaign's shared layout ("save for everyone") → defaults.
+  const columnPrefsKey = funnelId ? `leadey:lead-columns:funnel:${funnelId}:v1` : "leadey:lead-columns:org:v1";
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [columnPrefs, setColumnPrefs] = useState<ColumnPrefs | null>(null);
-  useEffect(() => { setColumnPrefs(loadColumnPrefs(columnPrefsKey)); }, [columnPrefsKey]);
+  const [columnSaved, setColumnSaved] = useState<"me" | "everyone" | null>(null);
+  useEffect(() => {
+    setColumnPrefs(loadColumnPrefs(columnPrefsKey) ?? initialColumns ?? null);
+  }, [columnPrefsKey, initialColumns]);
 
   // Org custom fields → extra filterable fields in the builder.
   useEffect(() => {
@@ -573,19 +582,46 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
     linkified: !!onLeadClick,
   }), [statuses, activityMap, getLeadValue, onLeadClick]);
 
+  // Edits in the drawer are a LIVE PREVIEW only — nothing is persisted until the
+  // rep explicitly chooses "Save for me" or "Save for everyone". (Fixes the old
+  // behaviour where every tweak auto-wrote a single global pref shared by all
+  // campaigns.)
   const applyColumns = useCallback((order: string[], hidden: string[]) => {
-    const prefs = { order, hidden };
-    setColumnPrefs(prefs);
-    saveColumnPrefs(prefs, columnPrefsKey);
-  }, [columnPrefsKey]);
+    setColumnPrefs({ order, hidden });
+    setColumnSaved(null);
+  }, []);
   const resetColumns = useCallback(() => {
-    const prefs = {
+    setColumnPrefs({
+      order: columnCatalog.map((c) => c.key),
+      hidden: columnCatalog.filter((c) => !c.defaultVisible).map((c) => c.key),
+    });
+    setColumnSaved(null);
+  }, [columnCatalog]);
+  // Persist the current layout to just this rep (this campaign).
+  const saveColumnsForMe = useCallback(() => {
+    const prefs = columnPrefs ?? {
       order: columnCatalog.map((c) => c.key),
       hidden: columnCatalog.filter((c) => !c.defaultVisible).map((c) => c.key),
     };
-    setColumnPrefs(prefs);
     saveColumnPrefs(prefs, columnPrefsKey);
-  }, [columnCatalog, columnPrefsKey]);
+    setColumnSaved("me");
+  }, [columnPrefs, columnCatalog, columnPrefsKey]);
+  // Persist the current layout to the whole team on this campaign, and clear the
+  // rep's personal override so they see the shared layout they just set.
+  const saveColumnsForEveryone = useCallback(async () => {
+    if (!funnelId) return;
+    const prefs = columnPrefs ?? {
+      order: columnCatalog.map((c) => c.key),
+      hidden: columnCatalog.filter((c) => !c.defaultVisible).map((c) => c.key),
+    };
+    try {
+      await saveColumnPrefsShared(funnelId, prefs);
+      if (typeof window !== "undefined") window.localStorage.removeItem(columnPrefsKey);
+      setColumnSaved("everyone");
+    } catch (err) {
+      console.error("Failed to share columns:", err);
+    }
+  }, [funnelId, columnPrefs, columnCatalog, columnPrefsKey]);
 
   // Apply the query-builder filter + free-text search + sequence-step filter.
   const filtered = useMemo(() => {
@@ -1107,6 +1143,9 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
         resolved={resolvedColumns}
         onChange={applyColumns}
         onReset={resetColumns}
+        onSaveForMe={saveColumnsForMe}
+        onSaveForEveryone={funnelId ? saveColumnsForEveryone : undefined}
+        saved={columnSaved}
       />
     </div>
   );
