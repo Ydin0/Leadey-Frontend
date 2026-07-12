@@ -13,7 +13,7 @@ export async function listOrgEmailAccounts(): Promise<OrgEmailAccount[]> {
 
 export async function updateEmailAccount(
   id: string,
-  patch: { fromName?: string; signature?: string | null },
+  patch: { fromName?: string; signature?: string | null; signatureId?: string | null },
 ): Promise<EmailAccount> {
   return apiRequest<EmailAccount>(`/email/accounts/${id}`, {
     method: "PATCH",

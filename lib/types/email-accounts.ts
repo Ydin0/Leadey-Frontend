@@ -5,8 +5,10 @@ export interface EmailAccount {
   provider: EmailAccountProvider;
   email: string;
   fromName: string;
-  /** Appended to one-off + workflow emails (HTML or plain text). */
+  /** Custom raw signature (fallback when no shared signature is chosen). */
   signature: string | null;
+  /** Chosen shared signature id (email_signatures.id), or null. */
+  signatureId: string | null;
   status: string; // active | error | disconnected
   isDefault: boolean;
   createdAt: string;

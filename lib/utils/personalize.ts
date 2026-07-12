@@ -17,6 +17,17 @@ export interface PersonalizationLead {
 export interface PersonalizationContext {
   /** The sending rep's display name, for {{sender_name}}. */
   senderName?: string;
+  /** The sending rep's details, for {{sender_*}} signature variables + custom
+   *  fields (keyed without the "sender_" prefix, e.g. { booking_link }). */
+  sender?: {
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    title?: string | null;
+    company?: string | null;
+    fields?: Record<string, string> | null;
+  };
 }
 
 /** Resolve the `{{variable}}` → value map for a lead. Mirrors the variable
@@ -30,7 +41,10 @@ export function buildVariableMap(
     lead.name || [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "";
   const parts = full.split(" ").filter(Boolean);
   const domain = lead.companyDomain || (lead.email?.split("@")[1] ?? "");
-  return {
+  const s = ctx?.sender;
+  const sFirst = s?.firstName || "";
+  const sLast = s?.lastName || "";
+  const map: Record<string, string> = {
     first_name: lead.firstName || parts[0] || "",
     last_name: lead.lastName || parts.slice(1).join(" ") || "",
     full_name: full,
@@ -39,7 +53,16 @@ export function buildVariableMap(
     email: lead.email || "",
     domain,
     sender_name: ctx?.senderName || "",
+    sender_first_name: sFirst,
+    sender_last_name: sLast,
+    sender_full_name: [sFirst, sLast].filter(Boolean).join(" "),
+    sender_email: s?.email || "",
+    sender_phone: s?.phone || "",
+    sender_title: s?.title || "",
+    sender_company: s?.company || "",
   };
+  for (const [k, v] of Object.entries(s?.fields || {})) map[`sender_${k}`] = String(v ?? "");
+  return map;
 }
 
 /** Replace every `{{key}}` token in `text` with the lead's value. Unknown

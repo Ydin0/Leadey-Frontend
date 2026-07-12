@@ -46,3 +46,15 @@ export const TEMPLATE_VARIABLES = [
   { key: "domain", label: "Domain" },
   { key: "sender_name", label: "Your Name" },
 ];
+
+/** Sender variables for signatures — resolve to each sending rep's own details
+ *  at send time, so one signature serves the whole team. */
+export const SIGNATURE_VARIABLES = [
+  { key: "sender_full_name", label: "Full Name" },
+  { key: "sender_first_name", label: "First Name" },
+  { key: "sender_last_name", label: "Last Name" },
+  { key: "sender_title", label: "Job Title" },
+  { key: "sender_email", label: "Email" },
+  { key: "sender_phone", label: "Phone" },
+  { key: "sender_company", label: "Company" },
+];

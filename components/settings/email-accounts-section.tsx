@@ -215,7 +215,7 @@ export function EmailAccountsSection() {
                 )}>
                   {a.status === "active" ? "Connected" : a.status}
                 </span>
-                <button onClick={() => setEditing(a)} title="Edit name & signature" className="p-1.5 rounded-md text-ink-muted hover:bg-hover hover:text-ink transition-colors">
+                <button onClick={() => setEditing(a)} title="Edit from name" className="p-1.5 rounded-md text-ink-muted hover:bg-hover hover:text-ink transition-colors">
                   <Pencil size={14} />
                 </button>
                 {!a.isDefault && (
@@ -252,7 +252,7 @@ export function EmailAccountsSection() {
                   </div>
                   <p className="text-[10px] text-ink-muted truncate">
                     {a.ownerName || "Unknown user"} · {PROVIDER_LABEL[a.provider] || a.provider}
-                    {a.signature ? " · has signature" : ""}
+                    {(a.signature || a.signatureId) ? " · has signature" : ""}
                   </p>
                 </div>
                 <span className={cn(
@@ -477,9 +477,8 @@ function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
-/** Edit a connected account's from-name + signature. The signature is
- *  appended automatically to one-off and workflow emails at send time
- *  (Smartlead sequences are unaffected). */
+/** Edit a connected account's from-name. Signatures now live in their own
+ *  Settings → Signature tab (shared, variable-driven). */
 function EditAccountModal({
   account,
   onClose,
@@ -490,7 +489,6 @@ function EditAccountModal({
   onSaved: (updated: EmailAccount) => void;
 }) {
   const [fromName, setFromName] = useState(account.fromName || "");
-  const [signature, setSignature] = useState(account.signature || "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -501,7 +499,6 @@ function EditAccountModal({
     try {
       const updated = await updateEmailAccount(account.id, {
         fromName: fromName.trim(),
-        signature: signature.trim() ? signature : null,
       });
       onSaved(updated);
     } catch (err) {
@@ -515,8 +512,8 @@ function EditAccountModal({
       <div className="bg-surface rounded-[14px] border border-border-subtle p-6 w-full max-w-lg shadow-xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-[14px] font-semibold text-ink mb-1">Edit {account.email}</h3>
         <p className="text-[11.5px] text-ink-muted mb-4">
-          The signature is appended automatically to one-off emails and workflow emails sent from
-          this mailbox. Plain text or HTML. Campaign sequences (Smartlead) are unaffected.
+          The name recipients see in the From field. Manage your email signature in{" "}
+          <span className="text-ink-secondary font-medium">Settings → Signature</span>.
         </p>
 
         <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">From name</label>
@@ -524,16 +521,7 @@ function EditAccountModal({
           value={fromName}
           onChange={(e) => setFromName(e.target.value)}
           placeholder="e.g. Yaseen from Leadey"
-          className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default mb-4"
-        />
-
-        <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Signature</label>
-        <textarea
-          value={signature}
-          onChange={(e) => setSignature(e.target.value)}
-          rows={8}
-          placeholder={"Best,\nYaseen Deen\nFounder, Leadey\n+44 7911 220866"}
-          className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default resize-y font-mono"
+          className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
         />
 
         {error && <p className="text-[11px] text-signal-red-text mt-2">{error}</p>}

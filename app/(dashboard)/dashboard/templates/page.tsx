@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Plus, Loader2, Mail, Linkedin, MessageSquare } from "lucide-react";
+import { FileText, Plus, Loader2, Mail, Linkedin, MessageSquare, Signature } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TemplateCard } from "@/components/templates/template-card";
+import { SignaturesPanel } from "@/components/templates/signatures-panel";
 import { listTemplates } from "@/lib/api/templates";
 import type { Template } from "@/lib/types/template";
 
@@ -25,6 +26,7 @@ export default function TemplatesPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabKey>("all");
+  const [section, setSection] = useState<"templates" | "signatures">("templates");
 
   const loadTemplates = useCallback(async () => {
     setLoading(true);
@@ -47,7 +49,7 @@ export default function TemplatesPage() {
     ? templates
     : templates.filter((t) => t.channel === activeTab);
 
-  if (loading) {
+  if (loading && section === "templates") {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 size={20} className="animate-spin text-ink-muted" />
@@ -58,14 +60,14 @@ export default function TemplatesPage() {
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-[18px] font-semibold text-ink">Templates</h1>
           <p className="text-[12px] text-ink-muted mt-0.5">
-            Reusable email and LinkedIn message templates
+            Reusable message templates and team signatures
           </p>
         </div>
-        {templates.length > 0 && (
+        {section === "templates" && templates.length > 0 && (
           <button
             onClick={() => router.push("/dashboard/templates/new")}
             className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
@@ -75,6 +77,27 @@ export default function TemplatesPage() {
           </button>
         )}
       </div>
+
+      {/* Section switch: Templates | Signatures */}
+      <div className="inline-flex items-center gap-1 mb-5 p-0.5 rounded-full bg-section border border-border-subtle">
+        {([["templates", "Templates", FileText], ["signatures", "Signatures", Signature]] as const).map(([key, label, Icon]) => (
+          <button
+            key={key}
+            onClick={() => setSection(key)}
+            className={cn(
+              "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11.5px] font-medium transition-colors",
+              section === key ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink-secondary",
+            )}
+          >
+            <Icon size={12} /> {label}
+          </button>
+        ))}
+      </div>
+
+      {section === "signatures" && <SignaturesPanel />}
+
+      {section === "templates" && (
+      <>{/* templates view */}
 
       {/* Tabs */}
       {templates.length > 0 && (
@@ -128,6 +151,8 @@ export default function TemplatesPage() {
         <div className="py-12 text-center">
           <p className="text-[12px] text-ink-muted">No {activeTab} templates</p>
         </div>
+      )}
+      </>
       )}
     </div>
   );
