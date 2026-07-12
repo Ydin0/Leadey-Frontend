@@ -1,10 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Pencil, Trash2, CalendarClock, ArrowLeft, Check, Video, CalendarCheck } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, CalendarClock, ArrowLeft, Check, Video, CalendarCheck, Users, Globe, Link2, Copy } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NativeSelect } from "@/components/ui/native-select";
 import { WeeklyHoursEditor } from "@/components/shared/weekly-hours-editor";
+import { MemberMultiSelect } from "@/components/shared/member-multi-select";
+import { useTeamMembers } from "@/hooks/use-team-members";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import { allTimezones, browserTimezone, tzOffsetLabel } from "@/lib/utils/timezones";
 import {
   listMyBookingPages, createBookingPage, updateBookingPage, deleteBookingPage,
@@ -96,6 +99,13 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
   const [availability, setAvailability] = useState<WeeklyAvailability>(page?.availability || DEFAULT_AVAIL);
   const [respectCalendar, setRespectCalendar] = useState(page?.respectCalendar ?? true);
   const [roundRobin, setRoundRobin] = useState(page?.roundRobin ?? true);
+  const [memberIds, setMemberIds] = useState<string[]>(page?.members ?? []);
+  const [isPublic, setIsPublic] = useState(page?.isPublic ?? false);
+  const [copied, setCopied] = useState(false);
+  const { has } = usePermissions();
+  const canManage = has("settings.manageTeam");
+  const { members: teamMembers } = useTeamMembers();
+  const publicUrl = page?.publicSlug ? `${typeof window !== "undefined" ? window.location.origin : ""}/book/${page.publicSlug}` : "";
   const [minNoticeMin, setMinNoticeMin] = useState(page?.minNoticeMin ?? 240);
   const [bufferBeforeMin, setBufferBeforeMin] = useState(page?.bufferBeforeMin ?? 0);
   const [bufferAfterMin, setBufferAfterMin] = useState(page?.bufferAfterMin ?? 0);
@@ -106,7 +116,7 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
   async function save() {
     if (!name.trim()) { setError("Give the page a name."); return; }
     setSaving(true); setError(null);
-    const payload = { name: name.trim(), durationMin, video, timezone, availability, respectCalendar, roundRobin, minNoticeMin, bufferBeforeMin, bufferAfterMin, maxDaysAhead };
+    const payload = { name: name.trim(), durationMin, video, timezone, availability, respectCalendar, roundRobin, minNoticeMin, bufferBeforeMin, bufferAfterMin, maxDaysAhead, ...(canManage ? { members: memberIds, isPublic } : {}) };
     try {
       if (page) await updateBookingPage(page.id, payload);
       else await createBookingPage(payload);
@@ -184,6 +194,46 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
           </div>
           <Toggle on={roundRobin} onClick={() => setRoundRobin((v) => !v)} />
         </div>
+
+        {canManage && (
+          <div className="space-y-3 rounded-[12px] border border-border-subtle p-3.5">
+            <p className="text-[12.5px] font-medium text-ink flex items-center gap-1.5"><Users size={14} /> Assigned hosts (round robin)</p>
+            <p className="text-[11px] text-ink-muted -mt-1.5">Add teammates as hosts on this page. Bookings auto-assign a free one. You&apos;re always a host.</p>
+            <MemberMultiSelect
+              options={teamMembers.map((m) => ({ id: m.id, name: m.name, email: m.email }))}
+              selected={memberIds}
+              onChange={setMemberIds}
+              placeholder="Search teammates to add…"
+            />
+          </div>
+        )}
+
+        {canManage && (
+          <div className="rounded-[12px] border border-border-subtle p-3.5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[12.5px] font-medium text-ink flex items-center gap-1.5"><Globe size={14} /> Public booking link</p>
+                <p className="text-[11px] text-ink-muted mt-0.5">Anyone with the link can book — no login needed.</p>
+              </div>
+              <Toggle on={isPublic} onClick={() => setIsPublic((v) => !v)} />
+            </div>
+            {isPublic && (publicUrl ? (
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center gap-1.5 px-2.5 py-1.5 rounded-[8px] bg-section border border-border-subtle text-[11.5px] text-ink-secondary min-w-0">
+                  <Link2 size={12} className="text-ink-muted shrink-0" />
+                  <span className="truncate">{publicUrl}</span>
+                </div>
+                <button type="button"
+                  onClick={() => { navigator.clipboard.writeText(publicUrl).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-[8px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90">
+                  {copied ? <Check size={12} /> : <Copy size={12} />} {copied ? "Copied" : "Copy"}
+                </button>
+              </div>
+            ) : (
+              <p className="text-[11px] text-ink-faint">Save the page to generate the shareable link.</p>
+            ))}
+          </div>
+        )}
 
         <div>
           <label className={lab}>Weekly hours ({timezone.replace(/_/g, " ")})</label>

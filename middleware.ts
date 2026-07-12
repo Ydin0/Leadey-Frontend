@@ -4,6 +4,8 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/",
+  // Public Calendly-style booking pages — anyone can open + book without login.
+  "/book(.*)",
   "/api/twilio/voice",
   // Sentry tunnel route (next.config tunnelRoute) — must bypass Clerk auth or
   // client-side error reporting fails.

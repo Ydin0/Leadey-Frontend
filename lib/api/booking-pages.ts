@@ -15,6 +15,11 @@ export interface BookingPage {
   respectCalendar: boolean;
   /** Participate in the team "All" round-robin pool. */
   roundRobin: boolean;
+  /** Assigned host member ids (owner excluded) — the page's round-robin pool. */
+  members: string[];
+  /** Shareable public link toggle + minted slug (/book/<publicSlug>). */
+  isPublic: boolean;
+  publicSlug: string | null;
   bufferBeforeMin: number;
   bufferAfterMin: number;
   minNoticeMin: number;
