@@ -831,9 +831,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
           onClose={() => setShowBooking(false)}
           funnelId={funnelId}
           leadId={currentLead.id}
-          leadName={currentLead.name}
-          leadEmail={currentLead.email}
-          company={currentLead.company}
+          lead={currentLead}
           contacts={companyContacts.map((c) => ({ id: c.id, name: c.name, email: c.email, extraEmails: c.extraEmails }))}
           onBooked={() => setMeetingsRefresh((n) => n + 1)}
         />

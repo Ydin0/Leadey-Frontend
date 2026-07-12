@@ -1,18 +1,21 @@
 import { apiRequest } from "./client";
 
 export interface BookMeetingPayload {
-  hostAccountId: string;
+  /** Book against a rep's booking page (Calendly flow): host, duration + video
+   *  come from the page. When absent, hostAccountId + durationMin drive it. */
+  bookingPageId?: string;
+  hostAccountId?: string;
   title: string;
   description?: string;
   /** UTC ISO start time. */
   startISO: string;
-  durationMin: number;
+  durationMin?: number;
   /** Lead-contact emails invited to the meeting. */
   inviteeEmails: string[];
   /** Ad-hoc guest emails. */
   guestEmails: string[];
   /** Attach a native video link (Google Meet / Teams). */
-  video: boolean;
+  video?: boolean;
   /** Location when it's not a video meeting. */
   location?: string;
 }
