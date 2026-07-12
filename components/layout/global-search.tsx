@@ -11,6 +11,7 @@ import {
   Loader2,
   PhoneCall,
   Clock,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -221,6 +222,18 @@ export function GlobalSearch() {
         />
         {loading ? (
           <Loader2 size={13} className="text-ink-muted shrink-0 animate-spin" />
+        ) : query ? (
+          <button
+            type="button"
+            aria-label="Clear search"
+            onClick={() => {
+              setQuery("");
+              inputRef.current?.focus();
+            }}
+            className="flex items-center justify-center shrink-0 text-ink-muted hover:text-ink transition-colors"
+          >
+            <X size={13} strokeWidth={2} />
+          </button>
         ) : (
           <kbd className="hidden sm:flex items-center gap-0.5 text-[10px] text-ink-faint border border-border-subtle rounded px-1 py-0.5 shrink-0">
             ⌘K
