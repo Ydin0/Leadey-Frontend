@@ -55,6 +55,23 @@ function evalCondition(c: FilterCondition, get: ValueGetter): boolean {
     return c.op === "is" ? b === (asStr(val) === "true") : true;
   }
 
+  // Call date — the lead's raw value is an array of call timestamps (from the
+  // filter-insights map); a condition matches when ANY call falls in range.
+  if (c.field === "callDate") {
+    const times = (Array.isArray(raw) ? raw : raw != null ? [raw] : [])
+      .map((d) => new Date(asStr(d)).getTime())
+      .filter((t) => !Number.isNaN(t));
+    if (c.op === "before") { const b = new Date(asStr(val)).getTime(); return times.some((t) => t < b); }
+    if (c.op === "after") { const a = new Date(asStr(val)).getTime(); return times.some((t) => t > a); }
+    if (c.op === "between" && Array.isArray(val)) {
+      const a = new Date(asStr(val[0])).getTime();
+      // Inclusive of the whole end day so "Mon–Fri" includes all of Friday.
+      const b = new Date(asStr(val[1])).getTime() + 24 * 60 * 60 * 1000;
+      return times.some((t) => t >= a && t < b);
+    }
+    return true;
+  }
+
   if (def?.type === "date") {
     const t = raw ? new Date(raw as string | number | Date).getTime() : NaN;
     if (Number.isNaN(t)) return false;

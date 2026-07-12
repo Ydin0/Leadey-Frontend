@@ -152,10 +152,10 @@ export async function getOrgLeadFunnel(id: string): Promise<{ funnelId: string }
 /** Per-lead derived filter values (opportunity stage, AI call outcomes) —
  *  sparse map fetched only while a filter uses those fields. */
 export async function getLeadFilterInsights(funnelId?: string): Promise<
-  Record<string, { oppStage: string | null; callOutcomes: string[] }>
+  Record<string, { oppStage: string | null; callOutcomes: string[]; callDates: string[] }>
 > {
   const params = funnelId ? `?funnelId=${encodeURIComponent(funnelId)}` : "";
-  const res = await apiRequest<{ insights: Record<string, { oppStage: string | null; callOutcomes: string[] }> }>(
+  const res = await apiRequest<{ insights: Record<string, { oppStage: string | null; callOutcomes: string[]; callDates: string[] }> }>(
     `/leads/filter-insights${params}`,
   );
   return res.insights;

@@ -431,7 +431,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
     () => new Set(filterGroup.conditions.map((c) => c.field)),
     [filterGroup],
   );
-  const needsInsights = usedFilterFields.has("oppStage") || usedFilterFields.has("callOutcome");
+  const needsInsights = usedFilterFields.has("oppStage") || usedFilterFields.has("callOutcome") || usedFilterFields.has("callDate");
   const { data: filterInsights } = useQuery({
     queryKey: qk.leadFilterInsights(funnelId ?? "org"),
     queryFn: () => getLeadFilterInsights(funnelId ?? undefined),
@@ -542,6 +542,7 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, s
         case "hasOpportunity": return !!l.opportunityId;
         case "oppStage": return filterInsights?.[l.id]?.oppStage ?? "";
         case "callOutcome": return filterInsights?.[l.id]?.callOutcomes ?? [];
+        case "callDate": return filterInsights?.[l.id]?.callDates ?? [];
         case "transcriptKeywords": {
           // The evaluator substring-matches — return the keywords this lead's
           // transcripts matched (server-resolved), joined.

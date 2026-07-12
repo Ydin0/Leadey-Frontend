@@ -107,6 +107,8 @@ export const LEAD_FILTER_FIELDS: FilterFieldDef[] = [
   { key: "callOutcome", label: "Call outcome (AI)", group: "Activity", type: "enum", operators: ENUM_OPS, dynamicOptionsKey: "callOutcome" },
   // Any call transcript containing a phrase (server-resolved match set).
   { key: "transcriptKeywords", label: "Call transcript", group: "Activity", type: "text", operators: ["contains", "not_contains"] },
+  // Date a call was placed to the lead — "called between Mon and Fri" (server-resolved from call_records).
+  { key: "callDate", label: "Call date", group: "Activity", type: "date", operators: ["between", "before", "after", "is_set", "is_empty"] },
   // Opportunity
   { key: "hasOpportunity", label: "Has opportunity", group: "Opportunity", type: "boolean", operators: BOOL_OPS, options: [{ value: "true", label: "Yes" }, { value: "false", label: "No" }] },
   { key: "oppStage", label: "Opportunity stage", group: "Opportunity", type: "enum", operators: ENUM_OPS, dynamicOptionsKey: "oppStage" },
