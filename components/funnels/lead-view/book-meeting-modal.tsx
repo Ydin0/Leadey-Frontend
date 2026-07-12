@@ -282,10 +282,9 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
                           onClick={() => { setSelectedDate(k); setSelectedSlot(null); }}
                           className={cn(
                             "aspect-square rounded-full text-[12px] flex items-center justify-center transition-colors",
-                            !inMonth ? "text-ink-faint/40" : "",
-                            sel ? "bg-signal-blue text-signal-blue-text font-semibold"
-                              : enabled ? "text-signal-blue-text font-medium bg-signal-blue/10 hover:bg-signal-blue/20"
-                              : "text-ink-faint cursor-default",
+                            sel ? "bg-accent text-on-ink font-semibold"
+                              : enabled ? "text-accent font-semibold bg-accent/15 hover:bg-accent/25"
+                              : !inMonth ? "text-ink-faint/40 cursor-default" : "text-ink-faint cursor-default",
                           )}>
                           {d.getUTCDate()}
                         </button>
@@ -311,10 +310,10 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
                         {daySlots.map((iso) => (
                           <button key={iso} onClick={() => setSelectedSlot(iso)}
                             className={cn(
-                              "w-full text-center py-2.5 rounded-[10px] border text-[13px] font-medium transition-colors",
+                              "w-full text-center py-2.5 rounded-[10px] border text-[13px] font-semibold transition-colors",
                               selectedSlot === iso
-                                ? "bg-signal-blue text-signal-blue-text border-transparent"
-                                : "border-border-default text-signal-blue-text hover:border-signal-blue-text/40",
+                                ? "bg-accent text-on-ink border-transparent"
+                                : "border-border-default text-accent hover:border-accent/50 hover:bg-accent/5",
                             )}>
                             {selectedSlot === iso ? <span className="inline-flex items-center gap-1.5"><Check size={13} /> {timeInTz(iso, displayTz)}</span> : timeInTz(iso, displayTz)}
                           </button>
