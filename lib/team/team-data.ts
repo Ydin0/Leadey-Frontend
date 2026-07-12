@@ -35,14 +35,22 @@ export interface DayRec {
    *  so it stays correct regardless of the viewer's timezone. */
   dayKey: string;
   calls: number;
+  callsInbound: number;
+  callsOutbound: number;
   /** Calls a person picked up (talk time > 0, not voicemail). */
   connectedCalls: number;
   /** Calls that reached voicemail. */
   voicemailCalls: number;
   /** Seconds spent on calls that day (sum of call durations). */
   talkTime: number;
+  talkTimeInbound: number;
+  talkTimeOutbound: number;
   emails: number;
+  emailsInbound: number;
+  emailsOutbound: number;
   sms: number;
+  smsInbound: number;
+  smsOutbound: number;
   linkedin: number;
   meetings: number;
   replies: number;
@@ -70,19 +78,36 @@ export interface TimeWindow {
 
 export interface Totals {
   calls: number;
+  callsInbound: number;
+  callsOutbound: number;
   /** Calls a person picked up (not voicemail). */
   connectedCalls: number;
   /** Calls that reached voicemail. */
   voicemailCalls: number;
   /** Seconds spent on calls (sum of call durations). */
   talkTime: number;
+  talkTimeInbound: number;
+  talkTimeOutbound: number;
   emails: number;
+  emailsInbound: number;
+  emailsOutbound: number;
   sms: number;
+  smsInbound: number;
+  smsOutbound: number;
   linkedin: number;
   meetings: number;
   replies: number;
   total: number;
 }
+
+/** Numeric metric keys on Totals/DayRec that a card can display. */
+export type MetricKey =
+  | "calls" | "callsInbound" | "callsOutbound"
+  | "connectedCalls" | "voicemailCalls"
+  | "talkTime" | "talkTimeInbound" | "talkTimeOutbound"
+  | "emails" | "emailsInbound" | "emailsOutbound"
+  | "sms" | "smsInbound" | "smsOutbound"
+  | "linkedin" | "meetings" | "replies" | "total";
 
 export const CHANNELS: Channel[] = [
   { id: "calls", label: "Calls", short: "Calls", icon: "phone", color: "#86EFAC", verb: "dials" },
@@ -136,11 +161,19 @@ const DAY_MS = 86400000;
 export interface ApiDayRec {
   date: string;
   calls: number;
+  callsInbound?: number;
+  callsOutbound?: number;
   connectedCalls?: number;
   voicemailCalls?: number;
   talkTime: number;
+  talkTimeInbound?: number;
+  talkTimeOutbound?: number;
   emails: number;
+  emailsInbound?: number;
+  emailsOutbound?: number;
   sms: number;
+  smsInbound?: number;
+  smsOutbound?: number;
   linkedin: number;
   meetings: number;
   replies: number;
@@ -165,11 +198,19 @@ export function hydrateSeries(api: ApiDayRec[]): DayRec[] {
       ts: date.getTime(),
       dayKey: r.date.slice(0, 10), // backend ISO is UTC-midnight → its date part
       calls: r.calls || 0,
+      callsInbound: r.callsInbound || 0,
+      callsOutbound: r.callsOutbound || 0,
       connectedCalls: r.connectedCalls || 0,
       voicemailCalls: r.voicemailCalls || 0,
       talkTime: r.talkTime || 0,
+      talkTimeInbound: r.talkTimeInbound || 0,
+      talkTimeOutbound: r.talkTimeOutbound || 0,
       emails: r.emails || 0,
+      emailsInbound: r.emailsInbound || 0,
+      emailsOutbound: r.emailsOutbound || 0,
       sms: r.sms || 0,
+      smsInbound: r.smsInbound || 0,
+      smsOutbound: r.smsOutbound || 0,
       linkedin: r.linkedin || 0,
       meetings: r.meetings || 0,
       replies: r.replies || 0,
@@ -186,7 +227,7 @@ export function emptySeries(): DayRec[] {
   const days: DayRec[] = [];
   for (let i = 0; i < DAYS; i++) {
     const date = new Date(start.getTime() - (DAYS - 1 - i) * DAY_MS);
-    days.push({ date, ts: date.getTime(), dayKey: localDayKey(date), calls: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 });
+    days.push({ date, ts: date.getTime(), dayKey: localDayKey(date), calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 });
   }
   return days;
 }
@@ -272,14 +313,14 @@ export function workingDays(slice: DayRec[]): number {
 }
 
 export function sumSlice(slice: DayRec[]): Totals {
-  const out: Totals = { calls: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
+  const out: Totals = { calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
   slice.forEach((d) => { (Object.keys(out) as (keyof Totals)[]).forEach((k) => { out[k] += d[k] || 0; }); });
   return out;
 }
 
 export function targetFor(member: Member, range: DayRange): Totals {
   const wd = Math.max(1, workingDays(sliceRange(member.series, range)));
-  const t = { calls: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 } as Totals;
+  const t = { calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 } as Totals;
   CH_IDS.forEach((ch) => { t[ch] = member.targets[ch] * wd; });
   t.total = CH_IDS.reduce((a, ch) => a + t[ch], 0);
   return t;
@@ -351,7 +392,7 @@ export interface TeamTotals {
   delta: Record<keyof Totals, number>;
 }
 export function teamTotals(members: Member[], range: DayRange): TeamTotals {
-  const cur: Totals = { calls: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, emails: 0, sms: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
+  const cur: Totals = { calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
   const prev: Totals = { ...cur };
   const pr = prevRange(range);
   members.forEach((m) => {
@@ -366,6 +407,24 @@ export function teamTotals(members: Member[], range: DayRange): TeamTotals {
 
 export function sparkFor(members: Member[], range: DayRange, ch: ChannelId): number[] {
   return bucketed(members, range).series[ch];
+}
+
+/** Per-bucket sparkline for ANY numeric metric key (powers the customizable
+ *  stat cards). Reuses the same day/week bucketing as bucketed(). */
+export function sparkForMetric(members: Member[], range: DayRange, key: MetricKey): number[] {
+  const slices = members.map((m) => sliceRange(m.series, range));
+  const n = slices[0]?.length ?? 0;
+  if (bucketMode(range) === "week") {
+    const groups: [number, number][] = [];
+    for (let i = 0; i < n; i += 7) groups.push([i, Math.min(n, i + 7)]);
+    return groups.map(([a, b]) => {
+      let sum = 0;
+      slices.forEach((s) => { for (let i = a; i < b; i++) sum += s[i]?.[key] || 0; });
+      return sum;
+    });
+  }
+  const ref = slices[0] ?? [];
+  return ref.map((_, i) => slices.reduce((acc, s) => acc + (s[i]?.[key] || 0), 0));
 }
 
 /** Per-bucket opportunities-created series for the opportunities sparkline. */

@@ -1,28 +1,44 @@
 "use client";
 
+import { useState } from "react";
 import { Icon } from "./icon";
-import { StatCard, MetricCard, Panel, ChannelLegend, Avatar, DeltaPill } from "./team-shared";
+import { MetricCard, Panel, ChannelLegend, Avatar, DeltaPill } from "./team-shared";
 import { TrendChart, Donut, Ring, Meter, attColor } from "./charts";
 import {
-  CH_IDS, CH_MAP, teamTotals, bucketed, attainment, sparkFor, talkSparkFor, meetingsSparkFor, fmtTalkTime,
-  connectRate, connectRateSparkFor, voicemailSparkFor, departmentColor,
-  type DayRange,
+  CH_IDS, CH_MAP, teamTotals, bucketed, attainment, sparkForMetric, fmtTalkTime,
+  connectRate, connectRateSparkFor, departmentColor,
+  type DayRange, type Member, type TeamTotals,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
+import { usePermissions } from "@/lib/hooks/use-permissions";
+import { CATALOG_BY_ID, type MetricCardDef } from "@/lib/team/metric-catalog";
+import { AnalyticsCardsDrawer } from "./analytics-cards-drawer";
 
-// Talk time gets its own accent (warm amber) so it reads as a duration metric
-// distinct from the green "Calls" channel it derives from.
+/** Resolve a catalog card to display props for the given totals + range. */
+function cardView(def: MetricCardDef, tot: TeamTotals, members: Member[], range: DayRange) {
+  if (def.kind === "percent") {
+    const cur = connectRate(tot.cur), prev = connectRate(tot.prev);
+    return { value: `${Math.round(cur * 100)}%`, delta: prev ? (cur - prev) / prev : 0, spark: connectRateSparkFor(members, range) };
+  }
+  const key = def.metricKey!;
+  const raw = tot.cur[key];
+  return {
+    value: def.kind === "duration" ? fmtTalkTime(raw) : raw.toLocaleString(),
+    delta: tot.delta[key],
+    spark: sparkForMetric(members, range, key),
+  };
+}
+
+// Talk time accent (warm amber) — used by the Top performers row below.
 const TALK_COLOR = "#E0A878";
-// Opportunities created — the headline conversion metric (signal green).
-const OPP_COLOR = "#6FBEA8";
-// Connect rate — human pickups (teal). Voicemail — machine reaches (muted slate).
-const CONNECT_COLOR = "#5FB6C9";
-const VM_COLOR = "#9AA3C4";
 
 export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
   range: DayRange; rangeLabel: string; trendMode: "area" | "bars"; onPickRep: (id: string) => void;
 }) {
-  const { activeMembers: members, departments } = useTeamData();
+  const { activeMembers: members, departments, cardIds, saveCards } = useTeamData();
+  const { has } = usePermissions();
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const canEdit = has("settings.manageTeam");
   if (members.length === 0) {
     return (
       <div className="card fade" style={{ padding: 48, textAlign: "center" }}>
@@ -51,49 +67,31 @@ export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
 
   const ranked = members.map((m) => ({ m, a: attainment(m, range) })).sort((x, y) => y.a.overall - x.a.overall);
 
+  const cards = cardIds.map((id) => CATALOG_BY_ID[id]).filter(Boolean) as MetricCardDef[];
+
   return (
     <div className="fade" style={{ display: "grid", gap: 16 }}>
-      <div className="row" style={{ gap: 7, fontSize: 11, color: "var(--fg-faint)" }}>
-        <Icon name="activity" size={12} />
-        Calls, talk time &amp; opportunities are tracked live. Email, SMS &amp; LinkedIn populate once their integrations are connected.
+      <div className="between" style={{ gap: 7 }}>
+        <div className="row" style={{ gap: 7, fontSize: 11, color: "var(--fg-faint)" }}>
+          <Icon name="activity" size={12} />
+          Calls, talk time, emails &amp; SMS are tracked live, split by inbound / outbound.
+        </div>
+        {canEdit && (
+          <button className="seg-btn row" style={{ gap: 6, fontSize: 11 }} onClick={() => setCustomizeOpen(true)}>
+            <Icon name="sliders-horizontal" size={12} /> Customize
+          </button>
+        )}
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: 14 }}>
-        {CH_IDS.map((ch) => (
-          <StatCard key={ch} ch={ch} total={tot.cur[ch]} delta={tot.delta[ch]} spark={sparkFor(members, range, ch)} />
-        ))}
-        <MetricCard
-          label="Talk time"
-          icon="clock"
-          color={TALK_COLOR}
-          value={fmtTalkTime(tot.cur.talkTime)}
-          delta={tot.delta.talkTime}
-          spark={talkSparkFor(members, range)}
-        />
-        <MetricCard
-          label="Opportunities"
-          icon="briefcase"
-          color={OPP_COLOR}
-          value={tot.cur.meetings.toLocaleString()}
-          delta={tot.delta.meetings}
-          spark={meetingsSparkFor(members, range)}
-        />
-        <MetricCard
-          label="Connect rate"
-          icon="phone-call"
-          color={CONNECT_COLOR}
-          value={`${Math.round(connectRate(tot.cur) * 100)}%`}
-          delta={connectRate(tot.prev) ? (connectRate(tot.cur) - connectRate(tot.prev)) / connectRate(tot.prev) : 0}
-          spark={connectRateSparkFor(members, range)}
-        />
-        <MetricCard
-          label="Voicemails"
-          icon="message-square"
-          color={VM_COLOR}
-          value={tot.cur.voicemailCalls.toLocaleString()}
-          delta={tot.delta.voicemailCalls}
-          spark={voicemailSparkFor(members, range)}
-        />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 14 }}>
+        {cards.map((def) => {
+          const v = cardView(def, tot, members, range);
+          return <MetricCard key={def.id} label={def.label} icon={def.icon} color={def.color} value={v.value} delta={v.delta} spark={v.spark} />;
+        })}
       </div>
+
+      {canEdit && (
+        <AnalyticsCardsDrawer open={customizeOpen} onClose={() => setCustomizeOpen(false)} selected={cardIds} onSave={saveCards} />
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1.7fr 1fr", gap: 16 }}>
         <Panel title="Activity over time" sub={`${tot.cur.total.toLocaleString()} total touches · ${rangeLabel}`} right={<ChannelLegend />}>

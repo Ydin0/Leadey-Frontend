@@ -34,19 +34,27 @@ export async function getTeamKpiConfig(): Promise<TeamKpiConfig> {
   return apiRequest<TeamKpiConfig>("/team/kpi-config");
 }
 
-/** Real 90-day daily activity series per member (calls + meetings live;
- *  email/sms/linkedin = 0 until those integrations land). */
+/** Real daily activity series per member. Calls, talk time, emails, SMS +
+ *  meetings are live and split by inbound/outbound; LinkedIn is 0 for now. */
 export interface TeamAnalyticsDay {
   date: string;
   calls: number;
+  callsInbound?: number;
+  callsOutbound?: number;
   /** Calls a person picked up (talk time > 0, not voicemail). */
   connectedCalls: number;
   /** Calls that reached voicemail. */
   voicemailCalls: number;
   /** Total time on calls that day, in seconds (sum of call_records.duration). */
   talkTime: number;
+  talkTimeInbound?: number;
+  talkTimeOutbound?: number;
   emails: number;
+  emailsInbound?: number;
+  emailsOutbound?: number;
   sms: number;
+  smsInbound?: number;
+  smsOutbound?: number;
   linkedin: number;
   meetings: number;
   replies: number;
@@ -64,6 +72,21 @@ export async function saveTeamKpiConfig(
     method: "PUT",
     body: JSON.stringify(entry),
   });
+}
+
+/** Org-wide Team-analytics stat-card layout (ordered card ids). Empty = the
+ *  client falls back to DEFAULT_CARD_IDS. */
+export async function getAnalyticsCards(): Promise<string[]> {
+  const res = await apiRequest<{ cards: string[] }>("/team/analytics-cards");
+  return res.cards;
+}
+
+export async function saveAnalyticsCards(cards: string[]): Promise<string[]> {
+  const res = await apiRequest<{ cards: string[] }>("/team/analytics-cards", {
+    method: "PUT",
+    body: JSON.stringify({ cards }),
+  });
+  return res.cards;
 }
 
 export async function inviteTeamMember(
