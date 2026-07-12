@@ -164,6 +164,7 @@ export async function sendEmail(
         subject: payload.subject,
         bodyHtml: payload.bodyHtml,
         attachmentIds: payload.attachmentIds,
+        signatureId: payload.signatureId,
       }),
     },
   );

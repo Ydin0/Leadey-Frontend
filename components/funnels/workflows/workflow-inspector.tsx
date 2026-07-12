@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Trash2, X, Loader2, BookmarkPlus, Check, Paperclip } from "lucide-react";
 import type { Workflow, WorkflowNode, WorkflowSettings, WorkflowStatus } from "@/lib/types/workflow";
 import { NativeSelect } from "@/components/ui/native-select";
+import { SignaturePicker } from "@/components/shared/signature-picker";
 import { VariablePicker } from "./variable-picker";
 import { listEmailAccounts } from "@/lib/api/email-accounts";
 import type { EmailAccount } from "@/lib/types/email-accounts";
@@ -346,6 +347,14 @@ function EmailStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Re
         {accounts.map((a) => <option key={a.id} value={a.id}>{a.fromName ? `${a.fromName} · ${a.email}` : a.email}</option>)}
       </NativeSelect>
       {accounts.length === 0 && <p className="text-[11px] text-ink-faint mt-1.5">No mailbox connected — add one in Settings → Email.</p>}
+
+      <SignaturePicker
+        label="Signature"
+        labelClassName={lab}
+        className={inp}
+        value={v("signatureId") || "default"}
+        onChange={(val) => set({ signatureId: val })}
+      />
 
       <label className={lab}>Template</label>
       <NativeSelect className={inp} value={tplId} onChange={(e) => applyTemplate(e.target.value)}>

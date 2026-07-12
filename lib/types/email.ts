@@ -110,6 +110,9 @@ export interface SendEmailPayload {
   bodyHtml: string;
   /** Ids of template attachments (or ad-hoc uploads) to attach to the email. */
   attachmentIds?: string[];
+  /** Per-send signature choice: a signature id, "none", or "default"/omitted
+   *  to use the mailbox's own configured signature. */
+  signatureId?: string | null;
   /** Set when this send completes a campaign step. */
   stepIndex?: number | null;
   scheduledAt?: string | null;

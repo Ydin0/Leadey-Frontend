@@ -8,6 +8,7 @@ import {
   listSignatures, createSignature, updateSignature, deleteSignature,
   getSignatureDetails, type EmailSignature, type SignatureDetails,
 } from "@/lib/api/signatures";
+import { invalidateSignatureCache } from "@/components/shared/signature-picker";
 
 /** Sample sender for the preview when the author has no details filled in. */
 const SAMPLE: SignatureDetails = {
@@ -137,6 +138,7 @@ function SignatureEditor({ signature, details, onBack, onSaved }: {
     try {
       if (signature) await updateSignature(signature.id, { name: name.trim(), contentHtml: html });
       else await createSignature({ name: name.trim(), contentHtml: html });
+      invalidateSignatureCache();
       onSaved();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save");
@@ -148,7 +150,7 @@ function SignatureEditor({ signature, details, onBack, onSaved }: {
     if (!signature) return;
     if (!confirm(`Delete "${signature.name}"? Mailboxes using it will fall back to no signature.`)) return;
     setSaving(true);
-    try { await deleteSignature(signature.id); onSaved(); }
+    try { await deleteSignature(signature.id); invalidateSignatureCache(); onSaved(); }
     catch (e) { setError(e instanceof Error ? e.message : "Failed to delete"); setSaving(false); }
   }
 

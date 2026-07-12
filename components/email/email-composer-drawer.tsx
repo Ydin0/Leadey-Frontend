@@ -5,6 +5,7 @@ import { NativeSelect } from "@/components/ui/native-select";
 import { X, Mail, Loader2, Send, ChevronDown, FileText, Clock, Paperclip } from "lucide-react";
 import { RichEmailEditor } from "./rich-email-editor";
 import { SlideOver } from "@/components/shared/slide-over";
+import { SignaturePicker } from "@/components/shared/signature-picker";
 import { listSendingAccounts, sendEmail } from "@/lib/api/email";
 import { listTemplates, listTemplateAttachments, uploadTemplateAttachment } from "@/lib/api/templates";
 import { renderPersonalized, type PersonalizationLead } from "@/lib/utils/personalize";
@@ -58,6 +59,7 @@ export function EmailComposerDrawer({
   const [showCc, setShowCc] = useState(false);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [signatureId, setSignatureId] = useState("default");
   const [attachments, setAttachments] = useState<TemplateAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -162,6 +164,7 @@ export function EmailComposerDrawer({
         bodyHtml: resolvedBody,
         attachmentIds: attachments.map((a) => a.id),
         stepIndex: stepIndex ?? null,
+        signatureId,
       });
       onSent({ subject: resolvedSubject, bodyHtml: resolvedBody });
       onClose();
@@ -311,21 +314,11 @@ export function EmailComposerDrawer({
               senderName={fromAccount?.fromName}
               minHeight={240}
             />
-            {fromAccount?.signature ? (
-              <div className="mt-2 rounded-[8px] border border-border-subtle bg-section/40 px-3 py-2">
-                <p className="text-[9px] uppercase tracking-wider text-ink-faint font-medium mb-1">
-                  Signature added automatically
-                </p>
-                <div
-                  className="text-[11.5px] text-ink-muted leading-relaxed [&_a]:text-accent"
-                  dangerouslySetInnerHTML={{
-                    __html: /<[a-z][\s\S]*>/i.test(fromAccount.signature)
-                      ? fromAccount.signature
-                      : fromAccount.signature.replace(/\n/g, "<br>"),
-                  }}
-                />
-              </div>
-            ) : null}
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[10.5px] text-ink-muted">Signature</span>
+              <SignaturePicker value={signatureId} onChange={setSignatureId} />
+              <span className="text-[10.5px] text-ink-faint">— filled with your details at send</span>
+            </div>
           </Field>
 
           {/* Attachments */}

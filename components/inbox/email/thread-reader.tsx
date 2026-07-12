@@ -20,6 +20,7 @@ import { renderPersonalized } from "@/lib/utils/personalize";
 import type { LeadStatusOption } from "@/lib/utils/lead-status";
 import { MemberAvatar } from "@/components/shared/member-avatar";
 import { NativeSelect } from "@/components/ui/native-select";
+import { SignaturePicker } from "@/components/shared/signature-picker";
 import { AttachmentChips } from "@/components/email/attachment-chips";
 import { STATUS_BADGE, messageTime, snoozePresets } from "./shared";
 
@@ -280,6 +281,7 @@ function ReplyBox({
   const [text, setText] = useState("");
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [signatureId, setSignatureId] = useState("default");
   const [attachments, setAttachments] = useState<TemplateAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [drafting, setDrafting] = useState(false);
@@ -352,6 +354,7 @@ function ReplyBox({
         subject,
         bodyHtml,
         attachmentIds: attachments.map((a) => a.id),
+        signatureId,
       });
       setText("");
       setAttachments([]);
@@ -488,9 +491,7 @@ function ReplyBox({
           ) : fromAccount ? (
             <span className="text-[11px] text-ink-faint truncate">from {fromAccount.email}</span>
           ) : null}
-          {fromAccount?.signature && (
-            <span className="hidden sm:block text-[10.5px] text-ink-faint">· Signature added automatically</span>
-          )}
+          <SignaturePicker value={signatureId} onChange={setSignatureId} />
         </div>
         <button
           onClick={handleSend}
