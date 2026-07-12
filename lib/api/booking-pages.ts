@@ -20,6 +20,10 @@ export interface BookingPage {
   /** Shareable public link toggle + minted slug (/book/<publicSlug>). */
   isPublic: boolean;
   publicSlug: string | null;
+  /** Is the current user the owner? Pages you're only assigned to as a host are read-only unless you can manage the team. */
+  owned: boolean;
+  /** Display name of the page owner (for pages shared with you). */
+  ownerName: string;
   bufferBeforeMin: number;
   bufferAfterMin: number;
   minNoticeMin: number;

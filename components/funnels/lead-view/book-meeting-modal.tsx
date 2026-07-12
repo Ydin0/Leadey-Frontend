@@ -10,7 +10,7 @@ import { TimezoneSelect } from "@/components/shared/timezone-select";
 import { guessLeadTimezone } from "@/lib/utils/lead-timezone";
 import { browserTimezone } from "@/lib/utils/timezones";
 import { monthGrid, dateKey, dateKeyInTz, timeInTz, groupSlotsByTz, CAL_WEEKDAYS, CAL_MONTHS } from "@/lib/utils/booking-calendar";
-import { listAllBookingPages, getPageAvailability, getRoundRobinAvailability, type BookingPageSummary } from "@/lib/api/booking-pages";
+import { listAllBookingPages, getPageAvailability, type BookingPageSummary } from "@/lib/api/booking-pages";
 import { bookMeeting, type BookedMeeting } from "@/lib/api/meetings";
 import type { FunnelLead } from "@/lib/types/funnel";
 
@@ -25,12 +25,10 @@ interface BookMeetingModalProps {
   onBooked: () => void;
 }
 
-const ALL = "all";
-
 export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contacts, onBooked }: BookMeetingModalProps) {
   const [pages, setPages] = useState<BookingPageSummary[]>([]);
   const [loadingPages, setLoadingPages] = useState(true);
-  const [selection, setSelection] = useState(ALL); // ALL | pageId
+  const [selection, setSelection] = useState(""); // selected pageId
 
   const [displayTz, setDisplayTz] = useState(() => guessLeadTimezone(lead) || browserTimezone());
   const [view, setView] = useState(() => { const n = new Date(); return { y: n.getUTCFullYear(), m: n.getUTCMonth() }; });
@@ -52,14 +50,13 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
   const [error, setError] = useState<string | null>(null);
   const [confirmed, setConfirmed] = useState<BookedMeeting | null>(null);
 
-  const isPool = selection === ALL;
   const selectedPage = pages.find((p) => p.id === selection);
-  const meta = isPool ? availMeta : { durationMin: selectedPage?.durationMin ?? availMeta.durationMin, video: selectedPage?.video ?? availMeta.video };
+  const meta = { durationMin: selectedPage?.durationMin ?? availMeta.durationMin, video: selectedPage?.video ?? availMeta.video };
 
   useEffect(() => {
     let alive = true;
     listAllBookingPages()
-      .then((ps) => { if (alive) setPages(ps); })
+      .then((ps) => { if (!alive) return; setPages(ps); if (ps[0]) { setSelection(ps[0].id); setTitle(ps[0].name); } })
       .catch(() => setPages([]))
       .finally(() => { if (alive) setLoadingPages(false); });
     return () => { alive = false; };
@@ -72,13 +69,14 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
   }, [contacts]);
 
   const loadAvailability = useCallback(async (y: number, m: number) => {
+    if (!selection) return;
     setLoadingAvail(true);
     const cells = monthGrid(y, m);
     const todayKey = dateKeyInTz(new Date().toISOString(), displayTz);
     const from = [dateKey(cells[0]), todayKey].sort()[1];
     const to = dateKey(cells[41]);
     try {
-      const res = isPool ? await getRoundRobinAvailability(from, to) : await getPageAvailability(selection, from, to);
+      const res = await getPageAvailability(selection, from, to);
       setAvailMeta({ durationMin: res.durationMin, video: res.video });
       setAvailByDate(groupSlotsByTz(res.days.flatMap((d) => d.slots), displayTz));
       setHostsBySlot(res.hostsBySlot || {});
@@ -89,10 +87,10 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
     } finally {
       setLoadingAvail(false);
     }
-  }, [displayTz, isPool, selection]);
+  }, [displayTz, selection]);
 
   useEffect(() => {
-    if (loadingPages) return;
+    if (loadingPages || !selection) return;
     setSelectedDate(null); setSelectedSlot(null);
     void loadAvailability(view.y, view.m);
   }, [loadingPages, selection, view.y, view.m, loadAvailability]);
@@ -103,8 +101,7 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
 
   function pickPage(id: string) {
     setSelection(id);
-    const p = pages.find((x) => x.id === id);
-    setTitle(id === ALL ? "Meeting" : p?.name || "Meeting");
+    setTitle(pages.find((x) => x.id === id)?.name || "Meeting");
   }
 
   async function submit() {
@@ -115,7 +112,7 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
     setSubmitting(true);
     try {
       const result = await bookMeeting(funnelId, leadId, {
-        ...(isPool ? { roundRobin: true } : { bookingPageId: selection }),
+        bookingPageId: selection,
         startISO: selectedSlot,
         title: title.trim() || selectedPage?.name || "Meeting",
         description: notes.trim() || undefined,
@@ -197,12 +194,11 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
           <div>
             <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Booking page</label>
             <NativeSelect value={selection} onChange={(e) => pickPage(e.target.value)} className="w-full text-[12.5px] bg-section border border-border-subtle rounded-[10px] px-3 py-2 text-ink">
-              <option value={ALL}>All hosts · round robin</option>
               {pages.map((p) => (
-                <option key={p.id} value={p.id}>{p.name} · {p.durationMin}m{p.memberCount > 0 ? " · team" : p.ownerName ? ` · ${p.ownerName}` : ""}</option>
+                <option key={p.id} value={p.id}>{p.name} · {p.durationMin}m · {p.memberCount > 0 ? "Team (round robin)" : p.ownerName || "You"}</option>
               ))}
             </NativeSelect>
-            {isPool && <p className="text-[11.5px] text-ink-faint mt-1.5 inline-flex items-center gap-1.5"><Users size={13} /> A free rep is auto-assigned for the time you pick.</p>}
+            {(selectedPage?.memberCount ?? 0) > 0 && <p className="text-[11.5px] text-ink-faint mt-1.5 inline-flex items-center gap-1.5"><Users size={13} /> A free rep from the team is auto-assigned for the time you pick.</p>}
           </div>
 
           <div className="h-px bg-border-subtle" />

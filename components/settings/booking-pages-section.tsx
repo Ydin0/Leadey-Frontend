@@ -71,6 +71,7 @@ export function BookingPagesSection() {
                 {p.video && <span className="inline-flex items-center gap-1"><Video size={12} /> Video</span>}
                 {p.respectCalendar && <span className="inline-flex items-center gap-1 text-signal-green-text"><CalendarCheck size={12} /> Checks calendar</span>}
                 <span className="text-ink-faint">· {p.timezone.replace(/_/g, " ")}</span>
+                {!p.owned && <span className="inline-flex items-center gap-1 text-signal-blue-text"><Users size={12} /> Shared by {p.ownerName || "a teammate"}</span>}
               </div>
             </button>
           ))}
@@ -104,6 +105,8 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
   const [copied, setCopied] = useState(false);
   const { has } = usePermissions();
   const canManage = has("settings.manageTeam");
+  // You're a host on this page but not the owner (and can't manage the team) → view-only.
+  const readOnly = !!page && !page.owned && !canManage;
   const { members: teamMembers } = useTeamMembers();
   const publicUrl = page?.publicSlug ? `${typeof window !== "undefined" ? window.location.origin : ""}/book/${page.publicSlug}` : "";
   const [minNoticeMin, setMinNoticeMin] = useState(page?.minNoticeMin ?? 240);
@@ -137,20 +140,31 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
         <button onClick={onBack} className="flex items-center gap-1.5 text-[12px] text-ink-secondary hover:text-ink">
           <ArrowLeft size={14} /> Back to booking pages
         </button>
-        <div className="flex items-center gap-2">
-          {page && (
-            <button onClick={remove} disabled={saving} className="p-2 rounded-[16px] text-ink-muted hover:text-signal-red-text hover:bg-signal-red/10" title="Delete">
-              <Trash2 size={14} />
+        {readOnly ? (
+          <span className="text-[11px] text-ink-muted inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[16px] bg-section border border-border-subtle"><Users size={12} /> View only</span>
+        ) : (
+          <div className="flex items-center gap-2">
+            {page && page.owned && (
+              <button onClick={remove} disabled={saving} className="p-2 rounded-[16px] text-ink-muted hover:text-signal-red-text hover:bg-signal-red/10" title="Delete">
+                <Trash2 size={14} />
+              </button>
+            )}
+            <button onClick={save} disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50 transition-colors">
+              {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save page
             </button>
-          )}
-          <button onClick={save} disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50 transition-colors">
-            {saving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />} Save page
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
-      <div className="space-y-5">
+      {readOnly && (
+        <div className="mb-5 rounded-[12px] border border-border-subtle bg-section/50 p-3.5 text-[12px] text-ink-secondary flex items-start gap-2">
+          <Users size={15} className="text-signal-blue-text mt-0.5 shrink-0" />
+          <span>You&apos;re a host on <span className="font-medium text-ink">{page?.name}</span>, shared by {page?.ownerName || "a teammate"}. Bookings round-robin to whoever&apos;s free — only the owner can change its settings.</span>
+        </div>
+      )}
+
+      <fieldset disabled={readOnly} className="space-y-5 min-w-0 disabled:opacity-70">
         <div>
           <label className={lab}>Name</label>
           <input value={name} onChange={(e) => setName(e.target.value)} className={inp} placeholder="e.g. 30-min intro" />
@@ -267,7 +281,7 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
         </div>
 
         {error && <p className="text-[12px] text-signal-red-text">{error}</p>}
-      </div>
+      </fieldset>
     </div>
   );
 }
