@@ -44,6 +44,20 @@ export interface AvailabilityResult {
   durationMin: number;
   video: boolean;
   days: AvailabilityDay[];
+  /** Which host userIds are free at each slot (UTC ISO → userIds). */
+  hostsBySlot?: Record<string, string[]>;
+  /** Host id → display name, for slot avatars. */
+  hosts?: { userId: string; name: string }[];
+}
+
+/** A booking page in the modal's page selector. */
+export interface BookingPageSummary {
+  id: string;
+  name: string;
+  durationMin: number;
+  video: boolean;
+  ownerName: string;
+  memberCount: number;
 }
 
 export const WEEKDAYS: { key: WeekdayKey; label: string }[] = [
@@ -69,6 +83,11 @@ export async function deleteBookingPage(id: string): Promise<{ deleted: boolean 
 
 export async function listBookingHosts(): Promise<BookingHost[]> {
   return apiRequest<BookingHost[]>("/booking-pages/hosts");
+}
+
+/** Every active booking page in the org — the modal's page selector. */
+export async function listAllBookingPages(): Promise<BookingPageSummary[]> {
+  return apiRequest<BookingPageSummary[]>("/booking-pages/all");
 }
 
 export async function getPageAvailability(pageId: string, from: string, to: string): Promise<AvailabilityResult> {
