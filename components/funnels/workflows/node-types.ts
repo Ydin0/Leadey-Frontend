@@ -23,7 +23,7 @@ export const NODE_TYPES: Record<WorkflowNodeType, NodeTypeDef> = {
   email:     { type: "email",     label: "Send Email",       kicker: "MESSAGING", icon: Mail,         ports: ["out"], defaultData: () => ({ from: "", subject: "", body: "" }) },
   sms:       { type: "sms",       label: "Send SMS",         kicker: "MESSAGING", icon: MessageSquare,ports: ["out"], defaultData: () => ({ message: "" }) },
   whatsapp:  { type: "whatsapp",  label: "Send WhatsApp",    kicker: "MESSAGING", icon: MessageCircle,ports: ["out"], defaultData: () => ({ message: "" }) },
-  linkedin:  { type: "linkedin",  label: "LinkedIn",         kicker: "MESSAGING", icon: Linkedin,     ports: ["out"], defaultData: () => ({ ltype: "connection", message: "" }) },
+  linkedin:  { type: "linkedin",  label: "LinkedIn",         kicker: "MESSAGING", icon: Linkedin,     ports: ["out"], defaultData: () => ({ action: "connection", senderMode: "actor", message: "" }) },
   call:      { type: "call",      label: "Call Task",        kicker: "MESSAGING", icon: Phone,        ports: ["out"], defaultData: () => ({ title: "Call lead", script: "" }) },
   wait:      { type: "wait",      label: "Wait / Delay",     kicker: "TIMING",    icon: Clock,        ports: ["out"], defaultData: () => ({ amount: 2, unit: "days" }) },
   waitevent: { type: "waitevent", label: "Wait for Event",   kicker: "TIMING",    icon: Hourglass,    ports: ["out"], defaultData: () => ({ event: "replied", amount: 3, unit: "days" }) },
@@ -59,7 +59,10 @@ export function nodeSummary(type: WorkflowNodeType, data: Record<string, unknown
     case "email": return s("subject") || "(no subject)";
     case "sms": return s("message") || "(empty message)";
     case "whatsapp": return s("message") || "(empty message)";
-    case "linkedin": return `${s("ltype") || "connection"}`;
+    case "linkedin": {
+      const a = s("action") || s("ltype") || "connection";
+      return a === "message" ? "Send message" : a === "visit" ? "Visit profile" : "Connection request";
+    }
     case "call": return s("title") || "Call task";
     case "wait": return `${s("amount") || "0"} ${s("unit") || "days"}`;
     case "waitevent": return `until ${s("event") || "reply"}`;

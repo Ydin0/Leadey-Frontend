@@ -8,6 +8,7 @@ import { SignaturePicker } from "@/components/shared/signature-picker";
 import { VariablePicker } from "./variable-picker";
 import { listEmailAccounts } from "@/lib/api/email-accounts";
 import type { EmailAccount } from "@/lib/types/email-accounts";
+import { listLinkedInAccounts, type LinkedInAccount } from "@/lib/api/linkedin";
 import { getPhoneLines } from "@/lib/api/phone-lines";
 import type { PhoneLine } from "@/lib/types/calling";
 import { listTemplates, createTemplate, listTemplateAttachments, uploadTemplateAttachment } from "@/lib/api/templates";
@@ -64,18 +65,7 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProp
 
       {node.type === "whatsapp" && <WhatsappStepForm d={d} set={set} />}
 
-      {node.type === "linkedin" && (<>
-        <label className={lab}>Action</label>
-        <NativeSelect className={inp} value={v("ltype")} onChange={(e) => set({ ltype: e.target.value })}>
-          <option value="connection">Connection request</option>
-          <option value="message">Direct message</option>
-          <option value="inmail">InMail</option>
-          <option value="visit">Profile visit</option>
-        </NativeSelect>
-        <label className={lab}>Message</label>
-        <textarea className={area} value={v("message")} onChange={(e) => set({ message: e.target.value })} />
-        <p className="text-[11px] text-ink-faint mt-1.5">Creates an assigned task for a rep to action.</p>
-      </>)}
+      {node.type === "linkedin" && <LinkedInStepForm d={d} set={set} />}
 
       {node.type === "call" && (<>
         <label className={lab}>Task title</label>
@@ -268,6 +258,57 @@ function SaveTemplateRow({ subject, body, channel, onSaved }: { subject?: string
     <button onClick={() => setShow(true)} className="flex items-center gap-1.5 mt-3 text-[11px] font-medium text-ink-muted hover:text-ink-secondary">
       {done ? <><Check size={12} className="text-signal-green-text" /> Saved as template</> : <><BookmarkPlus size={12} /> Save as template</>}
     </button>
+  );
+}
+
+function LinkedInStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Record<string, unknown>) => void }) {
+  const v = (k: string) => (d[k] != null ? String(d[k]) : "");
+  const [accounts, setAccounts] = useState<LinkedInAccount[]>([]);
+  const msgRef = useRef<HTMLTextAreaElement>(null);
+  const action = v("action") || "connection";
+  const isActor = v("senderMode") === "actor";
+
+  useEffect(() => { listLinkedInAccounts().then(setAccounts).catch(() => {}); }, []);
+
+  return (
+    <>
+      <label className={lab}>Action</label>
+      <NativeSelect className={inp} value={action} onChange={(e) => set({ action: e.target.value })}>
+        <option value="connection">Connection request + note</option>
+        <option value="message">Send message</option>
+        <option value="visit">Visit profile</option>
+      </NativeSelect>
+
+      <label className={lab}>Send as</label>
+      <NativeSelect className={inp} value={v("senderMode")} onChange={(e) => set({ senderMode: e.target.value })}>
+        <option value="">A fixed account (choose below)</option>
+        <option value="actor">The user who triggered the workflow</option>
+      </NativeSelect>
+      {isActor && (
+        <p className="text-[11px] text-ink-faint mt-1.5">
+          Runs from the LinkedIn account of whoever fired the trigger. If they have none connected, the fallback below is used.
+        </p>
+      )}
+
+      <label className={lab}>{isActor ? "Fallback account" : "LinkedIn account"}</label>
+      <NativeSelect className={inp} value={v("accountId")} onChange={(e) => set({ accountId: e.target.value })}>
+        <option value="">First connected account</option>
+        {accounts.map((a) => (
+          <option key={a.id} value={a.id}>{a.ownerName ? `${a.ownerName} · ${a.name || "LinkedIn"}` : a.name || a.unipileAccountId}</option>
+        ))}
+      </NativeSelect>
+      {accounts.length === 0 && <p className="text-[11px] text-ink-faint mt-1.5">No LinkedIn connected — add one in Settings → LinkedIn.</p>}
+
+      {action !== "visit" && (
+        <>
+          <FieldHeader label={action === "connection" ? "Connection note" : "Message"} picker={<VariablePicker targetRef={msgRef} value={v("message")} onChange={(val) => set({ message: val })} />} />
+          <textarea ref={msgRef} className={area} value={v("message")} onChange={(e) => set({ message: e.target.value })}
+            placeholder={action === "connection" ? "Hi {{first_name}}, saw you lead growth at {{company}} — keen to connect." : "Thanks for connecting {{first_name}}!"} />
+          {action === "message" && <p className="text-[11px] text-ink-faint mt-1.5">Messages only reach 1st-degree connections. Chain after a connection request + wait for best results.</p>}
+        </>
+      )}
+      <p className="text-[11px] text-ink-faint mt-2">Requires the lead to have a LinkedIn URL. Daily limits apply (80 invites, 100 messages, 300 profile views).</p>
+    </>
   );
 }
 
