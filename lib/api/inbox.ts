@@ -57,3 +57,11 @@ export async function convertPotentialContact(data: {
     body: JSON.stringify(data),
   });
 }
+
+/** Hide an unknown caller/texter from the Potential Contacts list (persisted). */
+export async function dismissPotentialContact(data: { phone?: string; email?: string }): Promise<void> {
+  await apiRequest("/inbox/potential-contacts/dismiss", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}

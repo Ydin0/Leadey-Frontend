@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { NativeSelect } from "@/components/ui/native-select";
-import { Loader2, UserPlus, PhoneCall, PhoneIncoming, MessageSquare, Calendar } from "lucide-react";
+import { Loader2, UserPlus, PhoneCall, PhoneIncoming, MessageSquare, Calendar, X } from "lucide-react";
 import { formatRelativeTime } from "@/lib/utils";
-import { getPotentialContacts, convertPotentialContact, type PotentialContact } from "@/lib/api/inbox";
+import { getPotentialContacts, convertPotentialContact, dismissPotentialContact, type PotentialContact } from "@/lib/api/inbox";
 import { listFunnels } from "@/lib/api/funnels";
 import { useCallContext } from "@/components/calling/call-context";
 import { Modal, ModalHeader } from "@/components/email/modal";
@@ -28,6 +28,12 @@ export function PotentialContactsInbox() {
     }
   }
   useEffect(() => { void load(); }, []);
+
+  function dismiss(c: PotentialContact) {
+    // Optimistic — drop the row immediately, persist in the background.
+    setContacts((prev) => prev.filter((x) => (x.phone || x.email) !== (c.phone || c.email)));
+    void dismissPotentialContact({ phone: c.phone || undefined, email: c.email || undefined }).catch(() => void load());
+  }
 
   return (
     <div className="flex-1 flex flex-col rounded-[14px] border border-border-subtle bg-surface overflow-hidden min-h-0">
@@ -73,6 +79,9 @@ export function PotentialContactsInbox() {
                 )}
                 <button onClick={() => setConverting(c)} title="Add as lead" className="flex items-center gap-1 px-2.5 py-1 rounded-[14px] bg-ink text-on-ink text-[10.5px] font-medium hover:opacity-90">
                   <UserPlus size={11} /> Add as lead
+                </button>
+                <button onClick={() => dismiss(c)} title="Dismiss" className="p-1.5 rounded-md text-ink-faint hover:text-signal-red-text hover:bg-signal-red/10">
+                  <X size={13} />
                 </button>
               </div>
             </div>
