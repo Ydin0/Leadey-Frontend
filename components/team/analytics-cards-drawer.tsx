@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, GripVertical, EyeOff, Plus, RotateCcw, Users, Loader2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -28,6 +29,11 @@ export function AnalyticsCardsDrawer({ open, onClose, selected, onSave }: {
   const [overId, setOverId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  // Render into document.body so the fixed overlay escapes the team page's
+  // transformed (.fade animation) ancestor — otherwise `fixed` is relative to
+  // that ancestor and the closed drawer peeks in from the right edge.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => { if (open) { setIds(selected); setSaved(false); } }, [open, selected]);
 
@@ -53,7 +59,9 @@ export function AnalyticsCardsDrawer({ open, onClose, selected, onSave }: {
     finally { setSaving(false); }
   }
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       <div
         className={cn("fixed inset-0 z-[65] bg-black/50 backdrop-blur-[3px] transition-opacity duration-200", open ? "opacity-100" : "opacity-0 pointer-events-none")}
@@ -141,6 +149,7 @@ export function AnalyticsCardsDrawer({ open, onClose, selected, onSave }: {
           </button>
         </div>
       </aside>
-    </>
+    </>,
+    document.body,
   );
 }
