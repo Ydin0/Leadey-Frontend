@@ -13,6 +13,8 @@ export interface BookingPage {
   timezone: string;
   availability: WeeklyAvailability;
   respectCalendar: boolean;
+  /** Participate in the team "All" round-robin pool. */
+  roundRobin: boolean;
   bufferBeforeMin: number;
   bufferAfterMin: number;
   minNoticeMin: number;
@@ -68,4 +70,9 @@ export async function getPageAvailability(pageId: string, from: string, to: stri
   return apiRequest<AvailabilityResult>(
     `/booking-pages/${encodeURIComponent(pageId)}/availability?from=${from}&to=${to}`,
   );
+}
+
+/** Combined availability across every rep's round-robin booking page. */
+export async function getRoundRobinAvailability(from: string, to: string): Promise<AvailabilityResult> {
+  return apiRequest<AvailabilityResult>(`/booking-pages/availability/round-robin?from=${from}&to=${to}`);
 }

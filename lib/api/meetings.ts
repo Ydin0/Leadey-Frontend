@@ -5,6 +5,8 @@ export interface BookMeetingPayload {
    *  come from the page. When absent, hostAccountId + durationMin drive it. */
   bookingPageId?: string;
   hostAccountId?: string;
+  /** Team round-robin: server auto-assigns a free rep for the slot. */
+  roundRobin?: boolean;
   title: string;
   description?: string;
   /** UTC ISO start time. */

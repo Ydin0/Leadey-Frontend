@@ -95,6 +95,7 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
   const [timezone, setTimezone] = useState(page?.timezone || browserTimezone());
   const [availability, setAvailability] = useState<WeeklyAvailability>(page?.availability || DEFAULT_AVAIL);
   const [respectCalendar, setRespectCalendar] = useState(page?.respectCalendar ?? true);
+  const [roundRobin, setRoundRobin] = useState(page?.roundRobin ?? true);
   const [minNoticeMin, setMinNoticeMin] = useState(page?.minNoticeMin ?? 240);
   const [bufferBeforeMin, setBufferBeforeMin] = useState(page?.bufferBeforeMin ?? 0);
   const [bufferAfterMin, setBufferAfterMin] = useState(page?.bufferAfterMin ?? 0);
@@ -105,7 +106,7 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
   async function save() {
     if (!name.trim()) { setError("Give the page a name."); return; }
     setSaving(true); setError(null);
-    const payload = { name: name.trim(), durationMin, video, timezone, availability, respectCalendar, minNoticeMin, bufferBeforeMin, bufferAfterMin, maxDaysAhead };
+    const payload = { name: name.trim(), durationMin, video, timezone, availability, respectCalendar, roundRobin, minNoticeMin, bufferBeforeMin, bufferAfterMin, maxDaysAhead };
     try {
       if (page) await updateBookingPage(page.id, payload);
       else await createBookingPage(payload);
@@ -174,6 +175,14 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
             <p className="text-[11px] text-ink-muted mt-0.5">Hide times you&apos;re already busy. Off = purely the hours below.</p>
           </div>
           <Toggle on={respectCalendar} onClick={() => setRespectCalendar((v) => !v)} />
+        </div>
+
+        <div className="flex items-center justify-between rounded-[12px] border border-border-subtle p-3.5">
+          <div>
+            <p className="text-[12.5px] font-medium text-ink flex items-center gap-1.5"><CalendarClock size={14} /> Include in team round robin</p>
+            <p className="text-[11px] text-ink-muted mt-0.5">Add this page to the shared &quot;All&quot; pool — bookings auto-assign to a free rep.</p>
+          </div>
+          <Toggle on={roundRobin} onClick={() => setRoundRobin((v) => !v)} />
         </div>
 
         <div>
