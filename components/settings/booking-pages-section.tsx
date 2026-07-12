@@ -8,13 +8,13 @@ import { WeeklyHoursEditor } from "@/components/shared/weekly-hours-editor";
 import { MemberMultiSelect } from "@/components/shared/member-multi-select";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { usePermissions } from "@/lib/hooks/use-permissions";
-import { allTimezones, browserTimezone, tzOffsetLabel } from "@/lib/utils/timezones";
+import { browserTimezone } from "@/lib/utils/timezones";
+import { TimezoneSelect } from "@/components/shared/timezone-select";
 import {
   listMyBookingPages, createBookingPage, updateBookingPage, deleteBookingPage,
   type BookingPage, type WeeklyAvailability,
 } from "@/lib/api/booking-pages";
 
-const TZ_LIST = allTimezones();
 const DURATIONS = [15, 30, 45, 60, 90];
 const DEFAULT_AVAIL: WeeklyAvailability = {
   mon: [{ start: "09:00", end: "17:00" }], tue: [{ start: "09:00", end: "17:00" }], wed: [{ start: "09:00", end: "17:00" }],
@@ -165,9 +165,7 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
           </div>
           <div>
             <label className={lab}>Timezone</label>
-            <NativeSelect value={timezone} onChange={(e) => setTimezone(e.target.value)} className={inp}>
-              {TZ_LIST.map((tz) => <option key={tz} value={tz}>{tz.replace(/_/g, " ")} ({tzOffsetLabel(tz)})</option>)}
-            </NativeSelect>
+            <TimezoneSelect value={timezone} onChange={setTimezone} />
           </div>
         </div>
 

@@ -5,10 +5,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2, Clock, Video, Globe, ChevronLeft, ChevronRight, Check, CheckCircle2, ExternalLink, CalendarX } from "lucide-react";
 import { LeadeyLogomark } from "@/components/brand/leadey-mark";
 import { getPublicPage, getPublicAvailability, publicBook, type PublicBookingPage } from "@/lib/api/public-booking";
-import { allTimezones, browserTimezone, tzOffsetLabel } from "@/lib/utils/timezones";
+import { browserTimezone } from "@/lib/utils/timezones";
+import { TimezoneSelect } from "@/components/shared/timezone-select";
 import { monthGrid, dateKey, dateKeyInTz, timeInTz, groupSlotsByTz, CAL_WEEKDAYS, CAL_MONTHS } from "@/lib/utils/booking-calendar";
-
-const TZ_LIST = allTimezones();
 
 const BACKDROP: React.CSSProperties = {
   backgroundImage: [
@@ -150,10 +149,7 @@ export default function PublicBookingPage() {
                   <h2 className="text-[15px] font-semibold text-slate-900">Select a time</h2>
                   <div className="flex items-center gap-1.5">
                     <Globe size={13} className="text-slate-400" />
-                    <select value={displayTz} onChange={(e) => setDisplayTz(e.target.value)}
-                      className="text-[12px] bg-slate-50 border border-slate-200 rounded-[8px] px-2 py-1.5 text-slate-700 max-w-[220px]">
-                      {TZ_LIST.map((tz) => <option key={tz} value={tz}>{tz.replace(/_/g, " ")} ({tzOffsetLabel(tz)})</option>)}
-                    </select>
+                    <TimezoneSelect value={displayTz} onChange={setDisplayTz} light align="right" className="w-[210px]" />
                   </div>
                 </div>
 

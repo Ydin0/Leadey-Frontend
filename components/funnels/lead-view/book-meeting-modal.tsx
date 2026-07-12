@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 import { NativeSelect } from "@/components/ui/native-select";
 import { TagInput } from "@/components/shared/tag-input";
 import { guessLeadTimezone } from "@/lib/utils/lead-timezone";
-import { allTimezones, browserTimezone, tzOffsetLabel } from "@/lib/utils/timezones";
+import { browserTimezone } from "@/lib/utils/timezones";
+import { TimezoneSelect } from "@/components/shared/timezone-select";
 import { listBookingHosts, getPageAvailability, getRoundRobinAvailability, type BookingHost, type BookingPage } from "@/lib/api/booking-pages";
 import { bookMeeting, type BookedMeeting } from "@/lib/api/meetings";
 import type { FunnelLead } from "@/lib/types/funnel";
@@ -23,7 +24,6 @@ interface BookMeetingModalProps {
 }
 
 const ALL = "all";
-const TZ_LIST = allTimezones();
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -283,10 +283,7 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
         <div className="px-6 py-3 border-b border-border-subtle flex items-center gap-2">
           <Globe size={13} className="text-ink-muted" />
           <span className="text-[12px] text-ink-secondary">Time zone</span>
-          <NativeSelect value={displayTz} onChange={(e) => setDisplayTz(e.target.value)}
-            className="text-[12px] bg-section border border-border-subtle rounded-[8px] px-2.5 py-1.5 text-ink max-w-[280px]">
-            {TZ_LIST.map((tz) => <option key={tz} value={tz}>{tz.replace(/_/g, " ")} ({tzOffsetLabel(tz)})</option>)}
-          </NativeSelect>
+          <TimezoneSelect value={displayTz} onChange={setDisplayTz} className="w-[240px]" />
         </div>
 
         <div className="flex-1 flex min-h-0">
