@@ -38,6 +38,9 @@ interface SmsThreadDrawerProps {
   /** Restrict the thread to one channel. On the lead profile this is "sms"
    *  (WhatsApp has its own drawer); the inbox leaves it unset to show all. */
   channelFilter?: "sms" | "whatsapp";
+  /** Other contacts at this company (sibling leads) so the rep can switch who
+   *  they're texting. Each is its own lead/thread. */
+  contacts?: { leadId: string; name: string; phone: string | null }[];
   /** Called after a message is sent so the parent can refresh the timeline. */
   onSent?: () => void;
 }
@@ -51,9 +54,20 @@ export function SmsThreadDrawer({
   leadPhone,
   lead,
   channelFilter,
+  contacts = [],
   onSent,
 }: SmsThreadDrawerProps) {
   const { resolveMember } = useTeamMembers();
+  // Which contact (sibling lead) we're texting. Each contact is its own thread.
+  const [activeLeadId, setActiveLeadId] = useState<string | null>(leadId ?? null);
+  // Reset to the opened lead whenever the drawer opens or the parent lead changes.
+  useEffect(() => {
+    if (open) setActiveLeadId(leadId ?? null);
+  }, [open, leadId]);
+  const activeContact = contacts.find((c) => c.leadId === activeLeadId);
+  const activePhone = activeContact?.phone ?? leadPhone;
+  const activeName = activeContact?.name ?? leadName;
+  const recipientOptions = contacts.filter((c) => c.phone);
   const [messages, setMessages] = useState<SmsMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [lines, setLines] = useState<PhoneLine[]>([]);
@@ -66,9 +80,9 @@ export function SmsThreadDrawer({
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
-  const personalize = (text: string) => renderPersonalized(text, lead || { name: leadName });
+  const personalize = (text: string) => renderPersonalized(text, lead || { name: activeName });
   /** Sending requires a linked lead; unmatched numbers are view-only. */
-  const canSend = !!(funnelId && leadId);
+  const canSend = !!(funnelId && activeLeadId);
 
   useEffect(() => {
     if (!open) return;
@@ -77,10 +91,10 @@ export function SmsThreadDrawer({
     setError(null);
     setBody("");
     setFromLineId(""); // re-pick a country-matched From line for this lead
-    const load = funnelId && leadId
-      ? getSmsThread(funnelId, leadId)
-      : leadPhone
-        ? getSmsThreadByPhone(leadPhone)
+    const load = funnelId && activeLeadId
+      ? getSmsThread(funnelId, activeLeadId)
+      : activePhone
+        ? getSmsThreadByPhone(activePhone)
         : Promise.resolve([] as SmsMessage[]);
     load
       .then((m) => !cancelled && setMessages(channelFilter ? m.filter((x) => (x.channel || "sms") === channelFilter) : m))
@@ -94,7 +108,7 @@ export function SmsThreadDrawer({
         setLines(active);
         // Default the "From" number to one whose country matches the recipient,
         // so a UK lead is texted from a UK number (Twilio rejects e.g. US→UK).
-        const destCountry = phoneCountry(leadPhone);
+        const destCountry = phoneCountry(activePhone);
         const match = destCountry !== "other"
           ? active.find((l) => phoneCountry(l.number) === destCountry)
           : undefined;
@@ -103,7 +117,7 @@ export function SmsThreadDrawer({
       .catch(() => {});
     listTemplates("sms").then((t) => !cancelled && setTemplates(t)).catch(() => {});
     return () => { cancelled = true; };
-  }, [open, funnelId, leadId, leadPhone, channelFilter]);
+  }, [open, funnelId, activeLeadId, activePhone, channelFilter]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end", behavior: "smooth" });
@@ -113,13 +127,13 @@ export function SmsThreadDrawer({
 
   async function handleSend() {
     const text = body.trim();
-    if (!text || sending || !funnelId || !leadId) return;
+    if (!text || sending || !funnelId || !activeLeadId) return;
     // Spend gate: balance floor / monthly budget.
     if (!(await ensureTelephonyAllowed())) return;
     setSending(true);
     setError(null);
     try {
-      const msg = await sendSms(funnelId, leadId, personalize(text), fromLineId || undefined);
+      const msg = await sendSms(funnelId, activeLeadId, personalize(text), fromLineId || undefined);
       setMessages((prev) => [...prev, msg]);
       setBody("");
       onSent?.();
@@ -149,9 +163,9 @@ export function SmsThreadDrawer({
               <MessageSquare size={16} strokeWidth={2} />
             </span>
             <div className="min-w-0">
-              <p className="text-[14px] font-semibold text-ink truncate leading-tight">{leadName}</p>
+              <p className="text-[14px] font-semibold text-ink truncate leading-tight">{activeName}</p>
               <p className="text-[11px] text-ink-muted truncate">
-                {leadPhone ? formatPhoneIntl(leadPhone) : "No phone number"}
+                {activePhone ? formatPhoneIntl(activePhone) : "No phone number"}
               </p>
             </div>
           </div>
@@ -162,6 +176,24 @@ export function SmsThreadDrawer({
             <X size={18} />
           </button>
         </div>
+
+        {/* Recipient switcher — text a different contact at this company. */}
+        {recipientOptions.length > 1 && (
+          <div className="mt-3 flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider text-ink-faint font-medium">To</span>
+            <div className="relative flex-1 min-w-0">
+              <NativeSelect
+                value={activeLeadId ?? ""}
+                onChange={(e) => setActiveLeadId(e.target.value)}
+                className="w-full rounded-full pl-3 pr-8 py-1.5 text-[11px] font-medium text-ink-secondary focus:border-signal-blue-text/40 truncate"
+              >
+                {recipientOptions.map((c) => (
+                  <option key={c.leadId} value={c.leadId}>{c.name} · {formatPhoneIntl(c.phone!)}</option>
+                ))}
+              </NativeSelect>
+            </div>
+          </div>
+        )}
 
         {/* Send-from selector — admins can text from any active number. */}
         {canSend && (

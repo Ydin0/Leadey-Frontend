@@ -700,6 +700,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
             onCompanySave={handleCompanySave}
             onCustomFieldsSave={handleCustomFieldsSave}
             onAddContact={handleAddContact}
+            onMakePrimary={goToLeadId}
             activeContactId={contactFilter}
             onContactSelect={toggleContactFilter}
             leads={leads}
@@ -781,6 +782,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
           email: currentLead.email,
           companyDomain: currentLead.companyDomain,
         }}
+        contacts={companyContacts.map((c) => ({ leadId: c.id, name: c.name, phone: c.phone }))}
         onSent={() => onLeadsChanged?.()}
       />
       )}

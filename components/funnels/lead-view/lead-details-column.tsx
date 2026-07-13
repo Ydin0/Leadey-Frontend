@@ -25,6 +25,7 @@ import {
   X,
   DollarSign,
   Trash2,
+  Star,
   GripVertical,
 } from "lucide-react";
 import {
@@ -95,6 +96,8 @@ interface LeadDetailsColumnProps {
   onCustomFieldsSave?: (values: Record<string, string>) => Promise<void>;
   /** Add another contact at this company. */
   onAddContact?: (name: string) => Promise<void>;
+  /** Switch the profile to another contact (make them the primary/focused). */
+  onMakePrimary?: (contactId: string) => void;
   onCall: (phone: string, name: string) => void;
   /** Opens the in-app email composer addressed to this contact. */
   onEmail: (email: string, name: string) => void;
@@ -173,6 +176,7 @@ function ContactRow({
   onDnc,
   onSave,
   onDelete,
+  onMakePrimary,
   active,
   onSelect,
   fallbackLocation,
@@ -191,6 +195,8 @@ function ContactRow({
   ) => Promise<void>;
   /** Delete this contact from the campaign (non-primary contacts only). */
   onDelete?: (contactId: string) => Promise<void>;
+  /** Switch the profile to this contact (make them the primary/focused one). */
+  onMakePrimary?: (contactId: string) => void;
   /** Highlighted when this contact is the active activity filter. */
   active?: boolean;
   /** Toggle the activity filter to this contact (rendered inside the details). */
@@ -399,6 +405,13 @@ function ContactRow({
           {c.title && <div className="text-[11px] text-ink-muted truncate">{c.title}</div>}
         </div>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+          {onMakePrimary && !c.isPrimary && (
+            <MiniBtn
+              icon={Star}
+              title="Make primary contact"
+              onClick={() => onMakePrimary(c.id)}
+            />
+          )}
           {c.email && (
             <MiniBtn
               icon={Mail}
@@ -976,6 +989,7 @@ export function LeadDetailsColumn({
   onDnc,
   onContactSave,
   onContactDelete,
+  onMakePrimary,
   activeContactId,
   onContactSelect,
   leads,
@@ -1053,6 +1067,7 @@ export function LeadDetailsColumn({
                     onDnc={onDnc}
                     onSave={onContactSave}
                     onDelete={onContactDelete}
+                    onMakePrimary={onMakePrimary}
                     active={activeContactId === c.id}
                     onSelect={onContactSelect ? () => onContactSelect(c.id) : undefined}
                     fallbackLocation={company?.address ?? null}
