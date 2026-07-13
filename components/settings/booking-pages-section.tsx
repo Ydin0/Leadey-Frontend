@@ -168,6 +168,7 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
   // Round-robin priority per host (userId → 1 Lowest … 4 Highest). Owner keyed
   // by page.userId; falls back to 3 (High) for anyone unset.
   const [priorities, setPriorities] = useState<Record<string, number>>(page?.priorities ?? {});
+  const [distribution, setDistribution] = useState<"equal" | "priority">(page?.distribution ?? "equal");
   const [isPublic, setIsPublic] = useState(page?.isPublic ?? false);
   const [copied, setCopied] = useState(false);
   const { has } = usePermissions();
@@ -188,7 +189,7 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
   async function save() {
     if (!name.trim()) { setError("Give the page a name."); return; }
     setSaving(true); setError(null);
-    const payload = { name: name.trim(), durationMin, video, timezone, availability, respectCalendar, roundRobin, minNoticeMin, bufferBeforeMin, bufferAfterMin, maxDaysAhead, priorities, ...(canManage ? { members: memberIds, isPublic } : {}) };
+    const payload = { name: name.trim(), durationMin, video, timezone, availability, respectCalendar, roundRobin, minNoticeMin, bufferBeforeMin, bufferAfterMin, maxDaysAhead, distribution, priorities, ...(canManage ? { members: memberIds, isPublic } : {}) };
     try {
       if (page) await updateBookingPage(page.id, payload);
       else await createBookingPage(payload);
@@ -286,8 +287,34 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
               onChange={setMemberIds}
               placeholder="Search teammates to add…"
             />
-            {/* Priority per host — a higher tier is booked first; lower tiers only
-                fill in when no higher-priority host is free for the slot. */}
+
+            {/* Distribution method — equal vs priority-weighted. */}
+            <div className="pt-1">
+              <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Distribution method</p>
+              <div className="flex items-center rounded-[10px] bg-section border border-border-subtle p-0.5">
+                {([["equal", "Equal distribution"], ["priority", "Allocate on priority"]] as const).map(([v, label]) => (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setDistribution(v)}
+                    className={cn(
+                      "flex-1 px-2.5 py-1.5 rounded-[8px] text-[11.5px] font-medium transition-colors",
+                      distribution === v ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink-secondary",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-ink-muted mt-1.5">
+                {distribution === "equal"
+                  ? "Bookings spread evenly across free hosts (least-loaded first). No priorities needed."
+                  : "Higher-priority hosts are booked first; lower tiers only fill in when no higher one is free."}
+              </p>
+            </div>
+
+            {/* Priority per host — only when allocating on priority. */}
+            {distribution === "priority" && (
             <div className="space-y-1 pt-1">
               <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">Priority</p>
               {[ownerId, ...memberIds.filter((id) => id !== ownerId)].filter(Boolean).map((id) => {
@@ -313,6 +340,7 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
                 );
               })}
             </div>
+            )}
           </div>
         )}
 

@@ -17,6 +17,9 @@ export interface BookingPage {
   roundRobin: boolean;
   /** Assigned host member ids (owner excluded) — the page's round-robin pool. */
   members: string[];
+  /** Round-robin distribution: "equal" (spread evenly) or "priority" (allocate
+   *  by each host's priority tier first). */
+  distribution: "equal" | "priority";
   /** Round-robin priority per host (owner + members): 4 Highest…1 Lowest. */
   priorities: Record<string, number>;
   /** The owner's own round-robin priority. */
