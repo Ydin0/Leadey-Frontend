@@ -28,10 +28,10 @@ export function Section({ icon: Icon, title, count, actions, defaultOpen = true,
           className={cn("text-ink-muted transition-transform", !open && "-rotate-90")}
         />
         <Icon size={13} className="text-ink-secondary" />
-        <span className="text-[10px] uppercase tracking-wider text-ink-secondary font-semibold">
+        <span className="text-[10px] uppercase tracking-wider text-ink-secondary font-medium">
           {title}
         </span>
-        {count != null && <span className="text-[11px] font-medium text-ink-muted">{count}</span>}
+        {count != null && <span className="text-[11px] text-ink-muted">{count}</span>}
         <div className="flex-1" />
         {actions && (
           <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>

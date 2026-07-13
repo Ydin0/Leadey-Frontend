@@ -18,8 +18,8 @@
   /* Light mode — inverted secondary experience */
   --color-ink: #0C1122;             /* Midnight Navy — primary text on light */
   --color-ink-secondary: #242E55;   /* Mid Navy */
-  --color-ink-muted: #3F466E;       /* Section labels — darkened hard for legibility on white */
-  --color-ink-faint: #525C86;       /* Values / hints — darkened so they clearly read on white */
+  --color-ink-muted: #2A3157;       /* Section labels — near-primary on white for max pop */
+  --color-ink-faint: #3B4369;       /* Values / hints — strong on white */
 
   --color-page: #F4F5F9;            /* Cool off-white */
   --color-surface: #FFFFFF;
@@ -87,8 +87,8 @@
 [data-theme="dark"] {
   --color-ink: #FFFFFF;             /* Pure White — primary text on dark */
   --color-ink-secondary: #C8CFE6;   /* Lightened periwinkle */
-  --color-ink-muted: #CDD4F0;       /* Section labels — brightened hard so they pop on dark navy */
-  --color-ink-faint: #B7BFE3;       /* Values / hints — brightened for clear legibility on dark */
+  --color-ink-muted: #E6EAF8;       /* Section labels — near-white on dark for max pop */
+  --color-ink-faint: #D2D8F0;       /* Values / hints — strong on dark navy */
 
   --color-page: #0C1122;            /* Midnight Navy — base canvas */
   --color-surface: #192039;         /* Deep Navy — cards, sidebar */
