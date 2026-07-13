@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Plus, Pencil, Trash2, CalendarClock, ArrowLeft, Check, Video, CalendarCheck, Users, Globe, Link2, Copy } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, CalendarClock, ArrowLeft, Check, Video, CalendarCheck, Users, Globe, Link2, Copy, Star } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { NativeSelect } from "@/components/ui/native-select";
+import { MemberAvatar } from "@/components/shared/member-avatar";
 import { WeeklyHoursEditor } from "@/components/shared/weekly-hours-editor";
 import { MemberMultiSelect } from "@/components/shared/member-multi-select";
 import { useTeamMembers } from "@/hooks/use-team-members";
@@ -16,6 +18,13 @@ import {
 } from "@/lib/api/booking-pages";
 
 const DURATIONS = [15, 30, 45, 60, 90];
+/** Round-robin priority tiers (Calendly-style). Higher value = booked first. */
+const PRIORITY_TIERS = [
+  { v: 4, label: "Highest" },
+  { v: 3, label: "High" },
+  { v: 2, label: "Low" },
+  { v: 1, label: "Lowest" },
+];
 const DEFAULT_AVAIL: WeeklyAvailability = {
   mon: [{ start: "09:00", end: "17:00" }], tue: [{ start: "09:00", end: "17:00" }], wed: [{ start: "09:00", end: "17:00" }],
   thu: [{ start: "09:00", end: "17:00" }], fri: [{ start: "09:00", end: "17:00" }], sat: [], sun: [],
@@ -101,9 +110,14 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
   const [respectCalendar, setRespectCalendar] = useState(page?.respectCalendar ?? true);
   const [roundRobin, setRoundRobin] = useState(page?.roundRobin ?? true);
   const [memberIds, setMemberIds] = useState<string[]>(page?.members ?? []);
+  // Round-robin priority per host (userId → 1 Lowest … 4 Highest). Owner keyed
+  // by page.userId; falls back to 3 (High) for anyone unset.
+  const [priorities, setPriorities] = useState<Record<string, number>>(page?.priorities ?? {});
   const [isPublic, setIsPublic] = useState(page?.isPublic ?? false);
   const [copied, setCopied] = useState(false);
   const { has } = usePermissions();
+  const { userId: myId } = useAuth();
+  const ownerId = page?.userId ?? myId ?? "";
   const canManage = has("settings.manageTeam");
   // You're a host on this page but not the owner (and can't manage the team) → view-only.
   const readOnly = !!page && !page.owned && !canManage;
@@ -119,7 +133,7 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
   async function save() {
     if (!name.trim()) { setError("Give the page a name."); return; }
     setSaving(true); setError(null);
-    const payload = { name: name.trim(), durationMin, video, timezone, availability, respectCalendar, roundRobin, minNoticeMin, bufferBeforeMin, bufferAfterMin, maxDaysAhead, ...(canManage ? { members: memberIds, isPublic } : {}) };
+    const payload = { name: name.trim(), durationMin, video, timezone, availability, respectCalendar, roundRobin, minNoticeMin, bufferBeforeMin, bufferAfterMin, maxDaysAhead, priorities, ...(canManage ? { members: memberIds, isPublic } : {}) };
     try {
       if (page) await updateBookingPage(page.id, payload);
       else await createBookingPage(payload);
@@ -217,6 +231,33 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
               onChange={setMemberIds}
               placeholder="Search teammates to add…"
             />
+            {/* Priority per host — a higher tier is booked first; lower tiers only
+                fill in when no higher-priority host is free for the slot. */}
+            <div className="space-y-1 pt-1">
+              <p className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">Priority</p>
+              {[ownerId, ...memberIds.filter((id) => id !== ownerId)].filter(Boolean).map((id) => {
+                const m = teamMembers.find((x) => x.id === id);
+                const name = m?.name || (id === myId ? "You" : "Teammate");
+                return (
+                  <div key={id} className="flex items-center gap-2.5 py-1">
+                    <MemberAvatar id={id} name={name} className="w-[22px] h-[22px] text-[9px]" />
+                    <span className="flex-1 min-w-0 text-[12.5px] text-ink truncate">
+                      {name}{id === myId && <span className="text-ink-muted"> (you)</span>}
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-ink-faint">
+                      <Star size={12} className="fill-current text-accent" />
+                    </span>
+                    <NativeSelect
+                      value={String(priorities[id] ?? 3)}
+                      onChange={(e) => setPriorities((prev) => ({ ...prev, [id]: Number(e.target.value) }))}
+                      className="w-[110px] px-2 py-1 rounded-[8px] bg-section border border-border-subtle text-[11.5px] text-ink focus:outline-none focus:border-border-default"
+                    >
+                      {PRIORITY_TIERS.map((t) => <option key={t.v} value={t.v}>{t.label}</option>)}
+                    </NativeSelect>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

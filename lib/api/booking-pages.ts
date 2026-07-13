@@ -17,6 +17,10 @@ export interface BookingPage {
   roundRobin: boolean;
   /** Assigned host member ids (owner excluded) — the page's round-robin pool. */
   members: string[];
+  /** Round-robin priority per host (owner + members): 4 Highest…1 Lowest. */
+  priorities: Record<string, number>;
+  /** The owner's own round-robin priority. */
+  ownerPriority: number;
   /** Shareable public link toggle + minted slug (/book/<publicSlug>). */
   isPublic: boolean;
   publicSlug: string | null;
