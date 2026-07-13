@@ -726,7 +726,7 @@ function AboutSection({ company, onSave }: { company: FunnelLeadCompany | null; 
     }
   }
 
-  const hasAny = !!(company?.address || company?.domain || company?.industry || company?.description || company?.linkedinUrl || company?.annualRevenue);
+  const hasAny = !!(company?.address || company?.domain || company?.industry || company?.employeeCount || company?.description || company?.linkedinUrl || company?.annualRevenue);
 
   return (
     <Section
@@ -765,12 +765,14 @@ function AboutSection({ company, onSave }: { company: FunnelLeadCompany | null; 
               <a href={company.website || `https://${company.domain}`} target="_blank" rel="noreferrer" className="text-[12.5px] font-medium text-link hover:underline truncate">{company.domain}</a>
             </div>
           )}
-          {company?.industry && (
+          {(company?.industry || company?.employeeCount) && (
             <div className="flex items-center gap-2">
-              <Building2 size={13} className="text-ink-faint shrink-0" />
+              <Building2 size={13} className="text-ink-muted shrink-0" />
               <span className="text-[12.5px] text-ink-secondary">
-                {company.industry}
-                {company.employeeCount ? ` · ${company.employeeCount.toLocaleString()} employees` : ""}
+                {[
+                  company.industry,
+                  company.employeeCount ? `${company.employeeCount.toLocaleString()} employees` : "",
+                ].filter(Boolean).join(" · ")}
               </span>
             </div>
           )}
