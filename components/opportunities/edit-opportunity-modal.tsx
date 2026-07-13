@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Loader2, X, Briefcase, Trash2 } from "lucide-react";
 import { useTeamMembers } from "@/hooks/use-team-members";
@@ -42,6 +43,7 @@ export function EditOpportunityModal({
   onDeleted,
 }: EditOpportunityModalProps) {
   const { members } = useTeamMembers();
+  const { userId } = useAuth();
 
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [pipelineId, setPipelineId] = useState("");
@@ -227,8 +229,9 @@ export function EditOpportunityModal({
               </Field>
               <Field label="Owner">
                 <NativeSelect value={ownerId} onChange={(e) => setOwnerId(e.target.value)} className={inputClass}>
-                  <option value="">Assign to me</option>
-                  {members.map((m) => (
+                  {!ownerId && <option value="">Unassigned</option>}
+                  {userId && <option value={userId}>Assign to me</option>}
+                  {members.filter((m) => m.id !== userId).map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
                     </option>
