@@ -32,6 +32,12 @@ interface RichEmailEditorProps {
   senderName?: string;
   placeholder?: string;
   minHeight?: number;
+  /** Rendered (token-filled) signature HTML shown INLINE below the body so the
+   *  message + signature read as one continuous email. Display-only. */
+  signatureHtml?: string | null;
+  /** Render the writing surface as a white "email sheet" (dark text) so an
+   *  inline signature's own colours/images display like a real email. */
+  sheet?: boolean;
 }
 
 export function RichEmailEditor({
@@ -41,6 +47,8 @@ export function RichEmailEditor({
   senderName,
   placeholder = "Write your email…",
   minHeight = 200,
+  signatureHtml,
+  sheet = false,
 }: RichEmailEditorProps) {
   const [preview, setPreview] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
@@ -55,8 +63,10 @@ export function RichEmailEditor({
     immediatelyRender: false,
     editorProps: {
       attributes: {
-        class:
-          "prose-email outline-none text-[13px] leading-relaxed text-ink px-3 py-2.5",
+        class: cn(
+          "prose-email outline-none text-[13px] leading-relaxed px-3 py-2.5",
+          sheet ? "text-[#1a1a2e]" : "text-ink",
+        ),
       },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
@@ -184,29 +194,48 @@ export function RichEmailEditor({
         </div>
       )}
 
-      {/* Editor / Preview */}
-      {preview ? (
-        <div
-          className="prose-email text-[13px] leading-relaxed text-ink px-3 py-2.5"
-          style={{ minHeight }}
-          dangerouslySetInnerHTML={{
-            __html: renderPersonalized(value, previewLead ?? {}, { senderName }),
-          }}
-        />
-      ) : (
-        <div
-          className="relative"
-          style={{ minHeight }}
-          onClick={() => editor.chain().focus().run()}
-        >
-          <EditorContent editor={editor} />
-          {editor.isEmpty && (
-            <div className="absolute top-2.5 left-3 text-[13px] text-ink-faint pointer-events-none">
-              {placeholder}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Editor / Preview + inline signature — wrapped in one surface so the
+          body and signature read as a single continuous email. */}
+      <div className={cn(sheet && "bg-white")}>
+        {preview ? (
+          <div
+            className={cn(
+              "prose-email text-[13px] leading-relaxed px-3 py-2.5",
+              sheet ? "text-[#1a1a2e]" : "text-ink",
+            )}
+            style={{ minHeight }}
+            dangerouslySetInnerHTML={{
+              __html: renderPersonalized(value, previewLead ?? {}, { senderName }),
+            }}
+          />
+        ) : (
+          <div
+            className="relative"
+            style={{ minHeight }}
+            onClick={() => editor.chain().focus().run()}
+          >
+            <EditorContent editor={editor} />
+            {editor.isEmpty && (
+              <div className={cn(
+                "absolute top-2.5 left-3 text-[13px] pointer-events-none",
+                sheet ? "text-slate-400" : "text-ink-faint",
+              )}>
+                {placeholder}
+              </div>
+            )}
+          </div>
+        )}
+        {signatureHtml && (
+          <div
+            className={cn(
+              "px-3 pb-4 pt-1 text-[13px] leading-relaxed prose-email",
+              "[&_a]:text-[#4A57B8] [&_a]:underline [&_img]:max-w-full [&_img]:h-auto",
+              sheet ? "text-[#1a1a2e]" : "text-ink",
+            )}
+            dangerouslySetInnerHTML={{ __html: signatureHtml }}
+          />
+        )}
+      </div>
     </div>
   );
 }

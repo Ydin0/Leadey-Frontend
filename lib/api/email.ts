@@ -161,6 +161,7 @@ export async function sendEmail(
         fromAccountId: payload.fromAccountId,
         toEmail: payload.toEmail,
         cc: payload.cc,
+        bcc: payload.bcc,
         subject: payload.subject,
         bodyHtml: payload.bodyHtml,
         attachmentIds: payload.attachmentIds,

@@ -106,6 +106,8 @@ export interface SendEmailPayload {
   toEmail: string;
   /** Optional comma-separated Cc recipients. */
   cc?: string;
+  /** Optional comma-separated Bcc recipients. */
+  bcc?: string;
   subject: string;
   bodyHtml: string;
   /** Ids of template attachments (or ad-hoc uploads) to attach to the email. */

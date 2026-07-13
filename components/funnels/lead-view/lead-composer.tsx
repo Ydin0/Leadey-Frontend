@@ -160,6 +160,8 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
   const [to, setTo] = useState<string[]>(prefill?.to ? [prefill.to.toLowerCase()] : (lead.email ? [lead.email.toLowerCase()] : []));
   const [cc, setCc] = useState<string[]>([]);
   const [showCc, setShowCc] = useState(false);
+  const [bcc, setBcc] = useState<string[]>([]);
+  const [showBcc, setShowBcc] = useState(false);
   const [subject, setSubject] = useState(prefill?.subject ?? "");
   const [body, setBody] = useState(prefill?.body ?? "");
   const [signatureId, setSignatureId] = useState("default");
@@ -237,6 +239,7 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
         leadId, funnelId, fromAccountId: fromId,
         toEmail: recipients.join(", "),
         cc: cc.length ? cc.join(", ") : undefined,
+        bcc: bcc.length ? bcc.join(", ") : undefined,
         subject: renderPersonalized(subject, lead, ctx),
         bodyHtml: renderPersonalized(body, lead, ctx),
         attachmentIds: attachments.map((a) => a.id),
@@ -261,14 +264,18 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
       <div className="flex items-start gap-2">
         <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium w-12 shrink-0 pt-2">To</span>
         <div className="flex-1 min-w-0"><ChipInput value={to} onChange={setTo} suggestions={emailSuggestions} placeholder="name@company.com" /></div>
-        {!showCc && (
-          <div className="flex items-center pt-1.5 shrink-0 text-[11px]">
-            <button onClick={() => setShowCc(true)} className="text-ink-muted hover:text-ink-secondary">Cc</button>
+        {(!showCc || !showBcc) && (
+          <div className="flex items-center gap-2 pt-1.5 shrink-0 text-[11px]">
+            {!showCc && <button onClick={() => setShowCc(true)} className="text-ink-muted hover:text-ink-secondary">Cc</button>}
+            {!showBcc && <button onClick={() => setShowBcc(true)} className="text-ink-muted hover:text-ink-secondary">Bcc</button>}
           </div>
         )}
       </div>
       {showCc && (
         <div className="flex items-start gap-2"><span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium w-12 shrink-0 pt-2">Cc</span><div className="flex-1 min-w-0"><ChipInput value={cc} onChange={setCc} suggestions={emailSuggestions} placeholder="cc@company.com" /></div></div>
+      )}
+      {showBcc && (
+        <div className="flex items-start gap-2"><span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium w-12 shrink-0 pt-2">Bcc</span><div className="flex-1 min-w-0"><ChipInput value={bcc} onChange={setBcc} suggestions={emailSuggestions} placeholder="bcc@company.com" /></div></div>
       )}
       <div className="flex items-center gap-2">
         <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium w-12 shrink-0">Subject</span>
@@ -284,29 +291,14 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
         </div>
       </div>
 
-      <RichEmailEditor value={body} onChange={setBody} previewLead={lead} senderName={fromAccount?.fromName} minHeight={200} />
+      {/* The signature renders INLINE below the body on the same white email
+          sheet, so what you write + the signature read as one email. */}
+      <RichEmailEditor value={body} onChange={setBody} previewLead={lead} senderName={fromAccount?.fromName} minHeight={200} sheet signatureHtml={signatureId === "none" ? null : signaturePreview} />
 
-      {/* Live signature preview — shows exactly what will be appended at send,
-          with the rep's own details filled in, plus a switcher dropdown. */}
-      <div className="rounded-[12px] border border-border-subtle bg-section/60 overflow-hidden">
-        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border-subtle bg-section">
-          <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">Signature</span>
-          <SignaturePicker value={signatureId} onChange={setSignatureId} />
-        </div>
-        {signatureId === "none" ? (
-          <div className="px-4 py-3 text-[11px] text-ink-faint">No signature will be added to this email.</div>
-        ) : signaturePreview ? (
-          <div className="bg-white px-4 py-3">
-            <div
-              className="text-[13px] leading-relaxed text-[#1a1a2e] [&_a]:text-[#4A57B8] [&_a]:underline [&_img]:max-w-full [&_img]:h-auto"
-              dangerouslySetInnerHTML={{ __html: signaturePreview }}
-            />
-          </div>
-        ) : (
-          <div className="px-4 py-3 text-[11px] text-ink-faint">
-            No signature configured for this mailbox. Add one in Settings → Signatures.
-          </div>
-        )}
+      {/* Slim signature switcher — the preview itself is now inline above. */}
+      <div className="flex items-center justify-between gap-2 px-1">
+        <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">Signature</span>
+        <SignaturePicker value={signatureId} onChange={setSignatureId} />
       </div>
 
       <div className="flex items-center gap-2">
