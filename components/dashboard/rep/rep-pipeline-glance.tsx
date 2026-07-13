@@ -114,7 +114,15 @@ export function RepPipelineGlance({ pipelines, opps }: RepPipelineGlanceProps) {
   return (
     <section className="bg-surface rounded-[14px] border border-border-subtle p-[18px]">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-[15px] font-semibold text-ink">Pipeline</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-[15px] font-semibold text-ink">Pipeline</h2>
+          <span
+            className="text-[10px] font-medium uppercase tracking-wider text-ink-muted bg-section border border-border-subtle rounded-full px-1.5 py-0.5"
+            title="This card shows only opportunities assigned to you. Open the full pipeline to see the whole team."
+          >
+            Yours
+          </span>
+        </div>
         <Link
           href={`/dashboard/opportunities?pipeline=${encodeURIComponent(active.id)}`}
           className="flex items-center gap-1 text-[12px] text-link font-medium hover:opacity-80"
