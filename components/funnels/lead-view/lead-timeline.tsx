@@ -42,7 +42,7 @@ import type { FunnelLeadActivity, ActivityTransition, NoteAttachment } from "@/l
 import type { CallRecord } from "@/lib/types/calling";
 import type { LeadEmailMessage } from "@/lib/api/email";
 import { uploadLeadDocument, downloadLeadDocumentById, type LeadDocument } from "@/lib/api/lead-documents";
-import { EmailActivityCard, type EmailReplyMode } from "./email-activity-card";
+import { EmailActivityCard, EmailThreadCard, normalizeSubject, type EmailReplyMode } from "./email-activity-card";
 import { LeadDocumentsPanel } from "./lead-documents-panel";
 
 function formatBytes(bytes: number): string {
@@ -104,6 +104,7 @@ const TYPE_META: Record<string, KindMeta> = {
 type FeedItem = (
   | { id: string; kind: "call"; timestamp: Date; record: CallRecord; actor: Actor | null }
   | { id: string; kind: "email"; timestamp: Date; message: LeadEmailMessage; actor: Actor | null }
+  | { id: string; kind: "emailThread"; timestamp: Date; messages: LeadEmailMessage[]; actor: Actor | null }
   | { id: string; kind: "activity"; timestamp: Date; activity: FunnelLeadActivity; actor: Actor | null }
 ) & {
   /** Campaign + contact attribution (universal company profile feed only). */
@@ -423,7 +424,7 @@ function TimelineRow({
   statusOptions?: LeadStatusOption[];
 }) {
   const meta =
-    item.kind === "email"
+    item.kind === "email" || item.kind === "emailThread"
       ? { icon: Mail, tint: "bg-signal-blue", fg: "text-signal-blue-text" }
       : TYPE_META[item.kind === "call" ? "call" : item.activity.type] ?? TYPE_META.note;
   const Icon = meta.icon;
@@ -471,6 +472,8 @@ function TimelineRow({
           <CallCard record={item.record} actor={item.actor} />
         ) : item.kind === "email" ? (
           <EmailActivityCard message={item.message} onReply={onReplyEmail} />
+        ) : item.kind === "emailThread" ? (
+          <EmailThreadCard messages={item.messages} onReply={onReplyEmail} />
         ) : (
           <ActivityCard
             a={item.activity}
@@ -711,21 +714,27 @@ export function LeadTimeline({ activities, callRecords, emailMessages, funnelId,
         actor: toActor(a.userId, a.userName),
         meta: itemMeta?.[a.id],
       }));
-    const emails: FeedItem[] = (emailMessages || []).map((m) => ({
-      id: `em_${m.id}`,
-      kind: "email" as const,
-      timestamp: new Date(m.createdAt),
-      message: m,
-      actor: toActor(m.userId, null),
-      meta: itemMeta?.[m.id],
-    }));
+    // Group emails into threads by normalized subject (Re:/Fwd: stripped). A
+    // single-message thread renders as a standalone card; multiple → a chain.
+    const byThread = new Map<string, LeadEmailMessage[]>();
+    for (const m of emailMessages || []) {
+      const key = normalizeSubject(m.subject);
+      (byThread.get(key) ?? byThread.set(key, []).get(key)!).push(m);
+    }
+    const emails: FeedItem[] = [...byThread.values()].map((group) => {
+      const latest = group.reduce((a, b) => (new Date(a.createdAt) > new Date(b.createdAt) ? a : b));
+      if (group.length === 1) {
+        return { id: `em_${latest.id}`, kind: "email" as const, timestamp: new Date(latest.createdAt), message: latest, actor: toActor(latest.userId, null), meta: itemMeta?.[latest.id] };
+      }
+      return { id: `emt_${latest.id}`, kind: "emailThread" as const, timestamp: new Date(latest.createdAt), messages: group, actor: toActor(latest.userId, null), meta: itemMeta?.[latest.id] };
+    });
     return [...calls, ...acts, ...emails].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }, [activities, callRecords, emailMessages, resolveMember, itemMeta]);
 
   const items = useMemo(() => {
     const conv = new Set(["call", "email", "linkedin", "sms_sent", "sms_received"]);
     return feed.filter((item) => {
-      const type = item.kind === "call" ? "call" : item.kind === "email" ? "email" : item.activity.type;
+      const type = item.kind === "call" ? "call" : item.kind === "email" || item.kind === "emailThread" ? "email" : item.activity.type;
       if (filter === "All") return true;
       if (filter === "Important") return type === "call" || type === "status_change" || type === "opportunity";
       if (filter === "Conversations") return conv.has(type);
