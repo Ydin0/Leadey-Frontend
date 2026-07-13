@@ -37,11 +37,9 @@ import {
   UserCircle2,
   X,
 } from "lucide-react";
-import { cn, formatRelativeTime } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { mockSettings } from "@/lib/mock-data/settings";
-import { UnipileIntegration } from "./unipile-integration";
-import { CalendlyIntegration } from "./calendly-integration";
-import { TranscriptIntegrations } from "./transcript-integration";
+import { IntegrationsGrid } from "./integrations-grid";
 import { PhoneLinesTab } from "@/components/calling/settings/phone-lines-tab";
 import { LocalPresenceSection } from "./local-presence-section";
 import { CallOutcomesSection } from "./call-outcomes-section";
@@ -52,10 +50,7 @@ import { EmailAccountsSection } from "./email-accounts-section";
 import { SignatureSection } from "./signature-section";
 import { BookingPagesSection } from "./booking-pages-section";
 import { WhatsappSection } from "./whatsapp-section";
-import type {
-  AppSettingsSnapshot,
-  IntegrationSettings,
-} from "@/lib/types/settings";
+import type { AppSettingsSnapshot } from "@/lib/types/settings";
 
 type SettingsTab =
   | "profile"
@@ -191,21 +186,6 @@ function ToggleField({
   );
 }
 
-function IntegrationBadge({ integration }: { integration: IntegrationSettings }) {
-  return (
-    <span
-      className={cn(
-        "text-[10px] font-medium rounded-full px-2 py-0.5",
-        integration.connected
-          ? "bg-signal-green text-signal-green-text"
-          : "bg-signal-slate text-signal-slate-text"
-      )}
-    >
-      {integration.connected ? "Connected" : "Disconnected"}
-    </span>
-  );
-}
-
 const VALID_TABS: SettingsTab[] = [
   "profile",
   "organization",
@@ -287,23 +267,6 @@ export function SettingsShell() {
 
   function handleDiscard() {
     setDraft(savedState);
-  }
-
-  function toggleIntegration(integrationId: string) {
-    setDraft((prev) => ({
-      ...prev,
-      integrations: prev.integrations.map((integration) =>
-        integration.id !== integrationId
-          ? integration
-          : {
-              ...integration,
-              connected: !integration.connected,
-              connectedAccount: integration.connected
-                ? null
-                : integration.connectedAccount || "configured",
-            }
-      ),
-    }));
   }
 
   return (
@@ -495,54 +458,7 @@ export function SettingsShell() {
 
           {activeTab === "api-keys" && <ApiKeysSection />}
 
-          {activeTab === "integrations" && (
-            <SettingCard
-              title="Integrations"
-              description="Manage provider connections and sync health."
-            >
-              <div className="space-y-2">
-                <CalendlyIntegration />
-                <TranscriptIntegrations />
-                {draft.integrations
-                  // Smartlead is our white-label backbone — managed centrally,
-                  // never exposed to customers as a connectable integration.
-                  .filter((integration) => integration.id !== "int_smartlead")
-                  .map((integration) =>
-                  integration.id === "int_unipile" ? (
-                    <UnipileIntegration key={integration.id} />
-                  ) : (
-                    <div
-                      key={integration.id}
-                      className="flex items-center justify-between rounded-[10px] border border-border-subtle bg-section/40 px-3 py-2"
-                    >
-                      <div>
-                        <p className="text-[12px] text-ink font-medium">{integration.name}</p>
-                        <p className="text-[11px] text-ink-muted">
-                          {integration.connectedAccount || "No account connected"}
-                          {integration.lastSyncAt ? ` · synced ${formatRelativeTime(integration.lastSyncAt)}` : ""}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <IntegrationBadge integration={integration} />
-                        <button
-                          type="button"
-                          onClick={() => toggleIntegration(integration.id)}
-                          className={cn(
-                            "px-3 py-1 rounded-[16px] text-[11px] font-medium transition-colors",
-                            integration.connected
-                              ? "bg-section text-ink-secondary hover:bg-hover"
-                              : "bg-ink text-on-ink hover:bg-ink/90"
-                          )}
-                        >
-                          {integration.connected ? "Disconnect" : "Connect"}
-                        </button>
-                      </div>
-                    </div>
-                  ),
-                )}
-              </div>
-            </SettingCard>
-          )}
+          {activeTab === "integrations" && <IntegrationsGrid />}
 
         </div>
       </div>

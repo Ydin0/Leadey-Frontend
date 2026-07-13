@@ -95,54 +95,8 @@ export const mockSettings: AppSettingsSnapshot = {
     scraperFailureSlack: true,
     billingAlertsEmail: true,
   },
-  integrations: [
-    {
-      id: "int_hubspot",
-      name: "HubSpot",
-      category: "crm",
-      connected: true,
-      connectedAccount: "growth@leadey.ai",
-      lastSyncAt: daysAgo(0),
-    },
-    {
-      id: "int_salesforce",
-      name: "Salesforce",
-      category: "crm",
-      connected: false,
-      connectedAccount: null,
-      lastSyncAt: null,
-    },
-    {
-      id: "int_bettercontact",
-      name: "BetterContact",
-      category: "enrichment",
-      connected: true,
-      connectedAccount: "api-key configured",
-      lastSyncAt: daysAgo(0),
-    },
-    {
-      id: "int_smartlead",
-      name: "Smartlead",
-      category: "sending",
-      connected: true,
-      connectedAccount: "leadey-prod-workspace",
-      lastSyncAt: daysAgo(0),
-    },
-    {
-      id: "int_unipile",
-      name: "Unipile (LinkedIn)",
-      category: "sending",
-      connected: false,
-      connectedAccount: null,
-      lastSyncAt: null,
-    },
-    {
-      id: "int_slack",
-      name: "Slack",
-      category: "communication",
-      connected: true,
-      connectedAccount: "#revops-alerts",
-      lastSyncAt: daysAgo(2),
-    },
-  ],
+  // Real, user-configurable integrations are rendered by IntegrationsGrid
+  // (Calendly, LinkedIn/Unipile, Fathom, Fireflies) from live status — no
+  // hardcoded/mock providers here.
+  integrations: [],
 };
