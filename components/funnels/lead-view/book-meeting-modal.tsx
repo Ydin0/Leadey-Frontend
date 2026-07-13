@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { CalendarPlus, Loader2, X, Video, ChevronLeft, ChevronRight, Clock, Globe, Check, CheckCircle2, ExternalLink, Users } from "lucide-react";
+import { CalendarPlus, Loader2, X, Video, ChevronLeft, ChevronRight, Clock, Globe, Check, CheckCircle2, ExternalLink, Users, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NativeSelect } from "@/components/ui/native-select";
 import { TagInput } from "@/components/shared/tag-input";
@@ -39,6 +39,7 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
   const [availMeta, setAvailMeta] = useState({ durationMin: 30, video: true });
   const [hostsBySlot, setHostsBySlot] = useState<Record<string, string[]>>({});
   const [hostNameById, setHostNameById] = useState<Map<string, string>>(new Map());
+  const [hostIssues, setHostIssues] = useState<{ userId: string; name: string; reason: "no-account" | "no-calendar" }[]>([]);
   const [loadingAvail, setLoadingAvail] = useState(false);
 
   const [title, setTitle] = useState("Meeting");
@@ -81,9 +82,11 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
       setAvailByDate(groupSlotsByTz(res.days.flatMap((d) => d.slots), displayTz));
       setHostsBySlot(res.hostsBySlot || {});
       setHostNameById(new Map((res.hosts || []).map((h) => [h.userId, h.name])));
+      setHostIssues(res.hostIssues || []);
     } catch {
       setAvailByDate(new Map());
       setHostsBySlot({});
+      setHostIssues([]);
     } finally {
       setLoadingAvail(false);
     }
@@ -244,6 +247,21 @@ export function BookMeetingModal({ open, onClose, funnelId, leadId, lead, contac
           <span className="text-[12px] text-ink-secondary">Time zone</span>
           <TimezoneSelect value={displayTz} onChange={setDisplayTz} className="w-[240px]" />
         </div>
+
+        {/* Explain a dead calendar: a host with no calendar-capable mailbox can't
+            offer any times, so every date is disabled. Tell the user who + how. */}
+        {!loadingAvail && availByDate.size === 0 && hostIssues.length > 0 && (
+          <div className="mx-6 mt-4 rounded-[10px] border border-signal-amber/40 bg-signal-amber/10 px-4 py-3">
+            <p className="text-[12.5px] font-semibold text-signal-amber-text inline-flex items-center gap-1.5">
+              <AlertTriangle size={14} /> No times can be offered on this page
+            </p>
+            <p className="text-[12px] text-ink-secondary mt-1.5">
+              {hostIssues.some((h) => h.reason === "no-calendar")
+                ? <>{hostIssues.filter((h) => h.reason === "no-calendar").map((h) => h.name).join(", ")} connected a mailbox without <strong>Calendar access</strong>. They need to reconnect their Google/Outlook account (Settings → Integrations → reconnect) and grant calendar permission so meetings can be booked.</>
+                : <>{hostIssues.map((h) => h.name).join(", ")} hasn&apos;t connected a Google/Outlook mailbox yet. Connect one in Settings → Integrations to enable booking.</>}
+            </p>
+          </div>
+        )}
 
         <div className="flex-1 flex min-h-0">
           <div className="p-6 w-[360px] shrink-0">

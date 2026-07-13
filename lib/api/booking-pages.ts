@@ -59,6 +59,9 @@ export interface AvailabilityResult {
   hostsBySlot?: Record<string, string[]>;
   /** Host id → display name, for slot avatars. */
   hosts?: { userId: string; name: string }[];
+  /** Pool hosts that can't host meetings (no mailbox / missing Calendar grant),
+   *  so the UI can explain an empty calendar instead of dead dates. */
+  hostIssues?: { userId: string; name: string; reason: "no-account" | "no-calendar" }[];
 }
 
 /** A booking page in the modal's page selector. */
