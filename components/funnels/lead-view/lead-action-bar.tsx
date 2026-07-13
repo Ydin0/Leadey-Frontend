@@ -357,7 +357,7 @@ export function LeadActionBar({
           </button>
           <button
             onClick={onBookMeeting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-signal-blue text-signal-blue-text text-[11px] font-medium hover:bg-signal-blue/80 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-[#2F5FD0] text-white text-[11px] font-medium hover:bg-[#2951BC] transition-colors"
           >
             <CalendarPlus size={13} strokeWidth={1.5} />
             Book meeting
