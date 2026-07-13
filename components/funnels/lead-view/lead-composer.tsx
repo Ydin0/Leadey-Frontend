@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { NativeSelect } from "@/components/ui/native-select";
 import { RichEmailEditor } from "@/components/email/rich-email-editor";
 import { SignaturePicker } from "@/components/shared/signature-picker";
+import { listSignatures, getSignatureDetails, type EmailSignature, type SignatureDetails } from "@/lib/api/signatures";
 import { listSendingAccounts, sendEmail } from "@/lib/api/email";
 import { listTemplates, listTemplateAttachments, uploadTemplateAttachment } from "@/lib/api/templates";
 import { getPhoneLines } from "@/lib/api/phone-lines";
@@ -162,6 +163,8 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
   const [subject, setSubject] = useState(prefill?.subject ?? "");
   const [body, setBody] = useState(prefill?.body ?? "");
   const [signatureId, setSignatureId] = useState("default");
+  const [signatures, setSignatures] = useState<EmailSignature[]>([]);
+  const [senderDetails, setSenderDetails] = useState<SignatureDetails | null>(null);
   const [attachments, setAttachments] = useState<TemplateAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
@@ -171,6 +174,8 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
   useEffect(() => {
     listSendingAccounts().then((a) => { const active = a.filter((x) => x.isActive); setAccounts(active); setFromId((p) => p || active[0]?.id || ""); }).catch(() => {});
     listTemplates("email").then(setTemplates).catch(() => setTemplates([]));
+    listSignatures().then(setSignatures).catch(() => setSignatures([]));
+    getSignatureDetails().then(setSenderDetails).catch(() => {});
   }, []);
 
   const emailSuggestions = useMemo(() => {
@@ -184,6 +189,24 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
   }, [contacts]);
 
   const fromAccount = accounts.find((a) => a.id === fromId);
+
+  // Live signature preview — render the SAME HTML the backend appends at send,
+  // with the rep's own {{sender_*}} details filled in, so it's visible here.
+  const signaturePreview = useMemo(() => {
+    if (signatureId === "none") return null;
+    const raw = signatureId === "default"
+      ? fromAccount?.signature || null
+      : signatures.find((s) => s.id === signatureId)?.contentHtml || null;
+    if (!raw) return null;
+    const senderCtx = senderDetails ? {
+      sender: {
+        firstName: senderDetails.firstName, lastName: senderDetails.lastName,
+        email: senderDetails.email, phone: senderDetails.phone, title: senderDetails.title,
+        fields: senderDetails.signatureFields,
+      },
+    } : undefined;
+    return renderPersonalized(raw, lead, senderCtx);
+  }, [signatureId, signatures, fromAccount, senderDetails, lead]);
 
   async function applyTemplate(t: Template) {
     setSubject(t.subject || "");
@@ -262,10 +285,28 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
       </div>
 
       <RichEmailEditor value={body} onChange={setBody} previewLead={lead} senderName={fromAccount?.fromName} minHeight={200} />
-      <div className="flex items-center gap-2">
-        <span className="text-[10.5px] text-ink-muted">Signature</span>
-        <SignaturePicker value={signatureId} onChange={setSignatureId} />
-        <span className="text-[10.5px] text-ink-faint">— added at send</span>
+
+      {/* Live signature preview — shows exactly what will be appended at send,
+          with the rep's own details filled in, plus a switcher dropdown. */}
+      <div className="rounded-[12px] border border-border-subtle bg-section/60 overflow-hidden">
+        <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-border-subtle bg-section">
+          <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">Signature</span>
+          <SignaturePicker value={signatureId} onChange={setSignatureId} />
+        </div>
+        {signatureId === "none" ? (
+          <div className="px-4 py-3 text-[11px] text-ink-faint">No signature will be added to this email.</div>
+        ) : signaturePreview ? (
+          <div className="bg-white px-4 py-3">
+            <div
+              className="text-[13px] leading-relaxed text-[#1a1a2e] [&_a]:text-[#4A57B8] [&_a]:underline [&_img]:max-w-full [&_img]:h-auto"
+              dangerouslySetInnerHTML={{ __html: signaturePreview }}
+            />
+          </div>
+        ) : (
+          <div className="px-4 py-3 text-[11px] text-ink-faint">
+            No signature configured for this mailbox. Add one in Settings → Signatures.
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2">

@@ -748,7 +748,9 @@ export function LeadTimeline({ activities, callRecords, emailMessages, funnelId,
       {/* Wide cap: the feed should use the available width on large screens
           instead of pinning to a narrow centered column. */}
       <div className="max-w-[1480px] mx-auto w-full px-7 pt-5 pb-16">
-        {filter !== "Documents" && (composerSlot ?? <Composer onAdd={onAddNote} funnelId={funnelId} leadId={leadId} />)}
+        {filter !== "Documents" && (
+          <div className="mb-6">{composerSlot ?? <Composer onAdd={onAddNote} funnelId={funnelId} leadId={leadId} />}</div>
+        )}
 
         {/* Filters */}
         <div className="flex items-center justify-between gap-3 mb-5 flex-wrap">
