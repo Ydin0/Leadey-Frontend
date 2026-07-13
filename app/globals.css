@@ -18,8 +18,8 @@
   /* Light mode — inverted secondary experience */
   --color-ink: #0C1122;             /* Midnight Navy — primary text on light */
   --color-ink-secondary: #242E55;   /* Mid Navy */
-  --color-ink-muted: #6B7299;       /* Periwinkle blended toward navy */
-  --color-ink-faint: #97A4D6;       /* Periwinkle */
+  --color-ink-muted: #565D85;       /* Periwinkle blended toward navy — darkened for legibility */
+  --color-ink-faint: #737EAD;       /* Periwinkle — darkened so values/links read on white */
 
   --color-page: #F4F5F9;            /* Cool off-white */
   --color-surface: #FFFFFF;
@@ -84,8 +84,8 @@
 [data-theme="dark"] {
   --color-ink: #FFFFFF;             /* Pure White — primary text on dark */
   --color-ink-secondary: #C8CFE6;   /* Lightened periwinkle */
-  --color-ink-muted: #97A4D6;       /* Periwinkle — secondary text */
-  --color-ink-faint: #6B7299;       /* Periwinkle dimmed */
+  --color-ink-muted: #AEB6DC;       /* Periwinkle — secondary text (brightened for legibility) */
+  --color-ink-faint: #8A93BC;       /* Periwinkle dimmed — brightened so it reads on dark navy */
 
   --color-page: #0C1122;            /* Midnight Navy — base canvas */
   --color-surface: #192039;         /* Deep Navy — cards, sidebar */
