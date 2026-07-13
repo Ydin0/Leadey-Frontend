@@ -12,7 +12,6 @@ import { CreditsProvider } from "@/components/providers/credits-provider";
 import { DueTasksProvider } from "@/components/providers/due-tasks-provider";
 import { DueTasksBanner, DueTaskAlert } from "@/components/tasks/due-tasks-banner";
 import { ScraperRunsWidget } from "@/components/scrapers/scraper-runs-widget";
-import { AssistantWidget } from "@/components/assistant/assistant-widget";
 
 export default function DashboardLayout({
   children,
@@ -46,8 +45,7 @@ export default function DashboardLayout({
                 <div className="flex-1 min-h-0 overflow-y-auto p-6">{children}</div>
               </main>
               <ScraperRunsWidget />
-              {/* AI assistant — floating launcher (bottom-right) + chat panel. */}
-              <AssistantWidget />
+              {/* AI assistant now lives at the bottom of the sidebar rail. */}
               {/* Global ringing prompt for inbound calls (accept/reject). */}
               <IncomingCallPrompt />
               {/* Top-right flash + chime when a task first becomes due. */}

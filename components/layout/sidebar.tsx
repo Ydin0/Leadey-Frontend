@@ -12,6 +12,7 @@ import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getInboxCounts } from "@/lib/api/inbox";
 import { LeadeyMark, LeadeyWordmark } from "@/components/brand/leadey-mark";
 import { usePermissions } from "@/lib/hooks/use-permissions";
+import { AssistantWidget } from "@/components/assistant/assistant-widget";
 import type { NavItem } from "@/lib/types";
 
 export function Sidebar() {
@@ -233,6 +234,11 @@ export function Sidebar() {
           );
         })}
       </nav>
+
+      {/* AI assistant launcher — pinned to the bottom of the rail. */}
+      <div className="shrink-0 px-2 pb-2 pt-1 border-t border-border-subtle/60">
+        <AssistantWidget expanded={expanded} />
+      </div>
     </aside>
   );
 }

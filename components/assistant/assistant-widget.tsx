@@ -12,7 +12,7 @@ const SUGGESTIONS = [
   "Who made the most calls this week?",
 ];
 
-export function AssistantWidget() {
+export function AssistantWidget({ expanded = true }: { expanded?: boolean }) {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [input, setInput] = useState("");
@@ -65,9 +65,9 @@ export function AssistantWidget() {
 
   return (
     <>
-      {/* Chat panel */}
+      {/* Chat panel — anchored to the bottom-left, clear of the sidebar rail. */}
       {open && (
-        <div className="fixed bottom-24 right-6 z-[61] w-[390px] max-w-[calc(100vw-2rem)] h-[600px] max-h-[calc(100vh-8rem)] flex flex-col rounded-[18px] border border-border-default bg-surface shadow-2xl overflow-hidden">
+        <div className="fixed bottom-4 left-[68px] z-[61] w-[390px] max-w-[calc(100vw-84px)] h-[600px] max-h-[calc(100vh-2rem)] flex flex-col rounded-[18px] border border-border-default bg-surface shadow-2xl overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-section/40 shrink-0">
             <div className="flex items-center gap-2.5">
@@ -170,20 +170,26 @@ export function AssistantWidget() {
         </div>
       )}
 
-      {/* Floating launcher */}
+      {/* Launcher — a row at the bottom of the sidebar rail. */}
       <button
         onClick={() => setOpen((o) => !o)}
         title="Leadey Assistant"
         aria-label="Open Leadey Assistant"
         className={cn(
-          // z-40 keeps the launcher BELOW drawers/modals (z-50+) so it can never
-          // cover their controls (e.g. the SMS composer's Send button). When no
-          // overlay is open it's still the top-most thing in its corner.
-          "fixed bottom-6 right-6 z-40 flex items-center justify-center w-[52px] h-[52px] rounded-full shadow-xl transition-all hover:scale-105",
-          open ? "bg-ink text-on-ink" : "bg-accent text-on-ink",
+          "flex items-center gap-3 h-9 px-2 rounded-lg transition-colors w-full min-w-0",
+          open ? "bg-accent/15" : "hover:bg-hover/60",
         )}
       >
-        {open ? <X size={22} /> : <Sparkles size={22} />}
+        <Sparkles size={17} strokeWidth={1.5} className="shrink-0 text-accent" />
+        <span
+          className={cn(
+            "text-[13px] whitespace-nowrap transition-opacity duration-200 truncate",
+            expanded ? "opacity-100" : "opacity-0",
+            open ? "text-ink font-medium" : "text-ink-secondary",
+          )}
+        >
+          AI Assistant
+        </span>
       </button>
     </>
   );
