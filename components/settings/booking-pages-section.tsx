@@ -101,6 +101,61 @@ function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
 const lab = "block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5";
 const inp = "w-full px-3 py-2 rounded-[10px] bg-section border border-border-subtle text-[12.5px] text-ink focus:outline-none focus:border-border-default";
 
+const NOTICE_UNITS = [
+  { key: "minutes", label: "minutes", min: 1 },
+  { key: "hours", label: "hours", min: 60 },
+  { key: "days", label: "days", min: 1440 },
+];
+const NOTICE_PRESETS = [
+  { label: "None", m: 0 }, { label: "1 hour", m: 60 }, { label: "4 hours", m: 240 },
+  { label: "1 day", m: 1440 }, { label: "2 days", m: 2880 }, { label: "1 week", m: 10080 },
+];
+function noticeUnitOf(m: number): string {
+  if (m > 0 && m % 1440 === 0) return "days";
+  if (m > 0 && m % 60 === 0) return "hours";
+  return "minutes";
+}
+
+/** Fully-customisable minimum-notice control: a value + unit (minutes/hours/
+ *  days) with quick presets — or type any custom value. Emits total minutes. */
+function MinNoticeField({ value, onChange }: { value: number; onChange: (minutes: number) => void }) {
+  const [unit, setUnit] = useState(() => noticeUnitOf(value));
+  const unitMin = NOTICE_UNITS.find((u) => u.key === unit)!.min;
+  const num = unit === "minutes" ? value : Math.round((value / unitMin) * 100) / 100;
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          type="number" min={0} value={num}
+          onChange={(e) => onChange(Math.max(0, Math.round(Number(e.target.value) || 0)) * unitMin)}
+          className={cn(inp, "w-24")}
+        />
+        <NativeSelect
+          value={unit}
+          onChange={(e) => { const nu = e.target.value; const nm = NOTICE_UNITS.find((u) => u.key === nu)!.min; setUnit(nu); onChange(num * nm); }}
+          className={cn(inp, "flex-1")}
+        >
+          {NOTICE_UNITS.map((u) => <option key={u.key} value={u.key}>{u.label}</option>)}
+        </NativeSelect>
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {NOTICE_PRESETS.map((p) => (
+          <button
+            type="button" key={p.label}
+            onClick={() => { setUnit(noticeUnitOf(p.m)); onChange(p.m); }}
+            className={cn(
+              "px-2 py-1 rounded-full text-[10.5px] font-medium border transition-colors",
+              value === p.m ? "bg-accent/15 text-link border-accent/30" : "bg-section text-ink-secondary border-border-subtle hover:bg-hover",
+            )}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBack: () => void; onSaved: () => void }) {
   const [name, setName] = useState(page?.name || "30 Minute Meeting");
   const [durationMin, setDurationMin] = useState(page?.durationMin ?? 30);
@@ -293,14 +348,13 @@ function PageEditor({ page, onBack, onSaved }: { page: BookingPage | null; onBac
           <WeeklyHoursEditor value={availability} onChange={setAvailability} />
         </div>
 
+        <div>
+          <label className={lab}>Minimum notice</label>
+          <p className="text-[11px] text-ink-muted -mt-1 mb-2">How far in advance a slot must be booked. Pick a preset or set your own.</p>
+          <MinNoticeField value={minNoticeMin} onChange={setMinNoticeMin} />
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className={lab}>Minimum notice</label>
-            <NativeSelect value={String(minNoticeMin)} onChange={(e) => setMinNoticeMin(Number(e.target.value))} className={inp}>
-              <option value={0}>None</option><option value={60}>1 hour</option><option value={240}>4 hours</option>
-              <option value={720}>12 hours</option><option value={1440}>1 day</option><option value={2880}>2 days</option>
-            </NativeSelect>
-          </div>
           <div>
             <label className={lab}>Bookable up to</label>
             <NativeSelect value={String(maxDaysAhead)} onChange={(e) => setMaxDaysAhead(Number(e.target.value))} className={inp}>
