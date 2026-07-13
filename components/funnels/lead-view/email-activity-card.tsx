@@ -53,20 +53,17 @@ function MessageRow({
         <ChevronRight size={14} className={cn("text-ink-muted shrink-0 transition-transform", expanded && "rotate-90")} />
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
-            <span className={cn(
-              "text-[10px] uppercase tracking-wide font-semibold shrink-0 rounded-full px-1.5 py-0.5",
-              outbound ? "bg-signal-blue/15 text-signal-blue-text" : "bg-signal-green/15 text-signal-green-text",
-            )}>
-              {outbound ? "Sent" : "Reply"}
+            <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-ink-faint shrink-0">
+              {outbound ? "Sent" : "Received"}
             </span>
             {showSubject
-              ? <span className="text-[12.5px] font-semibold text-ink truncate">{message.subject || "(no subject)"}</span>
+              ? <span className="text-[13px] font-semibold text-ink truncate">{message.subject || "(no subject)"}</span>
               : <span className="text-[12px] text-ink-secondary truncate">{outbound ? `To ${message.toEmail}` : fromLabel}</span>}
             {message.attachments?.length > 0 && <Paperclip size={11} className="text-ink-faint shrink-0" />}
             {outbound && <ReadReceipt opened={opened} openedAt={message.openedAt} count={message.openCount} compact />}
           </span>
           {showSubject && (
-            <span className="block text-[11px] text-ink-muted truncate mt-0.5">
+            <span className="block text-[11.5px] text-ink-muted truncate mt-0.5">
               {outbound ? `To ${message.toEmail}` : `From ${fromLabel}`}
             </span>
           )}
@@ -76,34 +73,47 @@ function MessageRow({
 
       {expanded && (
         <div className="border-t border-border-subtle">
-          <div className="flex items-start justify-between gap-3 px-4 py-3">
-            <div className="min-w-0 text-[11px] space-y-0.5">
-              <p className="truncate"><span className="text-ink-faint">From: </span><span className="text-ink">{fromLabel}</span></p>
-              <p className="truncate"><span className="text-ink-faint">To: </span><span className="text-ink">{message.toEmail}</span></p>
-              <p className="text-ink-muted">{new Date(message.createdAt).toLocaleString()}</p>
-              {outbound && <ReadReceipt opened={opened} openedAt={message.openedAt} count={message.openCount} />}
+          {/* The open email renders as a traditional white "sheet" (header + body
+              on white with dark text) — like a real inbox, regardless of theme. */}
+          <div className="bg-white text-[#1a1a2e]">
+            <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-black/[0.07]">
+              <div className="min-w-0 text-[11.5px] space-y-0.5">
+                <p className="truncate"><span className="text-black/45">From: </span><span className="font-medium">{fromLabel}</span></p>
+                <p className="truncate"><span className="text-black/45">To: </span>{message.toEmail}</p>
+                <p className="text-black/45">{new Date(message.createdAt).toLocaleString()}</p>
+                {outbound && (
+                  <p className={cn("flex items-center gap-1 mt-0.5", opened ? "text-emerald-600" : "text-black/40")}>
+                    {opened ? <Eye size={12} /> : <EyeOff size={12} />}
+                    {opened ? `Opened ${formatRelativeTime(message.openedAt!)}${message.openCount > 1 ? ` · ${message.openCount} times` : ""}` : "Not opened yet"}
+                  </p>
+                )}
+              </div>
+              <div ref={menuRef} className="relative shrink-0">
+                <button type="button" onClick={() => setMenuOpen((v) => !v)} className="p-1.5 rounded-md text-black/40 hover:bg-black/5 hover:text-black/70 transition-colors">
+                  <MoreHorizontal size={16} />
+                </button>
+                {menuOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-20 w-40 bg-white border border-black/10 rounded-[10px] shadow-lg py-1 text-[#1a1a2e]">
+                    <MenuItem icon={Reply} label="Reply" onClick={() => { setMenuOpen(false); onReply?.(message, "reply"); }} />
+                    <MenuItem icon={ReplyAll} label="Reply all" onClick={() => { setMenuOpen(false); onReply?.(message, "reply_all"); }} />
+                    <MenuItem icon={Forward} label="Forward" onClick={() => { setMenuOpen(false); onReply?.(message, "forward"); }} />
+                  </div>
+                )}
+              </div>
             </div>
-            <div ref={menuRef} className="relative shrink-0">
-              <button type="button" onClick={() => setMenuOpen((v) => !v)} className="p-1.5 rounded-md text-ink-muted hover:bg-hover hover:text-ink transition-colors">
-                <MoreHorizontal size={16} />
-              </button>
-              {menuOpen && (
-                <div className="absolute right-0 top-full mt-1 z-20 w-40 bg-surface border border-border-subtle rounded-[10px] shadow-lg py-1">
-                  <MenuItem icon={Reply} label="Reply" onClick={() => { setMenuOpen(false); onReply?.(message, "reply"); }} />
-                  <MenuItem icon={ReplyAll} label="Reply all" onClick={() => { setMenuOpen(false); onReply?.(message, "reply_all"); }} />
-                  <MenuItem icon={Forward} label="Forward" onClick={() => { setMenuOpen(false); onReply?.(message, "forward"); }} />
-                </div>
-              )}
-            </div>
+
+            <EmailBody html={message.bodyHtml || message.bodyText} />
+
+            {message.attachments?.length > 0 && (
+              <div className="px-4 pt-2 pb-3 border-t border-black/[0.07]">
+                <p className="text-[10.5px] uppercase tracking-wide font-semibold text-black/45 mb-1.5">Attachments</p>
+                <AttachmentChips attachments={message.attachments} />
+              </div>
+            )}
           </div>
 
-          <EmailBody html={message.bodyHtml || message.bodyText} />
-
-          {message.attachments?.length > 0 && (
-            <div className="px-4 pt-1 pb-3"><AttachmentChips attachments={message.attachments} /></div>
-          )}
-
-          <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border-subtle">
+          {/* Actions stay on the card chrome (theme-aware) below the sheet. */}
+          <div className="flex items-center gap-2 px-4 py-2.5 border-t border-border-subtle bg-surface">
             <button type="button" onClick={() => onReply?.(message, "reply")} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors border border-border-subtle">
               <Reply size={12} /> Reply
             </button>
@@ -194,7 +204,7 @@ function MenuItem({ icon: Icon, label, onClick }: { icon: typeof Reply; label: s
     <button
       type="button"
       onClick={onClick}
-      className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-ink-secondary hover:bg-hover transition-colors"
+      className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-black/70 hover:bg-black/5 transition-colors"
     >
       <Icon size={12} /> {label}
     </button>
