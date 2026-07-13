@@ -41,6 +41,7 @@ import { cn, formatRelativeTime } from "@/lib/utils";
 import { mockSettings } from "@/lib/mock-data/settings";
 import { UnipileIntegration } from "./unipile-integration";
 import { CalendlyIntegration } from "./calendly-integration";
+import { TranscriptIntegrations } from "./transcript-integration";
 import { PhoneLinesTab } from "@/components/calling/settings/phone-lines-tab";
 import { LocalPresenceSection } from "./local-presence-section";
 import { CallOutcomesSection } from "./call-outcomes-section";
@@ -501,6 +502,7 @@ export function SettingsShell() {
             >
               <div className="space-y-2">
                 <CalendlyIntegration />
+                <TranscriptIntegrations />
                 {draft.integrations
                   // Smartlead is our white-label backbone — managed centrally,
                   // never exposed to customers as a connectable integration.
