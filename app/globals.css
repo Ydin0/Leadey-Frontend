@@ -266,6 +266,17 @@ body {
   border-color: rgba(255, 255, 255, 0.06);
 }
 
+/* Hide scrollbars on horizontally-scrollable strips (e.g. pipeline tabs). */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Cockpit pipeline-tab content swap — fade + slide as you switch pipelines. */
+@keyframes pipeline-swap {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-pipeline-swap { animation: pipeline-swap 0.28s cubic-bezier(0.22, 0.61, 0.36, 1); }
+
 /* Rich email editor (TipTap) content styling */
 .prose-email p { margin: 0 0 0.6em; }
 .prose-email p:last-child { margin-bottom: 0; }

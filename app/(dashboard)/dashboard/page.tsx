@@ -9,7 +9,7 @@ import { listOpportunities, listPipelines } from "@/lib/api/opportunities";
 import { listMeetings } from "@/lib/api/calendar";
 import type { OrgMeeting } from "@/lib/types/calendar";
 import { updateLeadTask } from "@/lib/api/lead-tasks";
-import type { Opportunity, OpportunitySummary, Pipeline } from "@/lib/types/opportunity";
+import type { Opportunity, Pipeline } from "@/lib/types/opportunity";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { RepGreeting } from "@/components/dashboard/rep/rep-greeting";
 import { RepKpiRow, buildKpiSpecs } from "@/components/dashboard/rep/rep-kpi-row";
@@ -43,7 +43,6 @@ export default function DashboardPage() {
 
   const [rep, setRep] = useState<RepDashboardData | null>(null);
   const [dash, setDash] = useState<DashboardData | null>(null);
-  const [oppSummary, setOppSummary] = useState<OpportunitySummary | null>(null);
   const [opps, setOpps] = useState<Opportunity[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [meetings, setMeetings] = useState<OrgMeeting[]>([]);
@@ -68,7 +67,6 @@ export default function DashboardPage() {
       ]);
       setRep(repData);
       setDash(dashData);
-      setOppSummary(oppData.summary);
       setOpps(oppData.data);
       setPipelines(pipelineData);
       setMeetings(meetingsData?.meetings ?? []);
@@ -146,7 +144,7 @@ export default function DashboardPage() {
           <RepQueueCockpit calls={dash.calls} linkedin={dash.linkedin} email={dash.email} />
         </div>
         <div className="flex flex-col gap-6 min-w-0 lg:sticky lg:top-[84px]">
-          <RepPipelineGlance summary={oppSummary} pipelines={pipelines} opps={opps} />
+          <RepPipelineGlance pipelines={pipelines} opps={opps} />
         </div>
       </div>
     </div>
