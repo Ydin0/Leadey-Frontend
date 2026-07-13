@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Mail, Loader2, X, ChevronDown, UserPlus, Clock, Trash2, AlertTriangle, Pencil, SlidersHorizontal } from "lucide-react";
+import { Users, Mail, Loader2, X, ChevronDown, UserPlus, Clock, Trash2, Pencil, SlidersHorizontal } from "lucide-react";
 import { useUser } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -16,10 +16,13 @@ import {
   updateMemberRole,
   updateMember,
   removeMember,
+  getRemovalSummary,
   getDepartments,
   getTeamKpiConfig,
   saveTeamKpiConfig,
   type Department,
+  type RemovalSummary,
+  type ReassignTargets,
 } from "@/lib/api/team";
 import { DepartmentsManager } from "./departments-manager";
 import { MemberPermissionsModal, RolesCard } from "./team-permissions";
@@ -61,6 +64,15 @@ function memberName(m: TeamMember): string {
   return m.email;
 }
 
+/** Small pill showing how many items are in a reassignable category. */
+function CountBadge({ n }: { n: number }) {
+  return (
+    <span className="inline-flex items-center justify-center min-w-[20px] h-[18px] px-1.5 rounded-full bg-section border border-border-subtle text-[10px] font-medium text-ink-secondary">
+      {n}
+    </span>
+  );
+}
+
 export function TeamSection() {
   const isAuthReady = useAuthReady();
   const { user } = useUser();
@@ -92,6 +104,24 @@ export function TeamSection() {
   const [removing, setRemoving] = useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<TeamMember | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [removalSummary, setRemovalSummary] = useState<RemovalSummary | null>(null);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+  const [reassign, setReassign] = useState<ReassignTargets>({});
+  const [ackRemove, setAckRemove] = useState(false);
+
+  // Load the leaving member's active-work counts when the modal opens.
+  const openRemove = useCallback((member: TeamMember) => {
+    setRemoveError(null);
+    setReassign({});
+    setAckRemove(false);
+    setRemovalSummary(null);
+    setConfirmRemove(member);
+    setLoadingSummary(true);
+    getRemovalSummary(member.id)
+      .then(setRemovalSummary)
+      .catch(() => setRemovalSummary({ tasks: 0, opportunities: 0, leads: 0, phoneNumbers: 0 }))
+      .finally(() => setLoadingSummary(false));
+  }, []);
 
   // Edit member
   const [editMember, setEditMember] = useState<TeamMember | null>(null);
@@ -197,8 +227,8 @@ export function TeamSection() {
       setInviteSuccess(true);
       setTimeout(() => setInviteSuccess(false), 3000);
       await loadData();
-    } catch (err: any) {
-      setInviteError(err.message || "Failed to send invitation");
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Failed to send invitation");
     } finally {
       setInviting(false);
     }
@@ -240,7 +270,7 @@ export function TeamSection() {
     setRemoving(userId);
     setRemoveError(null);
     try {
-      await removeMember(userId);
+      await removeMember(userId, reassign);
       setMembers((prev) => prev.filter((m) => m.id !== userId));
       setSeatUsage((prev) => ({ ...prev, used: Math.max(0, prev.used - 1) }));
       setConfirmRemove(null);
@@ -454,10 +484,7 @@ export function TeamSection() {
                   </span>
                 ) : (
                   <button
-                    onClick={() => {
-                      setRemoveError(null);
-                      setConfirmRemove(member);
-                    }}
+                    onClick={() => openRemove(member)}
                     className="p-1.5 rounded-md text-ink-faint hover:text-signal-red-text hover:bg-signal-red/10 transition-colors"
                     title="Remove member"
                   >
@@ -558,49 +585,118 @@ export function TeamSection() {
         </Modal>
       )}
 
-      {/* Confirm remove modal */}
-      {confirmRemove && (
-        <Modal onClose={() => (removing ? null : setConfirmRemove(null))} maxWidth={440}>
+      {/* Remove member modal — reassign active work, then remove */}
+      {confirmRemove && (() => {
+        const candidates = members.filter((m) => m.id !== confirmRemove.id);
+        const s = removalSummary;
+        const hasWork = !!s && (s.tasks + s.opportunities + s.leads + s.phoneNumbers) > 0;
+        const setTarget = (key: keyof ReassignTargets, v: string) =>
+          setReassign((prev) => ({ ...prev, [key]: v || undefined }));
+        const row = (key: keyof ReassignTargets, label: string, count: number, hint?: string) => {
+          if (count <= 0) return null;
+          return (
+            <div>
+              <label className="flex items-center gap-1.5 text-[12px] font-medium text-ink mb-1.5">
+                {label}
+                <CountBadge n={count} />
+                {hint && <span className="text-[10.5px] font-normal text-ink-faint">· {hint}</span>}
+              </label>
+              <NativeSelect
+                value={reassign[key] || ""}
+                onChange={(e) => setTarget(key, e.target.value)}
+                className="w-full px-3 py-2 rounded-[10px] bg-section border border-border-subtle text-[12.5px] text-ink focus:outline-none focus:border-border-default"
+              >
+                <option value="">Do not reassign</option>
+                {candidates.map((m) => (
+                  <option key={m.id} value={m.id}>{memberName(m)}</option>
+                ))}
+              </NativeSelect>
+            </div>
+          );
+        };
+        return (
+        <Modal onClose={() => (removing ? null : setConfirmRemove(null))} maxWidth={520}>
           <ModalHeader
-            title="Remove member?"
+            title={`Remove member · ${memberName(confirmRemove)}`}
             onClose={() => (removing ? null : setConfirmRemove(null))}
           />
-          <div className="p-[18px]">
-            <div className="flex items-start gap-3">
-              <span className="flex items-center justify-center w-9 h-9 rounded-full bg-signal-red/10 text-signal-red-text shrink-0">
-                <AlertTriangle size={16} />
-              </span>
-              <p className="text-[12.5px] text-ink-secondary leading-relaxed">
-                <span className="font-medium text-ink">{memberName(confirmRemove)}</span>{" "}
-                ({confirmRemove.email}) will be removed from the organization and lose
-                access immediately. This can&apos;t be undone.
-              </p>
+          <div className="max-h-[70vh] overflow-y-auto">
+            {/* Warning panel */}
+            <div className="bg-signal-red/[0.07] border-b border-border-subtle px-[18px] py-4">
+              <p className="text-[12px] font-semibold text-ink mb-2.5">Are you sure you want to remove:</p>
+              <div className="flex items-center gap-2.5 mb-3">
+                <MemberAvatar id={confirmRemove.id} name={memberName(confirmRemove)} />
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-ink truncate">{memberName(confirmRemove)}</p>
+                  <p className="text-[11px] text-ink-muted truncate">{confirmRemove.email}</p>
+                </div>
+              </div>
+              <p className="text-[11.5px] font-semibold text-ink mb-1.5">This will:</p>
+              <ul className="text-[11.5px] text-ink-secondary leading-relaxed list-disc pl-4 space-y-0.5">
+                <li>Revoke their access to this organization immediately</li>
+                <li>Remove them from all campaigns, and unassign any work you don&apos;t reassign below</li>
+                <li>Free their seat — billing adjusts on the next cycle</li>
+              </ul>
             </div>
 
-            {removeError && (
-              <p className="text-[11.5px] text-signal-red-text mt-3">{removeError}</p>
-            )}
+            {/* Reassignment */}
+            <div className="px-[18px] py-4">
+              {loadingSummary ? (
+                <div className="flex items-center gap-2 text-[12px] text-ink-muted py-4">
+                  <Loader2 size={14} className="animate-spin" /> Checking their active work…
+                </div>
+              ) : hasWork ? (
+                <>
+                  <p className="text-[12px] text-ink-muted mb-3">You can reassign the following to another teammate:</p>
+                  <div className="space-y-3.5">
+                    {row("tasks", "Incomplete tasks", s!.tasks)}
+                    {row("opportunities", "Active opportunities", s!.opportunities)}
+                    {row("leads", "Owned leads", s!.leads)}
+                    {row("phoneNumbers", "Personal phone numbers", s!.phoneNumbers, "avoids broken call routing")}
+                  </div>
+                </>
+              ) : (
+                <p className="text-[12px] text-ink-muted">This member has no active work to reassign.</p>
+              )}
 
-            <div className="flex items-center justify-end gap-2 mt-5">
-              <button
-                onClick={() => setConfirmRemove(null)}
-                disabled={!!removing}
-                className="px-4 py-2 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleRemove(confirmRemove.id)}
-                disabled={!!removing}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-signal-red text-signal-red-text text-[11px] font-medium hover:bg-signal-red/80 transition-colors disabled:opacity-50"
-              >
-                {removing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                Remove member
-              </button>
+              {/* Acknowledge */}
+              <label className="flex items-start gap-2.5 mt-5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={ackRemove}
+                  onChange={(e) => setAckRemove(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 rounded border-border-default accent-signal-red-text shrink-0"
+                />
+                <span className="text-[11.5px] text-ink-secondary leading-relaxed">
+                  I understand this can&apos;t be undone. Reassignments apply immediately, and any invoice
+                  adjustment takes effect on the next billing cycle.
+                </span>
+              </label>
+
+              {removeError && <p className="text-[11.5px] text-signal-red-text mt-3">{removeError}</p>}
+
+              <div className="flex items-center justify-end gap-2 mt-5">
+                <button
+                  onClick={() => setConfirmRemove(null)}
+                  disabled={!!removing}
+                  className="px-4 py-2 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleRemove(confirmRemove.id)}
+                  disabled={!!removing || !ackRemove || loadingSummary}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-signal-red text-signal-red-text text-[11px] font-medium hover:bg-signal-red/80 transition-colors disabled:opacity-50"
+                >
+                  {removing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                  Remove member
+                </button>
+              </div>
             </div>
           </div>
         </Modal>
-      )}
+        );
+      })()}
 
       {/* Edit member modal */}
       {editMember && (

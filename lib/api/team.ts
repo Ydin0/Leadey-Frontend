@@ -126,6 +126,28 @@ export async function updateMember(
   });
 }
 
-export async function removeMember(userId: string): Promise<void> {
-  await apiRequest(`/team/${userId}`, { method: "DELETE" });
+export interface RemovalSummary {
+  tasks: number;
+  opportunities: number;
+  leads: number;
+  phoneNumbers: number;
+}
+
+/** Counts of a member's active work, for the Remove-User reassignment modal. */
+export async function getRemovalSummary(userId: string): Promise<RemovalSummary> {
+  return apiRequest<RemovalSummary>(`/team/${userId}/removal-summary`);
+}
+
+/** Target userIds to hand each category of the leaving member's work to.
+ *  Omit or leave a key empty to NOT reassign that category. */
+export interface ReassignTargets {
+  tasks?: string;
+  opportunities?: string;
+  leads?: string;
+  phoneNumbers?: string;
+}
+
+export async function removeMember(userId: string, reassign?: ReassignTargets): Promise<void> {
+  const body = reassign && Object.values(reassign).some(Boolean) ? { reassign } : undefined;
+  await apiRequest(`/team/${userId}`, { method: "DELETE", ...(body ? { body: JSON.stringify(body) } : {}) });
 }
