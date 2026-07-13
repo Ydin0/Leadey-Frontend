@@ -31,9 +31,12 @@
 
   --color-on-ink: #FFFFFF;          /* Text on bg-ink (ink = navy) */
 
-  /* Accent — Periwinkle Blue (the brand's human moment, §4.2) */
+  /* Accent — Periwinkle Blue (the brand's human moment, §4.2). Kept light so
+     `bg-accent` fills pair with dark `text-on-ink`. For accent-coloured TEXT
+     (links) use `--color-link`, which is legible on the page background. */
   --color-accent: #97A4D6;
   --color-accent-text: #FFFFFF;
+  --color-link: #4A57B8;            /* Legible periwinkle-indigo link on white */
 
   /* Signal colours — recoloured to live in the brand palette.
      Bright web greens/reds would clash; these are tinted toward the
@@ -98,6 +101,7 @@
   --color-on-ink: #0C1122;          /* Text on bg-ink (ink = white) */
 
   --color-accent: #97A4D6;          /* Periwinkle accent */
+  --color-link: #A6B2E8;            /* Legible periwinkle link on dark navy */
   --color-accent-text: #0C1122;
 
   --color-signal-blue: rgba(151, 164, 214, 0.18);

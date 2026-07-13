@@ -383,7 +383,7 @@ function ContactRow({
               </span>
             )}
             {active && (
-              <span className="text-[9px] font-medium rounded-full px-1.5 py-px bg-accent/15 text-accent">
+              <span className="text-[9px] font-medium rounded-full px-1.5 py-px bg-accent/15 text-link">
                 Filtering
               </span>
             )}
@@ -477,7 +477,7 @@ function ContactRow({
           ))}
           {c.linkedinUrl && (
             <DetailRow icon={Linkedin}>
-              <a href={c.linkedinUrl.startsWith("http") ? c.linkedinUrl : `https://www.linkedin.com/in/${c.linkedinUrl}`} target="_blank" rel="noreferrer" className="text-accent hover:underline truncate">
+              <a href={c.linkedinUrl.startsWith("http") ? c.linkedinUrl : `https://www.linkedin.com/in/${c.linkedinUrl}`} target="_blank" rel="noreferrer" className="text-link hover:underline truncate">
                 LinkedIn profile
               </a>
             </DetailRow>
@@ -495,7 +495,7 @@ function ContactRow({
               onClick={onSelect}
               className={cn(
                 "inline-flex items-center gap-1.5 self-start mt-0.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors",
-                active ? "bg-accent/15 text-accent border-accent/30" : "bg-section text-ink-secondary border-border-subtle hover:bg-hover",
+                active ? "bg-accent/15 text-link border-accent/30" : "bg-section text-ink-secondary border-border-subtle hover:bg-hover",
               )}
             >
               <Filter size={11} />
@@ -761,8 +761,8 @@ function AboutSection({ company, onSave }: { company: FunnelLeadCompany | null; 
           )}
           {company?.domain && (
             <div className="flex items-center gap-2">
-              <LinkIcon size={13} className="text-ink-faint shrink-0" />
-              <a href={company.website || `https://${company.domain}`} target="_blank" rel="noreferrer" className="text-[12.5px] text-accent hover:underline truncate">{company.domain}</a>
+              <LinkIcon size={13} className="text-ink-muted shrink-0" />
+              <a href={company.website || `https://${company.domain}`} target="_blank" rel="noreferrer" className="text-[12.5px] font-medium text-link hover:underline truncate">{company.domain}</a>
             </div>
           )}
           {company?.industry && (
@@ -782,8 +782,8 @@ function AboutSection({ company, onSave }: { company: FunnelLeadCompany | null; 
           )}
           {company?.linkedinUrl && (
             <div className="flex items-center gap-2">
-              <Linkedin size={13} className="text-ink-faint shrink-0" />
-              <a href={company.linkedinUrl.startsWith("http") ? company.linkedinUrl : `https://${company.linkedinUrl}`} target="_blank" rel="noreferrer" className="text-[12.5px] text-accent hover:underline truncate">Company LinkedIn</a>
+              <Linkedin size={13} className="text-ink-muted shrink-0" />
+              <a href={company.linkedinUrl.startsWith("http") ? company.linkedinUrl : `https://${company.linkedinUrl}`} target="_blank" rel="noreferrer" className="text-[12.5px] font-medium text-link hover:underline truncate">Company LinkedIn</a>
             </div>
           )}
           {company?.description ? (
@@ -899,7 +899,7 @@ function CustomFieldsSection({
             <div key={i} className="flex items-start gap-2.5 py-1.5 px-1">
               <span className="text-[11.5px] text-ink-muted w-[116px] shrink-0">{f.label}</span>
               {f.isLink ? (
-                <a href={f.value.startsWith("http") ? f.value : `https://${f.value}`} target="_blank" rel="noreferrer" className="text-[11.5px] text-accent hover:underline min-w-0 break-all">{f.value}</a>
+                <a href={f.value.startsWith("http") ? f.value : `https://${f.value}`} target="_blank" rel="noreferrer" className="text-[11.5px] text-link hover:underline min-w-0 break-all">{f.value}</a>
               ) : (
                 <span className="text-[11.5px] text-ink min-w-0 break-words whitespace-pre-wrap">{f.value}</span>
               )}
