@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Header } from "@/components/layout/header";
 import { CallProvider } from "@/components/calling/call-context";
 import { IncomingCallPrompt } from "@/components/calling/incoming-call-prompt";
+import { ActiveCallBar } from "@/components/calling/active-call-bar";
 import { VersionGate } from "@/components/providers/version-gate";
 import { DialerProvider } from "@/components/dialer/context/dialer-context";
 import { DialerBar } from "@/components/dialer/bar/dialer-bar";
@@ -48,6 +49,9 @@ export default function DashboardLayout({
               {/* AI assistant now lives at the bottom of the sidebar rail. */}
               {/* Global ringing prompt for inbound calls (accept/reject). */}
               <IncomingCallPrompt />
+              {/* Persistent call bar — stays on every page during an active/
+                  ringing call so you can always jump back to the lead or hang up. */}
+              <ActiveCallBar />
               {/* Top-right flash + chime when a task first becomes due. */}
               <DueTaskAlert />
               {/* Auto-reloads stale tabs so reps never run outdated call code. */}
