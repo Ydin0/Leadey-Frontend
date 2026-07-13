@@ -56,10 +56,10 @@ export function LeadStepTracker({
   return (
     <div className="bg-surface rounded-[14px] border border-border-subtle p-4 mb-6">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">
+        <h3 className="text-[10px] uppercase tracking-wider text-ink-secondary font-semibold">
           Campaign Progress
         </h3>
-        <span className="text-[10px] text-ink-faint">
+        <span className="text-[10px] font-medium text-ink-muted">
           {completedCount}/{steps.length} steps
         </span>
       </div>

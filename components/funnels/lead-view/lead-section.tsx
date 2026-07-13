@@ -25,13 +25,13 @@ export function Section({ icon: Icon, title, count, actions, defaultOpen = true,
       >
         <ChevronDown
           size={13}
-          className={cn("text-ink-faint transition-transform", !open && "-rotate-90")}
+          className={cn("text-ink-muted transition-transform", !open && "-rotate-90")}
         />
-        <Icon size={13} className="text-ink-muted" />
-        <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium">
+        <Icon size={13} className="text-ink-secondary" />
+        <span className="text-[10px] uppercase tracking-wider text-ink-secondary font-semibold">
           {title}
         </span>
-        {count != null && <span className="text-[11px] text-ink-faint">{count}</span>}
+        {count != null && <span className="text-[11px] font-medium text-ink-muted">{count}</span>}
         <div className="flex-1" />
         {actions && (
           <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
@@ -53,7 +53,7 @@ export function MiniBtn({ icon: Icon, onClick, title }: { icon: LucideIcon; onCl
         e.stopPropagation();
         onClick?.();
       }}
-      className="flex items-center justify-center w-[22px] h-[22px] rounded-md text-ink-muted hover:bg-hover hover:text-ink-secondary transition-colors"
+      className="flex items-center justify-center w-[22px] h-[22px] rounded-md text-ink-secondary hover:bg-hover hover:text-ink transition-colors"
     >
       <Icon size={13} />
     </button>
