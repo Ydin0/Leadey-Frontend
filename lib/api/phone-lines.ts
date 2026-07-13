@@ -164,6 +164,34 @@ export async function fetchCallRecordingBlobUrl(callRecordId: string): Promise<s
   return URL.createObjectURL(blob);
 }
 
+/** Download the call audio as a file (the recording stream is auth-scoped, so we
+ *  fetch the bytes with the bearer token then save them via a temporary link).
+ *  `filename` should already include an extension; ".mp3" is appended if not. */
+export async function downloadCallRecording(callRecordId: string, filename: string): Promise<void> {
+  const token = getAuthToken();
+  const res = await fetch(
+    `${API_BASE_URL}/api/phone-lines/call-records/${callRecordId}/recording`,
+    {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      cache: "no-store",
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Failed to download recording (${res.status})`);
+  }
+  const blob = await res.blob();
+  const name = /\.(mp3|wav|m4a|ogg)$/i.test(filename) ? filename : `${filename}.mp3`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  // Revoke after a tick so the download has grabbed the blob.
+  window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
 export async function summarizeCall(
   callRecordId: string,
 ): Promise<Pick<CallRecord, "transcript" | "summary" | "transcriptSegments" | "speakers" | "summaryStructured" | "outcome" | "outcomeManual">> {

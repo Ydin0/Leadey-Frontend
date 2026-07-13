@@ -14,6 +14,7 @@ import { DataTablePagination } from "@/components/ui/data-table-pagination";
 import { AudioPlayer } from "./audio-player";
 import { CallReview } from "./call-review";
 import { ShareRecordingButton } from "./share-recording-button";
+import { DownloadRecordingButton, recordingFileName } from "./download-recording-button";
 import { CallOutcomeSelect } from "@/components/calling/call-outcome-select";
 import { useCallOutcomes } from "@/lib/hooks/use-call-outcomes";
 import { summarizeCall, setCallOutcome } from "@/lib/api/phone-lines";
@@ -108,7 +109,7 @@ export function RecordingsTable({
             <TableHead className="text-left w-[180px]">Outcome</TableHead>
             <TableHead className="text-left w-[240px]">Recording</TableHead>
             <TableHead className="text-center w-[100px]">Transcript</TableHead>
-            <TableHead className="text-center w-[52px]">Share</TableHead>
+            <TableHead className="text-center w-[84px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -259,9 +260,20 @@ export function RecordingsTable({
                     )}
                   </TableCell>
 
-                  {/* Share — copy a deep link to this recording */}
+                  {/* Actions — download the MP3 + copy a deep link */}
                   <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                    <ShareRecordingButton recordId={record.id} />
+                    <div className="flex items-center justify-center gap-0.5">
+                      {hasRecording && (
+                        <DownloadRecordingButton
+                          recordId={record.id}
+                          fileName={recordingFileName({
+                            contact: record.contactName || record.companyName || (record.direction === "outbound" ? record.to : record.from),
+                            timestamp: record.timestamp,
+                          })}
+                        />
+                      )}
+                      <ShareRecordingButton recordId={record.id} />
+                    </div>
                   </TableCell>
                 </TableRow>
 

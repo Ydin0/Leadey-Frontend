@@ -11,6 +11,7 @@ import { cn, formatRelativeTime, formatPhoneIntl } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { CallReview } from "@/components/recordings/call-review";
 import { ShareRecordingButton } from "@/components/recordings/share-recording-button";
+import { DownloadRecordingButton, recordingFileName } from "@/components/recordings/download-recording-button";
 import { getCallRecord, summarizeCall } from "@/lib/api/phone-lines";
 import type { CallRecord } from "@/lib/types/calling";
 
@@ -133,7 +134,19 @@ export default function RecordingDetailPage() {
         <Link href="/dashboard/recordings" className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted hover:text-ink transition-colors">
           <ArrowLeft size={14} /> Back to recordings
         </Link>
-        <ShareRecordingButton recordId={record.id} variant="button" />
+        <div className="flex items-center gap-2">
+          {record.recordingUrl && (
+            <DownloadRecordingButton
+              recordId={record.id}
+              variant="button"
+              fileName={recordingFileName({
+                contact: record.contactName || record.companyName || counterpart,
+                timestamp: record.timestamp,
+              })}
+            />
+          )}
+          <ShareRecordingButton recordId={record.id} variant="button" />
+        </div>
       </div>
 
       {/* Header card */}
