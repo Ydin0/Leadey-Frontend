@@ -10,18 +10,10 @@ import { BookMeetingModal } from "./book-meeting-modal";
 import { LeadTimeline } from "./lead-timeline";
 import { LeadStepTracker } from "@/components/funnels/focus/lead-step-tracker";
 import { FocusCallControls } from "@/components/funnels/focus/focus-call-controls";
-// Heavy overlays load on first use, not with the lead view: the email
-// composer alone pulls the whole TipTap editor chain into the chunk.
-const EmailComposerDrawer = dynamic(
-  () => import("@/components/email/email-composer-drawer").then((m) => m.EmailComposerDrawer),
-  { ssr: false },
-);
-const SmsThreadDrawer = dynamic(
-  () => import("@/components/sms/sms-thread-drawer").then((m) => m.SmsThreadDrawer),
-  { ssr: false },
-);
-const WhatsappThreadDrawer = dynamic(
-  () => import("@/components/whatsapp/whatsapp-thread-drawer").then((m) => m.WhatsappThreadDrawer),
+// The inline activity-timeline composer (Note/Email/SMS/WhatsApp) loads lazily —
+// it pulls the TipTap editor chain, so defer it off the lead-view chunk.
+const LeadComposer = dynamic(
+  () => import("./lead-composer").then((m) => m.LeadComposer),
   { ssr: false },
 );
 const ConvertToOpportunityModal = dynamic(
@@ -86,16 +78,13 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   const [editedNotes, setEditedNotes] = useState<Record<string, string>>({});
   const [deletedNotes, setDeletedNotes] = useState<Set<string>>(new Set());
   const [advancing, setAdvancing] = useState(false);
-  const [showComposer, setShowComposer] = useState(false);
-  const [showSms, setShowSms] = useState(false);
-  const [showWhatsapp, setShowWhatsapp] = useState(false);
+  // Inline activity-timeline composer: which channel is active (default note).
+  const [composerMode, setComposerMode] = useState<import("./lead-composer").ComposerMode>("note");
   const [showBooking, setShowBooking] = useState(false);
   // Bumped after a booking so the "Upcoming meetings" section refetches.
   const [meetingsRefresh, setMeetingsRefresh] = useState(0);
   // Bumped after a Magic Enrich so the "Hiring roles" section refetches.
   const [hiringRefresh, setHiringRefresh] = useState(0);
-  const [noteOpen, setNoteOpen] = useState(false);
-  const [noteText, setNoteText] = useState("");
   const [showConvert, setShowConvert] = useState(false);
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
   const [emailMessages, setEmailMessages] = useState<LeadEmailMessage[]>([]);
@@ -259,7 +248,9 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   // (never a stale closure) and ignores key auto-repeat so holding a key can't
   // fly through the list.
   const navRef = useRef<{ prevId: string | null; nextId: string | null; blocked: boolean }>({ prevId, nextId, blocked: false });
-  navRef.current = { prevId, nextId, blocked: showComposer || showSms || showWhatsapp || noteOpen || showConvert };
+  // Block prev/next while a channel composer (email/sms/whatsapp) is open so a
+  // half-written message is never lost; a plain note doesn't block.
+  navRef.current = { prevId, nextId, blocked: composerMode !== "note" || showConvert || showBooking };
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.repeat) return;
@@ -445,7 +436,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   function handleCompleteStep(step: FunnelStep) {
     if (!currentLead) return;
     if (step.channel === "email") {
-      setShowComposer(true);
+      setComposerMode("email");
       return;
     }
     if (step.channel === "call") dialPrimary();
@@ -462,12 +453,14 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     completeStep("sent");
   }
 
-  function handleEmailSent() {
+  // After the inline composer sends: refresh the relevant thread + advance the
+  // campaign step when the sent channel matches the current step.
+  function handleComposerSent() {
     if (!currentLead) return;
-    // Pull the freshly-sent email into the timeline as a rich card.
     void reloadEmails();
     setReplyPrefill(null);
-    if (currentStepDef?.channel === "email") completeStep("sent");
+    if (currentStepDef?.channel === composerMode) completeStep("sent");
+    onLeadsChanged?.();
   }
 
   // Reply / reply-all / forward from an email card → open the composer prefilled
@@ -481,7 +474,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
       mode === "forward" ? "" : message.direction === "inbound" ? message.fromEmail : message.toEmail;
     const quoted = `<br/><br/><blockquote>On ${new Date(message.createdAt).toLocaleString()}, ${message.fromName || message.fromEmail} wrote:<br/>${message.bodyHtml || message.bodyText}</blockquote>`;
     setReplyPrefill({ to, subject, body: quoted });
-    setShowComposer(true);
+    setComposerMode("email");
   }, []);
 
   function addNote(text: string, attachments?: NoteAttachment[]) {
@@ -666,10 +659,10 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         doNotCall={currentLead.doNotCall}
         onStatusChange={handleStatusChange}
         onRenameCompany={handleRenameCompany}
-        onNote={() => { pauseForEngagement(); setNoteOpen(true); }}
-        onEmail={() => { pauseForEngagement(); setShowComposer(true); }}
-        onSms={() => { pauseForEngagement(); setShowSms(true); }}
-        onWhatsapp={() => { pauseForEngagement(); setShowWhatsapp(true); }}
+        onNote={() => { pauseForEngagement(); setComposerMode("note"); }}
+        onEmail={() => { pauseForEngagement(); setReplyPrefill(null); setComposerMode("email"); }}
+        onSms={() => { pauseForEngagement(); setComposerMode("sms"); }}
+        onWhatsapp={() => { pauseForEngagement(); setComposerMode("whatsapp"); }}
         onBookMeeting={() => { pauseForEngagement(); setShowBooking(true); }}
         onCall={dialPrimary}
         onEnriched={() => setHiringRefresh((n) => n + 1)}
@@ -693,7 +686,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
             onConvert={() => { pauseForEngagement(); setShowConvert(true); }}
             onOpportunityChanged={() => onLeadsChanged?.()}
             onCall={(phone, name) => dial(phone, name)}
-            onEmail={(email) => { pauseForEngagement(); setReplyPrefill({ to: email, subject: "", body: "" }); setShowComposer(true); }}
+            onEmail={(email) => { pauseForEngagement(); setReplyPrefill({ to: email, subject: "", body: "" }); setComposerMode("email"); }}
             onDnc={handleDnc}
             onContactSave={handleContactSave}
             onContactDelete={handleContactDelete}
@@ -736,6 +729,20 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
             onReplyEmail={handleReplyEmail}
             filterContactName={filterContactName}
             onClearFilter={() => setContactFilter(null)}
+            composerSlot={
+              <LeadComposer
+                funnelId={funnelId}
+                leadId={currentLead.id}
+                lead={{ id: currentLead.id, name: currentLead.name, company: currentLead.company, title: currentLead.title, email: currentLead.email, companyDomain: currentLead.companyDomain }}
+                contacts={companyContacts.map((c) => ({ leadId: c.id, name: c.name, email: c.email, phone: c.phone }))}
+                mode={composerMode}
+                onModeChange={setComposerMode}
+                stepIndex={currentStepDef ? Math.max(0, (currentLead.currentStep || 1) - 1) : null}
+                prefill={replyPrefill}
+                onAddNote={addNote}
+                onSent={handleComposerSent}
+              />
+            }
           />
         </section>
       </div>
@@ -765,70 +772,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         </div>
       )}
 
-      {/* SMS thread — mounted (and its chunk loaded) only when opened. */}
-      {showSms && (
-      <SmsThreadDrawer
-        open={showSms}
-        onClose={() => setShowSms(false)}
-        channelFilter="sms"
-        funnelId={funnelId}
-        leadId={currentLead.id}
-        leadName={currentLead.name}
-        leadPhone={primaryPhone || null}
-        lead={{
-          name: currentLead.name,
-          company: currentLead.company,
-          title: currentLead.title,
-          email: currentLead.email,
-          companyDomain: currentLead.companyDomain,
-        }}
-        contacts={companyContacts.map((c) => ({ leadId: c.id, name: c.name, phone: c.phone }))}
-        onSent={() => onLeadsChanged?.()}
-      />
-      )}
-
-      {showWhatsapp && (
-      <WhatsappThreadDrawer
-        open={showWhatsapp}
-        onClose={() => setShowWhatsapp(false)}
-        funnelId={funnelId}
-        leadId={currentLead.id}
-        leadName={currentLead.name}
-        leadPhone={primaryPhone || null}
-        lead={{
-          name: currentLead.name,
-          company: currentLead.company,
-          title: currentLead.title,
-          email: currentLead.email,
-          companyDomain: currentLead.companyDomain,
-        }}
-        onSent={() => onLeadsChanged?.()}
-      />
-      )}
-
-      {/* Email composer — mounted only when opened (defers the TipTap chunk). */}
-      {showComposer && (
-      <EmailComposerDrawer
-        open={showComposer}
-        onClose={() => { setShowComposer(false); setReplyPrefill(null); }}
-        initialSubject={replyPrefill?.subject}
-        initialBody={replyPrefill?.body}
-        initialTo={replyPrefill?.to}
-        lead={{
-          id: currentLead.id,
-          name: currentLead.name,
-          firstName: currentLead.firstName,
-          lastName: currentLead.lastName,
-          email: currentLead.email,
-          company: currentLead.company,
-          title: currentLead.title,
-          companyDomain: currentLead.companyDomain,
-        }}
-        funnelId={funnelId}
-        stepIndex={currentStepDef?.channel === "email" ? effectiveStep - 1 : null}
-        onSent={handleEmailSent}
-      />
-      )}
+      {/* Email / SMS / WhatsApp are now composed inline in the activity
+          timeline (LeadComposer via composerSlot) — no more sidebar drawers. */}
 
       {/* Book meeting */}
       {showBooking && (
@@ -853,41 +798,6 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         />
       )}
 
-      {/* Note modal */}
-      {noteOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[3px]" onClick={() => setNoteOpen(false)} />
-          <div className="relative w-full max-w-md bg-surface rounded-[14px] border border-border-subtle shadow-2xl p-5">
-            <h3 className="text-[13px] font-semibold text-ink mb-3">Add a note</h3>
-            <textarea
-              autoFocus
-              value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
-              rows={4}
-              placeholder="Log a note about this lead…"
-              className="w-full bg-section border border-border-subtle rounded-[8px] px-3 py-2 text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default resize-none"
-            />
-            <div className="flex justify-end gap-2 mt-3">
-              <button
-                onClick={() => setNoteOpen(false)}
-                className="px-3 py-1.5 rounded-[20px] text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  addNote(noteText);
-                  setNoteText("");
-                  setNoteOpen(false);
-                }}
-                className="px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 transition-colors"
-              >
-                Save note
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
