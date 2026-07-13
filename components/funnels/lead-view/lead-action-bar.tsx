@@ -281,10 +281,9 @@ export function LeadActionBar({
               onClick={() => setEnrichOpen((v) => !v)}
               disabled={enriching}
               title="Magic Enrich"
-              className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] text-[11px] font-semibold text-white bg-gradient-to-r from-[#5B4FD1] to-[#3457C4] shadow-sm hover:opacity-90 transition-opacity disabled:opacity-70 overflow-hidden"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] text-[11px] font-medium bg-accent/15 text-link hover:bg-accent/25 transition-colors disabled:opacity-60"
             >
-              <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-              {enriching ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} strokeWidth={2} />}
+              {enriching ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} strokeWidth={1.5} />}
               {enriching ? "Enriching…" : "Magic Enrich"}
             </button>
             {enrichOpen && (
@@ -357,7 +356,7 @@ export function LeadActionBar({
           </button>
           <button
             onClick={onBookMeeting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-[#2F5FD0] text-white text-[11px] font-medium hover:bg-[#2951BC] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-accent/15 text-link text-[11px] font-medium hover:bg-accent/25 transition-colors"
           >
             <CalendarPlus size={13} strokeWidth={1.5} />
             Book meeting
