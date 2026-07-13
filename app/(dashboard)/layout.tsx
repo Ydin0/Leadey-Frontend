@@ -43,7 +43,10 @@ export default function DashboardLayout({
                 <DialerBar />
                 {/* Persistent reminder for past-due tasks assigned to you. */}
                 <DueTasksBanner />
-                <div className="flex-1 min-h-0 overflow-y-auto p-6">{children}</div>
+                {/* overflow-x-hidden stops any hair-too-wide child from adding a
+                    stray page-level horizontal scrollbar at the bottom; wide
+                    content (tables) scrolls inside its own container. */}
+                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6">{children}</div>
               </main>
               <ScraperRunsWidget />
               {/* AI assistant now lives at the bottom of the sidebar rail. */}
