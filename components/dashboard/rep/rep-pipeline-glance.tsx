@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useMemo, useRef, useLayoutEffect } from "react";
+import { useState, useMemo, useRef, useLayoutEffect, useEffect } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
+import { listOpportunities } from "@/lib/api/opportunities";
 import type { Opportunity, Pipeline, PipelineStage } from "@/lib/types/opportunity";
 
 const STAGE_PALETTE = [
@@ -63,23 +64,42 @@ function computeView(pipeline: Pipeline, opps: Opportunity[]) {
 }
 
 export function RepPipelineGlance({ pipelines, opps }: RepPipelineGlanceProps) {
-  // Only surface pipelines the rep actually has deals in (fall back to the
+  // Scope: the rep's own deals (default) or the whole team's. Team data is
+  // fetched lazily the first time it's needed, then cached.
+  const [scope, setScope] = useState<"mine" | "team">("mine");
+  const [teamOpps, setTeamOpps] = useState<Opportunity[] | null>(null);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+  useEffect(() => {
+    if (scope !== "team" || teamOpps !== null || loadingTeam) return;
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setLoadingTeam(true);
+    listOpportunities({}) // no ownerId → every owner's opportunities
+      .then((res) => setTeamOpps(res.data))
+      .catch(() => setTeamOpps([]))
+      .finally(() => setLoadingTeam(false));
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [scope, teamOpps, loadingTeam]);
+
+  const activeOpps = useMemo(() => (scope === "team" ? teamOpps ?? [] : opps), [scope, teamOpps, opps]);
+  const teamLoading = scope === "team" && teamOpps === null;
+
+  // Only surface pipelines with deals in the active scope (fall back to the
   // first pipeline so the card never renders empty tabs).
   const tabs = useMemo(() => {
-    const withOpps = pipelines.filter((p) => opps.some((o) => o.pipelineId === p.id));
+    const withOpps = pipelines.filter((p) => activeOpps.some((o) => o.pipelineId === p.id));
     return withOpps.length ? withOpps : pipelines.slice(0, 1);
-  }, [pipelines, opps]);
+  }, [pipelines, activeOpps]);
 
-  // Default to the busiest pipeline (most open deals).
+  // Default to the busiest pipeline (most open deals) in the active scope.
   const defaultId = useMemo(() => {
     let best = tabs[0]?.id ?? null;
     let bestOpen = -1;
     for (const p of tabs) {
-      const open = opps.filter((o) => o.pipelineId === p.id).length;
+      const open = activeOpps.filter((o) => o.pipelineId === p.id).length;
       if (open > bestOpen) { bestOpen = open; best = p.id; }
     }
     return best;
-  }, [tabs, opps]);
+  }, [tabs, activeOpps]);
 
   const [activeId, setActiveId] = useState<string | null>(null);
   const active = tabs.find((p) => p.id === (activeId ?? defaultId)) || tabs[0] || null;
@@ -109,19 +129,31 @@ export function RepPipelineGlance({ pipelines, opps }: RepPipelineGlanceProps) {
     );
   }
 
-  const v = computeView(active, opps);
+  const v = computeView(active, activeOpps);
+
+  const scopeToggle = (
+    <div className="flex items-center rounded-full bg-section border border-border-subtle p-0.5">
+      {(["mine", "team"] as const).map((s) => (
+        <button
+          key={s}
+          onClick={() => setScope(s)}
+          className={cn(
+            "px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors",
+            scope === s ? "bg-surface text-ink shadow-sm" : "text-ink-muted hover:text-ink-secondary",
+          )}
+        >
+          {s === "mine" ? "Mine" : "Team"}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <section className="bg-surface rounded-[14px] border border-border-subtle p-[18px]">
       <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <h2 className="text-[15px] font-semibold text-ink">Pipeline</h2>
-          <span
-            className="text-[10px] font-medium uppercase tracking-wider text-ink-muted bg-section border border-border-subtle rounded-full px-1.5 py-0.5"
-            title="This card shows only opportunities assigned to you. Open the full pipeline to see the whole team."
-          >
-            Yours
-          </span>
+          {scopeToggle}
         </div>
         <Link
           href={`/dashboard/opportunities?pipeline=${encodeURIComponent(active.id)}`}
@@ -158,7 +190,12 @@ export function RepPipelineGlance({ pipelines, opps }: RepPipelineGlanceProps) {
       )}
 
       {/* Swappable pipeline body — re-animates on every pipeline switch. */}
-      <div key={active.id} className="animate-pipeline-swap">
+      {teamLoading ? (
+        <div className="flex items-center gap-2 text-[12px] text-ink-muted py-8">
+          <Loader2 size={14} className="animate-spin" /> Loading the team&apos;s pipeline…
+        </div>
+      ) : (
+      <div key={`${scope}-${active.id}`} className="animate-pipeline-swap">
         {/* totals */}
         <div className="flex items-stretch gap-5 mb-4">
           <div>
@@ -240,6 +277,7 @@ export function RepPipelineGlance({ pipelines, opps }: RepPipelineGlanceProps) {
           )}
         </div>
       </div>
+      )}
     </section>
   );
 }
