@@ -78,6 +78,8 @@ export interface EditableCustomField {
 interface LeadDetailsColumnProps {
   funnelId: string;
   leadId: string;
+  /** Bumped by the parent after a Magic Enrich to force the hiring-roles refetch. */
+  hiringRefreshToken?: number;
   company: FunnelLeadCompany | null;
   contacts: FunnelLeadContact[];
   customFields: FunnelLeadCustomField[];
@@ -957,6 +959,7 @@ function AddContactInline({ onAdd, onCancel }: { onAdd: (name: string) => Promis
 export function LeadDetailsColumn({
   funnelId,
   leadId,
+  hiringRefreshToken,
   company,
   contacts,
   customFields,
@@ -1061,7 +1064,7 @@ export function LeadDetailsColumn({
           </Section>
 
           {/* Hiring roles — full CRUD (title, salary, location, seniority, …) */}
-          <LeadHiringRolesSection funnelId={funnelId} leadId={leadId} seedRoles={seedHiringRoles} />
+          <LeadHiringRolesSection funnelId={funnelId} leadId={leadId} seedRoles={seedHiringRoles} refreshToken={hiringRefreshToken} />
 
           {/* Custom fields — editable org-defined values + read-only system fields */}
           <CustomFieldsSection

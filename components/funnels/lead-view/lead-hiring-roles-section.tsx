@@ -52,6 +52,7 @@ export function LeadHiringRolesSection({
   funnelId,
   leadId,
   seedRoles,
+  refreshToken,
 }: {
   funnelId: string;
   leadId: string;
@@ -59,6 +60,8 @@ export function LeadHiringRolesSection({
    *  the company's scraped job posts. When set, the section is read-only and
    *  skips the per-lead fetch. */
   seedRoles?: HiringRole[];
+  /** Bumped by the parent (e.g. after Magic Enrich) to force a refetch. */
+  refreshToken?: number;
 }) {
   const isAuthReady = useAuthReady();
   const readOnly = !!seedRoles;
@@ -78,7 +81,7 @@ export function LeadHiringRolesSection({
   useEffect(() => {
     if (!isAuthReady || readOnly) return;
     void load();
-  }, [isAuthReady, load, readOnly]);
+  }, [isAuthReady, load, readOnly, refreshToken]);
 
   function startAdd() {
     setDraft(EMPTY);

@@ -92,6 +92,8 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   const [showBooking, setShowBooking] = useState(false);
   // Bumped after a booking so the "Upcoming meetings" section refetches.
   const [meetingsRefresh, setMeetingsRefresh] = useState(0);
+  // Bumped after a Magic Enrich so the "Hiring roles" section refetches.
+  const [hiringRefresh, setHiringRefresh] = useState(0);
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteText, setNoteText] = useState("");
   const [showConvert, setShowConvert] = useState(false);
@@ -670,6 +672,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
         onWhatsapp={() => { pauseForEngagement(); setShowWhatsapp(true); }}
         onBookMeeting={() => { pauseForEngagement(); setShowBooking(true); }}
         onCall={dialPrimary}
+        onEnriched={() => setHiringRefresh((n) => n + 1)}
       />
 
       <div className="px-6 pt-3 shrink-0">
@@ -681,6 +684,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
           <LeadDetailsColumn
             funnelId={funnelId}
             leadId={currentLead.id}
+            hiringRefreshToken={hiringRefresh}
             company={realCompany}
             contacts={companyContacts}
             customFields={readOnlyFields}

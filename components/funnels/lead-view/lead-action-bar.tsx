@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, FileText, Mail, Phone, MessageSquare, MessageCircle, CalendarPlus, Pencil, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, FileText, Mail, Phone, MessageSquare, MessageCircle, CalendarPlus, Pencil, Loader2, Sparkles, Search, Bot, UserPlus, Check, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
 import { LeadCampaignsMenu } from "./lead-campaigns-menu";
+import { enrichJobPosts } from "@/lib/api/funnels";
 import { getStatusLabel, getStatusDotClass, type LeadStatusOption } from "@/lib/utils/lead-status";
 import type { FunnelStatus } from "@/lib/types/funnel";
 
@@ -28,6 +29,9 @@ interface LeadActionBarProps {
   onWhatsapp: () => void;
   onBookMeeting: () => void;
   onCall: () => void;
+  /** Called after a successful Magic Enrich so the profile can refresh (e.g.
+   *  the Hiring Roles section picks up the newly-scraped job posts). */
+  onEnriched?: () => void;
 }
 
 export function LeadActionBar({
@@ -48,9 +52,46 @@ export function LeadActionBar({
   onWhatsapp,
   onBookMeeting,
   onCall,
+  onEnriched,
 }: LeadActionBarProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  // Magic Enrich (job posts via TheirStack, for now — more options later).
+  const [enrichOpen, setEnrichOpen] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichMsg, setEnrichMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const enrichRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!enrichOpen) return;
+    function onClick(e: MouseEvent) {
+      if (enrichRef.current && !enrichRef.current.contains(e.target as Node)) setEnrichOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [enrichOpen]);
+
+  async function findJobPosts() {
+    if (enriching) return;
+    setEnrichOpen(false);
+    setEnriching(true);
+    setEnrichMsg(null);
+    try {
+      const res = await enrichJobPosts(funnelId, [{ name: companyName, domain: companyDomain || null }]);
+      onEnriched?.();
+      setEnrichMsg({
+        ok: true,
+        text: res.jobsFound > 0
+          ? `Found ${res.jobsFound} job${res.jobsFound === 1 ? "" : "s"} · added ${res.rolesCreated} role${res.rolesCreated === 1 ? "" : "s"}`
+          : "No open jobs found for this company right now.",
+      });
+    } catch (err) {
+      setEnrichMsg({ ok: false, text: err instanceof Error ? err.message : "Magic Enrich failed" });
+    } finally {
+      setEnriching(false);
+      setTimeout(() => setEnrichMsg(null), 5000);
+    }
+  }
 
   // Inline company-name rename (hover the title → pencil → edit).
   const [editingName, setEditingName] = useState(false);
@@ -234,6 +275,58 @@ export function LeadActionBar({
 
         {/* Action pills */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Magic Enrich — job-post scraping now, more options later. */}
+          <div className="relative" ref={enrichRef}>
+            <button
+              onClick={() => setEnrichOpen((v) => !v)}
+              disabled={enriching}
+              title="Magic Enrich"
+              className="group relative flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] text-[11px] font-semibold text-white bg-gradient-to-r from-accent to-signal-blue-text shadow-sm hover:opacity-90 transition-opacity disabled:opacity-70 overflow-hidden"
+            >
+              <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/25 to-transparent" />
+              {enriching ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} strokeWidth={2} />}
+              {enriching ? "Enriching…" : "Magic Enrich"}
+            </button>
+            {enrichOpen && (
+              <div className="absolute left-0 top-full mt-1.5 z-50 w-[264px] bg-surface rounded-[12px] border border-border-subtle shadow-lg py-1.5">
+                <div className="px-3 pt-0.5 pb-1.5 text-[10px] uppercase tracking-wider text-ink-muted font-medium">Enrich this company</div>
+                <button
+                  onClick={() => void findJobPosts()}
+                  className="w-full text-left px-3 py-2 hover:bg-hover transition-colors flex items-start gap-2.5"
+                >
+                  <Search size={14} className="text-signal-blue-text mt-0.5 shrink-0" />
+                  <span>
+                    <span className="block text-[12px] font-medium text-ink">Find job posts</span>
+                    <span className="block text-[10.5px] text-ink-muted leading-snug">See if {companyName || "this company"} is hiring and add the roles to this lead.</span>
+                  </span>
+                </button>
+                <div className="my-1 border-t border-border-subtle" />
+                <div className="w-full text-left px-3 py-2 flex items-start gap-2.5 opacity-50 cursor-not-allowed">
+                  <Bot size={14} className="text-ink-muted mt-0.5 shrink-0" />
+                  <span>
+                    <span className="flex items-center gap-1.5 text-[12px] font-medium text-ink">Enrich company data <span className="text-[9px] font-medium rounded-full px-1.5 py-px bg-section text-ink-muted">Soon</span></span>
+                    <span className="block text-[10.5px] text-ink-muted leading-snug">AI-enrich firmographics &amp; insights.</span>
+                  </span>
+                </div>
+                <div className="w-full text-left px-3 py-2 flex items-start gap-2.5 opacity-50 cursor-not-allowed">
+                  <UserPlus size={14} className="text-ink-muted mt-0.5 shrink-0" />
+                  <span>
+                    <span className="flex items-center gap-1.5 text-[12px] font-medium text-ink">Find more contacts <span className="text-[9px] font-medium rounded-full px-1.5 py-px bg-section text-ink-muted">Soon</span></span>
+                    <span className="block text-[10.5px] text-ink-muted leading-snug">Discover additional people at this company.</span>
+                  </span>
+                </div>
+              </div>
+            )}
+            {enrichMsg && (
+              <div className={cn(
+                "absolute left-0 top-full mt-1.5 z-50 w-[264px] flex items-start gap-2 px-3 py-2 rounded-[10px] border text-[11px] shadow-lg",
+                enrichMsg.ok ? "bg-signal-green/10 border-signal-green-text/20 text-signal-green-text" : "bg-signal-red/10 border-signal-red-text/20 text-signal-red-text",
+              )}>
+                {enrichMsg.ok ? <Check size={13} className="mt-0.5 shrink-0" /> : <AlertCircle size={13} className="mt-0.5 shrink-0" />}
+                <span className="leading-snug">{enrichMsg.text}</span>
+              </div>
+            )}
+          </div>
           <button
             onClick={onNote}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[11px] font-medium hover:bg-hover transition-colors"
