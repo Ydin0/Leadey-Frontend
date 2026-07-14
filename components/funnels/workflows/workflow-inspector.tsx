@@ -15,6 +15,8 @@ import { listTemplates, createTemplate, listTemplateAttachments, uploadTemplateA
 import type { Template } from "@/lib/types/template";
 import { getWhatsappSettings, listWhatsappTemplates, type WhatsappSettings, type WhatsappTemplate } from "@/lib/api/whatsapp";
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
+import { listPipelines } from "@/lib/api/opportunities";
+import type { Pipeline } from "@/lib/types/opportunity";
 import { NODE_TYPES } from "./node-types";
 
 const lab = "block text-[10px] uppercase tracking-wider text-ink-muted font-medium mt-4 mb-1.5";
@@ -593,6 +595,15 @@ function WhatsappStepForm({ d, set }: { d: Record<string, unknown>; set: (patch:
 function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set: (patch: Record<string, unknown>) => void; v: (k: string) => string; orgLevel?: boolean }) {
   const { statuses } = useLeadStatuses();
   const label = v("label") || (orgLevel ? "Meeting upcoming" : "Lead enters campaign");
+  const isOpp = label.startsWith("Opportunity");
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  useEffect(() => {
+    if (!isOpp) return;
+    let alive = true;
+    listPipelines().then((p) => { if (alive) setPipelines(p); }).catch(() => {});
+    return () => { alive = false; };
+  }, [isOpp]);
+  const stagesForPipeline = pipelines.find((p) => p.id === v("pipelineId"))?.stages ?? [];
   return (
     <>
       <label className={lab}>{orgLevel ? "Run this workflow when" : "Enroll leads when"}</label>
@@ -619,9 +630,22 @@ function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set:
         <input type="number" min={1} max={10080} className={inp} value={v("minutesBefore") || "15"} onChange={(e) => set({ minutesBefore: Math.max(1, Number(e.target.value) || 15) })} />
         <p className="text-[11px] text-ink-faint mt-1.5">Runs this long before each meeting&apos;s start (the meeting must be linked to a lead). Use <code>{"{{meeting_time}}"}</code> / <code>{"{{meeting_title}}"}</code> in messages.</p>
       </>)}
-      {(label === "Opportunity created" || label === "Opportunity stage changes" || label === "Opportunity won" || label === "Opportunity lost") && (
-        <p className="text-[11px] text-ink-faint mt-2">Runs for the opportunity&apos;s source lead when this happens.</p>
-      )}
+      {isOpp && (<>
+        <label className={lab}>Pipeline</label>
+        <NativeSelect className={inp} value={v("pipelineId")} onChange={(e) => set({ pipelineId: e.target.value, ...(e.target.value !== v("pipelineId") ? { toStageId: "" } : {}) })}>
+          <option value="">Any pipeline</option>
+          {pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+        </NativeSelect>
+        {label === "Opportunity stage changes" && (<>
+          <label className={lab}>Moves to stage</label>
+          <NativeSelect className={inp} value={v("toStageId")} onChange={(e) => set({ toStageId: e.target.value })} disabled={!v("pipelineId")}>
+            <option value="">Any stage</option>
+            {stagesForPipeline.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+          </NativeSelect>
+          {!v("pipelineId") && <p className="text-[11px] text-ink-faint mt-1.5">Pick a pipeline first to choose a target stage.</p>}
+        </>)}
+        <p className="text-[11px] text-ink-faint mt-2">Runs for the opportunity&apos;s source lead. Leave pipeline as “Any” to match every pipeline.</p>
+      </>)}
 
       {label === "Status changes" && (<>
         <label className={lab}>Status changes to</label>
