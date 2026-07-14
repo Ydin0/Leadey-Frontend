@@ -83,6 +83,7 @@ export async function releasePhoneLine(id: string): Promise<{ id: string; status
 
 export async function getCallRecords(params?: {
   lineId?: string;
+  lineIds?: string[];
   direction?: string;
   userId?: string;
   disposition?: string;
@@ -98,7 +99,8 @@ export async function getCallRecords(params?: {
   offset?: number;
 }): Promise<{ data: CallRecord[]; meta: { page: number; pageSize: number; totalCount: number; totalPages: number } }> {
   const searchParams = new URLSearchParams();
-  if (params?.lineId) searchParams.set("lineId", params.lineId);
+  if (params?.lineIds?.length) searchParams.set("lineIds", params.lineIds.join(","));
+  else if (params?.lineId) searchParams.set("lineId", params.lineId);
   if (params?.direction) searchParams.set("direction", params.direction);
   if (params?.userId) searchParams.set("userId", params.userId);
   if (params?.disposition) searchParams.set("disposition", params.disposition);

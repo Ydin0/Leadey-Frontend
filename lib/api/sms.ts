@@ -59,6 +59,12 @@ export interface SmsThread {
   inboundCount: number;
   total: number;
   needsReply: boolean;
+  /** The org phone line this conversation is on (latest message), + its owner —
+   *  so the inbox can mark which of our numbers the text hit and filter by it. */
+  lineId?: string | null;
+  lineNumber?: string | null;
+  assignedTo?: string | null;
+  assignedToName?: string | null;
 }
 
 /** All SMS conversations across the org, latest first (incl. unmatched). */

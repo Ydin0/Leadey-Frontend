@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@clerk/nextjs";
 import {
   Inbox as InboxIcon, Mail, Phone, MessageSquare, ListChecks, Bell, UserPlus,
 } from "lucide-react";
@@ -12,7 +13,12 @@ import { MessagesInbox } from "./tabs/messages-inbox";
 import { PrimaryFeed } from "./tabs/primary-feed";
 import { EmailInbox } from "./email/email-inbox";
 import { PotentialContactsInbox } from "./tabs/potential-contacts-inbox";
+import { InboxLineFilter } from "./inbox-line-filter";
 import { getInboxCounts, type InboxCounts } from "@/lib/api/inbox";
+import { getPhoneLines } from "@/lib/api/phone-lines";
+import type { PhoneLine } from "@/lib/types/calling";
+
+const LINE_FILTER_KEY = "leadey:inbox-line-filter";
 
 type TabKey = "primary" | "emails" | "calls" | "messages" | "tasks" | "reminders" | "potential";
 
@@ -33,13 +39,46 @@ const VALID = new Set<TabKey>(TABS.map((t) => t.key));
 export function InboxShell() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { userId } = useAuth();
   const requested = searchParams.get("tab") as TabKey | null;
   const [tab, setTab] = useState<TabKey>(requested && VALID.has(requested) ? requested : "primary");
   const [counts, setCounts] = useState<InboxCounts | null>(null);
 
+  // Phone-line filter — Missed Calls & Messages default to the rep's own line(s).
+  const [lines, setLines] = useState<PhoneLine[]>([]);
+  const [selectedLines, setSelectedLines] = useState<string[] | null>(null); // null = not yet initialised
+  const showLineFilter = tab === "calls" || tab === "messages";
+  // undefined = All numbers (no scoping); otherwise the selected line ids.
+  const lineFilter = selectedLines && selectedLines.length ? selectedLines : undefined;
+
   useEffect(() => {
-    getInboxCounts().then(setCounts).catch(() => {});
-  }, [tab]); // refresh counts as the rep works through tabs
+    getPhoneLines().then((ls) => setLines(ls.filter((l) => l.status === "active"))).catch(() => setLines([]));
+  }, []);
+
+  // Initialise the selection once lines + auth are known: a saved choice wins,
+  // else default to the rep's own assigned line(s) (empty ⇒ All).
+  useEffect(() => {
+    if (selectedLines !== null || lines.length === 0) return;
+    const saved = typeof window !== "undefined" ? window.localStorage.getItem(LINE_FILTER_KEY) : null;
+    if (saved !== null) {
+      const ids = saved ? saved.split(",").filter(Boolean).filter((id) => lines.some((l) => l.id === id)) : [];
+      setSelectedLines(ids);
+      return;
+    }
+    const mine = lines.filter((l) => l.assignedTo && l.assignedTo === userId).map((l) => l.id);
+    setSelectedLines(mine);
+  }, [lines, userId, selectedLines]);
+
+  function changeLines(ids: string[]) {
+    setSelectedLines(ids);
+    try { window.localStorage.setItem(LINE_FILTER_KEY, ids.join(",")); } catch { /* ignore */ }
+  }
+
+  const countsKey = useMemo(() => (lineFilter ? lineFilter.join(",") : ""), [lineFilter]);
+  useEffect(() => {
+    getInboxCounts(lineFilter).then(setCounts).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, countsKey]); // refresh counts as the rep works through tabs / changes filter
 
   function selectTab(key: TabKey) {
     setTab(key);
@@ -83,15 +122,25 @@ export function InboxShell() {
         })}
       </div>
 
+      {/* Phone-line filter — shown on the number-scoped tabs. */}
+      {showLineFilter && lines.length > 0 && (
+        <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
+          <span className="text-[11px] text-ink-muted">
+            {lineFilter ? "Showing selected numbers" : "Showing all numbers"}
+          </span>
+          <InboxLineFilter lines={lines} selected={selectedLines ?? []} onChange={changeLines} currentUserId={userId ?? null} />
+        </div>
+      )}
+
       {/* Active tab */}
       {tab === "primary" ? (
         <PrimaryFeed />
       ) : tab === "emails" ? (
         <EmailInbox />
       ) : tab === "calls" ? (
-        <CallsInbox />
+        <CallsInbox lineIds={lineFilter} lines={lines} currentUserId={userId ?? null} />
       ) : tab === "messages" ? (
-        <MessagesInbox />
+        <MessagesInbox lineIds={lineFilter} currentUserId={userId ?? null} />
       ) : tab === "tasks" ? (
         <TasksInbox />
       ) : tab === "reminders" ? (

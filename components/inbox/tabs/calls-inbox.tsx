@@ -1,31 +1,42 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Phone, PhoneIncoming, ArrowUpRight, PhoneCall } from "lucide-react";
+import { Loader2, PhoneIncoming, ArrowUpRight, PhoneCall } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { getCallRecords } from "@/lib/api/phone-lines";
 import { useCallContext } from "@/components/calling/call-context";
-import type { CallRecord } from "@/lib/types/calling";
+import { LineMarker } from "../inbox-line-filter";
+import type { CallRecord, PhoneLine } from "@/lib/types/calling";
 
 /** Calls tab — recent inbound calls, surfacing the ones that didn't connect so
- *  reps can call them straight back. */
-export function CallsInbox() {
+ *  reps can call them straight back. Scoped to the inbox's phone-line filter. */
+export function CallsInbox({ lineIds, lines = [], currentUserId }: {
+  lineIds?: string[];
+  lines?: PhoneLine[];
+  currentUserId?: string | null;
+}) {
   const router = useRouter();
   const { startCall } = useCallContext();
   const [records, setRecords] = useState<CallRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Which of our numbers each call hit + whose it is (for the row marker).
+  const lineById = useMemo(() => new Map(lines.map((l) => [l.id, l])), [lines]);
+  const lineKey = lineIds ? lineIds.join(",") : "";
+
   useEffect(() => {
     let cancelled = false;
+    setLoading(true);
     // Only MISSED inbound calls belong in the inbox (not connected ones, not
     // outbound). Fetch inbound and keep the unanswered ones.
-    getCallRecords({ direction: "inbound", limit: 100 })
+    getCallRecords({ direction: "inbound", lineIds, limit: 100 })
       .then((r) => { if (!cancelled) setRecords(r.data.filter((c) => c.disposition !== "completed")); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lineKey]);
 
   return (
     <div className="flex-1 flex flex-col rounded-[14px] border border-border-subtle bg-surface overflow-hidden min-h-0">
@@ -53,6 +64,12 @@ export function CallsInbox() {
                     {c.companyName ? ` · ${c.companyName}` : ""}
                   </div>
                 </div>
+                <LineMarker
+                  number={lineById.get(c.lineId)?.number || c.to}
+                  ownerId={lineById.get(c.lineId)?.assignedTo ?? null}
+                  ownerName={lineById.get(c.lineId)?.assignedToName || c.userName || null}
+                  currentUserId={currentUserId}
+                />
                 <span className="text-[10.5px] text-ink-faint shrink-0 w-16 text-right">{formatRelativeTime(new Date(c.timestamp))}</span>
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-surface pl-3">
                   <button

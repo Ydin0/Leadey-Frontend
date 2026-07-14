@@ -34,8 +34,9 @@ export interface PotentialContact {
   source: "phone" | "calendly";
 }
 
-export async function getInboxCounts(): Promise<InboxCounts> {
-  return apiRequest<InboxCounts>("/inbox/counts");
+export async function getInboxCounts(lineIds?: string[]): Promise<InboxCounts> {
+  const qs = lineIds?.length ? `?lineIds=${encodeURIComponent(lineIds.join(","))}` : "";
+  return apiRequest<InboxCounts>(`/inbox/counts${qs}`);
 }
 
 export async function getPrimaryFeed(): Promise<PrimaryItem[]> {

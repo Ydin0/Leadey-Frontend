@@ -9,27 +9,36 @@ import { getSmsThreads, type SmsThread } from "@/lib/api/sms";
 import { SmsThreadDrawer } from "@/components/sms/sms-thread-drawer";
 import { WhatsappThreadDrawer } from "@/components/whatsapp/whatsapp-thread-drawer";
 import { CompanyAvatar } from "@/components/funnels/focus/company-avatar";
+import { LineMarker } from "../inbox-line-filter";
 
-/** Messages tab — every SMS conversation across the org, newest first, with the
- *  ones awaiting a reply flagged. Clicking a row opens a WhatsApp-style chat. */
-export function MessagesInbox() {
+/** Messages tab — SMS conversations, newest first, with the ones awaiting a
+ *  reply flagged. Scoped to the inbox's phone-line filter. Clicking a row opens
+ *  a WhatsApp-style chat. */
+export function MessagesInbox({ lineIds, currentUserId }: {
+  lineIds?: string[];
+  currentUserId?: string | null;
+}) {
   const router = useRouter();
-  const [threads, setThreads] = useState<SmsThread[]>([]);
+  const [allThreads, setAllThreads] = useState<SmsThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<SmsThread | null>(null);
 
   const refresh = useCallback(() => {
-    return getSmsThreads().then(setThreads).catch(() => {});
+    return getSmsThreads().then(setAllThreads).catch(() => {});
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     getSmsThreads()
-      .then((t) => { if (!cancelled) setThreads(t); })
+      .then((t) => { if (!cancelled) setAllThreads(t); })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
+
+  // Filter by the selected org line(s) client-side (threads carry lineId).
+  const lineSet = lineIds && lineIds.length ? new Set(lineIds) : null;
+  const threads = lineSet ? allThreads.filter((t) => t.lineId && lineSet.has(t.lineId)) : allThreads;
 
   return (
     <div className="flex-1 flex flex-col rounded-[14px] border border-border-subtle bg-surface overflow-hidden min-h-0">
@@ -108,6 +117,7 @@ export function MessagesInbox() {
                 </div>
               )}
 
+              <LineMarker number={t.lineNumber} ownerId={t.assignedTo} ownerName={t.assignedToName} currentUserId={currentUserId} />
               <span className="text-[10.5px] text-ink-faint shrink-0 w-16 text-right">{formatRelativeTime(new Date(t.lastAt))}</span>
               {t.leadId && t.funnelId && (
                 <button
