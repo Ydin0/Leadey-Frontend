@@ -32,6 +32,7 @@ import {
   PhoneCall,
   PlugZap,
   Save,
+  ShieldX,
   Tags,
   Users,
   UserCircle2,
@@ -50,6 +51,7 @@ import { EmailAccountsSection } from "./email-accounts-section";
 import { SignatureSection } from "./signature-section";
 import { BookingPagesSection } from "./booking-pages-section";
 import { WhatsappSection } from "./whatsapp-section";
+import { EmailSuppressionsSection } from "./email-suppressions-section";
 import type { AppSettingsSnapshot } from "@/lib/types/settings";
 
 type SettingsTab =
@@ -69,6 +71,7 @@ type SettingsTab =
   | "linkedin"
   | "email-accounts"
   | "signature"
+  | "email-suppressions"
   | "booking-pages"
   | "billing"
   | "credits"
@@ -93,6 +96,7 @@ const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
   { id: "linkedin", label: "LinkedIn", icon: Linkedin },
   { id: "email-accounts", label: "Email Accounts", icon: Mail },
   { id: "signature", label: "Signature", icon: Signature },
+  { id: "email-suppressions", label: "Suppression List", icon: ShieldX },
   { id: "booking-pages", label: "Booking Pages", icon: CalendarClock },
   { id: "billing", label: "Billing", icon: CreditCard },
   { id: "credits", label: "Credits", icon: Coins },
@@ -203,6 +207,7 @@ const VALID_TABS: SettingsTab[] = [
   "linkedin",
   "email-accounts",
   "signature",
+  "email-suppressions",
   "booking-pages",
   "billing",
   "credits",
@@ -221,6 +226,7 @@ const TAB_GATE: Partial<Record<SettingsTab, string>> = {
   "api-keys": "settings.manageApiKeys",
   "phone-lines": "settings.managePhoneLines",
   "email-accounts": "settings.manageIntegrations",
+  "email-suppressions": "settings.manageOrgConfig",
   integrations: "settings.manageIntegrations",
   linkedin: "settings.manageIntegrations",
   "lead-statuses": "settings.manageOrgConfig",
@@ -358,6 +364,7 @@ export function SettingsShell() {
           {activeTab === "call-outcomes" && <CallOutcomesSection />}
           {activeTab === "email-accounts" && <EmailAccountsSection />}
           {activeTab === "signature" && <SignatureSection />}
+          {activeTab === "email-suppressions" && <EmailSuppressionsSection />}
           {activeTab === "booking-pages" && <BookingPagesSection />}
 
           {activeTab === "dialer" && <DialerSettingsTab />}

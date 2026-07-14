@@ -17,6 +17,9 @@ import { getWhatsappSettings, listWhatsappTemplates, type WhatsappSettings, type
 import { useLeadStatuses } from "@/lib/hooks/use-lead-statuses";
 import { listPipelines } from "@/lib/api/opportunities";
 import type { Pipeline } from "@/lib/types/opportunity";
+import { getSmartViews, type SmartView } from "@/lib/api/smart-views";
+import { listCustomFields } from "@/lib/api/custom-fields";
+import type { CustomFieldDefinition } from "@/lib/types/custom-field";
 import { NODE_TYPES } from "./node-types";
 
 const lab = "block text-[10px] uppercase tracking-wider text-ink-muted font-medium mt-4 mb-1.5";
@@ -596,13 +599,31 @@ function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set:
   const { statuses } = useLeadStatuses();
   const label = v("label") || (orgLevel ? "Meeting upcoming" : "Lead enters campaign");
   const isOpp = label.startsWith("Opportunity");
+  const isSmartView = label === "Matches a smart view";
+  const isDateField = label === "Date reaches";
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [views, setViews] = useState<SmartView[]>([]);
+  const [fields, setFields] = useState<CustomFieldDefinition[]>([]);
   useEffect(() => {
     if (!isOpp) return;
     let alive = true;
     listPipelines().then((p) => { if (alive) setPipelines(p); }).catch(() => {});
     return () => { alive = false; };
   }, [isOpp]);
+  useEffect(() => {
+    if (!isSmartView) return;
+    let alive = true;
+    // Both org- and campaign-scoped saved views are eligible.
+    Promise.all([getSmartViews("org"), getSmartViews("campaign")])
+      .then(([o, c]) => { if (alive) setViews([...o, ...c]); }).catch(() => {});
+    return () => { alive = false; };
+  }, [isSmartView]);
+  useEffect(() => {
+    if (!isDateField) return;
+    let alive = true;
+    listCustomFields().then((f) => { if (alive) setFields(f.filter((x) => x.fieldType === "date")); }).catch(() => {});
+    return () => { alive = false; };
+  }, [isDateField]);
   const stagesForPipeline = pipelines.find((p) => p.id === v("pipelineId"))?.stages ?? [];
   return (
     <>
@@ -615,6 +636,8 @@ function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set:
           <option value="Opportunity stage changes">An opportunity changes stage</option>
           <option value="Opportunity won">An opportunity is won</option>
           <option value="Opportunity lost">An opportunity is lost</option>
+          <option value="Matches a smart view">A lead matches a smart view</option>
+          <option value="Date reaches">A date field is reached</option>
         </>) : (<>
           <option value="Lead enters campaign">Lead enters this campaign</option>
           <option value="Status changes">Lead status changes</option>
@@ -645,6 +668,38 @@ function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set:
           {!v("pipelineId") && <p className="text-[11px] text-ink-faint mt-1.5">Pick a pipeline first to choose a target stage.</p>}
         </>)}
         <p className="text-[11px] text-ink-faint mt-2">Runs for the opportunity&apos;s source lead. Leave pipeline as “Any” to match every pipeline.</p>
+      </>)}
+
+      {isSmartView && (<>
+        <label className={lab}>Smart view</label>
+        <NativeSelect className={inp} value={v("viewId")} onChange={(e) => set({ viewId: e.target.value })}>
+          <option value="">Select a view…</option>
+          {views.map((sv) => <option key={sv.id} value={sv.id}>{sv.name}{sv.scope === "campaign" ? " (campaign)" : ""}</option>)}
+        </NativeSelect>
+        <p className="text-[11px] text-ink-faint mt-1.5">Every lead matching this saved view is enrolled — new matches enroll automatically (checked every few minutes). Already-enrolled leads aren&apos;t re-enrolled.</p>
+      </>)}
+
+      {isDateField && (<>
+        <label className={lab}>Date field</label>
+        <NativeSelect className={inp} value={v("fieldKey")} onChange={(e) => set({ fieldKey: e.target.value })}>
+          <option value="">Select a date field…</option>
+          <option value="nextDate">Next scheduled date</option>
+          {fields.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+        </NativeSelect>
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <div>
+            <label className={lab}>Days</label>
+            <input type="number" min={0} max={3650} className={inp} value={v("offsetDays") || "0"} onChange={(e) => set({ offsetDays: Math.max(0, Number(e.target.value) || 0) })} />
+          </div>
+          <div>
+            <label className={lab}>When</label>
+            <NativeSelect className={inp} value={v("direction") || "before"} onChange={(e) => set({ direction: e.target.value })}>
+              <option value="before">before the date</option>
+              <option value="after">after the date</option>
+            </NativeSelect>
+          </div>
+        </div>
+        <p className="text-[11px] text-ink-faint mt-1.5">Enrolls a lead once, on the day that many days before/after the field&apos;s date (checked hourly). Only date-type custom fields appear here.</p>
       </>)}
 
       {label === "Status changes" && (<>
