@@ -9,6 +9,8 @@ import { SignaturePicker } from "@/components/shared/signature-picker";
 import { listSignatures, getSignatureDetails, type EmailSignature, type SignatureDetails } from "@/lib/api/signatures";
 import { listSendingAccounts, sendEmail } from "@/lib/api/email";
 import { listTemplates, listTemplateAttachments, uploadTemplateAttachment } from "@/lib/api/templates";
+import { uploadLeadDocument } from "@/lib/api/lead-documents";
+import type { NoteAttachment } from "@/lib/types/funnel-focus";
 import { getPhoneLines } from "@/lib/api/phone-lines";
 import { sendSms } from "@/lib/api/sms";
 import { getWhatsappSettings, listWhatsappTemplates, sendWhatsappToLead, type WhatsappTemplate } from "@/lib/api/whatsapp";
@@ -39,7 +41,7 @@ interface LeadComposerProps {
   stepIndex?: number | null;
   /** Reply/forward prefill for email. */
   prefill?: { to?: string; subject?: string; body?: string } | null;
-  onAddNote: (text: string) => void;
+  onAddNote: (text: string, attachments?: NoteAttachment[]) => void;
   onSent: () => void;
 }
 
@@ -86,25 +88,79 @@ export function LeadComposer(props: LeadComposerProps) {
 }
 
 /* ── Note ─────────────────────────────────────────────────────────────── */
-function NoteForm({ onAddNote }: LeadComposerProps) {
+function NoteForm({ funnelId, leadId, onAddNote }: LeadComposerProps) {
   const [text, setText] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
+  const [dragOver, setDragOver] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  function addFiles(list: FileList | null) {
+    if (!list || !list.length) return;
+    setError(null);
+    setFiles((prev) => [...prev, ...Array.from(list)]);
+  }
+
+  async function submit() {
+    const clean = text.trim();
+    if (!clean && files.length === 0) return;
+    setSubmitting(true); setError(null);
+    try {
+      let attachments: NoteAttachment[] | undefined;
+      if (files.length) {
+        const uploaded = [];
+        for (const f of files) uploaded.push(await uploadLeadDocument(funnelId, leadId, f));
+        attachments = uploaded.map((d) => ({ id: d.id, fileName: d.fileName, mimeType: d.mimeType, size: d.size }));
+      }
+      onAddNote(clean, attachments);
+      setText(""); setFiles([]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to attach files");
+    } finally { setSubmitting(false); }
+  }
+
   return (
-    <div>
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files); }}
+      className={cn(
+        "rounded-[10px] border transition-colors",
+        dragOver ? "border-accent border-dashed bg-accent/5" : "border-border-subtle bg-section",
+      )}
+    >
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Write a note about this lead…"
+        placeholder="Write a note about this lead… (or drop files to attach)"
         rows={3}
-        className="w-full bg-section border border-border-subtle rounded-[10px] px-3 py-2.5 text-[13px] text-ink placeholder:text-ink-faint resize-y focus:outline-none focus:border-border-default"
+        className="w-full bg-transparent px-3 py-2.5 text-[13px] text-ink placeholder:text-ink-faint resize-y focus:outline-none"
       />
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-[10.5px] text-ink-faint">Notes save to this lead.</span>
+      {files.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 px-3 pb-2">
+          {files.map((f, i) => (
+            <span key={i} className="inline-flex items-center gap-1.5 max-w-full pl-2.5 pr-1.5 py-1 rounded-full bg-surface border border-border-subtle text-[11px] text-ink">
+              <FileText size={11} className="text-ink-muted shrink-0" />
+              <span className="truncate max-w-[160px]">{f.name}</span>
+              {f.size > 0 && <span className="text-ink-faint">{fmtSize(f.size)}</span>}
+              <button onClick={() => setFiles((prev) => prev.filter((_, j) => j !== i))} className="p-0.5 rounded-full hover:bg-hover text-ink-muted hover:text-ink"><X size={11} /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      {error && <p className="text-[11px] text-signal-red-text px-3 pb-1.5">{error}</p>}
+      <div className="flex items-center justify-between px-3 py-2 border-t border-border-subtle">
+        <input ref={fileRef} type="file" multiple className="hidden" onChange={(e) => { addFiles(e.target.files); if (fileRef.current) fileRef.current.value = ""; }} />
+        <button onClick={() => fileRef.current?.click()} disabled={submitting} title="Attach files" className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-surface border border-border-subtle text-[10.5px] text-ink-secondary hover:bg-hover disabled:opacity-50">
+          <Paperclip size={11} /> Attach
+        </button>
         <button
-          onClick={() => { if (text.trim()) { onAddNote(text.trim()); setText(""); } }}
-          disabled={!text.trim()}
-          className="px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50 transition-colors"
+          onClick={submit}
+          disabled={submitting || (!text.trim() && files.length === 0)}
+          className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50 transition-colors"
         >
-          Add note
+          {submitting && <Loader2 size={11} className="animate-spin" />} Add note
         </button>
       </div>
     </div>
@@ -169,6 +225,7 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
   const [senderDetails, setSenderDetails] = useState<SignatureDetails | null>(null);
   const [attachments, setAttachments] = useState<TemplateAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -196,8 +253,13 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
   // with the rep's own {{sender_*}} details filled in, so it's visible here.
   const signaturePreview = useMemo(() => {
     if (signatureId === "none") return null;
+    // "default" → the rep's personal default shared signature if they've marked
+    // one, else the mailbox's own configured signature.
+    const defaultRaw = senderDetails?.defaultSignatureId
+      ? signatures.find((s) => s.id === senderDetails.defaultSignatureId)?.contentHtml || null
+      : fromAccount?.signature || null;
     const raw = signatureId === "default"
-      ? fromAccount?.signature || null
+      ? defaultRaw
       : signatures.find((s) => s.id === signatureId)?.contentHtml || null;
     if (!raw) return null;
     const senderCtx = senderDetails ? {
@@ -253,7 +315,12 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
   }
 
   return (
-    <div className="space-y-2.5">
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(false); }}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFiles(e.dataTransfer.files); }}
+      className={cn("space-y-2.5 rounded-[12px] transition-colors", dragOver && "outline-2 outline-dashed outline-accent bg-accent/5")}
+    >
       <div className="flex items-center gap-2">
         <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium w-12 shrink-0">From</span>
         <NativeSelect value={fromId} onChange={(e) => setFromId(e.target.value)} className="flex-1 bg-section border border-border-subtle rounded-[8px] px-3 py-1.5 text-[12px] text-ink">

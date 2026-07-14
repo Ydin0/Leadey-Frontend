@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Pencil, Trash2, Signature, ArrowLeft, Check } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Signature, ArrowLeft, Check, Star } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { renderPersonalized } from "@/lib/utils/personalize";
 import { SIGNATURE_VARIABLES } from "@/lib/types/template";
 import {
   listSignatures, createSignature, updateSignature, deleteSignature,
-  getSignatureDetails, type EmailSignature, type SignatureDetails,
+  getSignatureDetails, setDefaultSignature, type EmailSignature, type SignatureDetails,
 } from "@/lib/api/signatures";
 import { invalidateSignatureCache } from "@/components/shared/signature-picker";
 
@@ -14,6 +15,7 @@ import { invalidateSignatureCache } from "@/components/shared/signature-picker";
 const SAMPLE: SignatureDetails = {
   firstName: "Jane", lastName: "Smith", email: "jane@acme.com",
   phone: "+44 7893 952310", title: "Account Executive", signatureFields: { booking_link: "https://cal.com/jane" },
+  defaultSignatureId: null,
 };
 
 /** Build the sender ctx for a live preview from the author's own details. */
@@ -32,6 +34,20 @@ export function SignaturesPanel() {
   const [loading, setLoading] = useState(true);
   const [details, setDetails] = useState<SignatureDetails | null>(null);
   const [editing, setEditing] = useState<EmailSignature | "new" | null>(null);
+  const [savingDefault, setSavingDefault] = useState<string | null>(null);
+
+  const defaultId = details?.defaultSignatureId ?? null;
+  async function toggleDefault(id: string) {
+    const next = defaultId === id ? null : id;
+    setSavingDefault(id);
+    try {
+      await setDefaultSignature(next);
+      invalidateSignatureCache();
+      setDetails((d) => (d ? { ...d, defaultSignatureId: next } : d));
+    } finally {
+      setSavingDefault(null);
+    }
+  }
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -63,8 +79,8 @@ export function SignaturesPanel() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-[12px] text-ink-muted">
-          Shared signatures used across the team. Variables like <code className="text-ink-secondary">{"{{sender_full_name}}"}</code> fill each rep&apos;s own details automatically.
+        <p className="text-[12px] text-ink-muted max-w-[640px]">
+          Shared signatures used across the team. Variables like <code className="text-ink-secondary">{"{{sender_full_name}}"}</code> fill each rep&apos;s own details automatically. Tap the <Star size={11} className="inline align-[-1px] text-link" /> to make one <strong className="text-ink-secondary font-medium">your</strong> default — it&apos;s picked automatically when you compose (just for you, not the team).
         </p>
         <button
           onClick={() => setEditing("new")}
@@ -85,10 +101,30 @@ export function SignaturesPanel() {
           {signatures.map((s) => (
             <div key={s.id} className="group rounded-[14px] border border-border-subtle bg-surface overflow-hidden">
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-subtle">
-                <span className="text-[12.5px] font-semibold text-ink truncate">{s.name}</span>
-                <button onClick={() => setEditing(s)} className="p-1.5 rounded-md text-ink-muted hover:bg-hover hover:text-ink transition-colors" title="Edit">
-                  <Pencil size={13} />
-                </button>
+                <span className="flex items-center gap-2 min-w-0">
+                  <span className="text-[12.5px] font-semibold text-ink truncate">{s.name}</span>
+                  {defaultId === s.id && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-accent/15 text-link text-[9px] font-semibold uppercase tracking-wider shrink-0">
+                      <Star size={9} className="fill-current" /> My default
+                    </span>
+                  )}
+                </span>
+                <div className="flex items-center gap-0.5 shrink-0">
+                  <button
+                    onClick={() => toggleDefault(s.id)}
+                    disabled={savingDefault === s.id}
+                    className={cn(
+                      "p-1.5 rounded-md transition-colors disabled:opacity-50",
+                      defaultId === s.id ? "text-link hover:bg-hover" : "text-ink-muted hover:bg-hover hover:text-ink",
+                    )}
+                    title={defaultId === s.id ? "Remove as my default" : "Set as my default"}
+                  >
+                    {savingDefault === s.id ? <Loader2 size={13} className="animate-spin" /> : <Star size={13} className={defaultId === s.id ? "fill-current" : ""} />}
+                  </button>
+                  <button onClick={() => setEditing(s)} className="p-1.5 rounded-md text-ink-muted hover:bg-hover hover:text-ink transition-colors" title="Edit">
+                    <Pencil size={13} />
+                  </button>
+                </div>
               </div>
               <div
                 className="px-4 py-3 text-[12px] text-ink-secondary max-h-[160px] overflow-hidden [&_img]:max-w-full [&_a]:text-accent"

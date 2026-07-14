@@ -16,6 +16,9 @@ export interface SignatureDetails {
   phone: string;
   title: string;
   signatureFields: Record<string, string>;
+  /** This rep's personal default signature id ("Default signature" resolves
+   *  to this). null = fall back to the mailbox's own configured signature. */
+  defaultSignatureId: string | null;
 }
 
 export async function listSignatures(): Promise<EmailSignature[]> {
@@ -38,6 +41,11 @@ export async function getSignatureDetails(): Promise<SignatureDetails> {
   return apiRequest<SignatureDetails>("/me/signature-details");
 }
 
-export async function updateSignatureDetails(input: { title?: string; signatureFields?: Record<string, string> }): Promise<void> {
+export async function updateSignatureDetails(input: { title?: string; signatureFields?: Record<string, string>; defaultSignatureId?: string | null }): Promise<void> {
   await apiRequest("/me/signature-details", { method: "PATCH", body: JSON.stringify(input) });
+}
+
+/** Mark (or clear) this rep's personal default signature. */
+export async function setDefaultSignature(id: string | null): Promise<void> {
+  await updateSignatureDetails({ defaultSignatureId: id });
 }
