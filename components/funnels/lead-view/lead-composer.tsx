@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@clerk/nextjs";
 import { FileText, Mail, MessageSquare, MessageCircle, Send, Loader2, ChevronDown, Paperclip, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NativeSelect } from "@/components/ui/native-select";
@@ -394,6 +395,7 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
 /* ── SMS + WhatsApp (share the same shape) ───────────────────────────── */
 function MessageForm({ funnelId, mode, lead, contacts, onSent }: LeadComposerProps) {
   const isWa = mode === "whatsapp";
+  const { userId } = useAuth();
   const recipients = useMemo(() => contacts.filter((c) => c.phone), [contacts]);
   const [toLeadId, setToLeadId] = useState<string>(recipients.find((c) => c.leadId)?.leadId || "");
   const [lines, setLines] = useState<PhoneLine[]>([]);
@@ -414,16 +416,28 @@ function MessageForm({ funnelId, mode, lead, contacts, onSent }: LeadComposerPro
       getWhatsappSettings().then((s) => setWaConnected(!!s.connected)).catch(() => setWaConnected(false));
       listWhatsappTemplates().then(setWaTemplates).catch(() => setWaTemplates([]));
     } else {
-      getPhoneLines().then((ls) => {
-        const act = ls.filter((l) => l.status === "active");
-        setLines(act);
-        const dest = phoneCountry(toPhone);
-        setFromLineId((p) => p || act.find((l) => phoneCountry(l.number) === dest)?.id || act[0]?.id || "");
-      }).catch(() => {});
+      getPhoneLines().then((ls) => setLines(ls.filter((l) => l.status === "active"))).catch(() => {});
       listTemplates("sms").then(setSmsTemplates).catch(() => setSmsTemplates([]));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isWa]);
+
+  // Default the FROM number to the rep's OWN assigned line if they have one,
+  // then a number matching the recipient's country, then the first active line.
+  // Kept in its own effect so it settles once lines + userId are both known.
+  useEffect(() => {
+    if (isWa || lines.length === 0) return;
+    setFromLineId((prev) => {
+      if (prev) return prev;
+      const dest = phoneCountry(toPhone);
+      return (
+        (userId ? lines.find((l) => l.assignedTo === userId)?.id : undefined) ||
+        lines.find((l) => phoneCountry(l.number) === dest)?.id ||
+        lines[0]?.id ||
+        ""
+      );
+    });
+  }, [isWa, lines, userId, toPhone]);
 
   async function send() {
     if (!body.trim()) { setError("Type a message."); return; }
@@ -453,7 +467,10 @@ function MessageForm({ funnelId, mode, lead, contacts, onSent }: LeadComposerPro
           <span className="text-[10px] uppercase tracking-wider text-ink-muted font-medium w-12 shrink-0">From</span>
           <NativeSelect value={fromLineId} onChange={(e) => setFromLineId(e.target.value)} className="flex-1 bg-section border border-border-subtle rounded-[8px] px-3 py-1.5 text-[12px] text-ink">
             {lines.length === 0 && <option value="">No active number</option>}
-            {lines.map((l) => <option key={l.id} value={l.id}>{l.number}</option>)}
+            {lines.map((l) => {
+              const owner = l.assignedTo === userId ? "You" : l.assignedToName || "Unassigned";
+              return <option key={l.id} value={l.id}>{l.number} · {owner}</option>;
+            })}
           </NativeSelect>
         </div>
       )}
