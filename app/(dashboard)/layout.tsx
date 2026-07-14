@@ -45,8 +45,11 @@ export default function DashboardLayout({
                 <DueTasksBanner />
                 {/* overflow-x-hidden stops any hair-too-wide child from adding a
                     stray page-level horizontal scrollbar at the bottom; wide
-                    content (tables) scrolls inside its own container. */}
-                <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6">{children}</div>
+                    content (tables) scrolls inside its own container.
+                    flex flex-col lets a full-height page (e.g. the lead profile)
+                    fill this container deterministically via flex-1 instead of
+                    fragile percentage heights. */}
+                <div className="flex flex-col flex-1 min-h-0 overflow-y-auto overflow-x-hidden p-6">{children}</div>
               </main>
               <ScraperRunsWidget />
               {/* AI assistant now lives at the bottom of the sidebar rail. */}
