@@ -82,7 +82,7 @@ async function fetchTwilioToken(clerkToken: string | null): Promise<string> {
 }
 
 export function CallProvider({ children }: { children: React.ReactNode }) {
-  const { getToken, userId } = useAuth();
+  const { getToken, userId, orgId } = useAuth();
   const isAuthReady = useAuthReady();
   const [activeCall, setActiveCall] = useState<ActiveCall | null>(null);
   const [phoneLines, setPhoneLines] = useState<PhoneLine[]>([]);
@@ -417,7 +417,9 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       setDeviceReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthReady]);
+  }, [isAuthReady, orgId]); // rebuild the softphone (fresh org-scoped Voice
+  // identity token) whenever the active org changes — so a rep who switches
+  // workspaces only ever receives calls for the org they're currently in.
 
   // ── Duration timer ────────────────────────────
   useEffect(() => {
