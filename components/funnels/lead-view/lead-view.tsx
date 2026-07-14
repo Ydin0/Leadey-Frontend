@@ -115,7 +115,13 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
     if (!currentLead) return [] as string[];
     const key = (currentLead.company || "").trim().toLowerCase();
     if (!key) return [currentLead.id];
-    return leads.filter((l) => (l.company || "").trim().toLowerCase() === key).map((l) => l.id);
+    const same = leads.filter((l) => (l.company || "").trim().toLowerCase() === key).map((l) => l.id);
+    // Cap the company fan-out: a campaign where hundreds of leads share one
+    // company (or a blank/duplicated company value) must NOT trigger hundreds of
+    // per-lead activity fetches — that N+1 storm saturates the DB pool. Keep the
+    // focused lead first, then up to 24 sibling contacts.
+    const ordered = [currentLead.id, ...same.filter((id) => id !== currentLead.id)];
+    return ordered.slice(0, 25);
   }, [leads, currentLead]);
   const companyLeadIdsKey = companyLeadIds.join(",");
 
@@ -187,15 +193,10 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   const reloadCalls = useCallback(async () => {
     if (!companyLeadIds.length) { setCallRecords([]); return; }
     try {
-      const results = await Promise.all(
-        companyLeadIds.map((id) =>
-          getCallRecords({ leadId: id, limit: 50 })
-            .then((r) => r.data.map((rec) => ({ ...rec, leadId: id })))
-            .catch(() => [] as CallRecord[]),
-        ),
-      );
+      // ONE batched request for every company contact's calls (was N requests).
+      const r = await getCallRecords({ leadIds: companyLeadIds, limit: 200 });
       const seen = new Set<string>();
-      setCallRecords(results.flat().filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true))));
+      setCallRecords(r.data.filter((rec) => (seen.has(rec.id) ? false : (seen.add(rec.id), true))));
     } catch (err) {
       console.error("Failed to load call records:", err);
     }
