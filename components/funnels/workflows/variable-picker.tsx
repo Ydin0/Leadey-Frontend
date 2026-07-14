@@ -74,7 +74,7 @@ export function VariablePicker({ targetRef, value, onChange }: VariablePickerPro
       {open && rect && createPortal(
         <div
           ref={popRef}
-          className="fixed z-[200] w-56 max-h-[300px] overflow-y-auto rounded-[10px] border border-border-subtle bg-surface shadow-xl shadow-black/20 py-1"
+          className="fixed z-[200] w-56 max-h-[300px] overflow-y-auto overscroll-contain rounded-[10px] border border-border-subtle bg-surface shadow-xl shadow-black/20 py-1"
           style={{ left: rect.left, top: rect.top }}
           onMouseDown={(e) => e.preventDefault()}
         >

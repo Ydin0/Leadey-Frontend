@@ -284,7 +284,7 @@ export function SmsThreadDrawer({
             <FileText size={12} /> Use template <ChevronDown size={11} />
           </button>
           {showTemplates && (
-            <div className="absolute left-0 bottom-full mb-1 z-20 w-72 max-h-56 overflow-y-auto bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+            <div className="absolute left-0 bottom-full mb-1 z-20 w-72 max-h-56 overflow-y-auto overscroll-contain bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
               {templates.length === 0 ? (
                 <div className="px-3 py-2 text-[11px] text-ink-muted">
                   No SMS templates yet — create them in Templates.

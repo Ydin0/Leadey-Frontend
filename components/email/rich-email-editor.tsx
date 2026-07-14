@@ -290,7 +290,7 @@ function VariableMenu({ onInsert }: { onInsert: (key: string) => void }) {
         Variable
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-44 bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+        <div className="absolute left-0 top-full mt-1 z-50 w-44 max-h-64 overflow-y-auto overscroll-contain bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
           {TEMPLATE_VARIABLES.map((v) => (
             <button
               key={v.key}
