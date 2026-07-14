@@ -61,7 +61,7 @@ export default function WorkflowsPage() {
   };
 
   return (
-    <div className="max-w-[1100px] mx-auto">
+    <div className="max-w-[1640px] mx-auto">
       <div className="flex items-start justify-between mb-5">
         <div>
           <h1 className="text-[18px] font-semibold text-ink">Workflows</h1>
