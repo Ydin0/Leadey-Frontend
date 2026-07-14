@@ -160,15 +160,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* No app view is meant to scroll horizontally at the window level — the shell
- * is viewport-width and wide content (tables) scrolls inside its own wrapper.
- * A hair-too-wide descendant escaping to the root would otherwise show the
- * styled horizontal scrollbar as a fixed bar across the bottom of the page. */
-html,
-body {
-  overflow-x: hidden;
-}
-
 /* Display font utility — used for headlines in hero/auth contexts */
 .font-display {
   font-family: var(--font-display);
