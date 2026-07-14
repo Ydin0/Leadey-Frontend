@@ -79,30 +79,65 @@ type SettingsTab =
   | "api-keys"
   | "integrations";
 
-const tabs: { id: SettingsTab; label: string; icon: typeof UserCircle2 }[] = [
-  { id: "profile", label: "Profile", icon: UserCircle2 },
-  { id: "organization", label: "Organization", icon: Building2 },
-  { id: "team", label: "Team", icon: Users },
-  { id: "lead-statuses", label: "Lead Statuses", icon: Tags },
-  { id: "campaign-tags", label: "Campaign Tags", icon: Tags },
-  { id: "task-categories", label: "Task Categories", icon: ListChecks },
-  { id: "custom-fields", label: "Custom Fields", icon: ListPlus },
-  { id: "phone-lines", label: "Phone Lines", icon: Phone },
-  { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { id: "local-presence", label: "Local Presence", icon: MapPin },
-  { id: "call-outcomes", label: "Call Outcomes", icon: PhoneCall },
-  { id: "dialer", label: "Power Dialer", icon: PhoneCall },
-  { id: "pipelines", label: "Pipelines", icon: Briefcase },
-  { id: "linkedin", label: "LinkedIn", icon: Linkedin },
-  { id: "email-accounts", label: "Email Accounts", icon: Mail },
-  { id: "signature", label: "Signature", icon: Signature },
-  { id: "email-suppressions", label: "Suppression List", icon: ShieldX },
-  { id: "booking-pages", label: "Booking Pages", icon: CalendarClock },
-  { id: "billing", label: "Billing", icon: CreditCard },
-  { id: "credits", label: "Credits", icon: Coins },
-  { id: "notifications", label: "Notifications", icon: Bell },
-  { id: "api-keys", label: "API Keys", icon: Key },
-  { id: "integrations", label: "Integrations", icon: PlugZap },
+type TabDef = { id: SettingsTab; label: string; icon: typeof UserCircle2 };
+type TabGroup = { label: string; tabs: TabDef[] };
+
+// Tabs grouped into labeled sections in the settings sidebar. A group whose
+// every tab is hidden by permissions renders nothing (no orphan header).
+const TAB_GROUPS: TabGroup[] = [
+  {
+    label: "Account",
+    tabs: [
+      { id: "profile", label: "Profile", icon: UserCircle2 },
+      { id: "notifications", label: "Notifications", icon: Bell },
+    ],
+  },
+  {
+    label: "Organization",
+    tabs: [
+      { id: "organization", label: "Organization", icon: Building2 },
+      { id: "team", label: "Team", icon: Users },
+      { id: "billing", label: "Billing", icon: CreditCard },
+      { id: "credits", label: "Credits", icon: Coins },
+    ],
+  },
+  {
+    label: "Sales Data",
+    tabs: [
+      { id: "lead-statuses", label: "Lead Statuses", icon: Tags },
+      { id: "custom-fields", label: "Custom Fields", icon: ListPlus },
+      { id: "campaign-tags", label: "Campaign Tags", icon: Tags },
+      { id: "task-categories", label: "Task Categories", icon: ListChecks },
+      { id: "pipelines", label: "Pipelines", icon: Briefcase },
+    ],
+  },
+  {
+    label: "Calling",
+    tabs: [
+      { id: "phone-lines", label: "Phone Lines", icon: Phone },
+      { id: "local-presence", label: "Local Presence", icon: MapPin },
+      { id: "dialer", label: "Power Dialer", icon: PhoneCall },
+      { id: "call-outcomes", label: "Call Outcomes", icon: PhoneCall },
+    ],
+  },
+  {
+    label: "Email & Messaging",
+    tabs: [
+      { id: "email-accounts", label: "Email Accounts", icon: Mail },
+      { id: "signature", label: "Signature", icon: Signature },
+      { id: "email-suppressions", label: "Suppression List", icon: ShieldX },
+      { id: "whatsapp", label: "WhatsApp", icon: MessageCircle },
+      { id: "booking-pages", label: "Booking Pages", icon: CalendarClock },
+    ],
+  },
+  {
+    label: "Integrations",
+    tabs: [
+      { id: "linkedin", label: "LinkedIn", icon: Linkedin },
+      { id: "integrations", label: "Integrations", icon: PlugZap },
+      { id: "api-keys", label: "API Keys", icon: Key },
+    ],
+  },
 ];
 
 function SettingCard({
@@ -190,31 +225,7 @@ function ToggleField({
   );
 }
 
-const VALID_TABS: SettingsTab[] = [
-  "profile",
-  "organization",
-  "team",
-  "lead-statuses",
-  "campaign-tags",
-  "task-categories",
-  "custom-fields",
-  "phone-lines",
-  "whatsapp",
-  "local-presence",
-  "call-outcomes",
-  "dialer",
-  "pipelines",
-  "linkedin",
-  "email-accounts",
-  "signature",
-  "email-suppressions",
-  "booking-pages",
-  "billing",
-  "credits",
-  "notifications",
-  "api-keys",
-  "integrations",
-];
+const VALID_TABS: SettingsTab[] = TAB_GROUPS.flatMap((g) => g.tabs.map((t) => t.id));
 
 /** Which permission gates a given settings tab (unlisted tabs are always
  *  shown). A member without the capability doesn't see the tab, and a
@@ -249,7 +260,12 @@ export function SettingsShell() {
     },
     [permsLoaded, has],
   );
-  const visibleTabs = useMemo(() => tabs.filter((t) => canSeeTab(t.id)), [canSeeTab]);
+  const visibleGroups = useMemo(
+    () =>
+      TAB_GROUPS.map((g) => ({ label: g.label, tabs: g.tabs.filter((t) => canSeeTab(t.id)) }))
+        .filter((g) => g.tabs.length > 0),
+    [canSeeTab],
+  );
   const requestedTab = searchParams.get("tab") as SettingsTab | null;
   const initialTab: SettingsTab =
     requestedTab && VALID_TABS.includes(requestedTab) ? requestedTab : "profile";
@@ -313,26 +329,33 @@ export function SettingsShell() {
 
       <div className="grid grid-cols-12 gap-4">
         <aside className="col-span-3">
-          <div className="bg-surface rounded-[14px] border border-border-subtle p-2 space-y-1 sticky top-20">
-            {visibleTabs.map((tab) => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={cn(
-                    "w-full flex items-center gap-2 px-3 py-2 rounded-[10px] text-left transition-colors",
-                    activeTab === tab.id
-                      ? "bg-ink text-on-ink"
-                      : "text-ink-secondary hover:bg-hover"
-                  )}
-                >
-                  <Icon size={14} strokeWidth={1.8} />
-                  <span className="text-[12px] font-medium">{tab.label}</span>
-                </button>
-              );
-            })}
+          <div className="bg-surface rounded-[14px] border border-border-subtle p-2 sticky top-20">
+            {visibleGroups.map((group, gi) => (
+              <div key={group.label} className={cn("space-y-1", gi > 0 && "mt-1")}>
+                <p className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-ink-muted font-medium">
+                  {group.label}
+                </p>
+                {group.tabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-3 py-2 rounded-[10px] text-left transition-colors",
+                        activeTab === tab.id
+                          ? "bg-ink text-on-ink"
+                          : "text-ink-secondary hover:bg-hover"
+                      )}
+                    >
+                      <Icon size={14} strokeWidth={1.8} />
+                      <span className="text-[12px] font-medium">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </aside>
 
