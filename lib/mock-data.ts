@@ -16,6 +16,7 @@ import {
   UsersRound,
   GraduationCap,
   Inbox,
+  Workflow,
 } from "lucide-react";
 import type {
   NavItem,
@@ -53,6 +54,7 @@ export const navGroups: NavGroup[] = [
     label: "Outreach",
     items: [
       { id: "funnels", label: "Campaigns", icon: GitFork, href: "/dashboard/funnels", dynamicChildren: true },
+      { id: "workflows", label: "Workflows", icon: Workflow, href: "/dashboard/workflows" },
     ],
   },
   {

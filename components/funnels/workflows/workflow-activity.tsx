@@ -36,7 +36,7 @@ const STATUS_META: Record<string, { label: string; cls: string; icon: typeof Cir
   failed: { label: "Failed", cls: "bg-signal-red/15 text-signal-red-text", icon: AlertCircle },
 };
 
-export function WorkflowActivity({ funnelId, workflow, onClose }: { funnelId: string; workflow: Workflow; onClose: () => void }) {
+export function WorkflowActivity({ funnelId, workflow, onClose }: { funnelId: string | null; workflow: Workflow; onClose: () => void }) {
   const [rows, setRows] = useState<WorkflowEnrollment[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -146,7 +146,7 @@ export function WorkflowActivity({ funnelId, workflow, onClose }: { funnelId: st
   );
 }
 
-function RunTimeline({ funnelId, workflowId, enrollmentId, labels }: { funnelId: string; workflowId: string; enrollmentId: string; labels: Map<string, string> }) {
+function RunTimeline({ funnelId, workflowId, enrollmentId, labels }: { funnelId: string | null; workflowId: string; enrollmentId: string; labels: Map<string, string> }) {
   const [runs, setRuns] = useState<WorkflowStepRun[] | null>(null);
   useEffect(() => {
     listEnrollmentRuns(funnelId, workflowId, enrollmentId).then(setRuns).catch(() => setRuns([]));

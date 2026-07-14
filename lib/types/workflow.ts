@@ -83,7 +83,8 @@ export interface WorkflowStepRun {
 
 export interface Workflow {
   id: string;
-  funnelId: string;
+  /** null = an org-level workflow (not tied to a campaign). */
+  funnelId: string | null;
   name: string;
   status: WorkflowStatus;
   graph: WorkflowGraph;
@@ -91,4 +92,7 @@ export interface Workflow {
   stats: WorkflowStats;
   createdAt: string;
   updatedAt: string;
+  /** Present on the standalone /workflows list: the campaign name + trigger. */
+  funnelName?: string | null;
+  triggerType?: string;
 }

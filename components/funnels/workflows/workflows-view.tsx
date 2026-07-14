@@ -7,7 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import {
-  listWorkflows, createWorkflow, updateWorkflow, deleteWorkflow,
+  listWorkflows, createWorkflow, createOrgWorkflow, updateWorkflow, deleteWorkflow,
 } from "@/lib/api/workflows";
 import type { Workflow, WorkflowGraph, WorkflowNode, WorkflowNodeType, WorkflowSettings, WorkflowStatus } from "@/lib/types/workflow";
 import { NODE_TYPES, PALETTE_GROUPS, NODE_W, NODE_H } from "./node-types";
@@ -18,7 +18,8 @@ import { SlideOver } from "@/components/shared/slide-over";
 
 function newId(p: string) { return p + Math.random().toString(36).slice(2, 8); }
 
-export function WorkflowsView({ funnelId }: { funnelId: string }) {
+export function WorkflowsView({ funnelId, initialId }: { funnelId: string | null; initialId?: string }) {
+  const orgLevel = funnelId === null;
   const isAuthReady = useAuthReady();
   const [workflows, setWorkflows] = useState<Workflow[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -59,10 +60,14 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
     if (!isAuthReady) return;
     let cancelled = false;
     listWorkflows(funnelId)
-      .then((list) => {
+      .then((all) => {
         if (cancelled) return;
+        // Org-level builder: /workflows returns every workflow — keep only the
+        // org-level ones (campaign workflows are edited from their campaign tab).
+        const list = orgLevel ? all.filter((w) => !w.funnelId) : all;
         setWorkflows(list);
-        if (list.length) selectWorkflow(list[0]);
+        const first = (initialId && list.find((w) => w.id === initialId)) || list[0];
+        if (first) selectWorkflow(first);
       })
       .catch(() => { if (!cancelled) setWorkflows([]); });
     return () => { cancelled = true; };
@@ -138,7 +143,8 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
   async function create() {
     setBusy(true);
     try {
-      const w = await createWorkflow(funnelId, `Workflow ${(workflows?.length ?? 0) + 1}`);
+      const label = `Workflow ${(workflows?.length ?? 0) + 1}`;
+      const w = orgLevel ? await createOrgWorkflow(label, "Meeting upcoming") : await createWorkflow(funnelId as string, label);
       setWorkflows((prev) => [...(prev ?? []), w]);
       selectWorkflow(w);
       setSwitcherOpen(false);
@@ -174,7 +180,7 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
       <div className="rounded-[16px] border border-border-subtle bg-surface p-12 text-center">
         <div className="w-12 h-12 rounded-full bg-section flex items-center justify-center mx-auto mb-4"><WorkflowIcon size={20} className="text-ink-muted" /></div>
         <h3 className="text-[16px] font-semibold text-ink mb-1">No workflows yet</h3>
-        <p className="text-[12px] text-ink-muted mb-5 max-w-md mx-auto">Build a branching automation — trigger, email/SMS/call, waits, conditions and goals — that runs for every lead in this campaign.</p>
+        <p className="text-[12px] text-ink-muted mb-5 max-w-md mx-auto">Build a branching automation — trigger, email/SMS/call, waits, conditions and goals — {orgLevel ? "triggered org-wide by meetings and opportunities (e.g. “15 min before a meeting, text + email the participant”)." : "that runs for every lead in this campaign."}</p>
         <button onClick={create} disabled={busy} className="inline-flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[12px] font-medium hover:bg-ink/90 disabled:opacity-50">
           {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />} Create a workflow
         </button>
@@ -222,7 +228,7 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
             </button>
             {switcherOpen && (
               <div className="absolute top-full left-0 mt-1.5 w-[280px] z-50 bg-surface rounded-[12px] border border-border-subtle shadow-xl py-1.5">
-                <div className="text-[9.5px] font-bold uppercase tracking-wider text-ink-faint px-3 py-1.5">Workflows in this campaign</div>
+                <div className="text-[9.5px] font-bold uppercase tracking-wider text-ink-faint px-3 py-1.5">{orgLevel ? "Org-level workflows" : "Workflows in this campaign"}</div>
                 {workflows.map((w) => (
                   <button key={w.id} onClick={() => { selectWorkflow(w); setSwitcherOpen(false); }} className="flex items-center gap-2.5 w-full px-3 py-2 hover:bg-hover text-left">
                     <span className={cn("w-2 h-2 rounded-full shrink-0", w.status === "active" ? "bg-signal-green-text" : w.status === "paused" ? "bg-signal-slate-text" : "bg-ink-faint")} />
@@ -271,6 +277,7 @@ export function WorkflowsView({ funnelId }: { funnelId: string }) {
           onDeleteNode={onDeleteNode}
           onDeselect={() => setSelectedId(null)}
           workflow={{ ...active, name, status, settings, graph }}
+          orgLevel={orgLevel}
           onRename={(n) => { setName(n); setDirty(true); }}
           onStatus={(st) => { setStatus(st); setDirty(true); }}
           onSettings={(patch) => { setSettings((s) => ({ ...s, ...patch })); setDirty(true); }}

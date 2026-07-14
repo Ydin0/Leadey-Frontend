@@ -29,6 +29,8 @@ interface InspectorProps {
   onDeleteNode: (id: string) => void;
   onDeselect: () => void;
   workflow: Workflow;
+  /** Org-level workflow (funnelId null) → offer meeting/opportunity triggers. */
+  orgLevel?: boolean;
   onRename: (name: string) => void;
   onStatus: (status: WorkflowStatus) => void;
   onSettings: (patch: WorkflowSettings) => void;
@@ -39,7 +41,7 @@ export function WorkflowInspector(p: InspectorProps) {
   return <NodePanel {...p} node={p.node} />;
 }
 
-function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProps & { node: WorkflowNode }) {
+function NodePanel({ node, onNodeData, onDeleteNode, onDeselect, orgLevel }: InspectorProps & { node: WorkflowNode }) {
   const def = NODE_TYPES[node.type];
   const Icon = def.icon;
   const d = node.data || {};
@@ -57,7 +59,7 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect }: InspectorProp
         <button onClick={onDeselect} className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-faint bg-section hover:bg-hover"><X size={14} /></button>
       </div>
 
-      {node.type === "trigger" && <TriggerForm d={d} set={set} v={v} />}
+      {node.type === "trigger" && <TriggerForm d={d} set={set} v={v} orgLevel={!!orgLevel} />}
 
       {node.type === "email" && <EmailStepForm d={d} set={set} />}
 
@@ -588,20 +590,38 @@ function WhatsappStepForm({ d, set }: { d: Record<string, unknown>; set: (patch:
 
 // ─── Trigger form (enrollment condition + per-trigger config) ──────────────
 
-function TriggerForm({ d, set, v }: { d: Record<string, unknown>; set: (patch: Record<string, unknown>) => void; v: (k: string) => string }) {
+function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set: (patch: Record<string, unknown>) => void; v: (k: string) => string; orgLevel?: boolean }) {
   const { statuses } = useLeadStatuses();
-  const label = v("label") || "Lead enters campaign";
+  const label = v("label") || (orgLevel ? "Meeting upcoming" : "Lead enters campaign");
   return (
     <>
-      <label className={lab}>Enroll leads when</label>
+      <label className={lab}>{orgLevel ? "Run this workflow when" : "Enroll leads when"}</label>
       <NativeSelect className={inp} value={label} onChange={(e) => set({ label: e.target.value })}>
-        <option value="Lead enters campaign">Lead enters this campaign</option>
-        <option value="Status changes">Lead status changes</option>
-        <option value="Tag added">A tag is added</option>
-        <option value="Reply received">A reply is received</option>
-        <option value="Meeting booked">A meeting is booked</option>
-        <option value="Manually added">Manually added by a rep</option>
+        {orgLevel ? (<>
+          <option value="Meeting upcoming">A meeting is coming up</option>
+          <option value="Meeting booked">A meeting is booked</option>
+          <option value="Opportunity created">An opportunity is created</option>
+          <option value="Opportunity stage changes">An opportunity changes stage</option>
+          <option value="Opportunity won">An opportunity is won</option>
+          <option value="Opportunity lost">An opportunity is lost</option>
+        </>) : (<>
+          <option value="Lead enters campaign">Lead enters this campaign</option>
+          <option value="Status changes">Lead status changes</option>
+          <option value="Tag added">A tag is added</option>
+          <option value="Reply received">A reply is received</option>
+          <option value="Meeting booked">A meeting is booked</option>
+          <option value="Manually added">Manually added by a rep</option>
+        </>)}
       </NativeSelect>
+
+      {label === "Meeting upcoming" && (<>
+        <label className={lab}>Minutes before the meeting</label>
+        <input type="number" min={1} max={10080} className={inp} value={v("minutesBefore") || "15"} onChange={(e) => set({ minutesBefore: Math.max(1, Number(e.target.value) || 15) })} />
+        <p className="text-[11px] text-ink-faint mt-1.5">Runs this long before each meeting&apos;s start (the meeting must be linked to a lead). Use <code>{"{{meeting_time}}"}</code> / <code>{"{{meeting_title}}"}</code> in messages.</p>
+      </>)}
+      {(label === "Opportunity created" || label === "Opportunity stage changes" || label === "Opportunity won" || label === "Opportunity lost") && (
+        <p className="text-[11px] text-ink-faint mt-2">Runs for the opportunity&apos;s source lead when this happens.</p>
+      )}
 
       {label === "Status changes" && (<>
         <label className={lab}>Status changes to</label>
