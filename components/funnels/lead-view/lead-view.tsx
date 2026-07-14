@@ -646,7 +646,7 @@ export function LeadView({ funnel, leads, leadId, onLeadPatch, onLeadsChanged, s
   const toggleContactFilter = (id: string) => setContactFilter((prev) => (prev === id ? null : id));
 
   return (
-    <div className="-m-6 h-[calc(100vh-3.5rem)] flex flex-col bg-page">
+    <div className="-m-6 h-[calc(100%+3rem)] flex flex-col bg-page">
       <LeadActionBar
         funnelId={funnelId}
         leadId={currentLead.id}
