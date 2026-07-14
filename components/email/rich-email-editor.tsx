@@ -4,6 +4,7 @@ import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Bold,
   Italic,
@@ -268,29 +269,56 @@ function ToolbarButton({
 
 function VariableMenu({ onInsert }: { onInsert: (key: string) => void }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  // Anchor rect for the portalled dropdown. The dropdown is rendered into
+  // document.body (not inside the editor) so the editor's `overflow-hidden`
+  // can't clip it and it reliably scrolls its own list instead of the page.
+  const [rect, setRect] = useState<{ left: number; top: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
-    const onClick = (e: MouseEvent) => {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    const onDown = (e: MouseEvent) => {
+      if (popRef.current?.contains(e.target as Node) || btnRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
     };
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
+    const onScroll = (e: Event) => { if (!popRef.current?.contains(e.target as Node)) setOpen(false); };
+    const onResize = () => setOpen(false);
+    document.addEventListener("mousedown", onDown);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
+    };
   }, [open]);
 
+  function toggle() {
+    if (open) { setOpen(false); return; }
+    const r = btnRef.current?.getBoundingClientRect();
+    setRect(r ? { left: r.left, top: r.bottom + 4 } : null);
+    setOpen(true);
+  }
+
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        ref={btnRef}
+        onClick={toggle}
         className="flex items-center gap-1 px-2 h-7 rounded-md text-[10px] font-medium text-signal-blue-text bg-signal-blue/10 hover:bg-signal-blue/20 transition-colors"
         title="Insert personalization variable"
       >
         <Braces size={11} />
         Variable
       </button>
-      {open && (
-        <div className="absolute left-0 top-full mt-1 z-50 w-44 max-h-64 overflow-y-auto overscroll-contain bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1">
+      {open && rect && createPortal(
+        <div
+          ref={popRef}
+          className="fixed z-[200] w-44 max-h-64 overflow-y-auto overscroll-contain bg-surface rounded-[10px] border border-border-subtle shadow-lg py-1"
+          style={{ left: rect.left, top: rect.top }}
+        >
           {TEMPLATE_VARIABLES.map((v) => (
             <button
               key={v.key}
@@ -305,9 +333,10 @@ function VariableMenu({ onInsert }: { onInsert: (key: string) => void }) {
               <span className="text-[10px] text-ink-faint font-mono">{`{{${v.key}}}`}</span>
             </button>
           ))}
-        </div>
+        </div>,
+        document.body,
       )}
-    </div>
+    </>
   );
 }
 
