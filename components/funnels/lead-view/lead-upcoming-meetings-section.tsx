@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CalendarClock, Video, ChevronRight, X, Loader2, Sparkles, FileText, Gauge, PlayCircle } from "lucide-react";
+import { CalendarClock, Video, ChevronRight, X, Loader2, Sparkles, FileText, Gauge, PlayCircle, Trash2 } from "lucide-react";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getLeadMeetings, setMeetingDisposition } from "@/lib/api/calendar";
 import { cancelMeeting } from "@/lib/api/meetings";
-import { listLeadTranscripts, pullLeadTranscripts, type MeetingTranscript } from "@/lib/api/meeting-transcripts";
+import { listLeadTranscripts, pullLeadTranscripts, deleteMeetingTranscript, type MeetingTranscript } from "@/lib/api/meeting-transcripts";
 import type { LeadMeeting, MeetingDisposition } from "@/lib/types/calendar";
 import { SOURCE_LABEL, RsvpBadge, DispositionControl, meetingWhen } from "@/components/calendar/meeting-bits";
 import { MeetingDetailModal } from "./meeting-detail-modal";
@@ -57,6 +57,12 @@ export function LeadUpcomingMeetingsSection({ funnelId, leadId, refreshKey }: { 
   async function handleDispose(m: LeadMeeting, next: MeetingDisposition | null) {
     setMeetings((prev) => prev.map((x) => (x.id === m.id && x.source === m.source ? { ...x, disposition: next } : x)));
     try { await setMeetingDisposition(m.source, m.id, next); } catch { await load(); }
+  }
+
+  async function handleDeleteTranscript(id: string) {
+    if (!confirm("Remove this recording from the lead? This unlinks its transcript, summary and scorecard. (A re-pull can re-attach it to the right lead.)")) return;
+    setTranscripts((prev) => prev.filter((t) => t.id !== id)); // optimistic
+    try { await deleteMeetingTranscript(id); } catch { await load(); }
   }
 
   async function pull() {
@@ -135,17 +141,17 @@ export function LeadUpcomingMeetingsSection({ funnelId, leadId, refreshKey }: { 
           ) : (
             <>
               {upcoming.map((m) => (
-                <MeetingRow key={`${m.source}:${m.id}`} m={m} transcript={transcriptFor(m)} onOpenTranscript={setOpenTranscriptId} onCancel={handleCancel} cancelingId={cancelingId} />
+                <MeetingRow key={`${m.source}:${m.id}`} m={m} transcript={transcriptFor(m)} onOpenTranscript={setOpenTranscriptId} onDeleteTranscript={handleDeleteTranscript} onCancel={handleCancel} cancelingId={cancelingId} />
               ))}
 
               {(past.length > 0 || orphanTranscripts.length > 0) && (
                 <p className="text-[10px] uppercase tracking-wider text-ink-faint font-medium px-1 mt-2 mb-0.5">Past</p>
               )}
               {past.map((m) => (
-                <MeetingRow key={`${m.source}:${m.id}`} m={m} transcript={transcriptFor(m)} onOpenTranscript={setOpenTranscriptId} past onDispose={handleDispose} />
+                <MeetingRow key={`${m.source}:${m.id}`} m={m} transcript={transcriptFor(m)} onOpenTranscript={setOpenTranscriptId} onDeleteTranscript={handleDeleteTranscript} past onDispose={handleDispose} />
               ))}
               {orphanTranscripts.map((t) => (
-                <TranscriptRow key={t.id} t={t} onOpen={setOpenTranscriptId} />
+                <TranscriptRow key={t.id} t={t} onOpen={setOpenTranscriptId} onDelete={handleDeleteTranscript} />
               ))}
             </>
           )}
@@ -169,11 +175,12 @@ function TranscriptBadge({ t }: { t: MeetingTranscript }) {
 }
 
 function MeetingRow({
-  m, transcript, onOpenTranscript, past, onCancel, cancelingId, onDispose,
+  m, transcript, onOpenTranscript, onDeleteTranscript, past, onCancel, cancelingId, onDispose,
 }: {
   m: LeadMeeting;
   transcript?: MeetingTranscript;
   onOpenTranscript: (id: string) => void;
+  onDeleteTranscript?: (id: string) => void;
   past?: boolean;
   onCancel?: (id: string) => void;
   cancelingId?: string | null;
@@ -181,7 +188,7 @@ function MeetingRow({
 }) {
   const openable = !!transcript;
   return (
-    <div className={cn("flex items-start gap-2.5 py-1.5 px-1 rounded-lg hover:bg-hover/50", past && "opacity-75")}>
+    <div className={cn("group/mrow flex items-start gap-2.5 py-1.5 px-1 rounded-lg hover:bg-hover/50", past && "opacity-75")}>
       <button
         type="button"
         onClick={() => transcript && onOpenTranscript(transcript.id)}
@@ -231,30 +238,48 @@ function MeetingRow({
           </div>
         )}
       </div>
+      {transcript && onDeleteTranscript && (
+        <button
+          type="button"
+          onClick={() => onDeleteTranscript(transcript.id)}
+          title="Remove this recording from the lead"
+          className="opacity-0 group-hover/mrow:opacity-100 text-ink-faint hover:text-signal-red-text transition-all shrink-0 mt-1"
+        >
+          <Trash2 size={13} />
+        </button>
+      )}
     </div>
   );
 }
 
 /** A recorded meeting that didn't line up with a calendar event — still shown
  *  so its transcript/scorecard is reachable. */
-function TranscriptRow({ t, onOpen }: { t: MeetingTranscript; onOpen: (id: string) => void }) {
+function TranscriptRow({ t, onOpen, onDelete }: { t: MeetingTranscript; onOpen: (id: string) => void; onDelete?: (id: string) => void }) {
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(t.id)}
-      className="flex items-start gap-2.5 py-1.5 px-1 rounded-lg hover:bg-hover/50 text-left w-full opacity-90"
-    >
-      <span className="flex items-center justify-center w-7 h-7 rounded-full shrink-0 mt-0.5 bg-accent/15 text-link"><PlayCircle size={14} /></span>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5">
-          <span className="text-[12.5px] text-ink-secondary leading-snug truncate min-w-0">{t.title}</span>
-          <TranscriptBadge t={t} />
-        </div>
-        <p className="text-[10.5px] text-ink-muted mt-0.5">
-          {meetingWhen(t.heldAt)}
-          <span className="text-ink-faint"> · {t.provider === "fathom" ? "Fathom" : "Fireflies"}</span>
-        </p>
-      </div>
-    </button>
+    <div className="group/trow flex items-start gap-2.5 py-1.5 px-1 rounded-lg hover:bg-hover/50 opacity-90">
+      <button type="button" onClick={() => onOpen(t.id)} className="flex items-start gap-2.5 text-left min-w-0 flex-1">
+        <span className="flex items-center justify-center w-7 h-7 rounded-full shrink-0 mt-0.5 bg-accent/15 text-link"><PlayCircle size={14} /></span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5">
+            <span className="text-[12.5px] text-ink-secondary leading-snug truncate min-w-0">{t.title}</span>
+            <TranscriptBadge t={t} />
+          </span>
+          <span className="block text-[10.5px] text-ink-muted mt-0.5">
+            {meetingWhen(t.heldAt)}
+            <span className="text-ink-faint"> · {t.provider === "fathom" ? "Fathom" : "Fireflies"}</span>
+          </span>
+        </span>
+      </button>
+      {onDelete && (
+        <button
+          type="button"
+          onClick={() => onDelete(t.id)}
+          title="Remove this recording from the lead"
+          className="opacity-0 group-hover/trow:opacity-100 text-ink-faint hover:text-signal-red-text transition-all shrink-0 mt-1"
+        >
+          <Trash2 size={13} />
+        </button>
+      )}
+    </div>
   );
 }

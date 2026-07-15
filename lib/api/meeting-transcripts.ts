@@ -85,6 +85,11 @@ export async function getMeetingTranscript(id: string): Promise<MeetingTranscrip
   return apiRequest<MeetingTranscript>(`/meeting-transcripts/${encodeURIComponent(id)}`);
 }
 
+/** Remove a recording/transcript from a lead (e.g. a wrongly-matched pull). */
+export async function deleteMeetingTranscript(id: string): Promise<void> {
+  await apiRequest(`/meeting-transcripts/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
 /** Generate (or return cached) AI call scoring. Pass force to re-score. */
 export async function scoreMeetingTranscript(id: string, force = false): Promise<CallScore> {
   return apiRequest<CallScore>(`/meeting-transcripts/${encodeURIComponent(id)}/score`, {
