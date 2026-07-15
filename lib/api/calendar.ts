@@ -1,5 +1,5 @@
 import { apiRequest } from "./client";
-import type { CalendarAccountsResult, LeadMeetingsResult, OrgMeetingsResult } from "@/lib/types/calendar";
+import type { CalendarAccountsResult, LeadMeeting, LeadMeetingsResult, MeetingDisposition, OrgMeetingsResult } from "@/lib/types/calendar";
 
 /** The caller's connected calendars + whether each provider is server-configured. */
 export async function listCalendarAccounts(): Promise<CalendarAccountsResult> {
@@ -36,4 +36,16 @@ export async function listMeetings(params: {
     ...(params.scope ? { scope: params.scope } : {}),
   });
   return apiRequest<OrgMeetingsResult>(`/calendar/meetings?${qs.toString()}`);
+}
+
+/** Mark a past meeting attended / no_show, or clear it (disposition null). */
+export async function setMeetingDisposition(
+  source: LeadMeeting["source"],
+  id: string,
+  disposition: MeetingDisposition | null,
+): Promise<void> {
+  await apiRequest(
+    `/calendar/meetings/${encodeURIComponent(source)}/${encodeURIComponent(id)}/disposition`,
+    { method: "PUT", body: JSON.stringify({ disposition }) },
+  );
 }

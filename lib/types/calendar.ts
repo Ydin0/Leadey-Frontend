@@ -14,6 +14,8 @@ export interface CalendarAccountsResult {
 }
 
 export type MeetingResponseStatus = "accepted" | "declined" | "tentative" | "needsAction";
+/** A rep's manual attendance mark on a past meeting. */
+export type MeetingDisposition = "attended" | "no_show";
 
 export interface LeadMeeting {
   id: string;
@@ -26,6 +28,8 @@ export interface LeadMeeting {
   organizerEmail: string | null;
   /** The lead's RSVP to this meeting; null when unknown (e.g. events synced before RSVP tracking). */
   responseStatus: MeetingResponseStatus | null;
+  /** Manually-set attendance on a past meeting (attended = green, no_show = red). */
+  disposition: MeetingDisposition | null;
 }
 
 export interface LeadMeetingsResult {

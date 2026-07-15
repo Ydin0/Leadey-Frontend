@@ -21,9 +21,9 @@ import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { useTeamMembers } from "@/hooks/use-team-members";
 import { MemberAvatar, memberColorFromId } from "@/components/shared/member-avatar";
-import { listMeetings } from "@/lib/api/calendar";
-import type { OrgMeeting } from "@/lib/types/calendar";
-import { SOURCE_LABEL, RsvpBadge, meetingTime } from "@/components/calendar/meeting-bits";
+import { listMeetings, setMeetingDisposition } from "@/lib/api/calendar";
+import type { MeetingDisposition, OrgMeeting } from "@/lib/types/calendar";
+import { SOURCE_LABEL, RsvpBadge, DispositionBadge, DispositionControl, DISPOSITION_COLOR, meetingTime } from "@/components/calendar/meeting-bits";
 
 const VIEW_KEY = "leadey:calendar-view";
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -146,6 +146,19 @@ export function CalendarShell() {
     (m: OrgMeeting) => (m.userId ? memberColorFromId(m.userId) : FALLBACK_COLOR),
     [],
   );
+
+  // Mark a past meeting attended / no-show. Optimistic — patch state + the open
+  // popover, then persist.
+  const dispose = useCallback(async (m: OrgMeeting, next: MeetingDisposition | null) => {
+    const match = (x: OrgMeeting) => x.id === m.id && x.source === m.source;
+    setMeetings((prev) => prev.map((x) => (match(x) ? { ...x, disposition: next } : x)));
+    setPopover((p) => (p && match(p.meeting) ? { ...p, meeting: { ...p.meeting, disposition: next } } : p));
+    try {
+      await setMeetingDisposition(m.source, m.id, next);
+    } catch {
+      void load(); // revert to server truth on failure
+    }
+  }, [load]);
 
   // ‹ › navigation (+ keyboard arrows).
   const step = useCallback((dir: -1 | 1) => {
@@ -403,10 +416,19 @@ export function CalendarShell() {
 
           <div className="flex items-center gap-1.5 flex-wrap mb-2.5">
             <RsvpBadge status={popover.meeting.responseStatus} />
+            <DispositionBadge disposition={popover.meeting.disposition} />
             <span className="text-[10px] font-medium rounded-full px-2 py-0.5 bg-section text-ink-muted">
               {SOURCE_LABEL[popover.meeting.source]}
             </span>
           </div>
+
+          {/* Attendance — past meetings only. */}
+          {!!popover.meeting.startTime && now > 0 && new Date(popover.meeting.startTime).getTime() < now && (
+            <div className="mb-2.5">
+              <p className="text-[10px] uppercase tracking-wider text-ink-faint font-medium mb-1">Attendance</p>
+              <DispositionControl disposition={popover.meeting.disposition} onChange={(next) => dispose(popover.meeting, next)} />
+            </div>
+          )}
 
           {(popover.meeting.leadName || popover.meeting.company) && (
             <p className="flex items-center gap-1.5 text-[11.5px] text-ink-secondary mb-1">
@@ -503,20 +525,23 @@ function MonthView({
               {items.slice(0, 3).map((m) => {
                 const past = !!m.startTime && now > 0 && new Date(m.startTime).getTime() < now;
                 const color = colorOf(m);
+                // Past meetings marked attended/no-show read green/red at a glance.
+                const dispColor = past && m.disposition ? DISPOSITION_COLOR[m.disposition] : null;
+                const accent = dispColor ?? color;
                 return (
                   <button
                     key={m.id}
                     onClick={(e) => onMeetingClick(m, e)}
                     className={cn(
                       "flex items-center gap-1.5 w-full text-left rounded-[6px] px-1.5 py-1 text-[10.5px] font-medium truncate transition-colors border-l-2 bg-section hover:bg-hover",
-                      past && "opacity-55",
+                      past && !dispColor && "opacity-55",
                     )}
-                    style={{ borderLeftColor: color }}
+                    style={{ borderLeftColor: accent }}
                   >
-                    <span className="tabular-nums shrink-0" style={{ color: past ? undefined : color }}>
+                    <span className="tabular-nums shrink-0" style={{ color: past ? (dispColor ?? undefined) : color }}>
                       {meetingTime(m.startTime)}
                     </span>
-                    <span className={cn("truncate", past ? "text-ink-faint" : "text-ink")}>{m.title || "Meeting"}</span>
+                    <span className={cn("truncate", past && !dispColor ? "text-ink-faint" : "text-ink")}>{m.title || "Meeting"}</span>
                   </button>
                 );
               })}
@@ -581,21 +606,23 @@ function WeekView({
                 items.map((m) => {
                   const past = !!m.startTime && now > 0 && new Date(m.startTime).getTime() < now;
                   const color = colorOf(m);
+                  const dispColor = past && m.disposition ? DISPOSITION_COLOR[m.disposition] : null;
+                  const accent = dispColor ?? color;
                   return (
                     <button
                       key={m.id}
                       onClick={(e) => onMeetingClick(m, e)}
                       className={cn(
                         "w-full text-left rounded-[10px] border border-border-subtle bg-section/40 px-2.5 py-2 transition-colors hover:bg-hover border-l-[3px]",
-                        past && "opacity-55",
+                        past && !dispColor && "opacity-55",
                       )}
-                      style={{ borderLeftColor: color }}
+                      style={{ borderLeftColor: accent }}
                     >
-                      <div className="text-[10.5px] font-medium tabular-nums" style={{ color: past ? undefined : color }}>
+                      <div className="text-[10.5px] font-medium tabular-nums" style={{ color: past ? (dispColor ?? undefined) : color }}>
                         {meetingTime(m.startTime)}
                         {m.endTime ? ` – ${meetingTime(m.endTime)}` : ""}
                       </div>
-                      <div className={cn("text-[12px] font-medium leading-snug mt-0.5 line-clamp-2", past ? "text-ink-faint" : "text-ink")}>
+                      <div className={cn("text-[12px] font-medium leading-snug mt-0.5 line-clamp-2", past && !dispColor ? "text-ink-faint" : "text-ink")}>
                         {m.title || "Meeting"}
                       </div>
                       {(m.leadName || m.company) && (
@@ -605,7 +632,7 @@ function WeekView({
                         </div>
                       )}
                       <div className="flex items-center gap-1.5 mt-1.5">
-                        <RsvpBadge status={m.responseStatus} />
+                        {past ? <DispositionBadge disposition={m.disposition} /> : <RsvpBadge status={m.responseStatus} />}
                         {m.joinUrl && !past && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-signal-blue-text">
                             <Video size={10} /> Join

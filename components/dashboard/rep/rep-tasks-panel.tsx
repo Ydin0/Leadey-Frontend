@@ -6,7 +6,7 @@ import { Check, GitFork, CircleCheck, CalendarDays, CalendarClock, Video } from 
 import { cn } from "@/lib/utils";
 import type { RepTask } from "@/lib/api/dashboard";
 import type { OrgMeeting } from "@/lib/types/calendar";
-import { RsvpBadge, meetingTime } from "@/components/calendar/meeting-bits";
+import { RsvpBadge, DispositionBadge, meetingTime } from "@/components/calendar/meeting-bits";
 
 function timeLabel(dueAt: string | null): string {
   if (!dueAt) return "—";
@@ -110,7 +110,7 @@ function MeetingRow({ meeting, now, onOpen }: { meeting: OrgMeeting; now: number
           <span className={cn("text-[13px] font-medium truncate", past ? "text-ink-faint line-through" : "text-ink")}>
             {meeting.title || "Meeting"}
           </span>
-          <RsvpBadge status={meeting.responseStatus} />
+          {past ? <DispositionBadge disposition={meeting.disposition} /> : <RsvpBadge status={meeting.responseStatus} />}
         </div>
         {(meeting.leadName || meeting.company) && (
           <div className="text-[11px] text-ink-muted truncate mt-0.5">
