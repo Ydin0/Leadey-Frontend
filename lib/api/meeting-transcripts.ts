@@ -19,19 +19,43 @@ export interface TranscriptSummary {
   keywords: string[];
 }
 
+export interface CallScoreMetric {
+  key: string;
+  label: string;
+  score: number;
+  max: number;
+  note: string | null;
+}
+
+export interface CallScore {
+  overall: number;
+  verdict: string;
+  metrics: CallScoreMetric[];
+  strengths: string[];
+  improvements: string[];
+  talkRatio: { rep: number; prospect: number } | null;
+  model: string;
+  generatedAt: string;
+}
+
 export interface MeetingTranscript {
   id: string;
   provider: TranscriptProvider;
+  /** The scheduled/calendar meeting row this was matched to, when known. */
+  meetingId: string | null;
   title: string;
   heldAt: string | null;
   durationSec: number | null;
   embedUrl: string | null;
   recordingUrl: string | null;
   hasRecording: boolean;
+  /** Whether a call score has been generated + cached. */
+  scored: boolean;
   sentenceCount: number;
   /** Present only on the detail endpoint. */
   summary?: TranscriptSummary | null;
   transcript?: TranscriptSentence[];
+  score?: CallScore | null;
 }
 
 export async function getTranscriptsStatus(): Promise<TranscriptsStatus> {
@@ -59,4 +83,12 @@ export async function listLeadTranscripts(leadId: string): Promise<MeetingTransc
 
 export async function getMeetingTranscript(id: string): Promise<MeetingTranscript> {
   return apiRequest<MeetingTranscript>(`/meeting-transcripts/${encodeURIComponent(id)}`);
+}
+
+/** Generate (or return cached) AI call scoring. Pass force to re-score. */
+export async function scoreMeetingTranscript(id: string, force = false): Promise<CallScore> {
+  return apiRequest<CallScore>(`/meeting-transcripts/${encodeURIComponent(id)}/score`, {
+    method: "POST",
+    body: JSON.stringify({ force }),
+  });
 }

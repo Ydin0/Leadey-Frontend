@@ -51,7 +51,6 @@ import type { LeadStatusOption } from "@/lib/utils/lead-status";
 import { Section, MiniBtn } from "./lead-section";
 import { LeadTasksSection } from "./lead-tasks-section";
 import { LeadUpcomingMeetingsSection } from "./lead-upcoming-meetings-section";
-import { LeadTranscriptsSection } from "./lead-transcripts-section";
 import { LeadOpportunitySection } from "./lead-opportunity-section";
 import { LeadLeadsList } from "./lead-leads-list";
 import { LeadHiringRolesSection } from "./lead-hiring-roles-section";
@@ -1036,11 +1035,9 @@ export function LeadDetailsColumn({
           {/* Tasks (real) */}
           <LeadTasksSection funnelId={funnelId} leadId={leadId} />
 
-          {/* Upcoming meetings (connected calendars + Calendly) */}
+          {/* Meetings — connected calendars + Calendly, merged with Fathom /
+              Fireflies recordings (transcript + AI summary + call scorecard). */}
           <LeadUpcomingMeetingsSection funnelId={funnelId} leadId={leadId} refreshKey={meetingsRefreshKey} />
-
-          {/* Meeting transcripts (Fathom / Fireflies) */}
-          <LeadTranscriptsSection funnelId={funnelId} leadId={leadId} />
 
           {/* Opportunities */}
           <LeadOpportunitySection
