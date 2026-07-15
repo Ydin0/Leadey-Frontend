@@ -1,14 +1,50 @@
-import { apiRequest } from "./client";
+import { apiRequest, getAuthToken } from "./client";
 import type {
   KnowledgeBaseData,
   Offer,
   KbModule,
   Lesson,
   LessonType,
+  LinkItem,
 } from "@/lib/types/kb";
+
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://localhost:3001";
 
 export async function getKnowledgeBase(): Promise<KnowledgeBaseData> {
   return apiRequest<KnowledgeBaseData>("/knowledge-base");
+}
+
+// ── Lesson files (upload / view / delete) ──
+/** Multipart upload of a lesson file; returns its metadata to add to the
+ *  lesson's `files` on save. Bypasses the JSON client for the multipart body. */
+export async function uploadKbFile(file: File): Promise<LinkItem> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE_URL}/api/knowledge-base/files`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    body: form,
+  });
+  const payload = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(payload?.error?.message || `Upload failed (${res.status})`);
+  return payload?.data as LinkItem;
+}
+
+export async function deleteKbFile(key: string): Promise<void> {
+  await apiRequest(`/knowledge-base/files/${encodeURIComponent(key)}`, { method: "DELETE" });
+}
+
+/** Fetch an uploaded lesson file (authed) as a blob object URL for embedding
+ *  (PDF viewer) or opening. Caller must URL.revokeObjectURL when done. */
+export async function kbFileObjectUrl(fileUrl: string): Promise<string> {
+  const token = getAuthToken();
+  const res = await fetch(`${API_BASE_URL}/api${fileUrl}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) throw new Error(`Could not load file (${res.status})`);
+  return URL.createObjectURL(await res.blob());
 }
 
 // ── Offers (admin) ──

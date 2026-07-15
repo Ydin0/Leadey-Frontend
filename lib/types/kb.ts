@@ -7,8 +7,9 @@ export type LessonType = "video" | "article" | "script" | "quiz" | "file" | "faq
 export interface ArticleBlock { h: string; p: string }
 export interface ScriptBody { hook: string; points: string[]; objections: { o: string; a: string }[] }
 export interface QuizQuestion { q: string; options: string[]; answer: number }
-/** A linked resource/file (no upload — just a URL). */
-export interface LinkItem { name: string; url: string; type?: string }
+/** A resource/file: either an uploaded file (carries `key`, served by the API)
+ *  or an external linked URL. */
+export interface LinkItem { name: string; url: string; type?: string; key?: string; size?: number }
 export interface FaqItem { q: string; a: string }
 
 export interface Lesson {

@@ -8,6 +8,8 @@ import {
   OFFER_MAP, lessonById, lessonsOf, offerProgress, nextLesson, prevLesson, progress,
   type Lesson,
 } from "@/lib/kb/kb-data";
+import type { LinkItem } from "@/lib/types/kb";
+import { kbFileObjectUrl } from "@/lib/api/kb";
 
 /* ── Real video embed (Loom / YouTube / Vimeo) ─────────────────────────── */
 function videoEmbedUrl(raw?: string): string | null {
@@ -102,21 +104,66 @@ function ScriptView({ lesson }: { lesson: Lesson }) {
   );
 }
 
+function fileKind(f: LinkItem): "pdf" | "image" | "other" {
+  const s = `${f.type || ""} ${f.url || ""} ${f.name || ""}`.toLowerCase();
+  if (s.includes("pdf")) return "pdf";
+  if (/image\/|\.(png|jpe?g|gif|webp|svg)(\?|$|\s)/.test(s)) return "image";
+  return "other";
+}
+
+/** One lesson file: header row (name + Open) plus an inline preview — PDFs
+ *  render in an embedded viewer, images inline. Uploaded files (with `key`)
+ *  are fetched with the auth token as a blob; external links use their URL. */
+function LessonFile({ f }: { f: LinkItem }) {
+  const uploaded = !!f.key;
+  const [blobUrl, setBlobUrl] = React.useState<string | null>(null);
+  const [err, setErr] = React.useState(false);
+  React.useEffect(() => {
+    if (!uploaded) return;
+    let dead = false;
+    let made: string | null = null;
+    kbFileObjectUrl(f.url)
+      .then((u) => { if (dead) { URL.revokeObjectURL(u); return; } made = u; setBlobUrl(u); })
+      .catch(() => setErr(true));
+    return () => { dead = true; if (made) URL.revokeObjectURL(made); };
+  }, [f.url, uploaded]);
+
+  const viewUrl = uploaded ? blobUrl : f.url;
+  const kind = fileKind(f);
+  const loadingUpload = uploaded && !blobUrl && !err;
+
+  return (
+    <div style={{ borderRadius: 12, background: "var(--page)", border: "1px solid var(--border-subtle)", overflow: "hidden" }}>
+      <div className="between" style={{ padding: "12px 14px" }}>
+        <div className="row" style={{ gap: 12, minWidth: 0 }}>
+          <div className="row" style={{ width: 36, height: 36, borderRadius: 8, justifyContent: "center", background: "var(--section)", flexShrink: 0 }}><Icon name="file-text" size={16} style={{ color: "var(--fg-muted)" }} /></div>
+          <div style={{ minWidth: 0 }}><div style={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>{f.type && <div style={{ fontSize: 10.5, color: "var(--fg-faint)" }}>{f.type}</div>}</div>
+        </div>
+        {viewUrl && <a className="pill pill-soft" href={viewUrl} target="_blank" rel="noopener noreferrer"><Icon name="external-link" size={13} />Open</a>}
+      </div>
+      {err ? (
+        <div style={{ padding: "10px 14px", fontSize: 11.5, color: "var(--signal-red-text)" }}>Couldn&apos;t load this file.</div>
+      ) : loadingUpload ? (
+        <div style={{ padding: 24, textAlign: "center", fontSize: 11.5, color: "var(--fg-faint)" }}>Loading preview…</div>
+      ) : kind === "pdf" && viewUrl ? (
+        <iframe src={viewUrl} title={f.name} style={{ width: "100%", height: 620, border: 0, borderTop: "1px solid var(--border-subtle)", background: "#fff" }} />
+      ) : kind === "image" && viewUrl ? (
+        <div style={{ borderTop: "1px solid var(--border-subtle)", background: "var(--section)", textAlign: "center", padding: 12 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={viewUrl} alt={f.name} style={{ maxWidth: "100%", maxHeight: 620, borderRadius: 8 }} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 function FileView({ lesson }: { lesson: Lesson }) {
   const files = lesson.files || [];
   return (
-    <Panel title="Resources">
-      <div className="col" style={{ gap: 10 }}>
-        {files.length === 0 && <div style={{ fontSize: 11.5, color: "var(--fg-faint)" }}>No resources added.</div>}
-        {files.map((f, i) => (
-          <div key={i} className="between" style={{ padding: "12px 14px", borderRadius: 10, background: "var(--page)", border: "1px solid var(--border-subtle)" }}>
-            <div className="row" style={{ gap: 12 }}>
-              <div className="row" style={{ width: 36, height: 36, borderRadius: 8, justifyContent: "center", background: "var(--section)" }}><Icon name="file-text" size={16} style={{ color: "var(--fg-muted)" }} /></div>
-              <div><div style={{ fontSize: 12.5, fontWeight: 500 }}>{f.name}</div>{f.type && <div style={{ fontSize: 10.5, color: "var(--fg-faint)" }}>{f.type}</div>}</div>
-            </div>
-            <a className="pill pill-soft" href={f.url} target="_blank" rel="noopener noreferrer"><Icon name="external-link" size={13} />Open</a>
-          </div>
-        ))}
+    <Panel title="Files">
+      <div className="col" style={{ gap: 12 }}>
+        {files.length === 0 && <div style={{ fontSize: 11.5, color: "var(--fg-faint)" }}>No files added.</div>}
+        {files.map((f, i) => <LessonFile key={i} f={f} />)}
       </div>
     </Panel>
   );

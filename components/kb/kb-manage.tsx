@@ -7,7 +7,7 @@ import { OfferLogo } from "./kb-shared";
 import { TYPES, type LessonType, type Lesson, type Offer, type LinkItem, type ArticleBlock, type FaqItem, type QuizQuestion } from "@/lib/types/kb";
 import type { LessonInput } from "@/lib/api/kb";
 import { useTeamMembers } from "@/hooks/use-team-members";
-import { getOfferProgress } from "@/lib/api/kb";
+import { getOfferProgress, uploadKbFile } from "@/lib/api/kb";
 
 const KB_ACCENTS = ["#97A4D6", "#6E7BCB", "#86EFAC", "#C8CFE6", "#E8C45C", "#F8A1A1"];
 const KB_CATS = ["SaaS", "Coaching", "Agency", "Fintech", "E-commerce", "Onboarding"];
@@ -95,6 +95,12 @@ export function ModuleModal({ initial, onClose, onSave }: { initial?: string; on
 /* ───────────────────────── Lesson ───────────────────────── */
 const fieldStyle: React.CSSProperties = { };
 
+function fmtBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 function ListSection({ title, addLabel, onAdd, children }: { title: string; addLabel: string; onAdd: () => void; children: React.ReactNode }) {
   return (
     <div>
@@ -133,6 +139,25 @@ export function LessonModal({ initial, onClose, onSave }: {
   const [questions, setQuestions] = React.useState<QuizQuestion[]>(initial?.questions || [{ q: "", options: ["", ""], answer: 0 }]);
   const [items, setItems] = React.useState<FaqItem[]>(initial?.items || [{ q: "", a: "" }]);
   const [files, setFiles] = React.useState<LinkItem[]>(initial?.files || []);
+  const [uploading, setUploading] = React.useState(false);
+  const [uploadErr, setUploadErr] = React.useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!f) return;
+    setUploading(true);
+    setUploadErr(null);
+    try {
+      const meta = await uploadKbFile(f);
+      setFiles((prev) => [...prev, meta]);
+    } catch (err) {
+      setUploadErr(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   const valid = title.trim().length > 1;
   const typeKeys = Object.keys(TYPES) as LessonType[];
@@ -288,15 +313,46 @@ export function LessonModal({ initial, onClose, onSave }: {
       )}
 
       {type === "file" && (
-        <ListSection title="Resource links" addLabel="Add resource" onAdd={() => setFiles([...files, { name: "", url: "" }])}>
-          {files.map((f, i) => (
-            <div key={i} className="row" style={{ gap: 8 }}>
-              <input className="field" style={{ flex: 1 }} value={f.name} onChange={(e) => setFiles(files.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="File name" />
-              <input className="field" style={{ flex: 1.4 }} value={f.url} onChange={(e) => setFiles(files.map((x, j) => j === i ? { ...x, url: e.target.value } : x))} placeholder="https://…" />
-              <RemoveBtn onClick={() => setFiles(files.filter((_, j) => j !== i))} />
-            </div>
-          ))}
-        </ListSection>
+        <div>
+          <label className="lbl">Files</label>
+          <input ref={fileInputRef} type="file" style={{ display: "none" }} onChange={onPickFile} />
+          <div className="col" style={{ gap: 8 }}>
+            {files.map((f, i) =>
+              f.key ? (
+                // Uploaded file — name is fixed; just show + allow removal.
+                <div key={i} className="between" style={{ padding: "9px 12px", borderRadius: 9, background: "var(--page)", border: "1px solid var(--border-subtle)" }}>
+                  <div className="row" style={{ gap: 10, minWidth: 0 }}>
+                    <div className="row" style={{ width: 30, height: 30, borderRadius: 7, justifyContent: "center", background: "var(--section)", flexShrink: 0 }}><Icon name="file-text" size={14} style={{ color: "var(--fg-muted)" }} /></div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{f.name}</div>
+                      <div style={{ fontSize: 10.5, color: "var(--fg-faint)" }}>{f.size ? fmtBytes(f.size) : "Uploaded"}</div>
+                    </div>
+                  </div>
+                  <RemoveBtn onClick={() => setFiles(files.filter((_, j) => j !== i))} />
+                </div>
+              ) : (
+                // External linked resource.
+                <div key={i} className="row" style={{ gap: 8 }}>
+                  <input className="field" style={{ flex: 1 }} value={f.name} onChange={(e) => setFiles(files.map((x, j) => j === i ? { ...x, name: e.target.value } : x))} placeholder="File name" />
+                  <input className="field" style={{ flex: 1.4 }} value={f.url} onChange={(e) => setFiles(files.map((x, j) => j === i ? { ...x, url: e.target.value } : x))} placeholder="https://…" />
+                  <RemoveBtn onClick={() => setFiles(files.filter((_, j) => j !== i))} />
+                </div>
+              ),
+            )}
+          </div>
+          {uploadErr && <div style={{ fontSize: 11, color: "var(--signal-red-text)", marginTop: 6 }}>{uploadErr}</div>}
+          <div className="row" style={{ gap: 8, marginTop: 8 }}>
+            <button className="row" onClick={() => fileInputRef.current?.click()} disabled={uploading}
+              style={{ gap: 6, padding: "7px 11px", fontSize: 11.5, color: "var(--fg)", borderRadius: 8, border: "1px solid var(--border-default)", opacity: uploading ? 0.6 : 1 }}>
+              <Icon name="file-plus-2" size={13} />{uploading ? "Uploading…" : "Upload file"}
+            </button>
+            <button className="row" onClick={() => setFiles([...files, { name: "", url: "" }])}
+              style={{ gap: 6, padding: "7px 11px", fontSize: 11.5, color: "var(--fg-muted)", borderRadius: 8, border: "1px dashed var(--border-default)" }}>
+              <Icon name="plus" size={12} />Add link
+            </button>
+          </div>
+          <p style={{ fontSize: 10.5, color: "var(--fg-faint)", marginTop: 8 }}>Upload PDFs, docs, slides or images (up to 100 MB) — PDFs and images preview inside the lesson. Or paste an external link.</p>
+        </div>
       )}
     </ModalShell>
   );
