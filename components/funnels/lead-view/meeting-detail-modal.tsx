@@ -117,21 +117,29 @@ export function MeetingDetailModal({ id, onClose }: { id: string; onClose: () =>
         ) : (
           <div className="flex-1 overflow-y-auto">
             {/* ── Recording playback ── */}
+            {/* A direct media file plays inline (Fireflies). Provider share pages
+                (Fathom) forbid iframe embedding — "refused to connect" — so we
+                show a clickable poster that opens the recording in a new tab
+                rather than a broken frame. */}
             {isVideoFile ? (
               <div className="bg-black">
                 <video ref={videoRef} src={data.recordingUrl!} controls className="w-full max-h-[46vh] mx-auto" />
               </div>
-            ) : data.embedUrl ? (
-              <div className="aspect-video w-full bg-black max-h-[46vh]">
-                <iframe src={data.embedUrl} className="w-full h-full" allow="autoplay; fullscreen" title="Meeting recording" />
-              </div>
-            ) : data.recordingUrl ? (
-              <div className="px-6 pt-5">
-                <a href={data.recordingUrl} target="_blank" rel="noreferrer"
-                  className="flex items-center justify-center gap-2 w-full px-4 py-3 rounded-[12px] bg-ink text-on-ink text-[13px] font-medium hover:bg-ink/90 transition-colors">
-                  <Play size={15} /> Watch the recording <ExternalLink size={12} />
-                </a>
-              </div>
+            ) : (data.embedUrl || data.recordingUrl) ? (
+              <a
+                href={data.embedUrl || data.recordingUrl || "#"}
+                target="_blank"
+                rel="noreferrer"
+                className="group relative flex items-center justify-center aspect-video w-full max-h-[46vh] bg-gradient-to-b from-[#151a2e] to-[#0b0f1e]"
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <span className="flex items-center justify-center w-16 h-16 rounded-full bg-white/10 group-hover:bg-white/20 transition-colors ring-1 ring-white/15">
+                    <Play size={26} className="text-white translate-x-0.5" fill="currentColor" />
+                  </span>
+                  <span className="text-[13px] font-medium text-white/90">Watch the recording on {PROVIDER_LABEL[data.provider] || "the provider"}</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] text-white/50"><ExternalLink size={11} /> Opens in a new tab</span>
+                </div>
+              </a>
             ) : null}
 
             {/* ── Tabs ── */}
