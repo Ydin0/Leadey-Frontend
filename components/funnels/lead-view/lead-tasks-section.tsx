@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@clerk/nextjs";
-import { CircleCheck, Plus, Check, X, ChevronDown, User } from "lucide-react";
+import { CircleCheck, Plus, Check, X, ChevronDown, User, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { DateTimePicker } from "@/components/shared/date-time-picker";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -120,7 +120,8 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
 
   const [tasks, setTasks] = useState<LeadTask[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
-  const [adding, setAdding] = useState(false);
+  // null = closed, "add" = new-task form, or a task id = editing that task.
+  const [formMode, setFormMode] = useState<null | "add" | string>(null);
   const [label, setLabel] = useState("");
   const [due, setDue] = useState("");
   const [assignee, setAssignee] = useState<string | null>(null);
@@ -148,8 +149,23 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
   }, [isAuthReady, canAssignOthers]);
 
   function startAdding() {
+    setLabel("");
+    setDue("");
     setAssignee(userId ?? null);
-    setAdding(true);
+    setFormMode("add");
+  }
+
+  function startEditing(task: LeadTask) {
+    setLabel(task.label);
+    setDue(task.dueAt ?? "");
+    setAssignee(task.assigneeId ?? userId ?? null);
+    setFormMode(task.id);
+  }
+
+  function closeForm() {
+    setFormMode(null);
+    setLabel("");
+    setDue("");
   }
 
   async function toggle(task: LeadTask) {
@@ -171,31 +187,74 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
     }
   }
 
-  async function add() {
+  async function submit() {
     if (!label.trim()) {
-      setAdding(false);
+      closeForm();
       return;
     }
+    const dueAt = due ? new Date(due).toISOString() : null;
     setSaving(true);
     try {
-      const created = await createLeadTask(funnelId, leadId, {
-        label: label.trim(),
-        dueAt: due ? new Date(due).toISOString() : null,
-        // Members can only self-assign; admins pick anyone.
-        assigneeId: canAssignOthers ? assignee : userId,
-      });
-      setTasks((prev) => [...prev, created]);
-      setLabel("");
-      setDue("");
-      setAdding(false);
+      if (formMode === "add") {
+        const created = await createLeadTask(funnelId, leadId, {
+          label: label.trim(),
+          dueAt,
+          // Members can only self-assign; admins pick anyone.
+          assigneeId: canAssignOthers ? assignee : userId,
+        });
+        setTasks((prev) => [...prev, created]);
+      } else if (formMode) {
+        const updated = await updateLeadTask(formMode, {
+          label: label.trim(),
+          dueAt,
+          ...(canAssignOthers ? { assigneeId: assignee } : {}),
+        });
+        setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      }
+      closeForm();
     } catch (err) {
-      console.error("Failed to create task:", err);
+      console.error("Failed to save task:", err);
     } finally {
       setSaving(false);
     }
   }
 
   const openCount = tasks.filter((t) => !t.done).length;
+
+  // Shared add/edit form (used inline in place of a row when editing).
+  const renderForm = (saveLabel: string) => (
+    <div className="flex flex-col gap-2 mt-1 p-2 rounded-lg border border-border-subtle bg-section/40">
+      <input
+        autoFocus
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") void submit();
+          if (e.key === "Escape") closeForm();
+        }}
+        placeholder="Task name…"
+        className="w-full bg-transparent text-[12px] text-ink placeholder:text-ink-faint focus:outline-none"
+      />
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Leadey-styled picker — never the browser-default calendar. */}
+        <DateTimePicker value={due || null} onChange={(iso) => setDue(iso ?? "")} placeholder="Due date" />
+        {canAssignOthers && members.length > 0 && (
+          <AssigneePicker members={members} value={assignee} currentUserId={userId ?? null} onChange={setAssignee} />
+        )}
+        <div className="flex-1" />
+        <button onClick={closeForm} className="px-2.5 py-1 rounded-full text-[11px] text-ink-muted hover:bg-hover">
+          Cancel
+        </button>
+        <button
+          onClick={() => void submit()}
+          disabled={saving || !label.trim()}
+          className="px-3 py-1 rounded-full bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50"
+        >
+          {saveLabel}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <Section
@@ -206,6 +265,7 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
     >
       <div className="flex flex-col gap-0.5">
         {tasks.map((task) => {
+          if (formMode === task.id) return <div key={task.id}>{renderForm("Save")}</div>;
           const d = dueLabel(task.dueAt);
           const assigneeLabel =
             task.assigneeId && task.assigneeId === userId ? "Me" : task.assigneeName || null;
@@ -226,7 +286,12 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
               >
                 {task.done && <Check size={10} strokeWidth={2.5} className="text-signal-green-text" />}
               </button>
-              <div className="flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => startEditing(task)}
+                className="flex-1 min-w-0 text-left"
+                title="Edit task"
+              >
                 <span
                   className={cn(
                     "block text-[12px] leading-snug truncate",
@@ -241,7 +306,7 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
                     {assigneeLabel}
                   </span>
                 )}
-              </div>
+              </button>
               {d && (
                 <span
                   className={cn(
@@ -254,6 +319,14 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
               )}
               <button
                 type="button"
+                onClick={() => startEditing(task)}
+                className="opacity-0 group-hover:opacity-100 text-ink-faint hover:text-ink-secondary transition-all shrink-0"
+                title="Edit task"
+              >
+                <Pencil size={11} />
+              </button>
+              <button
+                type="button"
                 onClick={() => remove(task)}
                 className="opacity-0 group-hover:opacity-100 text-ink-faint hover:text-signal-red-text transition-all shrink-0"
                 title="Delete task"
@@ -264,60 +337,15 @@ export function LeadTasksSection({ funnelId, leadId }: { funnelId: string; leadI
           );
         })}
 
-        {adding ? (
-          <div className="flex flex-col gap-2 mt-1 p-2 rounded-lg border border-border-subtle bg-section/40">
-            <input
-              autoFocus
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void add();
-                if (e.key === "Escape") setAdding(false);
-              }}
-              placeholder="Add a task…"
-              className="w-full bg-transparent text-[12px] text-ink placeholder:text-ink-faint focus:outline-none"
-            />
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Leadey-styled picker — never the browser-default calendar. */}
-              <DateTimePicker
-                value={due || null}
-                onChange={(iso) => setDue(iso ?? "")}
-                placeholder="Due date"
-              />
-              {canAssignOthers && members.length > 0 && (
-                <AssigneePicker
-                  members={members}
-                  value={assignee}
-                  currentUserId={userId ?? null}
-                  onChange={setAssignee}
-                />
-              )}
-              <div className="flex-1" />
-              <button
-                onClick={() => setAdding(false)}
-                className="px-2.5 py-1 rounded-full text-[11px] text-ink-muted hover:bg-hover"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => void add()}
-                disabled={saving || !label.trim()}
-                className="px-3 py-1 rounded-full bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50"
-              >
-                Add
-              </button>
-            </div>
-          </div>
-        ) : (
-          tasks.length === 0 && (
-            <button
-              onClick={startAdding}
-              className="flex items-center gap-2 py-1.5 px-1 text-[11.5px] text-ink-muted hover:text-ink-secondary transition-colors"
-            >
-              <Plus size={12} />
-              Add a task…
-            </button>
-          )
+        {formMode === "add" && renderForm("Add")}
+        {formMode === null && tasks.length === 0 && (
+          <button
+            onClick={startAdding}
+            className="flex items-center gap-2 py-1.5 px-1 text-[11.5px] text-ink-muted hover:text-ink-secondary transition-colors"
+          >
+            <Plus size={12} />
+            Add a task…
+          </button>
         )}
       </div>
     </Section>
