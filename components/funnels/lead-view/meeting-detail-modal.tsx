@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   X, Play, ExternalLink, ListChecks, Clock, Loader2, Sparkles, RefreshCw,
-  Gauge, FileText, CheckCircle2, TrendingUp, Mic,
+  Gauge, FileText, CheckCircle2, TrendingUp, Mic, Copy, Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -45,6 +45,20 @@ export function MeetingDetailModal({ id, onClose }: { id: string; onClose: () =>
   const [scoreErr, setScoreErr] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const autoScored = useRef(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyTranscript = useCallback(async () => {
+    const lines = (data?.transcript || []).map((s) => {
+      const t = s.start != null ? `[${ts(s.start)}] ` : "";
+      const sp = s.speaker ? `${s.speaker}: ` : "";
+      return `${t}${sp}${s.text}`;
+    });
+    try {
+      await navigator.clipboard.writeText(lines.join("\n"));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard blocked */ }
+  }, [data]);
 
   const runScore = useCallback(async (force: boolean) => {
     setScoring(true);
@@ -196,6 +210,16 @@ export function MeetingDetailModal({ id, onClose }: { id: string; onClose: () =>
               {tab === "transcript" && (
                 hasTranscript ? (
                   <div className="space-y-3">
+                    <div className="flex justify-end -mt-1 mb-1">
+                      <button
+                        type="button"
+                        onClick={() => void copyTranscript()}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors"
+                      >
+                        {copied ? <Check size={12} className="text-signal-green-text" /> : <Copy size={12} />}
+                        {copied ? "Copied" : "Copy transcript"}
+                      </button>
+                    </div>
                     {data.transcript!.map((s, i) => (
                       <div key={i} className="flex gap-3">
                         {s.start != null ? (
