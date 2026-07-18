@@ -1,6 +1,6 @@
 import {
   Zap, Mail, MessageSquare, MessageCircle, Linkedin, Phone, Clock, Hourglass, GitBranch,
-  Split, Flag, Tag, Pencil, UserPlus, Webhook, Target, LogOut, type LucideIcon,
+  Split, Flag, Tag, Pencil, UserPlus, Webhook, Target, LogOut, Briefcase, type LucideIcon,
 } from "lucide-react";
 import type { WorkflowNodeType } from "@/lib/types/workflow";
 
@@ -33,6 +33,7 @@ export const NODE_TYPES: Record<WorkflowNodeType, NodeTypeDef> = {
   tag:       { type: "tag",       label: "Add / Remove Tag", kicker: "ACTION",    icon: Tag,          ports: ["out"], defaultData: () => ({ mode: "add", tag: "" }) },
   field:     { type: "field",     label: "Update Field",     kicker: "ACTION",    icon: Pencil,       ports: ["out"], defaultData: () => ({ field: "", op: "set", value: "" }) },
   assign:    { type: "assign",    label: "Assign Owner",     kicker: "ACTION",    icon: UserPlus,     ports: ["out"], defaultData: () => ({ owner: "Round robin" }) },
+  opportunity: { type: "opportunity", label: "Move Opportunity", kicker: "ACTION", icon: Briefcase,   ports: ["out"], defaultData: () => ({ pipelineId: "", stageId: "", pipelineName: "", stageLabel: "" }) },
   webhook:   { type: "webhook",   label: "Webhook",          kicker: "ACTION",    icon: Webhook,      ports: ["out"], defaultData: () => ({ method: "POST", url: "" }) },
   goal:      { type: "goal",      label: "Goal Reached",     kicker: "EXIT",      icon: Target,       ports: [], terminal: true, defaultData: () => ({ label: "Goal reached" }) },
   end:       { type: "end",       label: "Exit Workflow",    kicker: "EXIT",      icon: LogOut,       ports: [], terminal: true, defaultData: () => ({ label: "Exit workflow" }) },
@@ -42,7 +43,7 @@ export const PALETTE_GROUPS: { name: string; types: WorkflowNodeType[] }[] = [
   { name: "Messaging", types: ["email", "sms", "whatsapp", "linkedin", "call"] },
   { name: "Timing",    types: ["wait", "waitevent"] },
   { name: "Logic",     types: ["condition", "abtest"] },
-  { name: "Action",    types: ["status", "tag", "field", "assign", "webhook"] },
+  { name: "Action",    types: ["status", "tag", "field", "assign", "opportunity", "webhook"] },
   { name: "Exit",      types: ["goal", "end"] },
 ];
 
@@ -72,6 +73,12 @@ export function nodeSummary(type: WorkflowNodeType, data: Record<string, unknown
     case "tag": return `${s("mode") || "add"} “${s("tag")}”`;
     case "field": return `${s("op") || "set"} ${s("field")}`;
     case "assign": return s("owner") || "Round robin";
+    case "opportunity": {
+      const stage = s("stageLabel");
+      const pipe = s("pipelineName");
+      if (!stage) return "Pick a stage";
+      return pipe ? `→ ${pipe}: ${stage}` : `→ ${stage}`;
+    }
     case "webhook": return `${s("method") || "POST"} ${s("url")}`;
     case "goal": return s("label") || "Goal reached";
     case "end": return s("label") || "Exit workflow";

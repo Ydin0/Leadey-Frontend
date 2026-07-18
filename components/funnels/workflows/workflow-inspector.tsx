@@ -153,6 +153,8 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect, orgLevel }: Ins
         <p className="text-[11px] text-ink-faint mt-2">Round robin rotates across this campaign&apos;s members.</p>
       </>)}
 
+      {node.type === "opportunity" && <OpportunityStepForm set={set} v={v} />}
+
       {node.type === "webhook" && (<>
         <label className={lab}>Method</label>
         <NativeSelect className={inp} value={v("method")} onChange={(e) => set({ method: e.target.value })}><option value="POST">POST</option><option value="PUT">PUT</option><option value="GET">GET</option></NativeSelect>
@@ -594,6 +596,51 @@ function WhatsappStepForm({ d, set }: { d: Record<string, unknown>; set: (patch:
 }
 
 // ─── Trigger form (enrollment condition + per-trigger config) ──────────────
+
+function OpportunityStepForm({ set, v }: { set: (patch: Record<string, unknown>) => void; v: (k: string) => string }) {
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  useEffect(() => {
+    let alive = true;
+    listPipelines().then((p) => { if (alive) setPipelines(p); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const pipelineId = v("pipelineId");
+  const stages = pipelines.find((p) => p.id === pipelineId)?.stages ?? [];
+  return (
+    <>
+      <label className={lab}>Pipeline</label>
+      <NativeSelect
+        className={inp}
+        value={pipelineId}
+        onChange={(e) => {
+          const p = pipelines.find((x) => x.id === e.target.value);
+          set({ pipelineId: e.target.value, pipelineName: p?.name ?? "", stageId: "", stageLabel: "" });
+        }}
+      >
+        <option value="">Select a pipeline…</option>
+        {pipelines.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      </NativeSelect>
+      <label className={lab}>Move to stage</label>
+      <NativeSelect
+        className={inp}
+        value={v("stageId")}
+        disabled={!pipelineId}
+        onChange={(e) => {
+          const st = stages.find((s) => s.id === e.target.value);
+          set({ stageId: e.target.value, stageLabel: st?.label ?? "" });
+        }}
+      >
+        <option value="">Select a stage…</option>
+        {stages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
+      </NativeSelect>
+      {!pipelineId && <p className="text-[11px] text-ink-faint mt-1.5">Pick a pipeline first.</p>}
+      <p className="text-[11px] text-ink-faint mt-2">
+        Moves the lead&apos;s opportunity into this pipeline &amp; stage. Pair it with a Wait step to auto-advance a
+        deal after a set time. The lead must have a linked opportunity.
+      </p>
+    </>
+  );
+}
 
 function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set: (patch: Record<string, unknown>) => void; v: (k: string) => string; orgLevel?: boolean }) {
   const { statuses } = useLeadStatuses();

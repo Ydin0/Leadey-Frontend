@@ -46,6 +46,7 @@ export type WorkflowNodeType =
   | "tag"
   | "field"
   | "assign"
+  | "opportunity"
   | "webhook"
   | "goal"
   | "end";
