@@ -768,7 +768,7 @@ function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set:
         <p className="text-[11px] text-ink-faint mt-2">Enrolls when the lead replies by email or SMS.</p>
       )}
       {label === "Meeting booked" && (
-        <p className="text-[11px] text-ink-faint mt-2">Enrolls when a Calendly meeting is booked for the lead.</p>
+        <p className="text-[11px] text-ink-faint mt-2">Enrolls when a meeting is booked for the lead — via a Leadey booking page, the &ldquo;Book meeting&rdquo; scheduler, a connected Google/Outlook calendar, or Calendly.</p>
       )}
       {label === "Manually added" && (
         <p className="text-[11px] text-ink-faint mt-2">Enroll leads by hand from the campaign / lead view.</p>
