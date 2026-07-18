@@ -146,7 +146,7 @@ function LessonFile({ f }: { f: LinkItem }) {
       ) : loadingUpload ? (
         <div style={{ padding: 24, textAlign: "center", fontSize: 11.5, color: "var(--fg-faint)" }}>Loading preview…</div>
       ) : kind === "pdf" && viewUrl ? (
-        <iframe src={viewUrl} title={f.name} style={{ width: "100%", height: 620, border: 0, borderTop: "1px solid var(--border-subtle)", background: "#fff" }} />
+        <iframe src={viewUrl} title={f.name} style={{ width: "100%", height: "min(1400px, 88vh)", border: 0, borderTop: "1px solid var(--border-subtle)", background: "#fff" }} />
       ) : kind === "image" && viewUrl ? (
         <div style={{ borderTop: "1px solid var(--border-subtle)", background: "var(--section)", textAlign: "center", padding: 12 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
