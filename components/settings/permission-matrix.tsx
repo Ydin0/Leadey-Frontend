@@ -43,6 +43,7 @@ function humanize(key: string): string {
     "Manage Accounts": "Manage accounts", "Place Calls": "Place calls", "Use Dialer": "Use dialer",
     "Provision Numbers": "Provision numbers", View: "View", Run: "Run", Manage: "Manage", Use: "Use",
     "Manage Billing": "Manage billing", "Manage Team": "Manage team & permissions",
+    "Connect Own Email": "Connect own email & calendar",
     "Manage Phone Lines": "Manage phone lines", "Manage Integrations": "Manage integrations",
     "Manage Org Config": "Manage org config (statuses, tags, fields…)", "Manage Api Keys": "Manage API keys",
   };

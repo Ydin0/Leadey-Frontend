@@ -236,7 +236,9 @@ const TAB_GATE: Partial<Record<SettingsTab, string>> = {
   team: "settings.manageTeam",
   "api-keys": "settings.manageApiKeys",
   "phone-lines": "settings.managePhoneLines",
-  "email-accounts": "settings.manageIntegrations",
+  // Connecting your OWN mailbox + calendar is a baseline capability (ON by
+  // default for every role) — NOT the org-wide integrations admin permission.
+  "email-accounts": "settings.connectOwnEmail",
   "email-suppressions": "settings.manageOrgConfig",
   integrations: "settings.manageIntegrations",
   linkedin: "settings.manageIntegrations",
