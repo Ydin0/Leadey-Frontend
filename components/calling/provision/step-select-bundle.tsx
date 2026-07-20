@@ -26,14 +26,6 @@ const BUSINESS_TYPES = [
   { value: "nonprofit", label: "Non-Profit" },
 ];
 
-// Twilio business classifications (business_identity attribute)
-const BUSINESS_CLASSIFICATIONS = [
-  { value: "INDEPENDENT_SOFTWARE_VENDOR", label: "Independent Software Vendor" },
-  { value: "RESELLER", label: "Reseller" },
-  { value: "ENTERPRISE", label: "Enterprise" },
-  { value: "CONSULTING_AGENCY", label: "Consulting / Agency" },
-];
-
 // Per-country label for the registration-number field, so customers know
 // which number to type in. The actual authority code (UK:CRN etc.) is
 // derived server-side from the country — we don't ask the user.
@@ -86,7 +78,8 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
   const [businessType, setBusinessType] = useState("limited_company");
   const [businessRegNumber, setBusinessRegNumber] = useState("");
   const [businessWebsite, setBusinessWebsite] = useState("");
-  const [businessClassification, setBusinessClassification] = useState("INDEPENDENT_SOFTWARE_VENDOR");
+  // Always Direct Customer — the org is the end user of its own numbers.
+  const [businessClassification] = useState("DIRECT_CUSTOMER");
   // Address
   const [addressStreet1, setAddressStreet1] = useState("");
   const [addressStreet2, setAddressStreet2] = useState("");
@@ -372,19 +365,11 @@ export function StepSelectBundle({ country, selectedBundleId, onSelect, onSkip }
                   placeholder="Acme Ltd"
                   className="w-full px-3 py-2 rounded-[8px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default" />
               </div>
-              <div>
+              <div className="col-span-2">
                 <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Business Type</label>
                 <NativeSelect value={businessType} onChange={(e) => setBusinessType(e.target.value)}>
                   {BUSINESS_TYPES.map((bt) => (
                     <option key={bt.value} value={bt.value}>{bt.label}</option>
-                  ))}
-                </NativeSelect>
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1 block">Classification</label>
-                <NativeSelect value={businessClassification} onChange={(e) => setBusinessClassification(e.target.value)}>
-                  {BUSINESS_CLASSIFICATIONS.map((c) => (
-                    <option key={c.value} value={c.value}>{c.label}</option>
                   ))}
                 </NativeSelect>
               </div>

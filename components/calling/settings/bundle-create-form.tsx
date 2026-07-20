@@ -26,11 +26,6 @@ const NUMBER_TYPES = [
 
 // Twilio's regulation enforces:
 //   business_identity ∈ {DIRECT_CUSTOMER, INDEPENDENT_SOFTWARE_VENDOR}
-const BUSINESS_CLASSIFICATIONS = [
-  { value: "DIRECT_CUSTOMER", label: "Direct Customer (we use the number ourselves)" },
-  { value: "INDEPENDENT_SOFTWARE_VENDOR", label: "Software Vendor (number used in product)" },
-];
-
 const REGISTRATION_NUMBER_HINT_BY_COUNTRY: Record<string, string> = {
   GB: "Companies House registration number",
   US: "EIN (Employer Identification Number)",
@@ -97,8 +92,9 @@ export function BundleCreateForm({
     endUserType: initialValues?.endUserType || "business",
     businessName: initialValues?.businessName || "",
     businessType: initialValues?.businessType || "limited_company",
-    businessClassification:
-      initialValues?.businessClassification || "INDEPENDENT_SOFTWARE_VENDOR",
+    // Always Direct Customer — we submit every org's bundle as the number's
+    // end user (the classification picker is intentionally not shown).
+    businessClassification: initialValues?.businessClassification || "DIRECT_CUSTOMER",
     businessRegistrationNumber: initialValues?.businessRegistrationNumber || "",
     businessWebsite: initialValues?.businessWebsite || "",
     addressStreet1: initialValues?.addressStreet1 || "",
@@ -206,7 +202,7 @@ export function BundleCreateForm({
               className={inputClass}
             />
           </div>
-          <div>
+          <div className="col-span-2">
             <label className={labelClass}>Business Type</label>
             <NativeSelect
               value={d.businessType}
@@ -215,19 +211,6 @@ export function BundleCreateForm({
               {BUSINESS_TYPES.map((bt) => (
                 <option key={bt.value} value={bt.value}>
                   {bt.label}
-                </option>
-              ))}
-            </NativeSelect>
-          </div>
-          <div>
-            <label className={labelClass}>Classification</label>
-            <NativeSelect
-              value={d.businessClassification}
-              onChange={(e) => set("businessClassification", e.target.value)}
-            >
-              {BUSINESS_CLASSIFICATIONS.map((c) => (
-                <option key={c.value} value={c.value}>
-                  {c.label}
                 </option>
               ))}
             </NativeSelect>
