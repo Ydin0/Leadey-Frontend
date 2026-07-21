@@ -14,7 +14,7 @@ import { PrimaryFeed } from "./tabs/primary-feed";
 import { EmailInbox } from "./email/email-inbox";
 import { PotentialContactsInbox } from "./tabs/potential-contacts-inbox";
 import { InboxLineFilter } from "./inbox-line-filter";
-import { getInboxCounts, type InboxCounts } from "@/lib/api/inbox";
+import { getInboxCounts, markInboxSeen, type InboxCounts } from "@/lib/api/inbox";
 import { getPhoneLines } from "@/lib/api/phone-lines";
 import type { PhoneLine } from "@/lib/types/calling";
 
@@ -79,6 +79,20 @@ export function InboxShell() {
     getInboxCounts(lineFilter).then(setCounts).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, countsKey]); // refresh counts as the rep works through tabs / changes filter
+
+  // Opening Missed Calls acknowledges the current ones — advance the seen
+  // watermark, then refresh so the badge clears (it's a notification, not a
+  // permanent to-do). New missed calls afterwards re-light it.
+  useEffect(() => {
+    if (tab !== "calls") return;
+    let cancelled = false;
+    markInboxSeen("calls")
+      .then(() => getInboxCounts(lineFilter))
+      .then((c) => { if (!cancelled) setCounts(c); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, countsKey]);
 
   function selectTab(key: TabKey) {
     setTab(key);

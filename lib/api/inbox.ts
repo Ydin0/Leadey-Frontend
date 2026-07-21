@@ -43,6 +43,12 @@ export async function getPrimaryFeed(): Promise<PrimaryItem[]> {
   return apiRequest<PrimaryItem[]>("/inbox/primary");
 }
 
+/** Mark a notification-style inbox tab as seen (advances the rep's watermark so
+ *  the tab badge clears). */
+export async function markInboxSeen(tab: "calls" | "messages"): Promise<void> {
+  await apiRequest("/inbox/seen", { method: "POST", body: JSON.stringify({ tab }) });
+}
+
 export async function getPotentialContacts(): Promise<PotentialContact[]> {
   return apiRequest<PotentialContact[]>("/inbox/potential-contacts");
 }

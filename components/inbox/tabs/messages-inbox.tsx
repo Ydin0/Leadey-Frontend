@@ -22,6 +22,7 @@ export function MessagesInbox({ lineIds, currentUserId }: {
   const [allThreads, setAllThreads] = useState<SmsThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<SmsThread | null>(null);
+  const [filter, setFilter] = useState<"all" | "unread">("all");
 
   const refresh = useCallback(() => {
     return getSmsThreads().then(setAllThreads).catch(() => {});
@@ -38,17 +39,47 @@ export function MessagesInbox({ lineIds, currentUserId }: {
 
   // Filter by the selected org line(s) client-side (threads carry lineId).
   const lineSet = lineIds && lineIds.length ? new Set(lineIds) : null;
-  const threads = lineSet ? allThreads.filter((t) => t.lineId && lineSet.has(t.lineId)) : allThreads;
+  const scoped = lineSet ? allThreads.filter((t) => t.lineId && lineSet.has(t.lineId)) : allThreads;
+  const unreadCount = scoped.filter((t) => t.needsReply).length;
+  const threads = filter === "unread" ? scoped.filter((t) => t.needsReply) : scoped;
 
   return (
     <div className="flex-1 flex flex-col rounded-[14px] border border-border-subtle bg-surface overflow-hidden min-h-0">
+      {/* All / Unread filter */}
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-border-subtle shrink-0">
+        {([
+          { key: "all" as const, label: "All", n: scoped.length },
+          { key: "unread" as const, label: "Unread", n: unreadCount },
+        ]).map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setFilter(f.key)}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors",
+              filter === f.key ? "bg-ink text-on-ink" : "text-ink-muted hover:text-ink-secondary hover:bg-hover",
+            )}
+          >
+            {f.label}
+            {f.n > 0 && (
+              <span className={cn(
+                "text-[9px] font-semibold rounded-full px-1.5 min-w-[15px] text-center",
+                filter === f.key ? "bg-on-ink/20 text-on-ink" : "bg-section text-ink-muted",
+              )}>
+                {f.n}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
       <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="flex items-center justify-center py-16"><Loader2 size={18} className="animate-spin text-ink-muted" /></div>
         ) : threads.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-2 text-center px-6">
             <MessageSquare size={20} className="text-ink-faint" />
-            <p className="text-[12px] text-ink-muted">No text conversations yet.</p>
+            <p className="text-[12px] text-ink-muted">
+              {filter === "unread" ? "No unread messages — you're all caught up." : "No text conversations yet."}
+            </p>
           </div>
         ) : (
           threads.map((t) => (
