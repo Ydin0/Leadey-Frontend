@@ -695,11 +695,42 @@ function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set:
         </>)}
       </NativeSelect>
 
-      {label === "Meeting upcoming" && (<>
-        <label className={lab}>Minutes before the meeting</label>
-        <input type="number" min={1} max={10080} className={inp} value={v("minutesBefore") || "15"} onChange={(e) => set({ minutesBefore: Math.max(1, Number(e.target.value) || 15) })} />
-        <p className="text-[11px] text-ink-faint mt-1.5">Runs this long before each meeting&apos;s start (the meeting must be linked to a lead). Use <code>{"{{meeting_time}}"}</code> / <code>{"{{meeting_title}}"}</code> in messages.</p>
-      </>)}
+      {label === "Meeting upcoming" && (() => {
+        const FACTOR: Record<string, number> = { minutes: 1, hours: 60, days: 1440 };
+        const unit = v("beforeUnit") || "minutes";
+        // Back-compat: older workflows stored only minutesBefore.
+        const amount = Number(v("beforeAmount")) || Number(v("minutesBefore")) || 15;
+        return (
+          <>
+            <label className={lab}>Fire this far before the meeting</label>
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="number"
+                min={1}
+                className={inp}
+                value={amount}
+                onChange={(e) => {
+                  const n = Math.max(1, Number(e.target.value) || 1);
+                  set({ beforeAmount: n, beforeUnit: unit, minutesBefore: n * FACTOR[unit] });
+                }}
+              />
+              <NativeSelect
+                className={inp}
+                value={unit}
+                onChange={(e) => {
+                  const u = e.target.value;
+                  set({ beforeUnit: u, beforeAmount: amount, minutesBefore: amount * (FACTOR[u] ?? 1) });
+                }}
+              >
+                <option value="minutes">Minutes</option>
+                <option value="hours">Hours</option>
+                <option value="days">Days</option>
+              </NativeSelect>
+            </div>
+            <p className="text-[11px] text-ink-faint mt-1.5">Runs this long before each meeting&apos;s start (the meeting must be linked to a lead). Use <code>{"{{meeting_time}}"}</code> / <code>{"{{meeting_title}}"}</code> in messages.</p>
+          </>
+        );
+      })()}
       {isOpp && (<>
         <label className={lab}>Pipeline</label>
         <NativeSelect className={inp} value={v("pipelineId")} onChange={(e) => set({ pipelineId: e.target.value, ...(e.target.value !== v("pipelineId") ? { toStageId: "" } : {}) })}>
