@@ -17,6 +17,7 @@ import type { Device, Call } from "@twilio/voice-sdk";
 import type {
   ActiveCall,
   CallContextValue,
+  CallError,
   CallMeta,
   PhoneLine,
   CallRecord,
@@ -81,6 +82,57 @@ async function fetchTwilioToken(clerkToken: string | null): Promise<string> {
   return data.data.token;
 }
 
+/** Pre-flight: confirm the browser can actually use a microphone. A blocked /
+ *  missing / busy mic makes Twilio's connect() die instantly with a 0-second
+ *  "call" and no error — this returns a clear, actionable message instead.
+ *  Uses the Permissions API fast-path so a granted mic isn't re-acquired on
+ *  every dial. */
+async function probeMicrophone(): Promise<CallError | null> {
+  if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+    return { code: "no_media", title: "Microphone unavailable", message: "This browser can't access a microphone. Use an up-to-date Chrome or Edge on desktop to make calls." };
+  }
+  try {
+    const status = await (navigator.permissions as Permissions | undefined)?.query?.({ name: "microphone" as PermissionName });
+    if (status?.state === "granted") return null;
+    if (status?.state === "denied") {
+      return { code: "mic_blocked", title: "Microphone access is blocked", message: "Calls need microphone access. Click the padlock (🔒) in your browser's address bar → Microphone → Allow, then reload the page and try again." };
+    }
+  } catch { /* Permissions API doesn't support 'microphone' here — fall through to a real request */ }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    stream.getTracks().forEach((t) => t.stop()); // release immediately; Twilio re-acquires on connect
+    return null;
+  } catch (err) {
+    const name = (err as DOMException)?.name || "";
+    if (name === "NotAllowedError" || name === "SecurityError") {
+      return { code: "mic_blocked", title: "Microphone access is blocked", message: "Calls need microphone access. Click the padlock (🔒) in your browser's address bar → Microphone → Allow, then reload the page and try again." };
+    }
+    if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+      return { code: "mic_missing", title: "No microphone found", message: "No microphone is connected. Plug one in (or pick an input in your system sound settings), then try again." };
+    }
+    if (name === "NotReadableError" || name === "TrackStartError") {
+      return { code: "mic_in_use", title: "Microphone is busy", message: "Another app has your microphone (Zoom, Teams, another call tab). Close it, then try again." };
+    }
+    return { code: "mic_error", title: "Can't access the microphone", message: "Your browser blocked microphone access for calls. Check this site's microphone permission and try again." };
+  }
+}
+
+/** Map a Twilio Voice SDK error to a user-facing message (only the ones a rep
+ *  can act on — internal/transient codes are left to the auto-retry). */
+function mapTwilioCallError(err: unknown): CallError | null {
+  const code = (err as { code?: number })?.code;
+  if (code === 31401 || code === 31208) {
+    return { code: "mic_blocked", title: "Microphone access is blocked", message: "Calls need microphone access. Click the padlock (🔒) in your browser's address bar → Microphone → Allow, then reload the page." };
+  }
+  if (code === 31402) {
+    return { code: "mic_in_use", title: "Microphone unavailable", message: "Your microphone couldn't be used — another app may have it, or no input device is selected. Free it up and try again." };
+  }
+  if (code === 20101 || code === 20104 || code === 20151) {
+    return { code: "token", title: "Calling session expired", message: "Your calling session expired and is reconnecting. If calls keep failing, reload the page." };
+  }
+  return null;
+}
+
 export function CallProvider({ children }: { children: React.ReactNode }) {
   const { getToken, userId, orgId } = useAuth();
   const isAuthReady = useAuthReady();
@@ -101,6 +153,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   const [selectedOutputDeviceId, setSelectedOutputDeviceId] = useState<string | null>(null);
   const [outputSelectionSupported, setOutputSelectionSupported] = useState(false);
   const [incomingCall, setIncomingCall] = useState<IncomingCallInfo | null>(null);
+  const [callError, setCallError] = useState<CallError | null>(null);
+  const clearCallError = useCallback(() => setCallError(null), []);
 
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -296,6 +350,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
         device.on("error", (err) => {
           console.error("[Twilio Device Error]", err);
+          const mapped = mapTwilioCallError(err);
+          if (mapped) setCallError(mapped);
           // Fatal errors leave the device unusable — rebuild it.
           if (!cancelled && device.state !== "registered") {
             setDeviceReady(false);
@@ -680,6 +736,8 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       call.on("error", (err) => {
         if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
         console.error("[Twilio Call Error]", err);
+        const mapped = mapTwilioCallError(err);
+        if (mapped) setCallError(mapped);
         setActiveCall(null);
         callRef.current = null;
         dialingRef.current = false;
@@ -713,6 +771,16 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         console.warn("[Twilio] Skipping dial — invalid number:", to);
         return false;
       }
+
+      // Pre-flight microphone check — a blocked / missing / busy mic makes
+      // Twilio's connect() die instantly with a silent 0-second call (the
+      // "every call just ends" symptom). Surface a clear, fixable message.
+      const micErr = await probeMicrophone();
+      if (micErr) {
+        setCallError(micErr);
+        return false;
+      }
+      setCallError(null); // clear any stale error on a healthy dial
 
       // Telephony spend gate: balance floor / monthly budget. The server
       // also refuses the dial, but catching it here gives the rep a proper
@@ -794,6 +862,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         dialingRef.current = false;
         if (watchdogRef.current) { clearTimeout(watchdogRef.current); watchdogRef.current = null; }
         console.error("[Twilio] Connect failed:", err);
+        setCallError(
+          mapTwilioCallError(err) ?? {
+            code: "connect", title: "Couldn't start the call",
+            message: "The call didn't connect. Check your microphone and internet connection, then try again.",
+          },
+        );
         return false;
       }
       return true;
@@ -899,9 +973,12 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         incomingCall,
         acceptIncoming,
         rejectIncoming,
+        callError,
+        clearCallError,
       }}
     >
       {children}
+      {callError && <CallErrorPrompt error={callError} onDismiss={clearCallError} />}
       {localBuyPrompt && (
         <LocalBuyPrompt
           prompt={localBuyPrompt}
@@ -951,6 +1028,46 @@ function LocalBuyPrompt({
             {busy && <Loader2 size={11} className="animate-spin" />}
             Buy &amp; call
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Blocking-but-dismissible overlay shown when a call can't be placed for a
+ *  reason the rep can fix (mic blocked/missing/busy, expired session) — instead
+ *  of the previous silent 0-second "call". */
+function CallErrorPrompt({ error, onDismiss }: { error: CallError; onDismiss: () => void }) {
+  const micRelated = error.code.startsWith("mic") || error.code === "no_media";
+  return (
+    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onDismiss}>
+      <div className="bg-surface rounded-[16px] border border-border-subtle shadow-2xl w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-3">
+          <span className="flex items-center justify-center w-9 h-9 rounded-full bg-signal-red/15 text-signal-red-text shrink-0 text-[17px]">
+            {micRelated ? "🎤" : "⚠️"}
+          </span>
+          <div className="min-w-0">
+            <h2 className="text-[14.5px] font-semibold text-ink">{error.title}</h2>
+            <p className="text-[12.5px] text-ink-secondary leading-relaxed mt-1">{error.message}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 mt-5">
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="px-3.5 py-1.5 rounded-[20px] bg-section text-ink-secondary text-[12px] font-medium hover:bg-hover transition-colors border border-border-subtle"
+          >
+            Got it
+          </button>
+          {micRelated && (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="px-3.5 py-1.5 rounded-[20px] bg-ink text-on-ink text-[12px] font-medium hover:bg-ink/90 transition-colors"
+            >
+              Reload page
+            </button>
+          )}
         </div>
       </div>
     </div>

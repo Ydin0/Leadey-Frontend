@@ -288,6 +288,16 @@ export interface CallContextValue {
   acceptIncoming: () => void;
   /** Decline the ringing inbound call. */
   rejectIncoming: () => void;
+  /** A user-facing calling error (e.g. microphone blocked) surfaced instead of
+   *  a silent instant-ended call; null when clear. */
+  callError: CallError | null;
+  clearCallError: () => void;
+}
+
+export interface CallError {
+  code: string;
+  title: string;
+  message: string;
 }
 
 export interface AudioDeviceOption {
