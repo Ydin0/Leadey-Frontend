@@ -42,6 +42,9 @@ export interface DialerSessionFilters {
   /** Skip leads in a terminal status (Not Interested, DNC, Qualified, …). */
   excludeClosed: boolean;
   respectTimezone: boolean;
+  /** Dial every phone-having lead, ignoring the campaign's saved Smart View
+   *  filter (e.g. a stale "status = new" that now matches no one). */
+  ignoreCampaignFilter: boolean;
 }
 
 export interface DialerSession {

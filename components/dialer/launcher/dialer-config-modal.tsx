@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { NativeSelect } from "@/components/ui/native-select";
-import { X, Loader2, ShieldCheck, UserCheck, Clock, Calendar, AlertCircle, Play } from "lucide-react";
+import { X, Loader2, ShieldCheck, UserCheck, Clock, Calendar, AlertCircle, Play, ListFilter } from "lucide-react";
 import { createSession, getActiveSession, endSession } from "@/lib/api/dialer";
 import { useDialerContext } from "@/components/dialer/context/dialer-context";
 import { useTelephonyBlock } from "@/components/telephony/telephony-block";
@@ -25,6 +25,7 @@ export function DialerConfigModal({ funnelId, onClose }: DialerConfigModalProps)
   const [excludeRecentlyCalled, setExcludeRecentlyCalled] = useState(true);
   const [recentlyCalledHours, setRecentlyCalledHours] = useState(24);
   const [respectTimezone, setRespectTimezone] = useState(false);
+  const [ignoreCampaignFilter, setIgnoreCampaignFilter] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -54,6 +55,7 @@ export function DialerConfigModal({ funnelId, onClose }: DialerConfigModalProps)
           excludeRecentlyCalled,
           recentlyCalledHours,
           respectTimezone,
+          ignoreCampaignFilter,
         },
       });
       // Local-presence pre-flight — one consolidated buy prompt for uncovered
@@ -209,6 +211,13 @@ export function DialerConfigModal({ funnelId, onClose }: DialerConfigModalProps)
             description="Only queue contacts currently within their business hours"
             value={respectTimezone}
             onChange={setRespectTimezone}
+          />
+          <FilterRow
+            icon={<ListFilter size={13} className="text-ink-muted" />}
+            label="Dial every lead"
+            description="Ignore the campaign's saved Smart View filter (e.g. “status is New”) and queue the whole list"
+            value={ignoreCampaignFilter}
+            onChange={setIgnoreCampaignFilter}
           />
 
           {error && (
