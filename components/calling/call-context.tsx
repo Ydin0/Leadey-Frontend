@@ -351,7 +351,24 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         device.on("error", (err) => {
           console.error("[Twilio Device Error]", err);
           const mapped = mapTwilioCallError(err);
-          if (mapped) setCallError(mapped);
+          // Token/registration expiry is a BACKGROUND concern (common when a tab
+          // is throttled and misses a refresh tick). Recover it silently —
+          // refresh the token in place, and let the re-init path below rebuild
+          // if that fails — rather than nagging the rep with a modal every time
+          // the session blips. Only genuinely actionable errors (mic) prompt.
+          if (mapped?.code === "token") {
+            void (async () => {
+              try {
+                const clerkTk = await getToken();
+                const newToken = await fetchTwilioToken(clerkTk);
+                device.updateToken(newToken);
+              } catch {
+                /* the scheduleRetry() below rebuilds the device with a fresh token */
+              }
+            })();
+          } else if (mapped) {
+            setCallError(mapped);
+          }
           // Fatal errors leave the device unusable — rebuild it.
           if (!cancelled && device.state !== "registered") {
             setDeviceReady(false);
