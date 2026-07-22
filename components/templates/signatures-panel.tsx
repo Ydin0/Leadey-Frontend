@@ -7,7 +7,7 @@ import { renderPersonalized } from "@/lib/utils/personalize";
 import { SIGNATURE_VARIABLES } from "@/lib/types/template";
 import {
   listSignatures, createSignature, updateSignature, deleteSignature,
-  getSignatureDetails, setDefaultSignature, type EmailSignature, type SignatureDetails,
+  getSignatureDetails, setDefaultSignature, senderCtxFromDetails, type EmailSignature, type SignatureDetails,
 } from "@/lib/api/signatures";
 import { invalidateSignatureCache } from "@/components/shared/signature-picker";
 
@@ -21,22 +21,10 @@ const SAMPLE: SignatureDetails = {
 };
 
 /** Build the sender ctx for a live preview from the author's own details,
- *  preferring their signature overrides over the profile/org defaults. */
+ *  preferring their signature overrides (via the shared helper) over defaults. */
 function senderCtx(d: SignatureDetails | null) {
   const s = d && (d.signatureName || d.signatureEmail || d.firstName || d.email) ? d : SAMPLE;
-  const name = (s.signatureName || "").trim() || [s.firstName, s.lastName].filter(Boolean).join(" ");
-  const [firstName, ...rest] = name.split(/\s+/);
-  return {
-    sender: {
-      firstName: firstName || "",
-      lastName: rest.join(" "),
-      email: s.signatureEmail || s.email,
-      phone: s.signaturePhone || s.phone,
-      title: s.title,
-      company: s.signatureCompany || s.companyName || "",
-      fields: s.signatureFields,
-    },
-  };
+  return senderCtxFromDetails(s);
 }
 
 export function SignaturesPanel() {

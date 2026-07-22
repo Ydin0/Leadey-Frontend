@@ -4,31 +4,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2, Check, Plus, Trash2, Mail } from "lucide-react";
 import { renderPersonalized } from "@/lib/utils/personalize";
 import {
-  listSignatures, getSignatureDetails, updateSignatureDetails,
+  listSignatures, getSignatureDetails, updateSignatureDetails, senderCtxFromDetails,
   type EmailSignature, type SignatureDetails,
 } from "@/lib/api/signatures";
 import { listEmailAccounts, updateEmailAccount } from "@/lib/api/email-accounts";
 import type { EmailAccount } from "@/lib/types/email-accounts";
 
-/** Effective signature values — an override wins over the profile/org default. */
-function effectiveName(d: SignatureDetails) {
-  return (d.signatureName || "").trim() || [d.firstName, d.lastName].filter(Boolean).join(" ");
-}
-function senderCtx(d: SignatureDetails) {
-  const name = effectiveName(d);
-  const [firstName, ...rest] = name.split(/\s+/);
-  return {
-    sender: {
-      firstName: firstName || "",
-      lastName: rest.join(" "),
-      email: d.signatureEmail || d.email,
-      phone: d.signaturePhone || d.phone,
-      title: d.title,
-      company: d.signatureCompany || d.companyName || "",
-      fields: d.signatureFields,
-    },
-  };
-}
+const senderCtx = senderCtxFromDetails;
 
 export function SignatureSection() {
   const [details, setDetails] = useState<SignatureDetails | null>(null);

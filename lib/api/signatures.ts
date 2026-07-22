@@ -65,3 +65,25 @@ export async function updateSignatureDetails(input: {
 export async function setDefaultSignature(id: string | null): Promise<void> {
   await updateSignatureDetails({ defaultSignatureId: id });
 }
+
+/** Build the {{sender_*}} personalization context from a rep's signature
+ *  details, preferring their signature OVERRIDES over the profile/org defaults —
+ *  the single source of truth so every preview (settings, templates panel,
+ *  composer) matches what the backend actually renders at send time. */
+export function senderCtxFromDetails(d: SignatureDetails): {
+  sender: { firstName: string; lastName: string; email: string; phone: string; title: string; company: string; fields: Record<string, string> };
+} {
+  const name = (d.signatureName || "").trim() || [d.firstName, d.lastName].filter(Boolean).join(" ");
+  const [firstName, ...rest] = name.split(/\s+/);
+  return {
+    sender: {
+      firstName: firstName || "",
+      lastName: rest.join(" "),
+      email: d.signatureEmail || d.email,
+      phone: d.signaturePhone || d.phone,
+      title: d.title,
+      company: d.signatureCompany || d.companyName || "",
+      fields: d.signatureFields,
+    },
+  };
+}

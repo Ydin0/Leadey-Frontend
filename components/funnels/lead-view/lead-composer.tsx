@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { NativeSelect } from "@/components/ui/native-select";
 import { RichEmailEditor } from "@/components/email/rich-email-editor";
 import { SignaturePicker } from "@/components/shared/signature-picker";
-import { listSignatures, getSignatureDetails, type EmailSignature, type SignatureDetails } from "@/lib/api/signatures";
+import { listSignatures, getSignatureDetails, senderCtxFromDetails, type EmailSignature, type SignatureDetails } from "@/lib/api/signatures";
 import { listSendingAccounts, sendEmail } from "@/lib/api/email";
 import { listTemplates, listTemplateAttachments, uploadTemplateAttachment } from "@/lib/api/templates";
 import { uploadLeadDocument } from "@/lib/api/lead-documents";
@@ -263,13 +263,9 @@ function EmailForm({ funnelId, leadId, lead, contacts, stepIndex, prefill, onSen
       ? defaultRaw
       : signatures.find((s) => s.id === signatureId)?.contentHtml || null;
     if (!raw) return null;
-    const senderCtx = senderDetails ? {
-      sender: {
-        firstName: senderDetails.firstName, lastName: senderDetails.lastName,
-        email: senderDetails.email, phone: senderDetails.phone, title: senderDetails.title,
-        fields: senderDetails.signatureFields,
-      },
-    } : undefined;
+    // Prefer the rep's signature overrides (name/email/phone/company) so the
+    // preview matches what the backend renders at send time.
+    const senderCtx = senderDetails ? senderCtxFromDetails(senderDetails) : undefined;
     return renderPersonalized(raw, lead, senderCtx);
   }, [signatureId, signatures, fromAccount, senderDetails, lead]);
 
