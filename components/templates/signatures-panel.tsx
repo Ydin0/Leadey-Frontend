@@ -14,17 +14,27 @@ import { invalidateSignatureCache } from "@/components/shared/signature-picker";
 /** Sample sender for the preview when the author has no details filled in. */
 const SAMPLE: SignatureDetails = {
   firstName: "Jane", lastName: "Smith", email: "jane@acme.com",
-  phone: "+44 7893 952310", title: "Account Executive", signatureFields: { booking_link: "https://cal.com/jane" },
+  phone: "+44 7893 952310", companyName: "Acme", title: "Account Executive",
+  signatureName: null, signatureEmail: null, signaturePhone: null, signatureCompany: null,
+  signatureFields: { booking_link: "https://cal.com/jane" },
   defaultSignatureId: null,
 };
 
-/** Build the sender ctx for a live preview from the author's own details. */
+/** Build the sender ctx for a live preview from the author's own details,
+ *  preferring their signature overrides over the profile/org defaults. */
 function senderCtx(d: SignatureDetails | null) {
-  const s = d && (d.firstName || d.email) ? d : SAMPLE;
+  const s = d && (d.signatureName || d.signatureEmail || d.firstName || d.email) ? d : SAMPLE;
+  const name = (s.signatureName || "").trim() || [s.firstName, s.lastName].filter(Boolean).join(" ");
+  const [firstName, ...rest] = name.split(/\s+/);
   return {
     sender: {
-      firstName: s.firstName, lastName: s.lastName, email: s.email,
-      phone: s.phone, title: s.title, company: "", fields: s.signatureFields,
+      firstName: firstName || "",
+      lastName: rest.join(" "),
+      email: s.signatureEmail || s.email,
+      phone: s.signaturePhone || s.phone,
+      title: s.title,
+      company: s.signatureCompany || s.companyName || "",
+      fields: s.signatureFields,
     },
   };
 }

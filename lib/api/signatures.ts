@@ -10,11 +10,19 @@ export interface EmailSignature {
 }
 
 export interface SignatureDetails {
+  /** Profile/org defaults — shown as placeholders when no override is set. */
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+  companyName: string;
   title: string;
+  /** Signature-display overrides (null ⇒ use the default above). Let a rep put a
+   *  different name / work email / personal number / company on their signature. */
+  signatureName: string | null;
+  signatureEmail: string | null;
+  signaturePhone: string | null;
+  signatureCompany: string | null;
   signatureFields: Record<string, string>;
   /** This rep's personal default signature id ("Default signature" resolves
    *  to this). null = fall back to the mailbox's own configured signature. */
@@ -41,7 +49,15 @@ export async function getSignatureDetails(): Promise<SignatureDetails> {
   return apiRequest<SignatureDetails>("/me/signature-details");
 }
 
-export async function updateSignatureDetails(input: { title?: string; signatureFields?: Record<string, string>; defaultSignatureId?: string | null }): Promise<void> {
+export async function updateSignatureDetails(input: {
+  title?: string;
+  signatureName?: string;
+  signatureEmail?: string;
+  signaturePhone?: string;
+  signatureCompany?: string;
+  signatureFields?: Record<string, string>;
+  defaultSignatureId?: string | null;
+}): Promise<void> {
   await apiRequest("/me/signature-details", { method: "PATCH", body: JSON.stringify(input) });
 }
 

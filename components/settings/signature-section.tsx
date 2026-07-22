@@ -10,8 +10,24 @@ import {
 import { listEmailAccounts, updateEmailAccount } from "@/lib/api/email-accounts";
 import type { EmailAccount } from "@/lib/types/email-accounts";
 
+/** Effective signature values — an override wins over the profile/org default. */
+function effectiveName(d: SignatureDetails) {
+  return (d.signatureName || "").trim() || [d.firstName, d.lastName].filter(Boolean).join(" ");
+}
 function senderCtx(d: SignatureDetails) {
-  return { sender: { firstName: d.firstName, lastName: d.lastName, email: d.email, phone: d.phone, title: d.title, company: "", fields: d.signatureFields } };
+  const name = effectiveName(d);
+  const [firstName, ...rest] = name.split(/\s+/);
+  return {
+    sender: {
+      firstName: firstName || "",
+      lastName: rest.join(" "),
+      email: d.signatureEmail || d.email,
+      phone: d.signaturePhone || d.phone,
+      title: d.title,
+      company: d.signatureCompany || d.companyName || "",
+      fields: d.signatureFields,
+    },
+  };
 }
 
 export function SignatureSection() {
@@ -48,11 +64,17 @@ export function SignatureSection() {
 // ── Your details (job title + custom fields) ─────────────────────────
 function YourDetails({ details, onChange }: { details: SignatureDetails; onChange: (d: SignatureDetails) => void }) {
   const [title, setTitle] = useState(details.title);
+  const [name, setName] = useState(details.signatureName ?? "");
+  const [email, setEmail] = useState(details.signatureEmail ?? "");
+  const [phone, setPhone] = useState(details.signaturePhone ?? "");
+  const [company, setCompany] = useState(details.signatureCompany ?? "");
   const [fields, setFields] = useState<{ key: string; value: string }[]>(
     Object.entries(details.signatureFields || {}).map(([key, value]) => ({ key, value })),
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+
+  const profileName = [details.firstName, details.lastName].filter(Boolean).join(" ");
 
   async function save() {
     setSaving(true);
@@ -63,8 +85,14 @@ function YourDetails({ details, onChange }: { details: SignatureDetails; onChang
         const k = f.key.trim().replace(/[^a-zA-Z0-9_]/g, "_").toLowerCase();
         if (k) signatureFields[k] = f.value;
       }
-      await updateSignatureDetails({ title, signatureFields });
-      onChange({ ...details, title, signatureFields });
+      await updateSignatureDetails({
+        title, signatureName: name, signatureEmail: email, signaturePhone: phone, signatureCompany: company, signatureFields,
+      });
+      onChange({
+        ...details, title, signatureFields,
+        signatureName: name.trim() || null, signatureEmail: email.trim() || null,
+        signaturePhone: phone.trim() || null, signatureCompany: company.trim() || null,
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } finally {
@@ -76,18 +104,15 @@ function YourDetails({ details, onChange }: { details: SignatureDetails; onChang
     <div className="bg-surface rounded-[14px] border border-border-subtle p-5">
       <h3 className="text-[14px] font-semibold text-ink mb-1">Your signature details</h3>
       <p className="text-[11px] text-ink-muted mb-4">
-        These fill the <code className="text-ink-secondary">{"{{sender_*}}"}</code> variables in any signature you use. Name, email and phone come from your Profile.
+        These fill the <code className="text-ink-secondary">{"{{sender_*}}"}</code> variables in any signature you use. Leave a field blank to use your profile default (shown as the placeholder) — editing here only changes your signature, not your login.
       </p>
 
       <div className="grid grid-cols-2 gap-3 mb-4">
-        <ReadOnly label="Name" value={[details.firstName, details.lastName].filter(Boolean).join(" ") || "—"} />
-        <ReadOnly label="Email" value={details.email || "—"} />
-        <ReadOnly label="Phone" value={details.phone || "—"} />
-        <div>
-          <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Job Title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Account Executive"
-            className="w-full px-3 py-2 rounded-[10px] bg-section border border-border-subtle text-[12px] text-ink focus:outline-none focus:border-border-default" />
-        </div>
+        <Field label="Name" value={name} onChange={setName} placeholder={profileName || "Your name"} />
+        <Field label="Email" value={email} onChange={setEmail} placeholder={details.email || "you@company.com"} type="email" />
+        <Field label="Phone" value={phone} onChange={setPhone} placeholder={details.phone || "+1 555 123 4567"} type="tel" />
+        <Field label="Job Title" value={title} onChange={setTitle} placeholder="Account Executive" />
+        <Field label="Company" value={company} onChange={setCompany} placeholder={details.companyName || "Company name"} />
       </div>
 
       <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">Custom fields</label>
@@ -119,11 +144,19 @@ function YourDetails({ details, onChange }: { details: SignatureDetails; onChang
   );
 }
 
-function ReadOnly({ label, value }: { label: string; value: string }) {
+function Field({ label, value, onChange, placeholder, type = "text" }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; type?: string;
+}) {
   return (
     <div>
       <label className="block text-[10px] uppercase tracking-wider text-ink-muted font-medium mb-1.5">{label}</label>
-      <input value={value} disabled className="w-full px-3 py-2 rounded-[10px] bg-section/50 border border-border-subtle text-[12px] text-ink-muted cursor-not-allowed" />
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 rounded-[10px] bg-section border border-border-subtle text-[12px] text-ink placeholder:text-ink-faint focus:outline-none focus:border-border-default"
+      />
     </div>
   );
 }
