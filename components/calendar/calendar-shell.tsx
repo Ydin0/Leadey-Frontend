@@ -23,7 +23,7 @@ import { useTeamMembers } from "@/hooks/use-team-members";
 import { MemberAvatar, memberColorFromId } from "@/components/shared/member-avatar";
 import { listMeetings, setMeetingDisposition } from "@/lib/api/calendar";
 import type { MeetingDisposition, OrgMeeting } from "@/lib/types/calendar";
-import { SOURCE_LABEL, RsvpBadge, DispositionBadge, DispositionControl, DISPOSITION_COLOR, meetingTime } from "@/components/calendar/meeting-bits";
+import { SOURCE_LABEL, RsvpBadge, DispositionBadge, DispositionControl, DISPOSITION_COLOR, BookedByChip, meetingTime } from "@/components/calendar/meeting-bits";
 
 const VIEW_KEY = "leadey:calendar-view";
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -450,6 +450,9 @@ export function CalendarShell() {
           )}
           {popover.meeting.organizerEmail && (
             <p className="text-[10.5px] text-ink-faint mb-1 truncate">Organized by {popover.meeting.organizerEmail}</p>
+          )}
+          {popover.meeting.bookedByUserId && (
+            <div className="mt-1.5"><BookedByChip meeting={popover.meeting} /></div>
           )}
 
           <div className="flex items-center gap-2 mt-3">

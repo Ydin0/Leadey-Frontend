@@ -30,6 +30,12 @@ export interface LeadMeeting {
   responseStatus: MeetingResponseStatus | null;
   /** Manually-set attendance on a past meeting (attended = green, no_show = red). */
   disposition: MeetingDisposition | null;
+  /** The rep credited with booking this meeting (Leadey-booked meetings only). */
+  bookedByUserId?: string | null;
+  bookedByName?: string | null;
+  /** True when a prospect self-booked via a public link (no rep booked it) —
+   *  credited to the assigned host and shown as inbound. */
+  selfBooked?: boolean;
 }
 
 export interface LeadMeetingsResult {

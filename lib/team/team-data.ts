@@ -53,6 +53,13 @@ export interface DayRec {
   smsOutbound: number;
   linkedin: number;
   meetings: number;
+  /** Meetings booked through the Leadey booking flow, credited to this rep
+   *  (bucketed by the day booked). */
+  meetingsBooked: number;
+  /** Of the meetings this rep booked, how many were dispositioned attended /
+   *  no-show (bucketed by the day the meeting occurred). Drives sit rate. */
+  meetingsAttended: number;
+  meetingsNoShow: number;
   replies: number;
   total: number;
 }
@@ -96,6 +103,9 @@ export interface Totals {
   smsOutbound: number;
   linkedin: number;
   meetings: number;
+  meetingsBooked: number;
+  meetingsAttended: number;
+  meetingsNoShow: number;
   replies: number;
   total: number;
 }
@@ -107,7 +117,16 @@ export type MetricKey =
   | "talkTime" | "talkTimeInbound" | "talkTimeOutbound"
   | "emails" | "emailsInbound" | "emailsOutbound"
   | "sms" | "smsInbound" | "smsOutbound"
-  | "linkedin" | "meetings" | "replies" | "total";
+  | "linkedin" | "meetings"
+  | "meetingsBooked" | "meetingsAttended" | "meetingsNoShow"
+  | "replies" | "total";
+
+/** Sit rate = attended / (attended + no-show) over dispositioned meetings the
+ *  rep booked. null when nothing has been dispositioned yet (show "—"). */
+export function sitRate(t: Pick<Totals, "meetingsAttended" | "meetingsNoShow">): number | null {
+  const denom = t.meetingsAttended + t.meetingsNoShow;
+  return denom > 0 ? t.meetingsAttended / denom : null;
+}
 
 export const CHANNELS: Channel[] = [
   { id: "calls", label: "Calls", short: "Calls", icon: "phone", color: "#86EFAC", verb: "dials" },
@@ -176,6 +195,9 @@ export interface ApiDayRec {
   smsOutbound?: number;
   linkedin: number;
   meetings: number;
+  meetingsBooked?: number;
+  meetingsAttended?: number;
+  meetingsNoShow?: number;
   replies: number;
 }
 
@@ -213,6 +235,9 @@ export function hydrateSeries(api: ApiDayRec[]): DayRec[] {
       smsOutbound: r.smsOutbound || 0,
       linkedin: r.linkedin || 0,
       meetings: r.meetings || 0,
+      meetingsBooked: r.meetingsBooked || 0,
+      meetingsAttended: r.meetingsAttended || 0,
+      meetingsNoShow: r.meetingsNoShow || 0,
       replies: r.replies || 0,
       total,
     };
@@ -227,7 +252,7 @@ export function emptySeries(): DayRec[] {
   const days: DayRec[] = [];
   for (let i = 0; i < DAYS; i++) {
     const date = new Date(start.getTime() - (DAYS - 1 - i) * DAY_MS);
-    days.push({ date, ts: date.getTime(), dayKey: localDayKey(date), calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 });
+    days.push({ date, ts: date.getTime(), dayKey: localDayKey(date), calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, meetingsBooked: 0, meetingsAttended: 0, meetingsNoShow: 0, replies: 0, total: 0 });
   }
   return days;
 }
@@ -313,14 +338,14 @@ export function workingDays(slice: DayRec[]): number {
 }
 
 export function sumSlice(slice: DayRec[]): Totals {
-  const out: Totals = { calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
+  const out: Totals = { calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, meetingsBooked: 0, meetingsAttended: 0, meetingsNoShow: 0, replies: 0, total: 0 };
   slice.forEach((d) => { (Object.keys(out) as (keyof Totals)[]).forEach((k) => { out[k] += d[k] || 0; }); });
   return out;
 }
 
 export function targetFor(member: Member, range: DayRange): Totals {
   const wd = Math.max(1, workingDays(sliceRange(member.series, range)));
-  const t = { calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 } as Totals;
+  const t = { calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, meetingsBooked: 0, meetingsAttended: 0, meetingsNoShow: 0, replies: 0, total: 0 } as Totals;
   CH_IDS.forEach((ch) => { t[ch] = member.targets[ch] * wd; });
   t.total = CH_IDS.reduce((a, ch) => a + t[ch], 0);
   return t;
@@ -392,7 +417,7 @@ export interface TeamTotals {
   delta: Record<keyof Totals, number>;
 }
 export function teamTotals(members: Member[], range: DayRange): TeamTotals {
-  const cur: Totals = { calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, replies: 0, total: 0 };
+  const cur: Totals = { calls: 0, callsInbound: 0, callsOutbound: 0, connectedCalls: 0, voicemailCalls: 0, talkTime: 0, talkTimeInbound: 0, talkTimeOutbound: 0, emails: 0, emailsInbound: 0, emailsOutbound: 0, sms: 0, smsInbound: 0, smsOutbound: 0, linkedin: 0, meetings: 0, meetingsBooked: 0, meetingsAttended: 0, meetingsNoShow: 0, replies: 0, total: 0 };
   const prev: Totals = { ...cur };
   const pr = prevRange(range);
   members.forEach((m) => {

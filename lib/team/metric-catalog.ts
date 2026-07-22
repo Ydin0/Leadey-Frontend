@@ -1,6 +1,6 @@
 import type { MetricKey } from "./team-data";
 
-export type MetricKind = "count" | "duration" | "percent";
+export type MetricKind = "count" | "duration" | "percent" | "sitrate";
 
 /** One selectable stat card on the Team analytics page. `count` cards show a
  *  raw number, `duration` cards format seconds via fmtTalkTime, `percent` cards
@@ -50,6 +50,8 @@ export const METRIC_CATALOG: MetricCardDef[] = [
   // LinkedIn
   { id: "linkedin", label: "LinkedIn actions", icon: "linkedin", color: LINKEDIN_COLOR, group: "LinkedIn", kind: "count", metricKey: "linkedin" },
   // Outcomes
+  { id: "meetingsBooked", label: "Meetings booked", icon: "calendar-check", color: OPP_COLOR, group: "Outcomes", kind: "count", metricKey: "meetingsBooked" },
+  { id: "sitRate", label: "Sit rate", icon: "user-check", color: CONNECT_COLOR, group: "Outcomes", kind: "sitrate" },
   { id: "meetings", label: "Opportunities", icon: "briefcase", color: OPP_COLOR, group: "Outcomes", kind: "count", metricKey: "meetings" },
   { id: "replies", label: "Replies", icon: "message-square", color: VM_COLOR, group: "Outcomes", kind: "count", metricKey: "replies" },
 ];
@@ -60,7 +62,7 @@ export const CATALOG_BY_ID: Record<string, MetricCardDef> =
 /** Default card layout when the org hasn't customized — mirrors the previous
  *  fixed card row so nothing regresses. */
 export const DEFAULT_CARD_IDS = [
-  "calls", "emails", "sms", "linkedin", "talkTime", "meetings", "connectRate", "voicemailCalls",
+  "calls", "emails", "sms", "meetingsBooked", "sitRate", "talkTime", "meetings", "connectRate",
 ];
 
 /** Keep only known ids, de-duplicated, preserving the given order. */

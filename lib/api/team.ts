@@ -57,6 +57,11 @@ export interface TeamAnalyticsDay {
   smsOutbound?: number;
   linkedin: number;
   meetings: number;
+  /** Meetings booked through the Leadey booking flow, credited to this rep. */
+  meetingsBooked?: number;
+  /** Sit outcomes on meetings this rep booked (dispositioned attended/no-show). */
+  meetingsAttended?: number;
+  meetingsNoShow?: number;
   replies: number;
 }
 export async function getTeamAnalytics(): Promise<{

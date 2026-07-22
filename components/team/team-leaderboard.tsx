@@ -4,7 +4,7 @@ import { Avatar } from "./team-shared";
 import { Sparkline, Meter, attColor } from "./charts";
 import { DeltaPill } from "./team-shared";
 import {
-  CH_IDS, attainment, prevRange, sliceRange, sumSlice, bucketed, fmtTalkTime, connectRate,
+  CH_IDS, attainment, prevRange, sliceRange, sumSlice, bucketed, fmtTalkTime, connectRate, sitRate,
   type ChannelId, type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -23,21 +23,33 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
     return { m, a, spark: bucketed(m, range).totals, trend };
   });
 
+  // Sit rate ranks nulls (no dispositioned meetings) last.
+  const srSort = (g: typeof rows[number]["a"]["got"]) => sitRate(g) ?? -1;
+
   rows.sort((x, y) => {
     if (rankBy === "attainment") return y.a.overall - x.a.overall;
     if (rankBy === "volume") return y.a.got.total - x.a.got.total;
     if (rankBy === "talkTime") return y.a.got.talkTime - x.a.got.talkTime;
     if (rankBy === "meetings") return y.a.got.meetings - x.a.got.meetings;
+    if (rankBy === "meetingsBooked") return y.a.got.meetingsBooked - x.a.got.meetingsBooked;
+    if (rankBy === "sitRate") return srSort(y.a.got) - srSort(x.a.got);
     if (rankBy === "connectRate") return connectRate(y.a.got) - connectRate(x.a.got);
     if (rankBy === "voicemail") return y.a.got.voicemailCalls - x.a.got.voicemailCalls;
     return y.a.got[rankBy as ChannelId] - x.a.got[rankBy as ChannelId];
   });
+
+  const fmtSit = (g: typeof rows[number]["a"]["got"]) => {
+    const sr = sitRate(g);
+    return sr == null ? "—" : Math.round(sr * 100) + "%";
+  };
 
   const metricVal = (r: typeof rows[number]) => {
     if (rankBy === "attainment") return Math.round(r.a.overall * 100) + "%";
     if (rankBy === "volume") return r.a.got.total.toLocaleString();
     if (rankBy === "talkTime") return fmtTalkTime(r.a.got.talkTime);
     if (rankBy === "meetings") return r.a.got.meetings.toLocaleString();
+    if (rankBy === "meetingsBooked") return r.a.got.meetingsBooked.toLocaleString();
+    if (rankBy === "sitRate") return fmtSit(r.a.got);
     if (rankBy === "connectRate") return Math.round(connectRate(r.a.got) * 100) + "%";
     if (rankBy === "voicemail") return r.a.got.voicemailCalls.toLocaleString();
     return r.a.got[rankBy as ChannelId].toLocaleString();
@@ -62,7 +74,7 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
                   <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>{r.m.name}</div>
                   <div style={{ fontSize: 10, color: "var(--fg-muted)", marginTop: 1 }}>{r.m.role} · {r.m.pod}</div>
                 </div>
-                <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", color: rankBy === "attainment" ? attColor(r.a.overall) : "var(--fg1)" }}>{metricVal(r)}</div>
+                <div style={{ fontSize: 22, fontWeight: 600, letterSpacing: "-0.02em", color: rankBy === "attainment" ? attColor(r.a.overall) : rankBy === "sitRate" && sitRate(r.a.got) != null ? attColor(sitRate(r.a.got)!) : "var(--fg1)" }}>{metricVal(r)}</div>
               </div>
             );
           })}
@@ -83,6 +95,8 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
               <th style={{ textAlign: "right" }}>Connect</th>
               <th style={{ textAlign: "right" }}>VM</th>
               <th style={{ textAlign: "right" }}>Opps</th>
+              <th style={{ textAlign: "right" }}>Booked</th>
+              <th style={{ textAlign: "right" }}>Sit rate</th>
               <th style={{ textAlign: "right" }}>Talk time</th>
               <th style={{ width: 150 }}>Attainment</th>
               <th style={{ width: 96 }}>Trend</th>
@@ -115,6 +129,20 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
                 <td style={{ textAlign: "right", color: rankBy === "connectRate" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "connectRate" ? 600 : 400 }}>{Math.round(connectRate(r.a.got) * 100)}%</td>
                 <td style={{ textAlign: "right", color: rankBy === "voicemail" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "voicemail" ? 600 : 400 }}>{r.a.got.voicemailCalls.toLocaleString()}</td>
                 <td style={{ textAlign: "right", color: rankBy === "meetings" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "meetings" ? 600 : 400 }}>{r.a.got.meetings.toLocaleString()}</td>
+                <td style={{ textAlign: "right", color: rankBy === "meetingsBooked" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "meetingsBooked" ? 600 : 400 }}>{r.a.got.meetingsBooked.toLocaleString()}</td>
+                <td style={{ textAlign: "right", fontWeight: rankBy === "sitRate" ? 600 : 400 }}>
+                  {(() => {
+                    const sr = sitRate(r.a.got);
+                    const n = r.a.got.meetingsAttended + r.a.got.meetingsNoShow;
+                    if (sr == null) return <span style={{ color: "var(--fg-faint)" }}>—</span>;
+                    return (
+                      <span style={{ color: attColor(sr) }}>
+                        {Math.round(sr * 100)}%
+                        <span style={{ color: "var(--fg-faint)", fontWeight: 400, fontSize: 10, marginLeft: 4 }}>({n})</span>
+                      </span>
+                    );
+                  })()}
+                </td>
                 <td style={{ textAlign: "right", color: rankBy === "talkTime" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "talkTime" ? 600 : 400 }}>{fmtTalkTime(r.a.got.talkTime)}</td>
                 <td>
                   <div className="row" style={{ gap: 9 }}>

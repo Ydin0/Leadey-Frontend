@@ -7,7 +7,7 @@ import { getLeadMeetings, setMeetingDisposition } from "@/lib/api/calendar";
 import { cancelMeeting } from "@/lib/api/meetings";
 import { listLeadTranscripts, pullLeadTranscripts, deleteMeetingTranscript, type MeetingTranscript } from "@/lib/api/meeting-transcripts";
 import type { LeadMeeting, MeetingDisposition } from "@/lib/types/calendar";
-import { SOURCE_LABEL, RsvpBadge, DispositionControl, meetingWhen } from "@/components/calendar/meeting-bits";
+import { SOURCE_LABEL, RsvpBadge, DispositionControl, BookedByChip, meetingWhen } from "@/components/calendar/meeting-bits";
 import { MeetingDetailModal } from "./meeting-detail-modal";
 import { cn } from "@/lib/utils";
 import { Section } from "./lead-section";
@@ -218,6 +218,9 @@ function MeetingRow({
           {meetingWhen(m.startTime)}
           <span className="text-ink-faint"> · {SOURCE_LABEL[m.source]}</span>
         </p>
+        {m.bookedByUserId && (
+          <div className="mt-1"><BookedByChip meeting={m} size="xs" /></div>
+        )}
         {past ? (
           <div className="mt-1.5">
             <DispositionControl disposition={m.disposition} onChange={(next) => onDispose?.(m, next)} size="xs" />

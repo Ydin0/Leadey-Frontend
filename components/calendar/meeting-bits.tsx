@@ -1,8 +1,9 @@
 "use client";
 
-import { Check, X, CircleDashed, HelpCircle, UserCheck, UserX, Loader2 } from "lucide-react";
+import { Check, X, CircleDashed, HelpCircle, UserCheck, UserX, Loader2, ArrowDownLeft } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { MemberAvatar } from "@/components/shared/member-avatar";
 import type { LeadMeeting, MeetingDisposition, MeetingResponseStatus } from "@/lib/types/calendar";
 
 /** Shared meeting UI atoms — used by the lead profile meetings tab, the
@@ -114,6 +115,34 @@ export function DispositionControl({
         {busy ? <Loader2 size={11} className="animate-spin" /> : <UserX size={11} strokeWidth={2.5} />} No-show
       </button>
     </div>
+  );
+}
+
+/** "Booked by <rep>" chip for a Leadey-booked meeting — the credit that drives
+ *  the team leaderboard. Shows an "Inbound" tag when the prospect self-booked.
+ *  Renders nothing for external/synced meetings (no booker). */
+export function BookedByChip({
+  meeting,
+  size = "sm",
+}: {
+  meeting: Pick<LeadMeeting, "source" | "bookedByUserId" | "bookedByName" | "selfBooked">;
+  size?: "sm" | "xs";
+}) {
+  if (meeting.source !== "leadey" || !meeting.bookedByUserId) return null;
+  const name = meeting.bookedByName || "Unknown";
+  const text = size === "xs" ? "text-[10px]" : "text-[11px]";
+  return (
+    <span className={cn("inline-flex items-center gap-1.5 rounded-full bg-section pl-0.5 pr-2 py-0.5 shrink-0", text)}>
+      <MemberAvatar id={meeting.bookedByUserId} name={name} size="xs" />
+      <span className="text-ink-secondary font-medium whitespace-nowrap">
+        {meeting.selfBooked ? "Host" : "Booked by"} {name}
+      </span>
+      {meeting.selfBooked && (
+        <span className="inline-flex items-center gap-0.5 rounded-full bg-signal-blue/15 text-signal-blue-text px-1.5 text-[9px] font-medium">
+          <ArrowDownLeft size={9} strokeWidth={2.5} /> Inbound
+        </span>
+      )}
+    </span>
   );
 }
 

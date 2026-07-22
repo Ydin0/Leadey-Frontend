@@ -4,7 +4,7 @@ import { Icon } from "./icon";
 import { Avatar, StatusDot, Panel, ChannelLegend } from "./team-shared";
 import { TrendChart, Ring, Meter, attColor } from "./charts";
 import {
-  CH_IDS, CH_MAP, attainment, bucketed, workingDays, sliceRange, fmtTalkTime, connectRate,
+  CH_IDS, CH_MAP, attainment, bucketed, workingDays, sliceRange, fmtTalkTime, connectRate, sitRate,
   type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -22,8 +22,12 @@ export function TeamRep({ memberId, range, rangeLabel, trendMode, onEdit }: {
 
   const rank = activeMembers.map((x) => ({ id: x.id, v: attainment(x, range).overall })).sort((p, q) => q.v - p.v).findIndex((x) => x.id === m.id) + 1;
 
+  const sr = sitRate(tot);
+  const sitN = tot.meetingsAttended + tot.meetingsNoShow;
   // [label, display value, icon] — talk time + avg call length are formatted durations.
   const summary: [string, string, string][] = [
+    ["Meetings booked", tot.meetingsBooked.toLocaleString(), "calendar-check"],
+    ["Sit rate", sr == null ? "—" : `${Math.round(sr * 100)}% · ${sitN} sat`, "user-check"],
     ["Talk time", fmtTalkTime(tot.talkTime), "clock"],
     ["Avg call length", tot.connectedCalls ? fmtTalkTime(tot.talkTime / tot.connectedCalls) : "—", "phone-call"],
     ["Connect rate", `${Math.round(connectRate(tot) * 100)}%`, "phone-call"],

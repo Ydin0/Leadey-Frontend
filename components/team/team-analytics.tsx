@@ -6,7 +6,7 @@ import { MetricCard, Panel, ChannelLegend, Avatar, DeltaPill } from "./team-shar
 import { TrendChart, Donut, Ring, Meter, attColor } from "./charts";
 import {
   CH_IDS, CH_MAP, teamTotals, bucketed, attainment, sparkForMetric, fmtTalkTime,
-  connectRate, connectRateSparkFor, departmentColor,
+  connectRate, connectRateSparkFor, departmentColor, sitRate,
   type DayRange, type Member, type TeamTotals,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -19,6 +19,14 @@ function cardView(def: MetricCardDef, tot: TeamTotals, members: Member[], range:
   if (def.kind === "percent") {
     const cur = connectRate(tot.cur), prev = connectRate(tot.prev);
     return { value: `${Math.round(cur * 100)}%`, delta: prev ? (cur - prev) / prev : 0, spark: connectRateSparkFor(members, range) };
+  }
+  if (def.kind === "sitrate") {
+    const cur = sitRate(tot.cur), prev = sitRate(tot.prev);
+    return {
+      value: cur == null ? "—" : `${Math.round(cur * 100)}%`,
+      delta: cur != null && prev != null && prev > 0 ? (cur - prev) / prev : 0,
+      spark: sparkForMetric(members, range, "meetingsAttended"),
+    };
   }
   const key = def.metricKey!;
   const raw = tot.cur[key];
@@ -136,7 +144,8 @@ export function TeamAnalytics({ range, rangeLabel, trendMode, onPickRep }: {
 
         <Panel title="Outcomes">
           <div className="col" style={{ gap: 16, marginTop: 2 }}>
-            {([["Talk time", fmtTalkTime(tot.cur.talkTime), tot.delta.talkTime, "clock"],
+            {([["Meetings booked", tot.cur.meetingsBooked.toLocaleString(), tot.delta.meetingsBooked, "calendar-check"],
+              ["Sit rate", (() => { const sr = sitRate(tot.cur); const n = tot.cur.meetingsAttended + tot.cur.meetingsNoShow; return sr == null ? "—" : `${Math.round(sr * 100)}% · ${n}`; })(), (() => { const c = sitRate(tot.cur), p = sitRate(tot.prev); return c != null && p != null && p > 0 ? (c - p) / p : 0; })(), "user-check"],
               ["Opportunities created", tot.cur.meetings.toLocaleString(), tot.delta.meetings, "briefcase"],
               ["Replies", tot.cur.replies.toLocaleString(), tot.delta.replies, "message-square"]] as const).map(([l, v, d, ic]) => (
               <div key={l} className="between">

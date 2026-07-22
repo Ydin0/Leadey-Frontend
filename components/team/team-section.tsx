@@ -17,6 +17,7 @@ import { WIN_MAP, windowRange, fmtRange, DAYS, CH_IDS, CH_MAP, type WindowId, ty
 /** Leaderboard rank-by metric options (lives in the header now, so it's shared). */
 const RANK_OPTS: [string, string][] = [
   ["attainment", "Attainment %"], ["volume", "Total volume"], ["connectRate", "Connect rate"],
+  ["meetingsBooked", "Meetings booked"], ["sitRate", "Sit rate"],
   ["meetings", "Opportunities"], ["talkTime", "Talk time"], ["voicemail", "Voicemails"],
   ...CH_IDS.map((c) => [c, CH_MAP[c].label] as [string, string]),
 ];
