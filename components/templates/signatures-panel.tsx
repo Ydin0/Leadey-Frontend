@@ -1,12 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Plus, Pencil, Trash2, Signature, ArrowLeft, Check, Star } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Signature, ArrowLeft, Check, Star, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { renderPersonalized } from "@/lib/utils/personalize";
 import { SIGNATURE_VARIABLES } from "@/lib/types/template";
 import {
-  listSignatures, createSignature, updateSignature, deleteSignature,
+  listSignatures, createSignature, updateSignature, deleteSignature, analyzeSignature,
   getSignatureDetails, setDefaultSignature, senderCtxFromDetails, type EmailSignature, type SignatureDetails,
 } from "@/lib/api/signatures";
 import { invalidateSignatureCache } from "@/components/shared/signature-picker";
@@ -146,7 +146,29 @@ function SignatureEditor({ signature, details, onBack, onSaved }: {
   const [html, setHtml] = useState(signature?.contentHtml || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiNote, setAiNote] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  /** AI: read the pasted signature and drop the {{sender_*}} variables into the
+   *  right spots (name, email, phone, title, company, personal links). */
+  async function runAi() {
+    if (analyzing) return;
+    if (!html.trim()) { setError("Paste your signature HTML first, then click Auto-fill variables."); return; }
+    setAnalyzing(true);
+    setError(null);
+    setAiNote(null);
+    try {
+      const tokenized = await analyzeSignature(html);
+      setHtml(tokenized);
+      setAiNote("Added merge variables — review the preview, then save.");
+      setTimeout(() => setAiNote(null), 6000);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't analyze the signature.");
+    } finally {
+      setAnalyzing(false);
+    }
+  }
 
   function insertVar(token: string) {
     const ta = taRef.current;
@@ -215,19 +237,32 @@ function SignatureEditor({ signature, details, onBack, onSaved }: {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Editor */}
         <div>
-          <div className="flex items-center gap-1 flex-wrap mb-2">
-            <span className="text-[9px] uppercase tracking-wider text-ink-faint font-medium mr-1">Insert:</span>
-            {SIGNATURE_VARIABLES.map((v) => (
-              <button key={v.key} type="button" onClick={() => insertVar(`{{${v.key}}}`)}
-                className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-signal-blue/10 text-signal-blue-text hover:bg-signal-blue/20 transition-colors">
-                {v.label}
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[9px] uppercase tracking-wider text-ink-faint font-medium mr-1">Insert:</span>
+              {SIGNATURE_VARIABLES.map((v) => (
+                <button key={v.key} type="button" onClick={() => insertVar(`{{${v.key}}}`)}
+                  className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-signal-blue/10 text-signal-blue-text hover:bg-signal-blue/20 transition-colors">
+                  {v.label}
+                </button>
+              ))}
+              <button type="button" onClick={insertCustomField}
+                className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-signal-slate/15 text-signal-slate-text hover:bg-signal-slate/25 transition-colors">
+                + Custom field
               </button>
-            ))}
-            <button type="button" onClick={insertCustomField}
-              className="px-1.5 py-0.5 rounded text-[9px] font-medium bg-signal-slate/15 text-signal-slate-text hover:bg-signal-slate/25 transition-colors">
-              + Custom field
+            </div>
+            <button
+              type="button"
+              onClick={runAi}
+              disabled={analyzing}
+              title="Paste your existing signature, then let AI drop the merge variables into place"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium bg-accent/15 text-link hover:bg-accent/25 disabled:opacity-60 transition-colors shrink-0"
+            >
+              {analyzing ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+              {analyzing ? "Analyzing…" : "Auto-fill variables"}
             </button>
           </div>
+          {aiNote && <p className="text-[10.5px] text-signal-green-text mb-2 -mt-1">{aiNote}</p>}
           <textarea
             ref={taRef}
             value={html}

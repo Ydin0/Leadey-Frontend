@@ -45,6 +45,17 @@ export async function deleteSignature(id: string): Promise<void> {
   await apiRequest(`/email/signatures/${encodeURIComponent(id)}`, { method: "DELETE" });
 }
 
+/** AI-tokenize a pasted signature: returns the same HTML with the {{sender_*}}
+ *  merge variables inserted where the personal details are, so one signature
+ *  serves the whole team. */
+export async function analyzeSignature(html: string): Promise<string> {
+  const res = await apiRequest<{ html: string }>("/email/signatures/analyze", {
+    method: "POST",
+    body: JSON.stringify({ html }),
+  });
+  return res.html;
+}
+
 export async function getSignatureDetails(): Promise<SignatureDetails> {
   return apiRequest<SignatureDetails>("/me/signature-details");
 }
