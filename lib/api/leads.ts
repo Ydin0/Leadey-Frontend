@@ -139,6 +139,38 @@ export async function exportOrgLeads(filters: LeadFilters): Promise<string> {
   return res.text();
 }
 
+export interface ExportLeadsInput {
+  /** Explicit contact selection (exact WYSIWYG set). When omitted, the server
+   *  applies filter/funnelId/search instead. */
+  leadIds?: string[];
+  funnelId?: string;
+  /** Base64/JSON-encoded FilterGroup (Smart View) — server-side filtering. */
+  filter?: string;
+  search?: string;
+  /** Restrict/order CSV columns to these frontend column keys (else all fields). */
+  columns?: string[];
+  filename?: string;
+}
+
+/** Export leads/contacts to CSV (server-resolved: all fields incl. custom
+ *  fields + activity counts). Returns the raw CSV text to download. */
+export async function exportLeadsCsv(input: ExportLeadsInput): Promise<string> {
+  const res = await fetch(`${API_BASE}/api/leads/export`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getAuthToken() ?? ""}`,
+    },
+    body: JSON.stringify(input),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const msg = res.status === 403 ? "You don't have permission to export leads." : "Export failed. Please try again.";
+    throw new Error(msg);
+  }
+  return res.text();
+}
+
 export async function getLeadsFacets(): Promise<LeadsFacets> {
   return apiRequest<LeadsFacets>(`/leads/facets`);
 }

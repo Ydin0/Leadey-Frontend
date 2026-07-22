@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, Sparkles, Search, Bot, UserPlus, Check, Columns3, Megaphone, Trash2, UserMinus } from "lucide-react";
+import { MoreHorizontal, Phone, Mail, Linkedin, Loader2, Building2, Sparkles, Search, Bot, UserPlus, Check, Columns3, Megaphone, Trash2, UserMinus, Download } from "lucide-react";
 import { confirmDncCall } from "@/lib/utils/dnc";
 import { cn } from "@/lib/utils";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -30,7 +30,9 @@ import { useActivityCounts, useOrgActivityCounts } from "@/lib/queries/use-activ
 import { useQuery, useQueries } from "@tanstack/react-query";
 import { qk } from "@/lib/queries/keys";
 import { usePipelinesQuery, useCallOutcomesQuery } from "@/lib/queries/use-org-config";
-import { getLeadFilterInsights, getTranscriptMatches } from "@/lib/api/leads";
+import { getLeadFilterInsights, getTranscriptMatches, exportLeadsCsv } from "@/lib/api/leads";
+import { downloadCSV } from "@/lib/export-csv";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import {
   buildLeadColumns, resolveColumns, loadColumnPrefs, saveColumnPrefs,
   type ColumnPrefs, type LeadColumnCtx,
@@ -42,6 +44,8 @@ interface FunnelLeadTableProps {
   /** The campaign the table lives in. Absent on the org-wide Leads page,
    *  where each row carries its own `lead.funnelId` instead. */
   funnelId?: string;
+  /** Campaign name — used for the CSV export filename ("<name>-contacts.csv"). */
+  funnelName?: string;
   /** Campaign sequence steps — powers the "Step" filter. */
   steps?: FunnelStep[];
   /** Shared filter restored from the campaign config (persisted server-side). */
@@ -202,6 +206,8 @@ function MagicEnrichBar({
   onDone,
   onRemove,
   onDelete,
+  onExport,
+  exporting,
 }: {
   funnelId: string;
   companies: SelectedCompany[];
@@ -219,6 +225,9 @@ function MagicEnrichBar({
   onRemove?: () => void;
   /** Permanently delete the selected companies' leads (parent typed-confirms). */
   onDelete?: () => void;
+  /** Export the selected companies' contacts to CSV. */
+  onExport?: () => void;
+  exporting?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -285,6 +294,15 @@ function MagicEnrichBar({
 
       <div className="w-px h-5 bg-border-subtle mx-1" />
 
+      {onExport && (
+        <button
+          onClick={onExport}
+          disabled={exporting}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors disabled:opacity-50"
+        >
+          {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Export
+        </button>
+      )}
       {onRemove && (
         <button
           onClick={onRemove}
@@ -353,7 +371,7 @@ function MagicEnrichBar({
   );
 }
 
-export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, initialColumns, sortBy, onSortChange, onLeadAdvanced, onLeadClick, onCreateCampaign, onAddToCampaign, onRemoveLeads, onDeleteLeads }: FunnelLeadTableProps) {
+export function FunnelLeadTable({ leads, funnelId, funnelName, steps = [], initialFilters, initialColumns, sortBy, onSortChange, onLeadAdvanced, onLeadClick, onCreateCampaign, onAddToCampaign, onRemoveLeads, onDeleteLeads }: FunnelLeadTableProps) {
   const prefetchFunnel = usePrefetchFunnel();
   // Close-style query builder. Restored from the campaign config (a FilterGroup);
   // a legacy/other shape falls back to empty.
@@ -802,6 +820,37 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, i
   }, [groupByCompany, selectedCompanies, companyGroups, filtered, selectedIds]);
   const orgMode = !funnelId;
 
+  // ── CSV export ──────────────────────────────────────────────────────
+  const { has } = usePermissions();
+  const canExport = has("leads.export");
+  const [exporting, setExporting] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+
+  const exportFilename = useCallback(() => {
+    const base = (funnelName || "leads").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "leads";
+    const d = new Date();
+    const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return `${base}-contacts-${stamp}.csv`;
+  }, [funnelName]);
+
+  /** Export a set of contacts to CSV. `onlyVisible` restricts columns to the
+   *  on-screen ones; otherwise every field (incl. custom fields) is included. */
+  const runExport = useCallback(async (leadIds: string[], opts?: { onlyVisible?: boolean }) => {
+    if (exporting || leadIds.length === 0) return;
+    setExportMenuOpen(false);
+    setExporting(true);
+    try {
+      const columns = opts?.onlyVisible ? visibleColumns.map((c) => c.key) : undefined;
+      const csv = await exportLeadsCsv({ leadIds, funnelId, columns, filename: exportFilename() });
+      downloadCSV(csv, exportFilename());
+    } catch (e) {
+      setEnrichToast(e instanceof Error ? e.message : "Export failed. Please try again.");
+      setTimeout(() => setEnrichToast(null), 5000);
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, visibleColumns, funnelId, exportFilename]);
+
   return (
     <div>
       {/* Smart Views + filter builder + search */}
@@ -865,6 +914,43 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, i
             <Columns3 size={12} strokeWidth={1.5} />
             Columns
           </button>
+          {canExport && (
+            <div className="relative">
+              <button
+                onClick={() => setExportMenuOpen((o) => !o)}
+                disabled={exporting || filtered.length === 0}
+                title="Export contacts to CSV"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[8px] text-[11px] font-medium border border-border-subtle text-ink-secondary hover:bg-hover transition-colors disabled:opacity-50"
+              >
+                {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} strokeWidth={1.75} />}
+                Export
+              </button>
+              {exportMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setExportMenuOpen(false)} />
+                  <div className="absolute right-0 mt-1.5 z-50 w-64 rounded-[12px] border border-border-subtle bg-surface shadow-lg p-1.5">
+                    <p className="px-2.5 pt-1.5 pb-1 text-[10px] uppercase tracking-wider text-ink-muted font-medium">
+                      Export {filtered.length.toLocaleString()} contact{filtered.length === 1 ? "" : "s"}
+                    </p>
+                    <button
+                      onClick={() => runExport(filtered.map((l) => l.id))}
+                      className="w-full text-left px-2.5 py-2 rounded-[8px] text-[12px] text-ink hover:bg-hover transition-colors"
+                    >
+                      <span className="font-medium">All fields</span>
+                      <span className="block text-[10.5px] text-ink-muted">Every column incl. custom fields &amp; activity</span>
+                    </button>
+                    <button
+                      onClick={() => runExport(filtered.map((l) => l.id), { onlyVisible: true })}
+                      className="w-full text-left px-2.5 py-2 rounded-[8px] text-[12px] text-ink hover:bg-hover transition-colors"
+                    >
+                      <span className="font-medium">Visible columns only</span>
+                      <span className="block text-[10.5px] text-ink-muted">Match the columns shown here</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           {onCreateCampaign && (
             <button
               onClick={() => onCreateCampaign(filtered.map((l) => l.id))}
@@ -892,6 +978,15 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, i
             Clear
           </button>
           <div className="w-px h-5 bg-border-subtle mx-1" />
+          {canExport && (
+            <button
+              onClick={() => runExport(selectedLeadIds)}
+              disabled={exporting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-section text-ink-secondary border border-border-subtle text-[11px] font-medium hover:bg-hover transition-colors disabled:opacity-50"
+            >
+              {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Export
+            </button>
+          )}
           {onAddToCampaign && (
             <button
               onClick={() => onAddToCampaign(selectedLeadIds)}
@@ -936,6 +1031,8 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, i
           }}
           onRemove={onRemoveLeads ? () => onRemoveLeads(selectedLeadIds) : undefined}
           onDelete={onDeleteLeads ? () => onDeleteLeads(selectedLeadIds) : undefined}
+          onExport={canExport ? () => runExport(selectedLeadIds) : undefined}
+          exporting={exporting}
         />
       )}
 
@@ -952,6 +1049,15 @@ export function FunnelLeadTable({ leads, funnelId, steps = [], initialFilters, i
             Clear
           </button>
           <div className="w-px h-5 bg-border-subtle mx-1" />
+          {canExport && (
+            <button
+              onClick={() => runExport(selectedLeadIds)}
+              disabled={exporting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[20px] bg-section border border-border-subtle text-[11px] font-medium text-ink-secondary hover:bg-hover transition-colors disabled:opacity-50"
+            >
+              {exporting ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />} Export
+            </button>
+          )}
           {onRemoveLeads && (
             <button
               onClick={() => onRemoveLeads(selectedLeadIds)}

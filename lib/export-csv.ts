@@ -20,7 +20,10 @@ export function generateCSV(rows: any[], columns: CSVColumn[]): string {
 }
 
 export function downloadCSV(csvContent: string, filename: string) {
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  // Prepend a UTF-8 BOM so Excel reads accents/emoji correctly — idempotent, so
+  // server-generated CSV that already carries a BOM isn't double-prefixed.
+  const withBom = csvContent.charCodeAt(0) === 0xfeff ? csvContent : "﻿" + csvContent;
+  const blob = new Blob([withBom], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;

@@ -321,6 +321,7 @@ export default function FunnelDetailPage() {
             leads={sortedLeads}
             steps={funnel.steps}
             funnelId={funnel.id}
+            funnelName={funnel.name}
             initialFilters={funnel.config?.leadFilters as FilterGroup | undefined}
             initialColumns={funnel.config?.columnPrefs}
             sortBy={sortBy}
