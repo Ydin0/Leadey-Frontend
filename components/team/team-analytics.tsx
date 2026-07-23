@@ -6,7 +6,7 @@ import { MetricCard, Panel, ChannelLegend, Avatar, DeltaPill } from "./team-shar
 import { TrendChart, Donut, Ring, Meter, attColor } from "./charts";
 import {
   CH_IDS, CH_MAP, teamTotals, bucketed, attainment, sparkForMetric, fmtTalkTime,
-  connectRate, connectRateSparkFor, departmentColor, sitRate,
+  connectRate, connectRateSparkFor, departmentColor, sitRate, avgCallsPerBooking,
   type DayRange, type Member, type TeamTotals,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
@@ -26,6 +26,16 @@ function cardView(def: MetricCardDef, tot: TeamTotals, members: Member[], range:
       value: cur == null ? "—" : `${Math.round(cur * 100)}%`,
       delta: cur != null && prev != null && prev > 0 ? (cur - prev) / prev : 0,
       spark: sparkForMetric(members, range, "meetingsAttended"),
+    };
+  }
+  if (def.kind === "ratio") {
+    // Currently only "avg calls / booking".
+    const cur = avgCallsPerBooking(tot.cur), prev = avgCallsPerBooking(tot.prev);
+    return {
+      value: cur == null ? "—" : cur.toFixed(1),
+      // Fewer calls per booking is better, so invert the delta sign for tone.
+      delta: cur != null && prev != null && prev > 0 ? (prev - cur) / prev : 0,
+      spark: sparkForMetric(members, range, "meetingsBooked"),
     };
   }
   const key = def.metricKey!;

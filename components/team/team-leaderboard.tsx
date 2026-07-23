@@ -1,18 +1,34 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { Avatar } from "./team-shared";
-import { Sparkline, Meter, attColor } from "./charts";
-import { DeltaPill } from "./team-shared";
+import { attColor } from "./charts";
+import { Icon } from "./icon";
+import { usePermissions } from "@/lib/hooks/use-permissions";
 import {
-  CH_IDS, attainment, prevRange, sliceRange, sumSlice, bucketed, fmtTalkTime, connectRate, sitRate,
+  attainment, prevRange, sliceRange, sumSlice, bucketed, fmtTalkTime, connectRate, sitRate,
   type ChannelId, type DayRange,
 } from "@/lib/team/team-data";
 import { useTeamData } from "@/lib/team/team-data-context";
+import { resolveLbColumns, type LbColumnPrefs } from "@/lib/team/leaderboard-columns";
+import { LeaderboardColumnsDrawer } from "./leaderboard-columns-drawer";
 
 export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
   range: DayRange; podium: boolean; rankBy: string; onPickRep: (id: string) => void;
 }) {
-  const { filteredMembers: members } = useTeamData();
+  const { filteredMembers: members, leaderboardColumns, saveLeaderboardColumns } = useTeamData();
+  const { has } = usePermissions();
+  const canManage = has("settings.manageTeam");
+
+  // Column layout: a local draft (live-editable in the drawer) synced from the
+  // org-wide saved layout; Save persists it for everyone.
+  const [draft, setDraft] = useState<LbColumnPrefs | null>(leaderboardColumns);
+  const [colsOpen, setColsOpen] = useState(false);
+  const [savedFlag, setSavedFlag] = useState(false);
+  useEffect(() => { setDraft(leaderboardColumns); }, [leaderboardColumns]);
+
+  const resolved = resolveLbColumns(draft);
+  const visibleCols = resolved.filter((r) => r.visible).map((r) => r.col);
 
   const pr = prevRange(range);
   const rows = members.map((m) => {
@@ -23,33 +39,35 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
     return { m, a, spark: bucketed(m, range).totals, trend };
   });
 
-  // Sit rate ranks nulls (no dispositioned meetings) last.
   const srSort = (g: typeof rows[number]["a"]["got"]) => sitRate(g) ?? -1;
-
   rows.sort((x, y) => {
     if (rankBy === "attainment") return y.a.overall - x.a.overall;
     if (rankBy === "volume") return y.a.got.total - x.a.got.total;
     if (rankBy === "talkTime") return y.a.got.talkTime - x.a.got.talkTime;
     if (rankBy === "meetings") return y.a.got.meetings - x.a.got.meetings;
     if (rankBy === "meetingsBooked") return y.a.got.meetingsBooked - x.a.got.meetingsBooked;
+    if (rankBy === "meetingsNoShow") return y.a.got.meetingsNoShow - x.a.got.meetingsNoShow;
     if (rankBy === "sitRate") return srSort(y.a.got) - srSort(x.a.got);
+    if (rankBy === "avgCallsPerBooking") {
+      // Fewer calls per booking ranks higher; no bookings sinks to the bottom.
+      const av = (g: typeof rows[number]["a"]["got"]) => (g.meetingsBooked > 0 ? g.calls / g.meetingsBooked : Infinity);
+      return av(x.a.got) - av(y.a.got);
+    }
     if (rankBy === "connectRate") return connectRate(y.a.got) - connectRate(x.a.got);
     if (rankBy === "voicemail") return y.a.got.voicemailCalls - x.a.got.voicemailCalls;
     return y.a.got[rankBy as ChannelId] - x.a.got[rankBy as ChannelId];
   });
 
-  const fmtSit = (g: typeof rows[number]["a"]["got"]) => {
-    const sr = sitRate(g);
-    return sr == null ? "—" : Math.round(sr * 100) + "%";
-  };
-
+  const fmtSit = (g: typeof rows[number]["a"]["got"]) => { const sr = sitRate(g); return sr == null ? "—" : Math.round(sr * 100) + "%"; };
   const metricVal = (r: typeof rows[number]) => {
     if (rankBy === "attainment") return Math.round(r.a.overall * 100) + "%";
     if (rankBy === "volume") return r.a.got.total.toLocaleString();
     if (rankBy === "talkTime") return fmtTalkTime(r.a.got.talkTime);
     if (rankBy === "meetings") return r.a.got.meetings.toLocaleString();
     if (rankBy === "meetingsBooked") return r.a.got.meetingsBooked.toLocaleString();
+    if (rankBy === "meetingsNoShow") return r.a.got.meetingsNoShow.toLocaleString();
     if (rankBy === "sitRate") return fmtSit(r.a.got);
+    if (rankBy === "avgCallsPerBooking") return r.a.got.meetingsBooked > 0 ? (r.a.got.calls / r.a.got.meetingsBooked).toFixed(1) : "—";
     if (rankBy === "connectRate") return Math.round(connectRate(r.a.got) * 100) + "%";
     if (rankBy === "voicemail") return r.a.got.voicemailCalls.toLocaleString();
     return r.a.got[rankBy as ChannelId].toLocaleString();
@@ -59,7 +77,14 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
 
   return (
     <div className="fade" style={{ display: "grid", gap: 16 }}>
-      {/* Rank-by + rep/department filtering now live in the page header. */}
+      {canManage && (
+        <div className="row" style={{ justifyContent: "flex-end" }}>
+          <button className="seg-btn row" style={{ gap: 6, fontSize: 11 }} onClick={() => { setSavedFlag(false); setColsOpen(true); }}>
+            <Icon name="sliders-horizontal" size={12} /> Columns
+          </button>
+        </div>
+      )}
+
       {podium && rows.length >= 3 && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, alignItems: "end" }}>
           {[1, 0, 2].map((idx) => {
@@ -87,19 +112,9 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
             <tr>
               <th style={{ width: 50, textAlign: "center" }}>#</th>
               <th>Rep</th>
-              <th style={{ textAlign: "right" }}>Calls</th>
-              <th style={{ textAlign: "right" }}>Emails</th>
-              <th style={{ textAlign: "right" }}>SMS</th>
-              <th style={{ textAlign: "right" }}>LinkedIn</th>
-              <th style={{ textAlign: "right" }}>Total</th>
-              <th style={{ textAlign: "right" }}>Connect</th>
-              <th style={{ textAlign: "right" }}>VM</th>
-              <th style={{ textAlign: "right" }}>Opps</th>
-              <th style={{ textAlign: "right" }}>Booked</th>
-              <th style={{ textAlign: "right" }}>Sit rate</th>
-              <th style={{ textAlign: "right" }}>Talk time</th>
-              <th style={{ width: 150 }}>Attainment</th>
-              <th style={{ width: 96 }}>Trend</th>
+              {visibleCols.map((col) => (
+                <th key={col.key} style={{ textAlign: col.key === "attainment" || col.key === "trend" ? "left" : "right", ...(col.key === "attainment" ? { width: 150 } : col.key === "trend" ? { width: 96 } : {}) }}>{col.label}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -122,45 +137,32 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
                     </div>
                   </div>
                 </td>
-                {CH_IDS.map((ch) => (
-                  <td key={ch} style={{ textAlign: "right", color: rankBy === ch ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === ch ? 600 : 400 }}>{r.a.got[ch].toLocaleString()}</td>
+                {visibleCols.map((col) => (
+                  <td key={col.key} style={{ textAlign: col.key === "attainment" || col.key === "trend" ? "left" : "right" }}>
+                    {col.cell(r, col.rankKey === rankBy)}
+                  </td>
                 ))}
-                <td style={{ textAlign: "right", fontWeight: 600 }}>{r.a.got.total.toLocaleString()}</td>
-                <td style={{ textAlign: "right", color: rankBy === "connectRate" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "connectRate" ? 600 : 400 }}>{Math.round(connectRate(r.a.got) * 100)}%</td>
-                <td style={{ textAlign: "right", color: rankBy === "voicemail" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "voicemail" ? 600 : 400 }}>{r.a.got.voicemailCalls.toLocaleString()}</td>
-                <td style={{ textAlign: "right", color: rankBy === "meetings" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "meetings" ? 600 : 400 }}>{r.a.got.meetings.toLocaleString()}</td>
-                <td style={{ textAlign: "right", color: rankBy === "meetingsBooked" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "meetingsBooked" ? 600 : 400 }}>{r.a.got.meetingsBooked.toLocaleString()}</td>
-                <td style={{ textAlign: "right", fontWeight: rankBy === "sitRate" ? 600 : 400 }}>
-                  {(() => {
-                    const sr = sitRate(r.a.got);
-                    const n = r.a.got.meetingsAttended + r.a.got.meetingsNoShow;
-                    if (sr == null) return <span style={{ color: "var(--fg-faint)" }}>—</span>;
-                    return (
-                      <span style={{ color: attColor(sr) }}>
-                        {Math.round(sr * 100)}%
-                        <span style={{ color: "var(--fg-faint)", fontWeight: 400, fontSize: 10, marginLeft: 4 }}>({n})</span>
-                      </span>
-                    );
-                  })()}
-                </td>
-                <td style={{ textAlign: "right", color: rankBy === "talkTime" ? "var(--fg1)" : "var(--fg2)", fontWeight: rankBy === "talkTime" ? 600 : 400 }}>{fmtTalkTime(r.a.got.talkTime)}</td>
-                <td>
-                  <div className="row" style={{ gap: 9 }}>
-                    <div className="grow"><Meter pct={r.a.overall} /></div>
-                    <span style={{ width: 36, textAlign: "right", fontSize: 11.5, fontWeight: 600, color: attColor(r.a.overall) }}>{Math.round(r.a.overall * 100)}%</span>
-                  </div>
-                </td>
-                <td>
-                  <div className="row" style={{ gap: 7 }}>
-                    <Sparkline data={r.spark} color={r.trend >= 0 ? "var(--signal-green-text)" : "var(--signal-red-text)"} width={48} height={20} />
-                    <DeltaPill d={r.trend} />
-                  </div>
-                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      <LeaderboardColumnsDrawer
+        open={colsOpen}
+        onClose={() => setColsOpen(false)}
+        resolved={resolved}
+        onChange={(order, hidden) => { setDraft({ order, hidden }); setSavedFlag(false); }}
+        onReset={() => { setDraft(null); setSavedFlag(false); }}
+        canSave={canManage}
+        saved={savedFlag}
+        onSave={async () => {
+          const order = resolved.map((r) => r.col.key);
+          const hidden = resolved.filter((r) => !r.visible).map((r) => r.col.key);
+          await saveLeaderboardColumns({ order, hidden });
+          setSavedFlag(true);
+        }}
+      />
     </div>
   );
 }

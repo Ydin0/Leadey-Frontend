@@ -1,6 +1,6 @@
 import type { MetricKey } from "./team-data";
 
-export type MetricKind = "count" | "duration" | "percent" | "sitrate";
+export type MetricKind = "count" | "duration" | "percent" | "sitrate" | "ratio";
 
 /** One selectable stat card on the Team analytics page. `count` cards show a
  *  raw number, `duration` cards format seconds via fmtTalkTime, `percent` cards
@@ -52,6 +52,8 @@ export const METRIC_CATALOG: MetricCardDef[] = [
   // Outcomes
   { id: "meetingsBooked", label: "Meetings booked", icon: "calendar-check", color: OPP_COLOR, group: "Outcomes", kind: "count", metricKey: "meetingsBooked" },
   { id: "sitRate", label: "Sit rate", icon: "user-check", color: CONNECT_COLOR, group: "Outcomes", kind: "sitrate" },
+  { id: "meetingsNoShow", label: "Meetings not attended", icon: "user-x", color: VM_COLOR, group: "Outcomes", kind: "count", metricKey: "meetingsNoShow" },
+  { id: "avgCallsPerBooking", label: "Avg calls / booking", icon: "phone-call", color: CALL_COLOR, group: "Outcomes", kind: "ratio" },
   { id: "meetings", label: "Opportunities", icon: "briefcase", color: OPP_COLOR, group: "Outcomes", kind: "count", metricKey: "meetings" },
   { id: "replies", label: "Replies", icon: "message-square", color: VM_COLOR, group: "Outcomes", kind: "count", metricKey: "replies" },
 ];

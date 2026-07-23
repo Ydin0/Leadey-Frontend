@@ -18,6 +18,7 @@ import { WIN_MAP, windowRange, fmtRange, DAYS, CH_IDS, CH_MAP, type WindowId, ty
 const RANK_OPTS: [string, string][] = [
   ["attainment", "Attainment %"], ["volume", "Total volume"], ["connectRate", "Connect rate"],
   ["meetingsBooked", "Meetings booked"], ["sitRate", "Sit rate"],
+  ["meetingsNoShow", "Meetings not attended"], ["avgCallsPerBooking", "Avg calls / booking"],
   ["meetings", "Opportunities"], ["talkTime", "Talk time"], ["voicemail", "Voicemails"],
   ...CH_IDS.map((c) => [c, CH_MAP[c].label] as [string, string]),
 ];

@@ -6,7 +6,8 @@ import {
   getTeamMembers, getPendingInvitations, inviteTeamMember,
   getTeamKpiConfig, saveTeamKpiConfig, getTeamAnalytics, getDepartments,
   getAnalyticsCards, saveAnalyticsCards,
-  type TeamKpiConfig, type TeamAnalyticsDay, type Department,
+  getLeaderboardColumns, saveLeaderboardColumns as apiSaveLeaderboardColumns,
+  type TeamKpiConfig, type TeamAnalyticsDay, type Department, type LeaderboardColumnPrefs,
 } from "@/lib/api/team";
 import {
   ROLE_TARGETS, hydrateSeries, emptySeries, DEFAULT_DEPARTMENTS,
@@ -36,6 +37,10 @@ interface TeamDataValue {
   cardIds: string[];
   /** Persist a new org-wide card layout (managers/admins). */
   saveCards: (ids: string[]) => Promise<void>;
+  /** Org-wide leaderboard column layout (order + hidden); null = defaults. */
+  leaderboardColumns: LeaderboardColumnPrefs | null;
+  /** Persist the org-wide leaderboard columns (managers/admins). */
+  saveLeaderboardColumns: (prefs: LeaderboardColumnPrefs) => Promise<void>;
   refresh: () => Promise<void>;
   addMember: (data: { name: string; email: string; role: string; pod: string; targets: Targets }) => Promise<{ ok: boolean; error?: string }>;
   updateTargets: (emailKey: string, targets: Targets) => Promise<void>;
@@ -67,21 +72,24 @@ export function TeamDataProvider({ children }: { children: React.ReactNode }) {
   const [seatUsage, setSeatUsage] = useState({ used: 0, included: 1 });
   const [departments, setDepartments] = useState<Department[]>(DEFAULT_DEPARTMENTS);
   const [cardIds, setCardIds] = useState<string[]>(DEFAULT_CARD_IDS);
+  const [leaderboardColumns, setLeaderboardColumns] = useState<LeaderboardColumnPrefs | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
     try {
-      const [team, invites, cfg, analytics, depts, cards] = await Promise.all([
+      const [team, invites, cfg, analytics, depts, cards, lbCols] = await Promise.all([
         getTeamMembers(),
         getPendingInvitations().catch(() => []),
         getTeamKpiConfig().catch(() => ({} as TeamKpiConfig)),
         getTeamAnalytics().catch(() => ({ members: [] as { id: string; series: TeamAnalyticsDay[] }[] })),
         getDepartments().catch(() => DEFAULT_DEPARTMENTS),
         getAnalyticsCards().catch(() => [] as string[]),
+        getLeaderboardColumns().catch(() => null),
       ]);
       setDepartments(depts.length ? depts : DEFAULT_DEPARTMENTS);
       const clean = sanitizeCardIds(cards);
       setCardIds(clean.length ? clean : DEFAULT_CARD_IDS);
+      setLeaderboardColumns(lbCols);
       const byEmail = (e: string) => cfg[(e || "").toLowerCase()];
       // Real activity series keyed by member id.
       const seriesById = new Map(analytics.members.map((a) => [a.id, hydrateSeries(a.series)]));
@@ -155,6 +163,11 @@ export function TeamDataProvider({ children }: { children: React.ReactNode }) {
     await saveAnalyticsCards(clean).catch(() => {});
   }, []);
 
+  const saveLeaderboardColumns = useCallback(async (prefs: LeaderboardColumnPrefs) => {
+    setLeaderboardColumns(prefs); // optimistic
+    await apiSaveLeaderboardColumns(prefs).catch(() => {});
+  }, []);
+
   const [filter, setFilter] = useState<TeamFilter>({ repIds: [], departments: [] });
 
   const activeMembers = members.filter((m) => m.status !== "pending");
@@ -164,7 +177,7 @@ export function TeamDataProvider({ children }: { children: React.ReactNode }) {
     : activeMembers;
 
   return (
-    <Ctx.Provider value={{ members, activeMembers, filteredMembers, filter, setFilter, seatUsage, departments, loading, cardIds, saveCards, refresh, addMember, updateTargets }}>
+    <Ctx.Provider value={{ members, activeMembers, filteredMembers, filter, setFilter, seatUsage, departments, loading, cardIds, saveCards, leaderboardColumns, saveLeaderboardColumns, refresh, addMember, updateTargets }}>
       {children}
     </Ctx.Provider>
   );

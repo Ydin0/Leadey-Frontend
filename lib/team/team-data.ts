@@ -128,6 +128,11 @@ export function sitRate(t: Pick<Totals, "meetingsAttended" | "meetingsNoShow">):
   return denom > 0 ? t.meetingsAttended / denom : null;
 }
 
+/** Average number of calls made per meeting booked. null when no bookings yet. */
+export function avgCallsPerBooking(t: Pick<Totals, "calls" | "meetingsBooked">): number | null {
+  return t.meetingsBooked > 0 ? t.calls / t.meetingsBooked : null;
+}
+
 export const CHANNELS: Channel[] = [
   { id: "calls", label: "Calls", short: "Calls", icon: "phone", color: "#86EFAC", verb: "dials" },
   { id: "emails", label: "Emails", short: "Email", icon: "mail", color: "#C8CFE6", verb: "emails" },

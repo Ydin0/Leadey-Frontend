@@ -94,6 +94,20 @@ export async function saveAnalyticsCards(cards: string[]): Promise<string[]> {
   return res.cards;
 }
 
+/** Org-wide leaderboard column layout ({ order, hidden }); null = client default. */
+export interface LeaderboardColumnPrefs { order: string[]; hidden: string[] }
+export async function getLeaderboardColumns(): Promise<LeaderboardColumnPrefs | null> {
+  const res = await apiRequest<{ prefs: LeaderboardColumnPrefs | null }>("/team/leaderboard-columns");
+  return res.prefs;
+}
+export async function saveLeaderboardColumns(prefs: LeaderboardColumnPrefs): Promise<LeaderboardColumnPrefs> {
+  const res = await apiRequest<{ prefs: LeaderboardColumnPrefs }>("/team/leaderboard-columns", {
+    method: "PUT",
+    body: JSON.stringify(prefs),
+  });
+  return res.prefs;
+}
+
 export async function inviteTeamMember(
   email: string,
   role: string,
