@@ -347,14 +347,17 @@ function EmailStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Re
   async function applyTemplate(id: string) {
     setTplId(id);
     const t = templates.find((x) => x.id === id);
-    if (!t) return;
-    set({ subject: t.subject || "", body: t.body || "" });
-    try {
-      const atts = await listTemplateAttachments(t.id);
-      setAttached(atts.map((a) => ({ id: a.id, name: a.fileName })));
-    } catch {
-      setAttached([]);
-    }
+    if (!t) { set({ subject: "", body: "", attachments: [], attachmentIds: [] }); return; }
+    // Resolve attachments FIRST, then write subject/body/attachments in a SINGLE
+    // patch — a split (sync body + async attachments) races the graph update and
+    // the second write can wipe the first.
+    let atts: { id: string; name: string }[] = [];
+    try { atts = (await listTemplateAttachments(t.id)).map((a) => ({ id: a.id, name: a.fileName })); }
+    catch { atts = []; }
+    set({
+      subject: t.subject || "", body: t.body || "",
+      attachments: atts, attachmentIds: atts.map((a) => a.id),
+    });
   }
 
   async function handleFiles(files: FileList | null) {

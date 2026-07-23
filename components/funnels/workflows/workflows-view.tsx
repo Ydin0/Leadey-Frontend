@@ -113,7 +113,12 @@ export function WorkflowsView({ funnelId, initialId }: { funnelId: string | null
   }
 
   function onNodeData(id: string, patch: Record<string, unknown>) {
-    onGraphChange({ ...graph, nodes: graph.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)) });
+    // Functional update — merge off the LATEST graph, not the render-closure
+    // snapshot. Two rapid patches (e.g. applying a template sets subject/body,
+    // then an async attachments fetch patches again) would otherwise both build
+    // off a stale graph and the second would clobber the first's fields.
+    setGraph((prev) => ({ ...prev, nodes: prev.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)) }));
+    setDirty(true);
   }
   function onDeleteNode(id: string) {
     onGraphChange({ nodes: graph.nodes.filter((n) => n.id !== id), edges: graph.edges.filter((e) => e.from !== id && e.to !== id) });
