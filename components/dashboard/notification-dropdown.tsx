@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell, Inbox, MessageSquare, Mail, MailOpen, PhoneMissed, CalendarCheck,
-  Loader2, type LucideIcon,
+  Linkedin, Loader2, type LucideIcon,
 } from "lucide-react";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
@@ -27,6 +27,8 @@ function iconFor(type: string): { Icon: LucideIcon; tint: string } {
       return { Icon: PhoneMissed, tint: "bg-signal-red/15 text-signal-red-text" };
     case "meeting":
       return { Icon: CalendarCheck, tint: "bg-signal-violet/15 text-signal-violet-text" };
+    case "linkedin_reply":
+      return { Icon: Linkedin, tint: "bg-signal-blue/15 text-signal-blue-text" };
     case "sms_reply":
     default:
       return { Icon: MessageSquare, tint: "bg-signal-green/15 text-signal-green-text" };

@@ -97,6 +97,7 @@ function NodePanel({ node, onNodeData, onDeleteNode, onDeselect, orgLevel }: Ins
         <NativeSelect className={inp} value={v("event")} onChange={(e) => set({ event: e.target.value })}>
           <option value="email_opened">Email is opened</option><option value="link_clicked">Link is clicked</option>
           <option value="replied">Lead replies</option><option value="meeting_booked">Meeting is booked</option>
+          <option value="connection_accepted">LinkedIn connection accepted</option>
         </NativeSelect>
         <label className={lab}>Timeout after</label>
         <div className="flex gap-2">
@@ -204,7 +205,7 @@ function SettingsPanel({ workflow, onRename, onStatus, onSettings }: InspectorPr
       <div className={lab}>Exit conditions</div>
       <label className="flex items-center gap-2.5 text-[12.5px] text-ink-secondary cursor-pointer mt-2">
         <input type="checkbox" checked={s.exitOnReply !== false} onChange={(e) => onSettings({ exitOnReply: e.target.checked })} style={{ accentColor: "var(--color-accent)" }} />
-        Exit when the lead replies
+        Exit when the lead replies (email, SMS or LinkedIn)
       </label>
       <label className="flex items-center gap-2.5 text-[12.5px] text-ink-secondary cursor-pointer mt-2">
         <input type="checkbox" checked={s.exitOnMeeting !== false} onChange={(e) => onSettings({ exitOnMeeting: e.target.checked })} style={{ accentColor: "var(--color-accent)" }} />
@@ -693,11 +694,13 @@ function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set:
           <option value="Opportunity lost">An opportunity is lost</option>
           <option value="Matches a smart view">A lead matches a smart view</option>
           <option value="Date reaches">A date field is reached</option>
+          <option value="Connection accepted">A LinkedIn connection is accepted</option>
         </>) : (<>
           <option value="Lead enters campaign">Lead enters this campaign</option>
           <option value="Status changes">Lead status changes</option>
           <option value="Tag added">A tag is added</option>
           <option value="Reply received">A reply is received</option>
+          <option value="Connection accepted">A LinkedIn connection is accepted</option>
           <option value="Meeting booked">A meeting is booked</option>
           <option value="Manually added">Manually added by a rep</option>
         </>)}
@@ -804,7 +807,10 @@ function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set:
       </>)}
 
       {label === "Reply received" && (
-        <p className="text-[11px] text-ink-faint mt-2">Enrolls when the lead replies by email or SMS.</p>
+        <p className="text-[11px] text-ink-faint mt-2">Enrolls when the lead replies by email, SMS or LinkedIn.</p>
+      )}
+      {label === "Connection accepted" && (
+        <p className="text-[11px] text-ink-faint mt-2">Enrolls when a LinkedIn connection request you sent this lead is accepted (checked every ~15 min). Great for auto-sending a first message once you&apos;re connected.</p>
       )}
       {label === "Meeting booked" && (
         <p className="text-[11px] text-ink-faint mt-2">Enrolls when a meeting is booked for the lead — via a Leadey booking page, the &ldquo;Book meeting&rdquo; scheduler, a connected Google/Outlook calendar, or Calendly.</p>

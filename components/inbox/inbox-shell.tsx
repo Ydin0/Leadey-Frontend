@@ -4,12 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@clerk/nextjs";
 import {
-  Inbox as InboxIcon, Mail, Phone, MessageSquare, ListChecks, Bell, UserPlus,
+  Inbox as InboxIcon, Mail, Phone, MessageSquare, ListChecks, Bell, UserPlus, Linkedin,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TasksInbox } from "./tabs/tasks-inbox";
 import { CallsInbox } from "./tabs/calls-inbox";
 import { MessagesInbox } from "./tabs/messages-inbox";
+import { LinkedInInbox } from "./tabs/linkedin-inbox";
 import { PrimaryFeed } from "./tabs/primary-feed";
 import { EmailInbox } from "./email/email-inbox";
 import { PotentialContactsInbox } from "./tabs/potential-contacts-inbox";
@@ -20,7 +21,7 @@ import type { PhoneLine } from "@/lib/types/calling";
 
 const LINE_FILTER_KEY = "leadey:inbox-line-filter";
 
-type TabKey = "primary" | "emails" | "calls" | "messages" | "tasks" | "reminders" | "potential";
+type TabKey = "primary" | "emails" | "calls" | "messages" | "linkedin" | "tasks" | "reminders" | "potential";
 
 // Every tab here is backed by LIVE org data (no mock/hardcoded content).
 const TABS: { key: TabKey; label: string; icon: typeof Mail; count?: keyof InboxCounts }[] = [
@@ -28,6 +29,7 @@ const TABS: { key: TabKey; label: string; icon: typeof Mail; count?: keyof Inbox
   { key: "emails", label: "Emails", icon: Mail, count: "emails" },
   { key: "calls", label: "Missed Calls", icon: Phone, count: "calls" },
   { key: "messages", label: "Messages", icon: MessageSquare, count: "messages" },
+  { key: "linkedin", label: "LinkedIn", icon: Linkedin, count: "linkedin" },
   { key: "tasks", label: "Tasks", icon: ListChecks, count: "tasks" },
   { key: "reminders", label: "Reminders", icon: Bell, count: "reminders" },
   { key: "potential", label: "Potential Contacts", icon: UserPlus, count: "potential" },
@@ -155,6 +157,8 @@ export function InboxShell() {
         <CallsInbox lineIds={lineFilter} lines={lines} currentUserId={userId ?? null} />
       ) : tab === "messages" ? (
         <MessagesInbox lineIds={lineFilter} currentUserId={userId ?? null} />
+      ) : tab === "linkedin" ? (
+        <LinkedInInbox />
       ) : tab === "tasks" ? (
         <TasksInbox />
       ) : tab === "reminders" ? (
