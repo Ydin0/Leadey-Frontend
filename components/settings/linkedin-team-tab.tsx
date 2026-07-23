@@ -42,6 +42,7 @@ export function LinkedInTeamTab() {
   const [accounts, setAccounts] = useState<LinkedInAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -68,10 +69,13 @@ export function LinkedInTeamTab() {
 
   async function handleConnect() {
     setConnecting(true);
+    setConnectError(null);
     try {
       const { url } = await connectLinkedIn();
+      if (!url) throw new Error("no url");
       window.location.href = url;
     } catch {
+      setConnectError("Couldn't start LinkedIn connection — the integration is temporarily unavailable. Please try again shortly or contact support.");
       setConnecting(false);
     }
   }
@@ -110,14 +114,17 @@ export function LinkedInTeamTab() {
             messages run from workflow steps. Login and 2FA happen securely on Unipile; we never see your password.
           </p>
         </div>
-        <button
-          onClick={handleConnect}
-          disabled={connecting}
-          className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50 transition-colors"
-        >
-          {connecting ? <Loader2 size={13} className="animate-spin" /> : <Linkedin size={13} />}
-          Connect my LinkedIn
-        </button>
+        <div className="shrink-0 flex flex-col items-end gap-1.5">
+          <button
+            onClick={handleConnect}
+            disabled={connecting}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-ink text-on-ink text-[11px] font-medium hover:bg-ink/90 disabled:opacity-50 transition-colors"
+          >
+            {connecting ? <Loader2 size={13} className="animate-spin" /> : <Linkedin size={13} />}
+            Connect my LinkedIn
+          </button>
+          {connectError && <p className="text-[10.5px] text-signal-red-text max-w-[240px] text-right">{connectError}</p>}
+        </div>
       </div>
 
       {/* Team table */}
