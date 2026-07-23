@@ -380,6 +380,7 @@ function EmailStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Re
       <NativeSelect className={inp} value={v("senderMode")} onChange={(e) => set({ senderMode: e.target.value })}>
         <option value="">A fixed mailbox (choose below)</option>
         <option value="actor">The user who triggered the workflow</option>
+        <option value="meeting_host">The host of the meeting</option>
       </NativeSelect>
       {v("senderMode") === "actor" && (
         <p className="text-[11px] text-ink-faint mt-1.5">
@@ -387,8 +388,14 @@ function EmailStepForm({ d, set }: { d: Record<string, unknown>; set: (patch: Re
           lead). If they have no connected mailbox, the fallback below is used.
         </p>
       )}
+      {v("senderMode") === "meeting_host" && (
+        <p className="text-[11px] text-ink-faint mt-1.5">
+          For meeting workflows (e.g. a reminder before a meeting): sends from the mailbox of the rep
+          who hosts that meeting. If there&apos;s no linked meeting or host mailbox, the fallback below is used.
+        </p>
+      )}
 
-      <label className={lab}>{v("senderMode") === "actor" ? "Fallback mailbox" : "From"}</label>
+      <label className={lab}>{v("senderMode") ? "Fallback mailbox" : "From"}</label>
       <NativeSelect className={inp} value={v("accountId")} onChange={(e) => {
         const id = e.target.value; const acc = accounts.find((a) => a.id === id);
         set({ accountId: id, from: acc?.email || "" });
