@@ -9,6 +9,8 @@ import { useTeamMembers } from "@/hooks/use-team-members";
 import { FilterPopover } from "@/components/scrapers/filters/filter-popover";
 import { RecordingsTable } from "@/components/recordings/recordings-table";
 import { getCallRecords } from "@/lib/api/phone-lines";
+import { useCallOutcomes } from "@/lib/hooks/use-call-outcomes";
+import { OUTCOME_COLOR_DOT } from "@/lib/api/call-outcomes";
 import type { CallRecord } from "@/lib/types/calling";
 
 const DIRECTION_OPTIONS = [
@@ -30,6 +32,7 @@ const FILTERS_STORAGE_KEY = "leadey:recordings:filters:v1";
 type RecordingsFilters = {
   direction: string | null;
   disposition: string | null;
+  outcome: string | null;
   hasRecording: string | null;
   memberId: string | null;
   search: string;
@@ -44,6 +47,7 @@ type RecordingsFilters = {
 const DEFAULT_FILTERS: RecordingsFilters = {
   direction: null,
   disposition: null,
+  outcome: null,
   hasRecording: null,
   memberId: null,
   search: "",
@@ -68,6 +72,7 @@ function loadFilters(): RecordingsFilters {
 export default function RecordingsPage() {
   const isAuthReady = useAuthReady();
   const { members } = useTeamMembers();
+  const { outcomes } = useCallOutcomes();
   const [records, setRecords] = useState<CallRecord[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
@@ -79,6 +84,7 @@ export default function RecordingsPage() {
   const [initial] = useState(loadFilters);
   const [direction, setDirection] = useState<string | null>(initial.direction);
   const [disposition, setDisposition] = useState<string | null>(initial.disposition);
+  const [outcome, setOutcome] = useState<string | null>(initial.outcome);
   const [hasRecording, setHasRecording] = useState<string | null>(initial.hasRecording);
   const [memberId, setMemberId] = useState<string | null>(initial.memberId);
   const [search, setSearch] = useState(initial.search);
@@ -92,14 +98,14 @@ export default function RecordingsPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const payload: RecordingsFilters = {
-      direction, disposition, hasRecording, memberId, search, dateRange, dateFrom, dateTo, durMode, durMinutes,
+      direction, disposition, outcome, hasRecording, memberId, search, dateRange, dateFrom, dateTo, durMode, durMinutes,
     };
     try {
       window.localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(payload));
     } catch {
       /* storage unavailable — ignore */
     }
-  }, [direction, disposition, hasRecording, memberId, search, dateRange, dateFrom, dateTo, durMode, durMinutes]);
+  }, [direction, disposition, outcome, hasRecording, memberId, search, dateRange, dateFrom, dateTo, durMode, durMinutes]);
 
   const fetchRecords = useCallback(async (p: number) => {
     // Date range → ISO start/end. Presets set only a startDate; "custom" sets an
@@ -131,6 +137,7 @@ export default function RecordingsPage() {
         limit: pageSize,
         direction: direction || undefined,
         disposition: disposition || undefined,
+        outcome: outcome || undefined,
         hasRecording: hasRecording || undefined,
         userId: memberId || undefined,
         search: search || undefined,
@@ -147,7 +154,7 @@ export default function RecordingsPage() {
     } finally {
       setLoading(false);
     }
-  }, [direction, disposition, hasRecording, memberId, search, dateRange, dateFrom, dateTo, durMode, durMinutes]);
+  }, [direction, disposition, outcome, hasRecording, memberId, search, dateRange, dateFrom, dateTo, durMode, durMinutes]);
 
   useEffect(() => {
     if (!isAuthReady) return;
@@ -167,11 +174,12 @@ export default function RecordingsPage() {
 
   useEffect(() => {
     handleFilterChange();
-  }, [direction, disposition, hasRecording, memberId, dateRange, durMode, durMinutes]);
+  }, [direction, disposition, outcome, hasRecording, memberId, dateRange, durMode, durMinutes]);
 
   const moreFiltersCount = (dateRange !== "all" ? 1 : 0) + (durMode !== "any" ? 1 : 0);
-  const hasFilters = !!direction || !!disposition || !!hasRecording || !!memberId || moreFiltersCount > 0;
+  const hasFilters = !!direction || !!disposition || !!outcome || !!hasRecording || !!memberId || moreFiltersCount > 0;
   const selectedMember = members.find((m) => m.id === memberId);
+  const selectedOutcome = outcome === "none" ? { key: "none", label: "No outcome" } : outcomes.find((o) => o.key === outcome);
 
   if (loading && records.length === 0) {
     return (
@@ -241,6 +249,40 @@ export default function RecordingsPage() {
                 )}
               >
                 {opt.label}
+              </button>
+            ))}
+          </div>
+        </FilterPopover>
+
+        {/* Outcome — the org's sales-outcome catalog + "No outcome" */}
+        <FilterPopover
+          label={selectedOutcome ? selectedOutcome.label : "Outcome"}
+          isActive={!!outcome}
+          activeCount={outcome ? 1 : 0}
+        >
+          <div className="flex flex-col gap-0.5 max-h-64 overflow-y-auto min-w-[190px]">
+            <button
+              type="button"
+              onClick={() => setOutcome(outcome === "none" ? null : "none")}
+              className={cn(
+                "px-2 py-1.5 rounded-[6px] text-[11px] font-medium transition-colors text-left",
+                outcome === "none" ? "bg-signal-blue/15 text-signal-blue-text" : "text-ink-secondary hover:bg-hover",
+              )}
+            >
+              No outcome set
+            </button>
+            {outcomes.map((o) => (
+              <button
+                key={o.key}
+                type="button"
+                onClick={() => setOutcome(outcome === o.key ? null : o.key)}
+                className={cn(
+                  "flex items-center gap-2 px-2 py-1.5 rounded-[6px] text-[11px] font-medium transition-colors text-left",
+                  outcome === o.key ? "bg-signal-blue/15 text-signal-blue-text" : "text-ink-secondary hover:bg-hover",
+                )}
+              >
+                <span className={cn("w-2 h-2 rounded-full shrink-0", OUTCOME_COLOR_DOT[o.color] || "bg-ink-faint")} />
+                <span className="truncate">{o.label}</span>
               </button>
             ))}
           </div>
@@ -384,7 +426,7 @@ export default function RecordingsPage() {
         {hasFilters && (
           <button
             type="button"
-            onClick={() => { setDirection(null); setDisposition(null); setHasRecording(null); setMemberId(null); setDateRange("all"); setDateFrom(null); setDateTo(null); setDurMode("any"); setDurMinutes("2"); setSearch(""); setPage(1); }}
+            onClick={() => { setDirection(null); setDisposition(null); setOutcome(null); setHasRecording(null); setMemberId(null); setDateRange("all"); setDateFrom(null); setDateTo(null); setDurMode("any"); setDurMinutes("2"); setSearch(""); setPage(1); }}
             className="text-[11px] font-medium text-ink-muted hover:text-ink-secondary transition-colors ml-1"
           >
             Clear all

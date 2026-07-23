@@ -87,6 +87,7 @@ export async function getCallRecords(params?: {
   direction?: string;
   userId?: string;
   disposition?: string;
+  outcome?: string;
   hasRecording?: string;
   search?: string;
   leadId?: string;
@@ -105,6 +106,7 @@ export async function getCallRecords(params?: {
   if (params?.direction) searchParams.set("direction", params.direction);
   if (params?.userId) searchParams.set("userId", params.userId);
   if (params?.disposition) searchParams.set("disposition", params.disposition);
+  if (params?.outcome) searchParams.set("outcome", params.outcome);
   if (params?.hasRecording) searchParams.set("hasRecording", params.hasRecording);
   if (params?.search) searchParams.set("search", params.search);
   if (params?.leadIds?.length) searchParams.set("leadIds", params.leadIds.join(","));
