@@ -677,6 +677,7 @@ function TriggerForm({ d, set, v, orgLevel }: { d: Record<string, unknown>; set:
       <label className={lab}>{orgLevel ? "Run this workflow when" : "Enroll leads when"}</label>
       <NativeSelect className={inp} value={label} onChange={(e) => set({ label: e.target.value })}>
         {orgLevel ? (<>
+          <option value="Status changes">A lead&apos;s status changes</option>
           <option value="Meeting upcoming">A meeting is coming up</option>
           <option value="Meeting booked">A meeting is booked</option>
           <option value="Opportunity created">An opportunity is created</option>
