@@ -51,6 +51,7 @@ export const METRIC_CATALOG: MetricCardDef[] = [
   { id: "linkedin", label: "LinkedIn actions", icon: "linkedin", color: LINKEDIN_COLOR, group: "LinkedIn", kind: "count", metricKey: "linkedin" },
   // Outcomes
   { id: "meetingsBooked", label: "Meetings booked", icon: "calendar-check", color: OPP_COLOR, group: "Outcomes", kind: "count", metricKey: "meetingsBooked" },
+  { id: "meetingsAttended", label: "Meetings sat", icon: "check-circle-2", color: OPP_COLOR, group: "Outcomes", kind: "count", metricKey: "meetingsAttended" },
   { id: "sitRate", label: "Sit rate", icon: "user-check", color: CONNECT_COLOR, group: "Outcomes", kind: "sitrate" },
   { id: "meetingsNoShow", label: "Meetings not attended", icon: "user-x", color: VM_COLOR, group: "Outcomes", kind: "count", metricKey: "meetingsNoShow" },
   { id: "avgCallsPerBooking", label: "Avg calls / booking", icon: "phone-call", color: CALL_COLOR, group: "Outcomes", kind: "ratio" },
@@ -64,7 +65,7 @@ export const CATALOG_BY_ID: Record<string, MetricCardDef> =
 /** Default card layout when the org hasn't customized — mirrors the previous
  *  fixed card row so nothing regresses. */
 export const DEFAULT_CARD_IDS = [
-  "calls", "emails", "sms", "meetingsBooked", "sitRate", "talkTime", "meetings", "connectRate",
+  "calls", "emails", "sms", "meetingsBooked", "meetingsAttended", "sitRate", "talkTime", "meetings", "connectRate",
 ];
 
 /** Keep only known ids, de-duplicated, preserving the given order. */

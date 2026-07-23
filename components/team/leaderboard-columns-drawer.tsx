@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { X, GripVertical, Eye, EyeOff, Plus, Search, RotateCcw, Check, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { LB_GROUP_ORDER, type LbColumn, type LbGroup } from "@/lib/team/leaderboard-columns";
@@ -34,6 +35,12 @@ export function LeaderboardColumnsDrawer({ open, onClose, resolved, onChange, on
   const [query, setQuery] = useState("");
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
+  // Render into <body> via a portal so `position: fixed` is anchored to the
+  // viewport — the leaderboard lives inside a `.fade` container whose animation
+  // establishes a transform containing-block, which otherwise left the closed
+  // drawer peeking in from the right edge.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const order = useMemo(() => resolved.map((r) => r.col.key), [resolved]);
   const hiddenSet = useMemo(() => new Set(resolved.filter((r) => !r.visible).map((r) => r.col.key)), [resolved]);
@@ -62,7 +69,9 @@ export function LeaderboardColumnsDrawer({ open, onClose, resolved, onChange, on
     onChange(reorderVisible(order, hiddenSet, fromKey, toKey), [...hiddenSet]);
   }
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <>
       <div
         className={cn(
@@ -179,6 +188,7 @@ export function LeaderboardColumnsDrawer({ open, onClose, resolved, onChange, on
           )}
         </div>
       </aside>
-    </>
+    </>,
+    document.body,
   );
 }

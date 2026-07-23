@@ -46,6 +46,7 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
     if (rankBy === "talkTime") return y.a.got.talkTime - x.a.got.talkTime;
     if (rankBy === "meetings") return y.a.got.meetings - x.a.got.meetings;
     if (rankBy === "meetingsBooked") return y.a.got.meetingsBooked - x.a.got.meetingsBooked;
+    if (rankBy === "meetingsAttended") return y.a.got.meetingsAttended - x.a.got.meetingsAttended;
     if (rankBy === "meetingsNoShow") return y.a.got.meetingsNoShow - x.a.got.meetingsNoShow;
     if (rankBy === "sitRate") return srSort(y.a.got) - srSort(x.a.got);
     if (rankBy === "avgCallsPerBooking") {
@@ -65,6 +66,7 @@ export function TeamLeaderboard({ range, podium, rankBy, onPickRep }: {
     if (rankBy === "talkTime") return fmtTalkTime(r.a.got.talkTime);
     if (rankBy === "meetings") return r.a.got.meetings.toLocaleString();
     if (rankBy === "meetingsBooked") return r.a.got.meetingsBooked.toLocaleString();
+    if (rankBy === "meetingsAttended") return r.a.got.meetingsAttended.toLocaleString();
     if (rankBy === "meetingsNoShow") return r.a.got.meetingsNoShow.toLocaleString();
     if (rankBy === "sitRate") return fmtSit(r.a.got);
     if (rankBy === "avgCallsPerBooking") return r.a.got.meetingsBooked > 0 ? (r.a.got.calls / r.a.got.meetingsBooked).toFixed(1) : "—";

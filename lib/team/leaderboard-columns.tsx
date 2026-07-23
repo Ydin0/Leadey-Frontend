@@ -40,6 +40,7 @@ export const LEADERBOARD_COLUMNS: LbColumn[] = [
   { key: "voicemail", label: "VM", group: "Activity", defaultVisible: true, rankKey: "voicemail", cell: (r, a) => metric(num(r.a.got.voicemailCalls), a) },
   { key: "meetings", label: "Opps", group: "Outcomes", defaultVisible: true, rankKey: "meetings", cell: (r, a) => metric(num(r.a.got.meetings), a) },
   { key: "meetingsBooked", label: "Booked", group: "Outcomes", defaultVisible: true, rankKey: "meetingsBooked", cell: (r, a) => metric(num(r.a.got.meetingsBooked), a) },
+  { key: "meetingsAttended", label: "Sat", group: "Outcomes", defaultVisible: true, rankKey: "meetingsAttended", cell: (r, a) => metric(num(r.a.got.meetingsAttended), a) },
   {
     key: "sitRate", label: "Sit rate", group: "Outcomes", defaultVisible: true, rankKey: "sitRate",
     cell: (r) => {
