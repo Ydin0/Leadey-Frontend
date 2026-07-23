@@ -280,6 +280,30 @@ export async function getFunnelById(
   return hydrateFunnel(data);
 }
 
+/** The focused lead's activity timeline — the lead + its company's contacts'
+ *  events, keyed by leadId. Lightweight: replaces reloading the whole funnel
+ *  just to get one lead's events. */
+export async function getLeadTimeline(
+  funnelId: string,
+  leadId: string,
+): Promise<Record<string, FunnelLeadEvent[]>> {
+  const data = await apiRequest<{ events: Record<string, unknown[]> }>(
+    `/funnels/${encodeURIComponent(funnelId)}/leads/${encodeURIComponent(leadId)}/timeline`,
+  );
+  const out: Record<string, FunnelLeadEvent[]> = {};
+  for (const [lid, evs] of Object.entries(data.events || {})) {
+    out[lid] = (Array.isArray(evs) ? evs : []).map((e: any) => ({
+      id: String(e.id ?? ""),
+      type: String(e.type ?? ""),
+      outcome: e.outcome ? String(e.outcome) : null,
+      stepIndex: Number(e.stepIndex) || 0,
+      meta: e.meta && typeof e.meta === "object" ? e.meta : null,
+      timestamp: new Date(e.timestamp),
+    }));
+  }
+  return out;
+}
+
 /** Per-lead call/email totals, DEFERRED out of the funnel payload (the
  *  backend computes them org-wide and caches for 60s). Keyed by leadId;
  *  leads with zero activity are omitted. */

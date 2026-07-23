@@ -38,6 +38,7 @@ export function useFunnel(
     queryKey: qk.funnel(id, opts),
     queryFn: () => getFunnelById(id, { lite: opts?.lite, fullLeadId: opts?.fullLeadId ?? undefined }),
     staleTime: STALE.FUNNEL,
+    refetchOnWindowFocus: false, // heavy payload — don't re-pull all leads on tab focus
     enabled: isAuthReady && !!id && (cfg?.enabled ?? true),
     placeholderData: (prev) => prev ?? getFunnelPlaceholder(qc, id),
   });

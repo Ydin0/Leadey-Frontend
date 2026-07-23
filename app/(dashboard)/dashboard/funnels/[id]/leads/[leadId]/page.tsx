@@ -8,6 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { LeadView } from "@/components/funnels/lead-view/lead-view";
 import { useFunnel } from "@/lib/queries/use-funnel";
+import { useLeadTimeline } from "@/lib/queries/use-lead-timeline";
 import { patchLead, invalidateFunnel } from "@/lib/queries/funnel-cache";
 import { sortLeads, DEFAULT_LEAD_SORT, type LeadSortKey } from "@/lib/utils/sort-leads";
 import type { FunnelLead } from "@/lib/types/funnel";
@@ -29,17 +30,18 @@ export default function LeadViewPage() {
     if (saved) setSortBy(saved as LeadSortKey);
   }, []);
 
-  // The funnel, focused on this lead. Served from the shared React Query
-  // cache: prev/next navigation changes only `fullLeadId` in the key, and the
-  // placeholder falls back to the previous variant (or the campaign page's
-  // lite load), so the switch paints instantly while the focused lead's full
-  // events load in the background.
+  // The campaign's leads — SHARED with the leads-list page's cache (same
+  // {lite:true} key), so opening a lead reuses the already-loaded funnel instead
+  // of refetching all ~11k leads. The focused lead's activity timeline loads
+  // separately (cheap, per-lead) and is overlaid below.
   const {
     data: funnel,
     isPending,
     error: funnelError,
     refetch,
-  } = useFunnel(funnelId, { lite: true, fullLeadId: leadId });
+  } = useFunnel(funnelId, { lite: true });
+
+  const { data: timeline } = useLeadTimeline(funnelId, leadId);
 
   // Frozen navigation order for the focus session. The order is fixed when the
   // funnel first loads (and rebuilt only when the sort key changes); editing a
@@ -67,6 +69,13 @@ export default function LeadViewPage() {
     }
     return o.ids.map((id) => byId.get(id)).filter(Boolean) as FunnelLead[];
   }, [funnel, sortBy]);
+
+  // Overlay the per-lead timeline events (the lite funnel carries no events) onto
+  // the focus lead + its company contacts, so LeadView's timeline lights up.
+  const leadsWithEvents = useMemo(() => {
+    if (!timeline) return sortedLeads;
+    return sortedLeads.map((l) => (timeline[l.id] ? { ...l, events: timeline[l.id] } : l));
+  }, [sortedLeads, timeline]);
 
   // Safety net: never spin forever waiting on auth. If it hasn't become ready
   // within a few seconds, surface a recoverable state instead of an endless
@@ -125,7 +134,7 @@ export default function LeadViewPage() {
   return (
     <LeadView
       funnel={funnel}
-      leads={sortedLeads}
+      leads={leadsWithEvents}
       leadId={leadId}
       onLeadPatch={(id, patch) => patchLead(qc, funnelId, id, patch)}
       onLeadsChanged={() => invalidateFunnel(qc, funnelId)}
