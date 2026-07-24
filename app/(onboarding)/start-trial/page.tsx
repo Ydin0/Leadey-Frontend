@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useOrganization } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
 import { Loader2, Check, Minus, Plus, ShieldCheck, CalendarClock, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -46,23 +47,37 @@ export default function StartTrialPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Suggested seat count = the people who'll actually use the workspace: the
+  // owner (accepted members) + anyone invited on the previous signup step
+  // (pending invitations). NOT the org's DB seatsIncluded default (5).
+  const { memberships, invitations } = useOrganization({
+    memberships: { pageSize: 1, keepPreviousData: true },
+    invitations: { pageSize: 1, status: ["pending"], keepPreviousData: true },
+  });
+
   // Already has a card / subscription → nothing to do here.
   useEffect(() => {
     if (billing && !billing.needsPaymentSetup) router.replace("/dashboard");
   }, [billing, router]);
 
-  // Seed seat counts from the org's assigned seats (invited team etc.).
+  // Seed each plan's seat count once, from the member + pending-invite counts.
+  const seededRef = useRef(false);
   useEffect(() => {
-    if (billing && billing.seatsIncluded > 1) {
-      setSeats((prev) => {
-        const next = { ...prev };
-        (Object.keys(next) as PlanKey[]).forEach((k) => {
-          next[k] = Math.max(billing.seatsIncluded, PLANS[k].minSeats);
-        });
-        return next;
+    if (seededRef.current) return;
+    const members = memberships?.count;
+    const invites = invitations?.count;
+    // Wait until Clerk has resolved both counts before seeding.
+    if (members == null || invites == null) return;
+    seededRef.current = true;
+    const desired = Math.max(1, members + invites);
+    setSeats((prev) => {
+      const next = { ...prev };
+      (Object.keys(next) as PlanKey[]).forEach((k) => {
+        next[k] = Math.max(desired, PLANS[k].minSeats);
       });
-    }
-  }, [billing]);
+      return next;
+    });
+  }, [memberships?.count, invitations?.count]);
 
   const trialEndLabel = useMemo(() => {
     const d = new Date(Date.now() + 30 * 86400000);
