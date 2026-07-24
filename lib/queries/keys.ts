@@ -8,6 +8,7 @@ export const qk = {
   /** Prefix key for invalidate/setQueriesData across all of a funnel's variants. */
   funnelAll: (id: string) => ["funnel", id] as const,
   activityCounts: (id: string) => ["activity-counts", id] as const,
+  funnelAnalytics: (id: string) => ["funnel-analytics", id] as const,
   /** A focused lead's activity timeline (the lead + its company's events). */
   leadTimeline: (funnelId: string, leadId: string) => ["lead-timeline", funnelId, leadId] as const,
   /** Load-all org-wide leads for the /dashboard/leads table. */

@@ -316,6 +316,44 @@ export async function getFunnelActivityCounts(
   return data.counts ?? {};
 }
 
+// ─── Real campaign analytics (channels + workflows) ─────────────────────
+export interface CampaignChannelMetric {
+  label: string;
+  value: number;
+  /** Percentage of the channel's baseline (e.g. opened as % of sent). */
+  rate?: number;
+}
+export interface CampaignChannelStats {
+  channel: FunnelChannel;
+  metrics: CampaignChannelMetric[];
+}
+export interface CampaignWorkflowItem {
+  id: string;
+  name: string;
+  status: string;
+  enrolled: number;
+  active: number;
+  completed: number;
+  exited: number;
+  failed: number;
+}
+export interface CampaignAnalytics {
+  channels: CampaignChannelStats[];
+  meetingsBooked: number;
+  workflows: {
+    total: number;
+    active: number;
+    totals: { enrolled: number; active: number; completed: number; exited: number; failed: number };
+    items: CampaignWorkflowItem[];
+  };
+}
+
+/** GET /funnels/:id/analytics — real channel + workflow analytics, computed
+ *  from actual lead_events + workflow enrollments (no fabricated rates). */
+export async function getFunnelAnalytics(funnelId: string): Promise<CampaignAnalytics> {
+  return apiRequest<CampaignAnalytics>(`/funnels/${encodeURIComponent(funnelId)}/analytics`);
+}
+
 export interface UpdateFunnelWebhookPayload {
   enabled?: boolean;
   rotateToken?: boolean;

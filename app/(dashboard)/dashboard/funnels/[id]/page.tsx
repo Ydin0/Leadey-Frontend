@@ -16,7 +16,6 @@ import dynamic from "next/dynamic";
 import { FunnelLeadTable } from "@/components/funnels/leads/funnel-lead-table";
 import type { FilterGroup } from "@/lib/types/lead-filter";
 import { LeadSortMenu } from "@/components/funnels/leads/lead-sort-menu";
-import { EmailPerformancePanel } from "@/components/funnels/email-performance-panel";
 import { AddLeadsButton, type AddLeadsSource } from "@/components/funnels/add-leads/add-leads-button";
 import { NewLeadModal } from "@/components/funnels/add-leads/new-lead-modal";
 
@@ -352,17 +351,11 @@ export default function FunnelDetailPage() {
       )}
 
       {activeTab === "analytics" && (
-        <div className="space-y-6">
-          <AnalyticsView
-            metrics={(fullFunnel ?? funnel).metrics}
-            analyticsSteps={(fullFunnel ?? funnel).analyticsSteps}
-            sources={(fullFunnel ?? funnel).sources}
-          />
-          <div>
-            <h3 className="text-[13px] font-semibold text-ink mb-3">Email performance</h3>
-            <EmailPerformancePanel funnelId={funnel.id} />
-          </div>
-        </div>
+        <AnalyticsView
+          funnelId={funnel.id}
+          metrics={(fullFunnel ?? funnel).metrics}
+          sources={(fullFunnel ?? funnel).sources}
+        />
       )}
 
       {activeTab === "workflows" && (
