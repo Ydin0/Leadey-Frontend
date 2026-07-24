@@ -5,7 +5,7 @@ import { X, Sparkles } from "lucide-react";
 import { useAuth } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
-import { getBillingInfo, createCheckoutSession } from "@/lib/api/billing";
+import { getBillingInfo, createPortalSession } from "@/lib/api/billing";
 import type { BillingInfo } from "@/lib/types/billing";
 
 export function TrialBanner() {
@@ -35,38 +35,26 @@ export function TrialBanner() {
   if (!billing) return null;
   if (dismissed) return null;
 
-  // Only show for trial users
-  if (billing.plan !== "trial") return null;
+  // Show during a Stripe-managed free trial (card on file, auto-charges at the
+  // end). The pre-card "trial" state never reaches the dashboard (payment wall);
+  // legacy no-card trials have no subscription/customer, so skip them (their
+  // portal button would fail — they keep the app-side trial with no banner).
+  if (billing.planStatus !== "trialing" || !billing.stripeSubscriptionId) return null;
 
   const daysLeft = billing.trialDaysLeft;
   const isUrgent = daysLeft <= 3;
-  const isExpired = daysLeft <= 0;
+  const chargeDate = billing.trialEndsAt
+    ? new Date(billing.trialEndsAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+    : null;
 
-  async function handleUpgrade() {
-    if (!billing?.prices.growth.priceId) return;
+  async function handleManage() {
     setLoading(true);
     try {
-      const { url } = await createCheckoutSession(billing.prices.growth.priceId);
+      const { url } = await createPortalSession();
       window.location.href = url;
     } catch {
       setLoading(false);
     }
-  }
-
-  if (isExpired) {
-    return (
-      <div className="trial-banner-pill flex items-center gap-2.5 px-3.5 py-1.5 rounded-[24px] text-[12px] font-medium text-signal-red-text">
-        <Sparkles size={12} className="text-signal-red-text shrink-0" />
-        <span className="whitespace-nowrap">Your free trial has expired.</span>
-        <button
-          onClick={handleUpgrade}
-          disabled={loading}
-          className="px-3 py-1 rounded-[20px] bg-signal-red-text text-white text-[11px] font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
-        >
-          Upgrade now
-        </button>
-      </div>
-    );
   }
 
   return (
@@ -76,13 +64,16 @@ export function TrialBanner() {
         isUrgent ? "text-signal-red-text" : "text-ink-secondary",
       )}
     >
-      <Sparkles size={12} className="text-[#97A4D6] shrink-0" />
+      <Sparkles size={12} className={isUrgent ? "text-signal-red-text shrink-0" : "text-[#97A4D6] shrink-0"} />
       <span className="whitespace-nowrap">
-        <strong className="font-semibold text-ink">Free</strong> plan ·{" "}
+        <strong className="font-semibold text-ink">Trial</strong> ·{" "}
         {daysLeft === 1 ? "1 day" : `${daysLeft} days`} left
+        {chargeDate && (
+          <span className="text-ink-muted"> · {billing.planName} starts {chargeDate}</span>
+        )}
       </span>
       <button
-        onClick={handleUpgrade}
+        onClick={handleManage}
         disabled={loading}
         className={cn(
           "px-3 py-0.5 rounded-[20px] text-[11px] font-medium tracking-[0.02em] transition-opacity disabled:opacity-50",
@@ -91,7 +82,7 @@ export function TrialBanner() {
             : "bg-[#0F1730] text-white hover:bg-[#1A2347]",
         )}
       >
-        Upgrade
+        Manage
       </button>
       <button
         onClick={() => setDismissed(true)}

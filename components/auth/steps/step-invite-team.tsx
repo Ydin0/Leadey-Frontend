@@ -47,7 +47,7 @@ export function StepInviteTeam() {
         emailAddresses: emails,
         role: "org:member",
       });
-      router.push("/dashboard");
+      router.push("/start-trial");
     } catch (err) {
       if (isClerkAPIResponseError(err)) {
         setError(err.errors[0]?.longMessage || "Could not send invitations.");

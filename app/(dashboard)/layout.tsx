@@ -7,6 +7,7 @@ import { VersionGate } from "@/components/providers/version-gate";
 import { DialerProvider } from "@/components/dialer/context/dialer-context";
 import { DialerBar } from "@/components/dialer/bar/dialer-bar";
 import { AuthTokenSync } from "@/components/providers/auth-token-sync";
+import { BillingGate } from "@/components/providers/billing-gate";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ScraperRunsProvider } from "@/components/providers/scraper-runs-provider";
 import { CreditsProvider } from "@/components/providers/credits-provider";
@@ -22,6 +23,7 @@ export default function DashboardLayout({
   return (
     <QueryProvider>
     <AuthTokenSync>
+      <BillingGate>
       <CreditsProvider>
       <CallProvider>
         <DialerProvider>
@@ -68,6 +70,7 @@ export default function DashboardLayout({
         </DialerProvider>
       </CallProvider>
       </CreditsProvider>
+      </BillingGate>
     </AuthTokenSync>
     </QueryProvider>
   );

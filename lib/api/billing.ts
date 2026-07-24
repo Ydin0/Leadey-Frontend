@@ -8,12 +8,19 @@ export async function getBillingInfo(): Promise<BillingInfo> {
 export async function createCheckoutSession(
   priceId: string,
   seats?: number,
-  urls?: { successUrl: string; cancelUrl: string },
+  urls?: { successUrl?: string; cancelUrl?: string },
+  opts?: { trial?: boolean },
 ): Promise<{ url: string }> {
   return apiRequest<{ url: string }>("/billing/checkout", {
     method: "POST",
-    body: JSON.stringify({ priceId, seats, ...urls }),
+    body: JSON.stringify({ priceId, seats, trial: opts?.trial, ...urls }),
   });
+}
+
+/** Cancel the subscription at period end (during a trial: no charge, access
+ *  until trial end). Reversible via the Stripe Billing Portal. */
+export async function cancelSubscription(): Promise<{ cancelAtPeriodEnd: boolean; accessUntil: string | null }> {
+  return apiRequest("/billing/cancel", { method: "POST", body: JSON.stringify({}) });
 }
 
 export async function addSubscriptionSeats(seats: number): Promise<{ seats: number }> {

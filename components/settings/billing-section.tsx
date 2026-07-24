@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Loader2, Check, Minus, Plus, CreditCard, CalendarClock, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
-import { getBillingInfo, createCheckoutSession, getInvoices, getStripePayments, addSubscriptionSeats, type StripePayment } from "@/lib/api/billing";
+import { getBillingInfo, createCheckoutSession, createPortalSession, cancelSubscription, getInvoices, getStripePayments, addSubscriptionSeats, type StripePayment } from "@/lib/api/billing";
 import { apiRequest } from "@/lib/api/client";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
@@ -189,17 +189,34 @@ export function BillingSection() {
     }
   }
 
+  const [portalLoading, setPortalLoading] = useState(false);
+  async function handleManageBilling() {
+    setPortalLoading(true);
+    try {
+      const { url } = await createPortalSession();
+      window.location.href = url;
+    } catch (err) {
+      console.error("Portal session failed:", err);
+      setPortalLoading(false);
+    }
+  }
+
+  const [cancelAccessUntil, setCancelAccessUntil] = useState<string | null>(null);
   async function handleCancelRequest() {
     setCancelSubmitting(true);
     try {
-      // Sends a request to the team — doesn't cancel on the spot.
-      await apiRequest("/billing/cancel-request", {
+      // Actually cancel at period end (trial: no charge, access until trial end).
+      const res = await cancelSubscription();
+      setCancelAccessUntil(res.accessUntil);
+      // Best-effort feedback capture for the team — never blocks the cancel.
+      apiRequest("/billing/cancel-request", {
         method: "POST",
         body: JSON.stringify({ reason: cancelReason, feedback: cancelFeedback }),
-      });
+      }).catch(() => {});
       setCancelSubmitted(true);
+      load(); // refresh plan/status
     } catch (err) {
-      console.error("Cancel request failed:", err);
+      console.error("Cancel failed:", err);
     } finally {
       setCancelSubmitting(false);
     }
@@ -231,6 +248,10 @@ export function BillingSection() {
   const status = planStatusLabel[billing.planStatus] || planStatusLabel.active;
   const isTrial = billing.plan === "trial";
   const hasSubscription = !!billing.stripeSubscriptionId;
+  // A Stripe-managed free trial: has a subscription but hasn't been charged yet.
+  // (A legacy no-card trial has planStatus "trialing" with NO subscription — it
+  // falls through to the isTrial plan-picker branch, not this one.)
+  const isTrialing = billing.planStatus === "trialing" && hasSubscription;
   const currentPrice = billing.prices[billing.plan as keyof typeof billing.prices];
   const discountPct = billing.discountPct ?? 0;
   // Display-only math — Stripe's coupon does the authoritative discounting.
@@ -260,11 +281,13 @@ export function BillingSection() {
             </div>
             <div className="text-[26px] font-semibold text-ink leading-none">{billing.planName}</div>
             <p className="text-[12px] text-ink-muted mt-2 max-w-[380px]">
-              {isTrial
-                ? billing.trialDaysLeft > 0
-                  ? `${billing.trialDaysLeft} day${billing.trialDaysLeft === 1 ? "" : "s"} left in your free trial — pick a plan below to keep everything running.`
-                  : "Your trial has expired — pick a plan below to keep everything running."
-                : PLAN_DETAILS[billing.plan]?.description ?? ""}
+              {isTrialing
+                ? `Free trial — ${billing.trialDaysLeft} day${billing.trialDaysLeft === 1 ? "" : "s"} left. Your card is charged automatically when it ends${billing.trialEndsAt ? ` on ${new Date(billing.trialEndsAt).toLocaleDateString("en-GB", { day: "numeric", month: "long" })}` : ""} unless you cancel.`
+                : isTrial
+                  ? billing.trialDaysLeft > 0
+                    ? `${billing.trialDaysLeft} day${billing.trialDaysLeft === 1 ? "" : "s"} left in your free trial — pick a plan below to keep everything running.`
+                    : "Your trial has expired — pick a plan below to keep everything running."
+                  : PLAN_DETAILS[billing.plan]?.description ?? ""}
             </p>
           </div>
 
@@ -286,7 +309,7 @@ export function BillingSection() {
               {billing.currentPeriodEnd && (
                 <p className="text-[11.5px] text-ink-faint mt-1 flex items-center justify-end gap-1.5">
                   <CalendarClock size={12} />
-                  Renews {new Date(billing.currentPeriodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  {isTrialing ? "First charge" : "Renews"} {new Date(billing.currentPeriodEnd).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                 </p>
               )}
             </div>
@@ -375,7 +398,15 @@ export function BillingSection() {
         )}
 
         {hasSubscription && (
-          <div className="border-t border-border-subtle px-6 py-3 flex items-center justify-end">
+          <div className="border-t border-border-subtle px-6 py-3 flex items-center justify-between gap-3">
+            <button
+              onClick={() => void handleManageBilling()}
+              disabled={portalLoading}
+              className="inline-flex items-center gap-1.5 text-[11px] font-medium text-ink-secondary hover:text-ink transition-colors disabled:opacity-50"
+            >
+              {portalLoading ? <Loader2 size={12} className="animate-spin" /> : <CreditCard size={12} />}
+              Manage billing &amp; payment method
+            </button>
             <button
               onClick={() => setShowCancelModal(true)}
               className="text-[11px] text-ink-faint hover:text-signal-red-text transition-colors"
@@ -609,9 +640,11 @@ export function BillingSection() {
             {cancelSubmitted ? (
               <div className="text-center py-4">
                 <Check size={32} className="text-signal-green-text mx-auto mb-3" />
-                <h3 className="text-[14px] font-semibold text-ink mb-1">Request received</h3>
+                <h3 className="text-[14px] font-semibold text-ink mb-1">Subscription cancelled</h3>
                 <p className="text-[12px] text-ink-muted mb-4">
-                  We have received your cancellation request. Our team will be in touch within 24 hours.
+                  {cancelAccessUntil
+                    ? `You won't be charged again. Your access continues until ${new Date(cancelAccessUntil).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}. You can resubscribe any time from Manage billing.`
+                    : "You won't be charged again. You can resubscribe any time from Manage billing."}
                 </p>
                 <button
                   onClick={() => { setShowCancelModal(false); setCancelSubmitted(false); setCancelReason(""); setCancelFeedback(""); }}
@@ -624,7 +657,9 @@ export function BillingSection() {
               <>
                 <h3 className="text-[14px] font-semibold text-ink mb-1">Cancel subscription</h3>
                 <p className="text-[12px] text-ink-muted mb-4">
-                  We are sorry to see you go. Please let us know why so we can improve.
+                  {isTrialing
+                    ? "Your trial will end and you won't be charged. You keep access until the trial end date. Mind telling us why?"
+                    : "You'll keep access until the end of your current billing period, then you won't be charged again. Mind telling us why?"}
                 </p>
 
                 <div className="space-y-3 mb-5">
@@ -665,7 +700,7 @@ export function BillingSection() {
                     className="flex items-center gap-1.5 px-4 py-2 rounded-[20px] bg-signal-red text-signal-red-text text-[11px] font-medium hover:bg-signal-red/80 transition-colors disabled:opacity-50"
                   >
                     {cancelSubmitting && <Loader2 size={11} className="animate-spin" />}
-                    Submit cancellation request
+                    Cancel subscription
                   </button>
                 </div>
               </>
