@@ -458,7 +458,7 @@ export function FunnelLeadTable({ leads, funnelId, funnelName, steps = [], initi
     () => new Set(filterGroup.conditions.map((c) => c.field)),
     [filterGroup],
   );
-  const needsInsights = usedFilterFields.has("oppStage") || usedFilterFields.has("callOutcome") || usedFilterFields.has("callDate") || usedFilterFields.has("calledToday");
+  const needsInsights = usedFilterFields.has("oppStage") || usedFilterFields.has("callOutcome") || usedFilterFields.has("callDate") || usedFilterFields.has("calledToday") || usedFilterFields.has("callsToday");
   const { data: filterInsights } = useQuery({
     queryKey: qk.leadFilterInsights(funnelId ?? "org"),
     queryFn: () => getLeadFilterInsights(funnelId ?? undefined),
@@ -579,6 +579,16 @@ export function FunnelLeadTable({ leads, funnelId, funnelName, steps = [], initi
             const t = new Date(d).getTime();
             return !Number.isNaN(t) && t >= start && t < end;
           });
+        }
+        case "callsToday": {
+          // How many calls to this lead landed on the local calendar today.
+          const now = new Date();
+          const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+          const end = start + 24 * 60 * 60 * 1000;
+          return (filterInsights?.[l.id]?.callDates ?? []).filter((d) => {
+            const t = new Date(d).getTime();
+            return !Number.isNaN(t) && t >= start && t < end;
+          }).length;
         }
         case "transcriptKeywords": {
           // The evaluator substring-matches — return the keywords this lead's

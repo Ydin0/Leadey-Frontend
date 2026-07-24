@@ -112,6 +112,9 @@ export const LEAD_FILTER_FIELDS: FilterFieldDef[] = [
   // Whether the lead has been called at all TODAY — power-dialer staple ("who
   // haven't I reached yet today?"). "No" includes never-called leads.
   { key: "calledToday", label: "Called today", group: "Activity", type: "boolean", operators: BOOL_OPS, options: [{ value: "true", label: "Yes" }, { value: "false", label: "No" }] },
+  // How many calls were placed to the lead TODAY — "leads I've already dialled
+  // 3+ times today" / "not yet called today" (0). Consistent with Called today.
+  { key: "callsToday", label: "Times called today", group: "Activity", type: "number", operators: ["gte", "lte", "is", "between"] },
   // Opportunity
   { key: "hasOpportunity", label: "Has opportunity", group: "Opportunity", type: "boolean", operators: BOOL_OPS, options: [{ value: "true", label: "Yes" }, { value: "false", label: "No" }] },
   { key: "oppStage", label: "Opportunity stage", group: "Opportunity", type: "enum", operators: ENUM_OPS, dynamicOptionsKey: "oppStage" },
