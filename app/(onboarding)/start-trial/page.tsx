@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useOrganization } from "@clerk/nextjs";
+import { useOrganization, useOrganizationList } from "@clerk/nextjs";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2, Check, Minus, Plus, ShieldCheck, CalendarClock, CreditCard } from "lucide-react";
+import { Loader2, Check, Minus, Plus, ShieldCheck, CalendarClock, CreditCard, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthReady } from "@/components/providers/auth-token-sync";
 import { getBillingInfo, createCheckoutSession } from "@/lib/api/billing";
@@ -50,10 +50,14 @@ export default function StartTrialPage() {
   // Suggested seat count = the people who'll actually use the workspace: the
   // owner (accepted members) + anyone invited on the previous signup step
   // (pending invitations). NOT the org's DB seatsIncluded default (5).
-  const { memberships, invitations } = useOrganization({
+  const { organization, memberships, invitations } = useOrganization({
     memberships: { pageSize: 1, keepPreviousData: true },
     invitations: { pageSize: 1, status: ["pending"], keepPreviousData: true },
   });
+  // Does the user have OTHER workspaces to fall back to? (They do when this is
+  // an additional org.) Drives the "use a different workspace" escape hatch.
+  const { userMemberships } = useOrganizationList({ userMemberships: { pageSize: 2 } });
+  const hasOtherWorkspaces = (userMemberships?.count ?? 0) > 1;
 
   // Already has a card / subscription → nothing to do here.
   useEffect(() => {
@@ -102,7 +106,7 @@ export default function StartTrialPage() {
           successUrl: `${window.location.origin}/dashboard/settings/billing-success`,
           cancelUrl: `${window.location.origin}/start-trial`,
         },
-        { trial: true },
+        { trial: billing.trialAllowed },
       );
       window.location.href = url;
     } catch (err) {
@@ -138,19 +142,46 @@ export default function StartTrialPage() {
   const selectedSeats = seats[plan];
   const perSeat = (billing.prices[plan]?.amount ?? 0) / 100;
   const monthlyAfterTrial = applyDiscount(perSeat * selectedSeats);
+  // Free trial (first-ever signup) vs immediate paid subscription (an existing
+  // member spinning up an additional workspace).
+  const isTrial = billing.trialAllowed;
+  const orgName = organization?.name;
 
   return (
     <div className="min-h-screen flex flex-col items-center px-5 py-10 sm:py-14">
       <div className="w-full max-w-5xl">
+        {hasOtherWorkspaces && (
+          <button
+            onClick={() => router.push("/select-workspace")}
+            className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted hover:text-ink transition-colors mb-6"
+          >
+            <ArrowLeft size={14} /> Use a different workspace
+          </button>
+        )}
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-signal-green px-3 py-1 text-[11px] font-medium text-signal-green-text mb-4">
-            <ShieldCheck size={13} /> 30 days free · no charge today
+          <div className={cn(
+            "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium mb-4",
+            isTrial ? "bg-signal-green text-signal-green-text" : "bg-signal-blue text-signal-blue-text",
+          )}>
+            <ShieldCheck size={13} /> {isTrial ? "30 days free · no charge today" : "New workspace · billed today"}
           </div>
-          <h1 className="text-[26px] sm:text-[30px] font-semibold text-ink tracking-[-0.01em]">Start your free trial</h1>
+          <h1 className="text-[26px] sm:text-[30px] font-semibold text-ink tracking-[-0.01em]">
+            {isTrial ? "Start your free trial" : "Choose a plan"}
+            {orgName ? <span className="text-ink-muted font-normal"> for {orgName}</span> : null}
+          </h1>
           <p className="text-[13px] text-ink-muted mt-2 max-w-xl mx-auto">
-            Pick a plan to unlock Leadey. We&apos;ll save your card but you won&apos;t be charged until{" "}
-            <span className="text-ink font-medium">{trialEndLabel}</span> — cancel anytime before then and pay nothing.
+            {isTrial ? (
+              <>
+                Pick a plan to unlock Leadey. We&apos;ll save your card but you won&apos;t be charged until{" "}
+                <span className="text-ink font-medium">{trialEndLabel}</span> — cancel anytime before then and pay nothing.
+              </>
+            ) : (
+              <>
+                You&apos;re already using Leadey, so this additional workspace needs its own paid plan.
+                Pick one below — you&apos;ll be billed today and can cancel anytime.
+              </>
+            )}
           </p>
         </div>
 
@@ -232,9 +263,18 @@ export default function StartTrialPage() {
           <div className="text-[12px] text-ink-muted flex items-center gap-2">
             <CalendarClock size={15} className="text-accent shrink-0" />
             <span>
-              Free until <span className="text-ink font-medium">{trialEndLabel}</span>, then{" "}
-              <span className="text-ink font-medium tabular-nums">{gbp(monthlyAfterTrial)}/mo</span> for{" "}
-              {selectedSeats} <span className="capitalize">{plan}</span> seat{selectedSeats === 1 ? "" : "s"}.
+              {isTrial ? (
+                <>
+                  Free until <span className="text-ink font-medium">{trialEndLabel}</span>, then{" "}
+                  <span className="text-ink font-medium tabular-nums">{gbp(monthlyAfterTrial)}/mo</span> for{" "}
+                  {selectedSeats} <span className="capitalize">{plan}</span> seat{selectedSeats === 1 ? "" : "s"}.
+                </>
+              ) : (
+                <>
+                  <span className="text-ink font-medium tabular-nums">{gbp(monthlyAfterTrial)}/mo</span> — billed today for{" "}
+                  {selectedSeats} <span className="capitalize">{plan}</span> seat{selectedSeats === 1 ? "" : "s"}.
+                </>
+              )}
               {discountPct > 0 && <span className="text-signal-green-text font-medium"> {discountPct}% discount applied.</span>}
             </span>
           </div>
@@ -245,13 +285,13 @@ export default function StartTrialPage() {
             className="shrink-0 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-[20px] bg-ink text-on-ink text-[13px] font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
           >
             {submitting ? <Loader2 size={15} className="animate-spin" /> : <CreditCard size={15} />}
-            Add card &amp; start trial
+            {isTrial ? "Add card & start trial" : "Subscribe & pay"}
           </button>
         </div>
         {error && <p className="text-[11.5px] text-signal-red-text font-medium text-center mt-3 hidden sm:block">{error}</p>}
 
         <p className="text-[11px] text-ink-faint text-center mt-5 flex items-center justify-center gap-1.5">
-          <ShieldCheck size={12} /> Secure checkout by Stripe · cancel in a click before your trial ends
+          <ShieldCheck size={12} /> Secure checkout by Stripe · cancel anytime{isTrial ? " before your trial ends" : ""}
         </p>
       </div>
     </div>

@@ -13,6 +13,9 @@ export interface BillingInfo {
   /** True when the org must add a card + start a trial subscription before
    *  using the app (signup payment wall). Drives the /start-trial redirect. */
   needsPaymentSetup: boolean;
+  /** Whether the wall offers a FREE trial. False for an additional workspace
+   *  created by an existing member — they must pay immediately. */
+  trialAllowed: boolean;
   /** Negotiated discount (0–100 %) applied to the seat subscription. */
   discountPct: number;
   // Limits
