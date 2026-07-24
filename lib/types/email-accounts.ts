@@ -10,6 +10,9 @@ export interface EmailAccount {
   /** Chosen shared signature id (email_signatures.id), or null. */
   signatureId: string | null;
   status: string; // active | error | disconnected
+  /** Why the account isn't active (revoked token etc.) — shown with the
+   *  reconnect prompt. Null when healthy. */
+  lastError?: string | null;
   isDefault: boolean;
   /** True when this account can create calendar events (host a meeting).
    *  Older send-only connections are false until reconnected. */

@@ -138,6 +138,15 @@ export function EmailAccountsSection() {
     try { await disconnectEmailAccount(id); } catch { void load(); }
   }
 
+  // Re-run the connect flow for a dropped mailbox. OAuth providers redirect to
+  // consent (the callback re-activates the same account by email); SMTP re-opens
+  // the credentials modal.
+  function reconnect(a: EmailAccount) {
+    if (a.provider === "gmail") return void connectOAuth("google");
+    if (a.provider === "outlook") return void connectOAuth("microsoft");
+    setShowSmtp(true);
+  }
+
   return (
     <div className="space-y-4">
       <section className="bg-surface rounded-[14px] border border-border-subtle p-4">
@@ -208,6 +217,11 @@ export function EmailAccountsSection() {
                     {a.fromName ? ` · ${a.fromName}` : ""}
                     {a.status !== "active" ? ` · ${a.status}` : ""}
                   </p>
+                  {a.status !== "active" && (
+                    <p className="text-[10px] text-signal-red-text mt-0.5 truncate">
+                      {a.lastError ? `Connection lost: ${a.lastError}` : "Connection lost — reconnect to resume sending & reply capture."}
+                    </p>
+                  )}
                 </div>
                 <span className={cn(
                   "text-[10px] font-medium rounded-full px-2 py-0.5",
@@ -215,6 +229,15 @@ export function EmailAccountsSection() {
                 )}>
                   {a.status === "active" ? "Connected" : a.status}
                 </span>
+                {a.status !== "active" && (
+                  <button
+                    onClick={() => reconnect(a)}
+                    title="Reconnect this mailbox"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-[16px] bg-ink text-on-ink text-[10.5px] font-medium hover:opacity-90 transition-opacity shrink-0"
+                  >
+                    <RefreshCw size={12} /> Reconnect
+                  </button>
+                )}
                 <button onClick={() => setEditing(a)} title="Edit from name" className="p-1.5 rounded-md text-ink-muted hover:bg-hover hover:text-ink transition-colors">
                   <Pencil size={14} />
                 </button>
